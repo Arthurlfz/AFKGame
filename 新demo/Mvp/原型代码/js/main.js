@@ -332,6 +332,7 @@
     runtimeStarted = true;
     if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
     if (window.showPetGuide) window.showPetGuide();  // 登录进入游戏后才弹新手引导（离线不弹）
+    if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
     const battleBtn = document.getElementById('btn-battle');
     if (battleBtn) battleBtn.addEventListener('click', () => {

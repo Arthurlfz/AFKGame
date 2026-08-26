@@ -86,13 +86,90 @@
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  /* ---------- 发送社交消息（玩家在输入框打字，回车 / 点发送） ---------- */
-  function sendSocial() {
+  /* ========== 实时聊天（Supabase Realtime：写库 + 订阅广播，玩家互相能看到） ========== */
+  const seenIds = new Set();      // 已显示的消息 id（避免自己发的被 Realtime 再推一次导致重复）
+  let chatChannel = null;         // Realtime 订阅句柄
+  let myName = '玩家';            // 当前登录显示名
+  let lastSendTime = 0;           // 防刷屏
+
+  // 渲染一条聊天消息进社交分类（name 已转义）
+  function renderChatMessage(name, text, isSelf) {
+    const tag = isSelf ? '<b style="color:var(--accent)">' + escHtml(name) + '</b>' : '<b>' + escHtml(name) + '</b>';
+    consoleLog('social', '💬 ' + tag + '：' + escHtml(text));
+  }
+
+  // 加载最近聊天历史（进游戏先显示）
+  async function loadChatHistory() {
+    if (!window.Supabase || !window.Supabase.fetchRecentMessages) return;
+    const { data, error } = await window.Supabase.fetchRecentMessages(50);
+    if (error || !data || !data.length) return;
+    // 历史按时间正序显示（查询是倒序的，翻转）
+    const rows = [...data].reverse();
+    for (const r of rows) {
+      if (seenIds.has(r.id)) continue;
+      seenIds.add(r.id);
+      renderChatMessage(r.sender_name, r.message, r.user_id === (window.__chatMyId || ''));
+    }
+    // 历史只进本地，不依赖 Realtime 广播
+  }
+
+  // 订阅 Realtime：别人发消息实时收到
+  function initChatRealtime() {
+    if (!window.Supabase || !window.Supabase.getClient) return;
+    const client = window.Supabase.getClient();
+    if (!client || chatChannel) return;
+    chatChannel = client
+      .channel('public:chat_messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, payload => {
+        const row = payload && payload.new;
+        if (!row || !row.id || !row.message) return;
+        if (seenIds.has(row.id)) return;   // 自己发的（本地已显示过）跳过
+        seenIds.add(row.id);
+        renderChatMessage(row.sender_name, row.message, false);
+      })
+      .subscribe();
+  }
+
+  // 发送社交消息（玩家在输入框打字，回车 / 点发送）
+  async function sendSocial() {
     const input = $('console-input');
     if (!input) return;
     const text = String(input.value || '').trim();
     if (!text) return;
-    consoleLog('social', '💬 <b>我</b>：' + escHtml(text));
+
+    // 防刷屏：两次发送间隔至少 1.5 秒
+    const now = Date.now();
+    if (now - lastSendTime < 1500) {
+      UI.showToast && UI.showToast('⏳ 太快了', '每条消息至少间隔 1.5 秒');
+      return;
+    }
+    lastSendTime = now;
+
+    // 未登录：提示（聊天需要账号）
+    if (!window.Supabase || !window.Supabase.sendChatMessage) {
+      consoleLog('social', '💬 <b>我</b>：' + escHtml(text));
+      input.value = '';
+      return;
+    }
+
+    // 获取显示名（缓存）
+    if (!window.__chatMyId) {
+      const user = await (window.Supabase.getCurrentUser && window.Supabase.getCurrentUser());
+      if (user) {
+        window.__chatMyId = user.id;
+        myName = (user.email || '').split('@')[0] || '玩家';
+      }
+    }
+
+    const { data, error } = await window.Supabase.sendChatMessage(myName, text);
+    if (error) {
+      UI.showToast && UI.showToast('❌ 发送失败', error.message || '请先登录');
+      lastSendTime = 0; // 失败允许重试
+      return;
+    }
+    // 本地即时显示自己这条（并记录 id，Realtime 推回来时跳过）
+    if (data && data.id) seenIds.add(data.id);
+    renderChatMessage(myName, text, true);
     input.value = '';
     input.focus();
   }
@@ -191,4 +268,9 @@
   /* ---------- 对外 API ---------- */
   UI.consoleLog = consoleLog;
   UI.consoleClear = clearConsole;
+  // 登录后调用：加载聊天历史 + 订阅实时消息（未登录不调用，避免无会话订阅失败）
+  UI.initChat = function () {
+    loadChatHistory();
+    initChatRealtime();
+  };
 })();

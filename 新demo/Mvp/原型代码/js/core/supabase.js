@@ -292,6 +292,35 @@
       .upsert({ user_id: user.id, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   }
 
+  /* ---------- 聊天（chat_messages 表 + Realtime 广播） ---------- */
+  // 发送一条聊天消息：把消息写入 chat_messages 表，Realtime 会自动广播给订阅者
+  // senderName 由前端传（当前登录用户显示名），message 必须是纯文本（前端已转义防 XSS）
+  async function sendChatMessage(senderName, message) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: new Error('请先登录') };
+    if (!message || !String(message).trim()) return { data: null, error: new Error('消息不能为空') };
+    return client.from('chat_messages').insert({
+      user_id: user.id,
+      sender_name: String(senderName || '玩家').slice(0, 20),
+      message: String(message).slice(0, 200)
+    }).select().single();
+  }
+  // 读取最近聊天记录（进入游戏先加载历史，limit 默认 50 条）
+  async function fetchRecentMessages(limit = 50) {
+    return client.from('chat_messages')
+      .select('id,user_id,sender_name,message,created_at')
+      .order('created_at', { ascending: false })
+      .limit(Math.min(limit, 100));
+  }
+  // 获取当前登录用户的显示名（用邮箱前缀；未登录返回 null）
+  async function getMyDisplayName() {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const email = (user.email || '').trim();
+    if (email) return email.split('@')[0];
+    return '玩家' + String(user.id || '').slice(0, 4);
+  }
+
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
@@ -301,6 +330,7 @@
     updateEquipItem, fetchItemById, loadTradeRecords,
     addEgg, consumeEgg, loadEggCount,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
-    fetchQuestProgress, saveQuestProgress
+    fetchQuestProgress, saveQuestProgress,
+    sendChatMessage, fetchRecentMessages, getMyDisplayName
   };
 })();
