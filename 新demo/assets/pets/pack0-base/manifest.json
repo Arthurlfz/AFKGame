@@ -1,0 +1,57 @@
+{
+  "pack_id": "pack0-base",
+  "style": "realistic dark-fantasy ARPG full-body sprite",
+  "job_id": "job_e392b383f00a47a2ba784aebc0cbc92a",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "monster-00.png",
+      "name": "腐噜兽",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-01.png",
+      "name": "血狐",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-02.png",
+      "name": "瘟熊",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    },
+    {
+      "file": "monster-03.png",
+      "name": "疫毛兽",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-04.png",
+      "name": "骨狼",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-05.png",
+      "name": "毒沼蛙",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    },
+    {
+      "file": "monster-06.png",
+      "name": "尸犬",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-07.png",
+      "name": "幽影兔",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    }
+  ],
+  "notes": "role-neutral; rank/stats live in game data."
+}

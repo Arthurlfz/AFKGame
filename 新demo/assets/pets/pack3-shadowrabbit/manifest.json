@@ -1,0 +1,52 @@
+{
+  "pack_id": "pack3-shadowrabbit",
+  "family": "幽影兔家族",
+  "style": "dark majestic monster full-body sprite (clean, no gore)",
+  "job_id": "job_51e3bcaec4cc48da859cc2f4426da9f6",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "monster-00.png",
+      "name": "影刃兔",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-01.png",
+      "name": "霜影兔",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-02.png",
+      "name": "影舞者",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-03.png",
+      "name": "霜影魔兔",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    },
+    {
+      "file": "monster-04.png",
+      "name": "影蚀魔君",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-05.png",
+      "name": "霜魂兔皇",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-06.png",
+      "name": "幽影兔·异变",
+      "silhouette": "light",
+      "suggested_behaviors": "caster"
+    }
+  ],
+  "notes": "role-neutral; rank/stats live in game data."
+}

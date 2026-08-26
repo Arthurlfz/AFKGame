@@ -1,0 +1,52 @@
+{
+  "pack_id": "pack2-bonewolf",
+  "family": "骨狼家族",
+  "style": "dark majestic monster full-body sprite (clean, no gore)",
+  "job_id": "job_ab6dfc2ac6864caead3c847e78ea9563",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "monster-00.png",
+      "name": "骨刃狼",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-01.png",
+      "name": "冥霜狼",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-02.png",
+      "name": "骨刃王",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    },
+    {
+      "file": "monster-03.png",
+      "name": "霜狼祭司",
+      "silhouette": "medium",
+      "suggested_behaviors": "pouncer"
+    },
+    {
+      "file": "monster-04.png",
+      "name": "骸骨君主",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    },
+    {
+      "file": "monster-05.png",
+      "name": "霜寒领主",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    },
+    {
+      "file": "monster-06.png",
+      "name": "骨狼·异变",
+      "silhouette": "heavy",
+      "suggested_behaviors": "chaser"
+    }
+  ],
+  "notes": "role-neutral; rank/stats live in game data."
+}

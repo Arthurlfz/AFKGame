@@ -1,0 +1,24 @@
+// vtest_regression_c1.js —— 第1大陆配置与关键链路专项回归
+const fs=require('fs'),vm=require('vm');
+const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
+function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},appendChild(){},append(){},addEventListener(){},querySelector:()=>el(),querySelectorAll:()=>[],children:[],remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+const els={};const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el()},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+ctx.window=ctx;vm.createContext(ctx);vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/pet/enemy-data.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+const C=code=>vm.runInContext(code,ctx),A=(x,m)=>x?(console.log('PASS: '+m),true):(console.error('FAIL: '+m),failures++),S=ms=>new Promise(r=>setTimeout(r,ms));let failures=0;
+(async()=>{
+ await S(200);
+ const areas=C('Config.battle.areas'), enemies=C('EnemyData.list');
+ A(areas.length===6,'第1大陆配置 6 图');
+ A(new Set(areas.map(a=>a.id)).size===6,'6 图 id 唯一');
+     const ranges=[[1,10],[10,20],[20,30],[30,40],[40,50],[50,60]], growth=[[1,2],[3,4],[5,6],[7,8],[9,11],[12,14]];
+ areas.forEach((a,i)=>{A(JSON.stringify(a.levelRange)===JSON.stringify(ranges[i]),`图${i+1} levelRange 正确`);A(JSON.stringify(a.growthRange)===JSON.stringify(growth[i]),`图${i+1} growthRange 正确`);const ids=a.enemyIds||[];A(ids.length>0&&ids.every(id=>enemies.some(e=>e.id===id)),`图${i+1} enemyIds 全可解析`);const pool=C(`Battle.getAreas().find(a=>a.id===${JSON.stringify(a.id)})`);for(const lv of [a.levelRange[0],a.levelRange[1],Math.floor((a.levelRange[0]+a.levelRange[1])/2)]){const n=C(`(()=>{const a=Battle.getAreas().find(x=>x.id===${JSON.stringify(a.id)});return (function(){const es=EnemyData.list,[amin,amax]=a.levelRange,pl=${lv};const bandMin=Math.max(amin,Math.floor((Math.min(amax,Math.max(amin,pl))-1)/5)*5+1),bandMax=Math.min(amax,bandMin+4);const ids=new Set(a.enemyIds);const inArea=e=>(e.levelRange||[e.level,e.level])[1]>=amin&&(e.levelRange||[e.level,e.level])[0]<=amax;const inBand=e=>(e.levelRange||[e.level,e.level])[1]>=bandMin&&(e.levelRange||[e.level,e.level])[0]<=bandMax;const p=es.filter(e=>ids.has(e.id)&&inArea(e));return p.filter(inBand).length||p.length})()})()`);A(n>0,`图${i+1} 玩家等级${lv} 怪池非空`);}});
+ const roots=C('Config.pet.starters.map(s=>s.name)'),tree=C('Config.pet.evolution.tree');
+ const resolve=name=>{const map={},mark=base=>{const stack=[base];while(stack.length){const cur=stack.pop();for(const r of tree[cur]||[]){if(map[r.to]===undefined){map[r.to]=base;stack.push(r.to)}}}};roots.forEach(mark);return map[name]};
+ for(const root of roots){const stack=[root],seen=new Set();while(stack.length){const cur=stack.pop();for(const r of tree[cur]||[]){seen.add(r.to);stack.push(r.to)}}for(const name of seen){const p=C(`Pet.petFromRow({id:'x',name:${JSON.stringify(name)},icon:'x',growth:5,level:1,hp:100,attack:20,defense:10,speed:1,cur_hp:100})`);A(p.lineId===root,`${root} 终端/后代 ${name} 反查根源正确`);}}
+ const shadow=C(`Pet.petFromRow({id:'x',name:'影蚀魔君',icon:'x',growth:5,level:1,hp:100,attack:20,defense:10,speed:1,cur_hp:100})`);A(shadow.lineId==='幽影兔','影蚀魔君 lineId=幽影兔');A(C('Pet.getBaseSpeed(globalThis.shadow||{name:"影蚀魔君",lineId:"幽影兔"})')===110,'影蚀魔君基础速度=110');
+ A(C('Config.trade.taxPer===8&&Config.trade.taxAmount===1'),'交易税配置每满8收1');
+ A(C('Market.calcTax(7)===0&&Market.calcTax(8)===1&&Market.calcTax(16)===2'),'交易税边界正确');
+ A(C('Config.marketBot.enabled===true'),'假单机制开启');
+ console.log(failures?`C1 REGRESSION FAILED: ${failures}`:'ALL C1 REGRESSION PASSED');process.exit(failures?1:0);
+})().catch(e=>{console.error('EXC',e.stack||e);process.exit(1)});

@@ -1,0 +1,36 @@
+{
+  "pack_id": "av-2-bonewolf",
+  "style": "dark head-and-shoulders avatar (clean, no gore)",
+  "job_id": "job_db48bc725bd94cc9adfc412a466b36c7",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "骨刃狼.png",
+      "name": "骨刃狼"
+    },
+    {
+      "file": "冥霜狼.png",
+      "name": "冥霜狼"
+    },
+    {
+      "file": "骨刃王.png",
+      "name": "骨刃王"
+    },
+    {
+      "file": "霜狼祭司.png",
+      "name": "霜狼祭司"
+    },
+    {
+      "file": "骸骨君主.png",
+      "name": "骸骨君主"
+    },
+    {
+      "file": "霜寒领主.png",
+      "name": "霜寒领主"
+    },
+    {
+      "file": "骨狼·异变.png",
+      "name": "骨狼·异变"
+    }
+  ]
+}

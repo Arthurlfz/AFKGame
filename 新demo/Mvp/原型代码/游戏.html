@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宠物养成循环原型</title>
+<!-- 设计变量（颜色/尺寸/字体统一在 vars.css；v2 视觉规范 design-tokens.css 后加载覆盖同名变量，全站升级 v2 配色） -->
+<link rel="stylesheet" href="css/vars.css?v=20260827f">
+<link rel="stylesheet" href="css/design-tokens.css?v=20260827f">
+<!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
+<link rel="stylesheet" href="css/app.css?v=20260827f">
+<link rel="stylesheet" href="css/game.css?v=20260827f">
+</head>
+<body>
+
+<!-- ==================== 登录页（全屏，未登录时显示） ==================== -->
+<div id="login-screen" class="login-screen">
+  <div class="login-panel">
+    <div class="login-logo">⚒</div>
+    <div class="login-title">宠物养成循环原型</div>
+    <div class="login-sub">登录后数据自动云端存档</div>
+    <input id="login-email" type="email" placeholder="邮箱" autocomplete="email">
+    <input id="login-pwd" type="password" placeholder="密码" autocomplete="current-password">
+    <div class="login-err" id="login-err"></div>
+    <button id="login-btn" class="login-btn">登录</button>
+    <button id="login-signup-btn" class="login-signup-btn">没有账号？注册</button>
+  </div>
+</div>
+
+<!-- ==================== 开局选宠（本地与云端均无宠物时显示） ==================== -->
+<div id="starter-screen">
+  <div class="starter-panel">
+    <div class="starter-title">选择你的初始宠物</div>
+    <div class="starter-sub">从 8 只基宠中选择 1 只，选定后将进入游戏</div>
+    <div id="starter-list"></div>
+  </div>
+</div>
+
+<!-- ==================== 主界面（登录后显示；未登录 display:none） ==================== -->
+<div id="app" class="app-shell" style="display:none">
+
+  <!-- 顶栏：标题 + 账号区（快捷按钮已挪到左侧边栏） -->
+  <header class="topbar app-topbar">
+    <div class="title">⚒ 宠物养成循环原型</div>
+    <div class="spacer"></div>
+    <div id="auth-box"></div>
+  </header>
+
+  <div class="app-body">
+    <!-- 左侧边栏：主导航 + 任务/设置 -->
+    <nav class="sidebar" id="sidebar">
+      <button class="sb-btn active" data-page="battle"><span class="sb-icon">⚔️</span><span class="sb-label">野外探险</span></button>
+      <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
+      <button class="sb-btn" data-page="equip"><span class="sb-icon">🛠️</span><span class="sb-label">装备打造</span></button>
+      <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">交易市场</span></button>
+      <button class="sb-btn" data-page="market-sell"><span class="sb-icon">📦</span><span class="sb-label">我的上架</span></button>
+      <button class="sb-btn sb-divider" id="btn-quest-sidebar" title="任务"><span class="sb-icon">📜</span><span class="sb-label">任务</span></button>
+      <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon">⚙️</span><span class="sb-label">设置</span></button>
+    </nav>
+
+    <!-- 页面容器：4 个页面，display 显隐切换（DOM 常驻，不销毁） -->
+    <main class="page-container">
+
+      <!-- ============ 战斗页（野外探险）：对战主画面 + 属性/装备 + 掉落日志（v2 三段式） ============ -->
+      <section class="tab-page active" id="tab-battle">
+        <div class="battle-page">
+          <!-- 区域一：对战主画面（约 55% 高度） -->
+          <div class="fs-panel bp-arena">
+            <div class="fs-panel__head">野外探险
+              <span class="bp-hint">选好地图即自动挂机打怪</span>
+            </div>
+            <!-- 顶部：当前地图条 + 换图按钮（二级跳转入口） -->
+            <div class="battle-area-topbar">
+              <div id="battle-area-info" class="battle-area-info"></div>
+              <button type="button" class="fs-btn fs-btn--ghost" id="btn-change-map">换图</button>
+            </div>
+            <!-- 地图选择浮层：首次未选图自动弹出，平时隐藏，点「换图」打开 -->
+            <div class="map-select-overlay" id="map-select-overlay" aria-label="选择挂机地图">
+              <div class="map-select-panel">
+                <div class="map-select-title">选择挂机地图</div>
+                <div id="battle-area-selector" class="battle-area-selector"></div>
+                <button type="button" class="fs-btn fs-btn--ghost map-select-close" id="map-select-close">关闭</button>
+              </div>
+            </div>
+            <div class="battle-arena">
+              <!-- 最左 56px：出战宠物竖列（悬停看属性 / 点击切换，下一场生效） -->
+              <div class="pet-roster" id="pet-roster" aria-label="切换出战宠物"></div>
+              <!-- 立绘战斗舞台：我方立绘（左下）/ 敌方立绘（右上）面对面 -->
+              <div class="battle-stage">
+                <!-- 我方立绘角色：左下方，info 块在立绘上方（血量放上放） -->
+                <div class="fighter fighter-pet">
+                  <div class="fighter-info">
+                    <div class="combat-name" id="pet-icon-name">莱姆</div>
+                    <div class="bar-row">
+                      <div class="hp-shell"><div class="hp-bar pet-hp" id="pet-hp-bar" style="width:100%"></div></div>
+                      <div class="hp-text" id="pet-hp-text">100/100</div>
+                    </div>
+                    <div class="battle-exp" aria-label="宠物经验"><div class="battle-exp-meta"><span id="pet-exp-text">经验 0 / 0</span><b id="pet-exp-percent">0%</b></div><div class="battle-exp-track"><i id="pet-exp-fill" style="width:0%"></i></div></div>
+                    <div class="bar-row">
+                      <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-pet"></div></div>
+                    </div>
+                  </div>
+                  <div class="stage-avatar pet" id="pet-icon">🟢</div>
+                </div>
+                <!-- 中央飘字区 -->
+                <div class="stage-mid"></div>
+                <!-- 敌方立绘角色：右上方，info 块在立绘上方 -->
+                <div class="fighter fighter-enemy">
+                  <div class="fighter-info">
+                    <div class="combat-name" id="enemy-icon-name">野鼠</div>
+                    <div class="bar-row">
+                      <div class="hp-shell"><div class="hp-bar enemy-hp" id="enemy-hp-bar" style="width:100%"></div></div>
+                      <div class="hp-text" id="enemy-hp-text">60/60</div>
+                    </div>
+                    <div class="bar-row">
+                      <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-enemy"></div></div>
+                    </div>
+                  </div>
+                  <div class="stage-avatar enemy" id="enemy-icon">🐀</div>
+                  <div id="enemy-tip" class="enemy-tip" hidden></div>
+                </div>
+              </div>
+              <!-- 最右 32px：行动条轨道（贴容器右缘，0 顶部 → 100 底部，先到底者出手） -->
+              <div class="at-track">
+                <div class="at-fill"></div>
+                <div class="at-racer" id="at-racer-pet">🟢</div>
+                <div class="at-racer at-racer--enemy" id="at-racer-enemy">🐀</div>
+                <div class="at-finish"></div>
+              </div>
+            </div>
+            <div class="fight-control">
+              <div class="fight-status">
+                <span class="status-badge idle" id="status-badge">空闲</span>
+                <span class="fight-count">连续战斗 <b id="fight-count">0</b> 场</span>
+              </div>
+              <div class="fight-action">
+                <button class="fs-btn fs-btn--primary" id="btn-battle">开始自动战斗</button>
+              </div>
+            </div>
+            <div class="stat-row">
+              <span>累计战斗 <b id="stat-fights">0</b> 场</span>
+              <span>获得装备 <b id="stat-equips">0</b> 件</span>
+            </div>
+          </div>
+
+          <!-- 战斗记录（隐藏保留：addLog 依赖 #battle-log 写入，v2 布局不展示战斗过程） -->
+          <div class="battle-log" id="battle-log" style="display:none"></div>
+        </div>
+      </section>
+
+      <!-- ============ 宠物页（宠物资料）：5 个水平 tab = 资料 / 装备 / 融合 / 进化 / 宠物蛋 ============ -->
+      <section class="tab-page" id="tab-pet">
+        <!-- 页眉（暗黑标题 + 副标题） -->
+        <div class="pet-page-head">
+          <span class="pet-page-title">宠物军团</span>
+          <span class="pet-page-sub">养成 · 装备 · 融合 · 进化 · 孵化</span>
+        </div>
+        <!-- 顶部水平 tab 导航（金色刻度条）：资料 / 装备 / 进化 / 合成 / 涅槃 / 宠物蛋 -->
+        <div class="pet-tabs" id="pet-tabs">
+          <button class="pet-tab active" data-pet-tab="profile">资料</button>
+          <button class="pet-tab" data-pet-tab="equip">装备</button>
+          <button class="pet-tab" data-pet-tab="evolve">进化</button>
+          <button class="pet-tab" data-pet-tab="synth">合成</button>
+          <button class="pet-tab" data-pet-tab="merge">涅槃</button>
+          <button class="pet-tab" data-pet-tab="egg">宠物蛋</button>
+        </div>
+
+        <!-- 资料 tab：出战宠物详情 + 宠物列表 -->
+        <div class="pet-tab-pane active" data-pet-pane="profile">
+          <div class="pet-wrap">
+            <div class="pcol">
+              <div class="panel pet-hero-panel">
+                <div class="pet-active-corner">当前出战</div>
+                <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
+                <!-- 立绘区：大头像 + 名字/等级/经验条，横向信息卡 -->
+                <div class="pet-hero">
+                  <div class="pet-hero-art">
+                    <div class="pet-avatar" id="pet-avatar">🟢</div>
+                  </div>
+                  <div class="pet-hero-info">
+                    <div class="pet-name"><span id="pet-name">莱姆</span><span class="lv" id="pet-level">Lv.1</span></div>
+                    <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
+                    <div class="exp-text" id="exp-text">0/15</div>
+                    <div class="pet-hero-reborn" id="pet-reborn">转生 0 次</div>
+                  </div>
+                </div>
+                <!-- 属性数据牌：彩色大数字 -->
+                <div class="pet-stats">
+                  <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="pet-growth">5.0</span></div>
+                  <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="pet-hp">100</span></div>
+                  <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="pet-atk">20</span></div>
+                  <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="pet-def">10</span></div>
+                  <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="pet-spd">8</span></div>
+                  <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
+                  <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
+                  <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
+                  <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
+                  <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
+                  <div class="pstat pstat-bonus bonus-tip">
+                    <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
+                    <div class="bonus-pop" id="pet-bonus-pop"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物列表<span class="hint">点击切换出战 · 悬停看属性</span></div>
+                <div class="pet-list" id="pet-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 装备 tab：完整装备页（当前装备 + 换装背包 + 去打造） -->
+        <div class="pet-tab-pane" data-pet-pane="equip">
+          <div class="pet-wrap">
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">当前装备<span class="hint">点击槽位脱下 · 悬停看属性</span></div>
+                <div class="equip-slots" id="equip-slots"></div>
+                <div class="equip-go-craft">
+                  <button type="button" class="fs-btn fs-btn--ghost" data-nav="equip">🛠️ 去「装备打造」页做新装备</button>
+                </div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">换装背包<span class="hint">给当前出战宠物穿上 · 悬停看属性</span></div>
+                <div class="equip-inv" id="pet-equip-inv"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 合成 tab：两只素材宠 → 概率合成全新「·异变」稀有宠（三段式） -->
+        <div class="pet-tab-pane" data-pet-pane="synth">
+          <div class="pet-wrap">
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物合成
+                  <span class="q-tip" data-tip="合成：两只素材宠消耗「合成之石」，概率合成一只全新「·异变」稀有宠。穿着装备的宠物不能合成，请先卸下装备。">?</span>
+                </div>
+                <div class="merge-hint"><div class="hint">点击选择要合成的<b>主素材</b>：</div></div>
+                <div class="pet-list" id="synth-pet-list"></div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel evolve-stage-panel">
+                <div class="panel-title">合成流程<span class="hint">选主 → 选副 → 确认</span></div>
+                <div class="evolve-stage">
+                  <div class="es-main" id="synth-main-box">未选择主素材</div>
+                  <div class="es-arrow">＋</div>
+                  <div class="es-target" id="synth-sub-box">
+                    <div class="es-sub-list" id="synth-sub-list"></div>
+                  </div>
+                  <div class="es-preview" id="synth-preview"></div>
+                  <div class="es-confirm" id="synth-confirm"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 涅槃 tab：主宠吸副宠成长 → 重置等级 + 突破上限（三段式） -->
+        <div class="pet-tab-pane" data-pet-pane="merge">
+          <div class="pet-wrap">
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物涅槃
+                  <span class="q-tip" data-tip="涅槃：主宠吸副宠成长、重置等级、突破成长上限（消耗涅槃兽）。穿着装备的宠物不能涅槃，请先卸下装备。">?</span>
+                </div>
+                <div class="merge-hint"><div class="hint">点击选择要涅槃的<b>主宠</b>：</div></div>
+                <div class="pet-list" id="merge-pet-list"></div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel evolve-stage-panel">
+                <div class="panel-title">涅槃流程<span class="hint">选主宠 → 选副宠 → 确认</span></div>
+                <div class="evolve-stage">
+                  <div class="es-main" id="merge-main-box">未选择主宠</div>
+                  <div class="es-arrow">＋</div>
+                  <div class="es-target" id="merge-sub-box">
+                    <div class="es-sub-list" id="merge-sub-list"></div>
+                  </div>
+                  <div class="es-preview" id="merge-preview"></div>
+                  <div class="es-confirm" id="merge-confirm"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 进化 tab：宠物进化 -->
+        <div class="pet-tab-pane" data-pet-pane="evolve">
+          <div class="pet-wrap">
+            <!-- 左：主宠选择 -->
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物进化
+                  <span class="q-tip" data-tip="进化：基宠达到进化等级后，消耗对应进化素材走一段进化树，等级不变、成长提升、名字变化。">?</span>
+                </div>
+                <div class="merge-hint">
+                  <div class="hint">点击选择要进化的主宠：</div>
+                </div>
+                <div class="pet-list" id="evolve-pet-list"></div>
+              </div>
+            </div>
+            <!-- 右：目标形态 + 预览 + 确认 -->
+            <div class="pcol">
+              <div class="panel evolve-stage-panel">
+                <div class="panel-title">进化流程<span class="hint">选主宠 → 选方向 → 确认</span></div>
+                <div class="evolve-stage">
+                  <div class="es-main" id="evolve-main-box">未选择主宠</div>
+                  <div class="es-arrow">→</div>
+                  <div class="es-target" id="evolve-target-box">
+                    <div class="es-route-list" id="evolve-route-list"></div>
+                  </div>
+                  <div class="es-preview" id="evolve-preview"></div>
+                  <div class="es-confirm" id="evolve-confirm"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 宠物蛋 tab：按品种展示 + 孵化 -->
+        <div class="pet-tab-pane" data-pet-pane="egg">
+          <div class="pet-wrap">
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物蛋<span class="hint">挂机打基础怪掉落 · 按品种孵化 · 可上架交易</span></div>
+                <div id="egg-panel" class="egg-panel"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    <!-- ============ 背包页（独立分类查看） ============ -->
+    <section class="tab-page" id="tab-bag">
+      <div class="panel">
+        <div class="panel-title">背包<span class="hint">装备 / 素材 / 消耗品 / 宠物蛋 分类查看</span></div>
+        <div id="bag-root"></div>
+      </div>
+    </section>
+
+    <!-- ============ 装备页（装备打造）：背包网格 + 打造 + 分解 + 上架 ============ -->
+    <section class="tab-page" id="tab-equip">
+      <div class="panel">
+        <div class="panel-title">背包
+          <span class="panel-actions">
+            <span class="hint">悬停看详情 · 点选装备可多选 · 上架在「市场」页</span>
+            <button class="btn-mini danger" id="btn-salvage">🗑 一键分解</button>
+          </span>
+        </div>
+        <div id="inv-filter" class="inv-filter"></div>
+        <div class="inv-toolbar">
+          <span class="hint" id="inv-count">共 0 件</span>
+          <button class="btn-mini ghost" id="btn-select-all">全选</button>
+          <button class="btn-mini danger" id="btn-salvage-selected" disabled>批量分解（0）</button>
+        </div>
+        <div class="inv-list" id="inv-list"></div>
+      </div>
+    </section>
+
+      <!-- ============ 市场页（交易市场）：在售 + 上架 + 购买 + 交易记录 ============ -->
+      <section class="tab-page" id="tab-market">
+        <div class="guide-bar" style="margin:0 0 10px">💰 <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
+        <div class="market-page">
+          <aside class="market-filters" id="market-filters">
+            <div class="market-searchbar">
+              <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 属性" />
+              <div class="market-quick-types">
+                <button class="btn-mini primary" data-kind-quick="all">全部</button>
+                <button class="btn-mini" data-kind-quick="pet">宠物</button>
+                <button class="btn-mini" data-kind-quick="item">装备</button>
+                <button class="btn-mini" data-kind-quick="material">材料</button>
+              </div>
+              <select id="market-sort" class="market-sort">
+                <option value="latest">最新上架优先</option>
+                <option value="price-asc">价格从低到高</option>
+                <option value="price-desc">价格从高到低</option>
+              </select>
+            </div>
+            <div class="filter-group is-open" data-group="type"><button class="filter-head" data-toggle-group="type"><span class="arrow">▾</span><span>类型筛选</span></button><div class="filter-body"></div></div>
+            <div class="filter-group is-open" data-group="slot"><button class="filter-head" data-toggle-group="slot"><span class="arrow">▾</span><span>装备部位</span></button><div class="filter-body"></div></div>
+            <div class="filter-group is-open" data-group="rarity"><button class="filter-head" data-toggle-group="rarity"><span class="arrow">▾</span><span>稀有度</span></button><div class="filter-body"></div></div>
+            <div class="filter-group" data-group="tier"><button class="filter-head" data-toggle-group="tier"><span class="arrow">▸</span><span>T阶</span></button><div class="filter-body"></div></div>
+            <div class="filter-group" data-group="growth"><button class="filter-head" data-toggle-group="growth"><span class="arrow">▸</span><span>宠物成长值</span></button><div class="filter-body"></div></div>
+            <div class="filter-group" data-group="price"><button class="filter-head" data-toggle-group="price"><span class="arrow">▸</span><span>价格范围</span></button><div class="filter-body"></div></div>
+            <div class="filter-group" data-group="attr"><button class="filter-head" data-toggle-group="attr"><span class="arrow">▸</span><span>属性筛选</span></button><div class="filter-body"></div></div>
+          </aside>
+          <section class="market-results">
+            <div class="panel"><div class="panel-title">交易市场<span class="hint">宠物 + 装备 · 材料标价</span></div><div id="market-list"></div></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ============ 我的上架（独立页：上架 / 取回 + 税收 + 买卖记录） ============ -->
+      <section class="tab-page" id="tab-market-sell">
+        <div class="market-page">
+          <aside class="market-filters">
+            <div class="panel market-materials">
+              <div class="panel-title">材料<span class="hint">交易货币</span></div>
+              <div class="materials-row">
+                <span class="mat-chip stone">🎲 重铸石 <b id="reforge-num">0</b></span>
+                <span class="mat-chip stone strip">✂️ 剥离石 <b id="strip-num">0</b></span>
+                <span class="mat-chip material holy">🔮 神圣石 <b id="holy-num">0</b></span>
+                <span class="mat-chip material augment">➕ 增缀石 <b id="augment-num">0</b></span>
+                <span class="mat-chip material">🐉 涅磐兽 <b id="phoenix-num">0</b></span>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">税收规则<span class="hint">卖家承担</span></div>
+              <div class="hint" style="line-height:1.7">每满 <b>8</b> 个材料收 <b>1</b> 个税（不满不收）<br>买家按标价支付，卖家实收 = 标价 − 税</div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">交易记录<span class="hint">自动记录每笔成交</span></div>
+              <div class="tr-summary"><span class="tr-stat">累计卖出 <b id="tr-sell-count">0</b> 笔</span><span class="tr-stat">累计买入 <b id="tr-buy-count">0</b> 笔</span></div>
+              <div class="tr-summary-mats" id="tr-summary-mats"></div>
+              <div class="market-sub-title">卖出记录</div>
+              <div id="tr-sell-list"></div>
+              <div class="market-sub-title">买入记录</div>
+              <div id="tr-buy-list"></div>
+            </div>
+          </aside>
+          <section class="market-results">
+            <div class="panel"><div class="panel-title">📦 我的上架<span class="hint">挂单 / 取回</span></div><div id="market-sell"></div></div>
+          </section>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- 消息控制台（常驻底部横条：系统 / 社交 / 掉落，chip 高亮=开 低亮=关；社交可打字发送；可拖高度/移动/吸底） -->
+  <div class="console-bar" id="console-bar">
+    <div class="console-resize" id="console-resize" title="拖动调整高度"></div>
+    <div class="console-head" id="console-bar-head">
+      <span class="console-title">📟 消息</span>
+      <span class="console-chips">
+        <button class="console-chip on" data-cat="system" title="点击开关">⚙️ 系统</button>
+        <button class="console-chip on" data-cat="social" title="点击开关">💬 社交</button>
+        <button class="console-chip on" data-cat="loot" title="点击开关">✦ 掉落</button>
+      </span>
+      <span class="console-spacer"></span>
+      <button class="console-snap" id="console-snap" title="吸底还原">⤓ 吸底</button>
+      <button class="console-clear" id="console-clear" title="清空消息">🗑 清空</button>
+    </div>
+    <div class="console-list" id="console-list"></div>
+    <div class="console-input-row">
+      <input class="console-input" id="console-input" type="text" maxlength="200" placeholder="说点什么…（回车发送，聊天记录归入「社交」分类）">
+      <button class="console-send" id="console-send" title="发送">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 对话气泡（全局浮层，点击关闭） ==================== -->
+<div id="dialog-box" class="dialog-box">
+  <div class="dialog-bubble">
+    <div class="dialog-head">
+      <span class="dialog-icon" id="dialog-icon">💬</span>
+      <span class="dialog-speaker" id="dialog-speaker">系统</span>
+      <button class="dialog-close" id="dialog-close">✕</button>
+    </div>
+    <div class="dialog-text" id="dialog-text"></div>
+    <div class="dialog-actions" id="dialog-actions"></div>
+  </div>
+</div>
+
+<!-- ==================== 锚定按钮的 Popover 浮层（点击触发，点空白关闭） ==================== -->
+<div id="popover-box" class="popover-box">
+  <div class="popover-arrow"></div>
+  <div class="popover-content" id="popover-content"></div>
+</div>
+
+
+<!-- 任务面板（默认隐藏，点顶栏「任务」打开；可拖动、非模态，外部可点击） -->
+<div id="quest-panel" class="quest-panel" style="display:none">
+  <div class="quest-panel-head" id="quest-panel-head">
+    <span class="quest-panel-title">任务</span>
+    <button class="quest-panel-close" id="quest-cancel" title="关闭">×</button>
+  </div>
+  <div class="quest-panel-body" id="quest-body"></div>
+</div>
+
+<!-- 宠物融合面板（默认隐藏，点宠物卡「融合」按钮打开） -->
+<div class="modal-mask" id="merge-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">🧬 宠物融合</div>
+    <div class="modal-body" id="merge-body"></div>
+    <div class="modal-actions">
+      <button class="btn-mini ghost" id="merge-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 宠物进化面板（默认隐藏，点宠物卡「进化」按钮打开） -->
+<div class="modal-mask" id="evolve-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">🌟 宠物进化</div>
+    <div class="modal-body" id="evolve-body"></div>
+    <div class="modal-actions">
+      <button class="btn-mini ghost" id="evolve-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 装备打造面板（右侧滑出，默认隐藏） -->
+<div class="craft-drawer-host" id="craft-modal" style="display:none">
+  <aside class="craft-drawer" id="craft-drawer" aria-label="装备打造面板">
+    <header class="craft-drawer-header">
+      <div class="craft-drawer-heading">
+        <div class="modal-title">🔨 装备打造</div>
+        <div class="craft-drawer-subtitle">强化词缀 · 重铸数值 · 增加词缀</div>
+      </div>
+      <button class="craft-drawer-close" id="craft-cancel" type="button" aria-label="关闭打造面板">×</button>
+    </header>
+    <div class="modal-body craft-drawer-body" id="craft-body"></div>
+  </aside>
+</div>
+
+<!-- 一键分解确认面板（默认隐藏，点装备页「一键分解」打开） -->
+<div class="modal-mask" id="salvage-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">🗑 一键分解</div>
+    <div class="modal-body" id="salvage-body"></div>
+    <div class="modal-actions">
+      <button class="btn-mini ghost" id="salvage-cancel">取消</button>
+      <button class="btn-mini primary" id="salvage-ok">确认分解</button>
+    </div>
+  </div>
+</div>
+
+<!-- 购买确认面板（显示商品价格 / 交易税 / 买家需支付 / 卖家将收到） -->
+<div class="modal-mask" id="trade-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">💰 确认购买</div>
+    <div class="modal-body" id="trade-body"></div>
+    <div class="modal-actions">
+      <button class="btn-mini ghost" id="trade-cancel">取消</button>
+      <button class="btn-mini primary" id="trade-ok">确认购买</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新手引导（首次进入显示一次，关闭后不再弹出） -->
+<div class="modal-mask" id="guide-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-title">🎮 欢迎来到宠物养成</div>
+    <div class="guide-list">
+      <div class="guide-item">1️⃣ 挂机打怪，掉装备和宠物蛋</div>
+      <div class="guide-item">2️⃣ 给宠物穿装备，用石头强化</div>
+      <div class="guide-item">3️⃣ 好的宠物和装备可以挂市场卖</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-mini primary" id="guide-ok">开始游戏</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 面板取消按钮 + 新手引导（页面切换由 ui/ui-shell.js 管理；登录页由 ui/ui-login.js 管理）
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.UI && window.UI.initPetTabs) window.UI.initPetTabs(); // 宠物页 5 tab 切换
+    const mc = document.getElementById('merge-cancel');
+    if (mc) mc.onclick = () => window.UI.closeMergePanel();
+    const ec = document.getElementById('evolve-cancel');
+    if (ec) ec.onclick = () => window.UI.closeEvolvePanel();
+    const cc = document.getElementById('craft-cancel');
+    if (cc) cc.onclick = () => window.UI.closeCraftPanel();
+    const sc = document.getElementById('salvage-cancel');
+    if (sc) sc.onclick = () => window.UI.closeSalvagePanel();
+    const tcc = document.getElementById('trade-cancel');
+    if (tcc) tcc.onclick = () => window.UI.closeBuyPanel();
+    const sb = document.getElementById('btn-salvage');
+    if (sb) sb.onclick = () => window.UI.openSalvagePanel();
+
+    // 新手引导：localStorage 记录，只显示一次
+    if (!localStorage.getItem('pet_guide_seen_v1')) {
+      const gm = document.getElementById('guide-modal');
+      gm.style.display = 'flex';
+      document.getElementById('guide-ok').onclick = () => {
+        localStorage.setItem('pet_guide_seen_v1', '1');
+        gm.style.display = 'none';
+      };
+    }
+  });
+</script>
+
+<!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
+<!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
+<script src="js/vendor/supabase.min.js"></script>
+<script src="js/core/config.js?v=20260827f"></script>
+<!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
+<script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
+window.PetSprites = {
+  V: "20260827f",
+  pathOf: function (n) { if (!n) return null; var p = this.map[n] || (n.indexOf("·异变") > 0 ? this.map[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
+  avatarOf: function (n) { if (!n) return null; var p = this.avatarMap[n] || (n.indexOf("·异变") > 0 ? this.avatarMap[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
+  elm: function (n) { var p = this.pathOf(n); if (!p) return null; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-sprite"; return img; },
+  mount: function (el, n) { if (!el) return false; var img = this.elm(n); if (!img) return false; el.textContent = ""; el.appendChild(img); return true; },
+  mountAvatar: function (el, n) { if (!el) return false; var p = this.avatarOf(n); if (!p) return false; el.textContent = ""; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-avatar-sprite"; el.appendChild(img); return true; },
+  map: {"腐噜兽":"assets/pets/pack0-base/monster-00.png","血狐":"assets/pets/pack0-base/monster-01.png","瘟熊":"assets/pets/pack0-base/monster-02.png","疫毛兽":"assets/pets/pack0-base/monster-03.png","骨狼":"assets/pets/pack0-base/monster-04.png","毒沼蛙":"assets/pets/pack0-base/monster-05.png","尸犬":"assets/pets/pack0-base/monster-06.png","幽影兔":"assets/pets/pack0-base/monster-07.png","血牙狐":"assets/pets/pack1-bloodfox/monster-00.png","幽火狐":"assets/pets/pack1-bloodfox/monster-01.png","血灾领主":"assets/pets/pack1-bloodfox/monster-02.png","幽火王":"assets/pets/pack1-bloodfox/monster-03.png","血月魔狐":"assets/pets/pack1-bloodfox/monster-04.png","幽火魔狐":"assets/pets/pack1-bloodfox/monster-05.png","血狐·异变":"assets/pets/pack1-bloodfox/monster-06.png","骨刃狼":"assets/pets/pack2-bonewolf/monster-00.png","冥霜狼":"assets/pets/pack2-bonewolf/monster-01.png","骨刃王":"assets/pets/pack2-bonewolf/monster-02.png","霜狼祭司":"assets/pets/pack2-bonewolf/monster-03.png","骸骨君主":"assets/pets/pack2-bonewolf/monster-04.png","霜寒领主":"assets/pets/pack2-bonewolf/monster-05.png","骨狼·异变":"assets/pets/pack2-bonewolf/monster-06.png","影刃兔":"assets/pets/pack3-shadowrabbit/monster-00.png","霜影兔":"assets/pets/pack3-shadowrabbit/monster-01.png","影舞者":"assets/pets/pack3-shadowrabbit/monster-02.png","霜影魔兔":"assets/pets/pack3-shadowrabbit/monster-03.png","影蚀魔君":"assets/pets/pack3-shadowrabbit/monster-04.png","霜魂兔皇":"assets/pets/pack3-shadowrabbit/monster-05.png","幽影兔·异变":"assets/pets/pack3-shadowrabbit/monster-06.png","瘟甲熊":"assets/pets/pack4-plaguebear/monster-00.png","血瘟熊":"assets/pets/pack4-plaguebear/monster-01.png","瘟神巨熊":"assets/pets/pack4-plaguebear/monster-02.png","血疫暴君":"assets/pets/pack4-plaguebear/monster-03.png","瘟疫之主":"assets/pets/pack4-plaguebear/monster-04.png","血瘟暴君":"assets/pets/pack4-plaguebear/monster-05.png","瘟熊·异变":"assets/pets/pack4-plaguebear/monster-06.png","腐沼兽":"assets/pets/pack5-rotten/monster-00.png","毒噜兽":"assets/pets/pack5-rotten/monster-01.png","腐沼王":"assets/pets/pack5-rotten/monster-02.png","毒沼霸主":"assets/pets/pack5-rotten/monster-03.png","腐烂之母":"assets/pets/pack5-rotten/monster-04.png","剧毒魔君":"assets/pets/pack5-rotten/monster-05.png","疫刺兽":"assets/pets/pack6-plaguecat/monster-00.png","冥毛兽":"assets/pets/pack6-plaguecat/monster-01.png","疫魔刺龙":"assets/pets/pack6-plaguecat/monster-02.png","冥幽兽":"assets/pets/pack6-plaguecat/monster-03.png","刺骨魔兽":"assets/pets/pack6-plaguecat/monster-04.png","幽冥疫君":"assets/pets/pack6-plaguecat/monster-05.png","毒沼王":"assets/pets/pack7-bogfrog/monster-00.png","咒沼蛙":"assets/pets/pack7-bogfrog/monster-01.png","毒沼魔君":"assets/pets/pack7-bogfrog/monster-02.png","咒毒蛙王":"assets/pets/pack7-bogfrog/monster-03.png","剧毒魔神":"assets/pets/pack7-bogfrog/monster-04.png","深渊蛙帝":"assets/pets/pack7-bogfrog/monster-05.png","尸牙犬":"assets/pets/pack8-corpsehound/monster-00.png","幽灵犬":"assets/pets/pack8-corpsehound/monster-01.png","尸魔犬王":"assets/pets/pack8-corpsehound/monster-02.png","幽冥猎犬":"assets/pets/pack8-corpsehound/monster-03.png","尸界狱主":"assets/pets/pack8-corpsehound/monster-04.png","幽魂犬皇":"assets/pets/pack8-corpsehound/monster-05.png"},
+  avatarMap: {"腐噜兽":"assets/pets/avatars/pack0-base/腐噜兽.png","血狐":"assets/pets/avatars/pack0-base/血狐.png","瘟熊":"assets/pets/avatars/pack0-base/瘟熊.png","疫毛兽":"assets/pets/avatars/pack0-base/疫毛兽.png","骨狼":"assets/pets/avatars/pack0-base/骨狼.png","毒沼蛙":"assets/pets/avatars/pack0-base/毒沼蛙.png","尸犬":"assets/pets/avatars/pack0-base/尸犬.png","幽影兔":"assets/pets/avatars/pack0-base/幽影兔.png","血牙狐":"assets/pets/avatars/pack1-bloodfox/血牙狐.png","幽火狐":"assets/pets/avatars/pack1-bloodfox/幽火狐.png","血灾领主":"assets/pets/avatars/pack1-bloodfox/血灾领主.png","幽火王":"assets/pets/avatars/pack1-bloodfox/幽火王.png","血月魔狐":"assets/pets/avatars/pack1-bloodfox/血月魔狐.png","幽火魔狐":"assets/pets/avatars/pack1-bloodfox/幽火魔狐.png","血狐·异变":"assets/pets/avatars/pack1-bloodfox/血狐·异变.png","骨刃狼":"assets/pets/avatars/pack2-bonewolf/骨刃狼.png","冥霜狼":"assets/pets/avatars/pack2-bonewolf/冥霜狼.png","骨刃王":"assets/pets/avatars/pack2-bonewolf/骨刃王.png","霜狼祭司":"assets/pets/avatars/pack2-bonewolf/霜狼祭司.png","骸骨君主":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","霜寒领主":"assets/pets/avatars/pack2-bonewolf/霜寒领主.png","骨狼·异变":"assets/pets/pack2-bonewolf/骨狼·异变.png","影刃兔":"assets/pets/avatars/pack3-shadowrabbit/影刃兔.png","霜影兔":"assets/pets/avatars/pack3-shadowrabbit/霜影兔.png","影舞者":"assets/pets/avatars/pack3-shadowrabbit/影舞者.png","霜影魔兔":"assets/pets/avatars/pack3-shadowrabbit/霜影魔兔.png","影蚀魔君":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png","霜魂兔皇":"assets/pets/avatars/pack3-shadowrabbit/霜魂兔皇.png","幽影兔·异变":"assets/pets/avatars/pack3-shadowrabbit/幽影兔·异变.png","瘟甲熊":"assets/pets/avatars/pack4-plaguebear/瘟甲熊.png","血瘟熊":"assets/pets/avatars/pack4-plaguebear/血瘟熊.png","瘟神巨熊":"assets/pets/avatars/pack4-plaguebear/瘟神巨熊.png","血疫暴君":"assets/pets/avatars/pack4-plaguebear/血疫暴君.png","瘟疫之主":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","血瘟暴君":"assets/pets/avatars/pack4-plaguebear/血瘟暴君.png","瘟熊·异变":"assets/pets/avatars/pack4-plaguebear/瘟熊·异变.png","腐沼兽":"assets/pets/avatars/pack5-rotten/腐沼兽.png","毒噜兽":"assets/pets/avatars/pack5-rotten/毒噜兽.png","腐沼王":"assets/pets/avatars/pack5-rotten/腐沼王.png","毒沼霸主":"assets/pets/avatars/pack5-rotten/毒沼霸主.png","腐烂之母":"assets/pets/avatars/pack5-rotten/腐烂之母.png","剧毒魔君":"assets/pets/avatars/pack5-rotten/剧毒魔君.png","疫刺兽":"assets/pets/avatars/pack6-plaguecat/疫刺兽.png","冥毛兽":"assets/pets/avatars/pack6-plaguecat/冥毛兽.png","疫魔刺龙":"assets/pets/avatars/pack6-plaguecat/疫魔刺龙.png","冥幽兽":"assets/pets/avatars/pack6-plaguecat/冥幽兽.png","刺骨魔兽":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","幽冥疫君":"assets/pets/avatars/pack6-plaguecat/幽冥疫君.png","毒沼王":"assets/pets/avatars/pack7-bogfrog/毒沼王.png","咒沼蛙":"assets/pets/avatars/pack7-bogfrog/咒沼蛙.png","毒沼魔君":"assets/pets/avatars/pack7-bogfrog/毒沼魔君.png","咒毒蛙王":"assets/pets/avatars/pack7-bogfrog/咒毒蛙王.png","剧毒魔神":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","深渊蛙帝":"assets/pets/avatars/pack7-bogfrog/深渊蛙帝.png","尸牙犬":"assets/pets/avatars/pack8-corpsehound/尸牙犬.png","幽灵犬":"assets/pets/avatars/pack8-corpsehound/幽灵犬.png","尸魔犬王":"assets/pets/avatars/pack8-corpsehound/尸魔犬王.png","幽冥猎犬":"assets/pets/avatars/pack8-corpsehound/幽冥猎犬.png","尸界狱主":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","幽魂犬皇":"assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png"}
+};
+</script>
+<script src="js/pet/enemy-data.js?v=20260827f"></script>
+<script src="js/core/supabase.js"></script>
+<script src="js/equipment/equipment.js"></script>
+<script src="js/pet/pet.js"></script>
+<script src="js/core/items.js"></script>
+<script src="js/core/materials.js"></script>
+<script src="js/core/drop.js"></script>
+<script src="js/core/market.js"></script>
+<script src="js/core/market_bot.js"></script>
+<script src="js/equipment/equipment_craft.js"></script>
+<script src="js/equipment/salvage.js"></script>
+<script src="js/pet/pet_merge.js"></script>
+<script src="js/pet/pet_evolve.js"></script>
+<script src="js/core/quest.js"></script>
+<script src="js/core/battle.js"></script>
+<script src="js/ui/ui-common.js"></script>
+<script src="js/ui/ui-console.js"></script>
+<script src="js/ui/ui-shell.js"></script>
+<script src="js/ui/ui-login.js"></script>
+<script src="js/ui/ui-dialog.js"></script>
+<script src="js/ui/ui-popover.js"></script>
+<script src="js/ui/ui-quest.js"></script>
+<script src="js/ui/ui-battle.js?v=20260827h"></script>
+<script src="js/ui/ui-pet.js?v=20260827i"></script>
+<script src="js/ui/ui-bag.js"></script>
+<script src="js/ui/ui-equipment.js"></script>
+<script src="js/ui/ui-craft.js"></script>
+<script src="js/ui/ui-market.js"></script>
+<script src="js/main.js"></script>
+<!-- 战斗页宠物竖列共享 tooltip（body 层，fixed，不随竖列重建，避免被 overflow 裁掉/状态丢失） -->
+<div class="roster-tooltip" id="roster-tooltip"></div>
+<!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息） -->
+<div class="bag-tooltip" id="bag-tooltip"></div>
+</body>
+</html>

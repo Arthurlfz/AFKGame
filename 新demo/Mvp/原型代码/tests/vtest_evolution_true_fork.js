@@ -1,0 +1,23 @@
+// vtest_evolution_true_fork.js —— 真分叉进化树专项自测
+const fs=require('fs'),vm=require('vm');
+const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
+function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},dataset:{},appendChild(){},append(){},addEventListener(){},querySelector:()=>el(),querySelectorAll:()=>[],children:[],remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+const els={};
+const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el()},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+ctx.window=ctx;vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+let failures=0;const A=(ok,msg)=>{if(ok)console.log('PASS: '+msg);else{console.error('FAIL: '+msg);failures++}};const C=code=>vm.runInContext(code,ctx);const S=ms=>new Promise(r=>setTimeout(r,ms));
+function terminalLines(tree,starter){const out=[];for(const first of tree[starter])for(const second of tree[first.to]||[])for(const third of tree[second.to]||[])out.push({first,second,third});return out}
+(async()=>{await S(300);await C('Game.onLogin("truefork@test.com","123456")');await S(300);
+const tree=C('Config.pet.evolution.tree'),starters=C('Config.pet.starters');
+const lines=starters.flatMap(x=>terminalLines(tree,x.name));const terminals=lines.map(x=>x.third.to);
+const report={starterCount:starters.length,allStarters:starters.length===8&&starters.every(x=>Array.isArray(tree[x.name])&&tree[x.name].length===2),lineCount:lines.length,uniqueTerminals:new Set(terminals).size,branchIndependent:lines.every(x=>x.first.to!==x.second.to&&x.second.to!==x.third.to),levels:lines.every(x=>x.first.minLevel===10&&x.second.minLevel===25&&x.third.minLevel===40),allTerminalUnique:new Set(terminals).size===16};
+A(report.starterCount===8&&report.allStarters,'8 只基宠均在 tree 中且各有 2 条分支');A(report.lineCount===16,'共解析出 16 条三段分支');A(report.allTerminalUnique,'16 个第3阶终极宠全部互不重复');A(report.branchIndependent,'每条分支三段形态连续且无分支内汇合');A(report.levels,'每条分支 minLevel 严格为 10/25/40');
+async function make(name,tag){await C(`(async()=>{const p=Pet.createPet("${name}","x",10,100,20,10,8);p.level=10;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__${tag}=p.id})()`);await S(80);}
+async function evolve(id,level,index){C(`Pet.getPets().find(p=>p.id===${id}).level=${level}`);await C('Materials.gain("进化素材",1)');await S(40);return C(`Evolve.evolve(${id},${index})`)}
+await make('腐噜兽','a');const a=C('globalThis.__a');let r=await evolve(a,10,0);A(r.ok&&r.result==='腐沼兽','腐噜兽→腐沼兽（Lv10）');r=await evolve(a,25,0);A(r.ok&&r.result==='腐沼王','腐沼兽→腐沼王（Lv25）');r=await evolve(a,40,0);A(r.ok&&r.result==='腐烂之母','腐沼王→腐烂之母（Lv40）');A(C(`Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id===${a})).length`)===0,'第一条路线到达终点且无后续');
+await make('腐噜兽','b');const b=C('globalThis.__b');r=await evolve(b,10,1);A(r.ok&&r.result==='毒噜兽','腐噜兽→毒噜兽（Lv10）');r=await evolve(b,25,0);A(r.ok&&r.result==='毒沼霸主','毒噜兽→毒沼霸主（Lv25）');r=await evolve(b,40,0);A(r.ok&&r.result==='剧毒魔君','毒沼霸主→剧毒魔君（Lv40）');A(C(`Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id===${b})).length`)===0,'第二条路线到达终点且无后续');A(C(`Pet.getPets().find(p=>p.id===${a}).name`)!==C(`Pet.getPets().find(p=>p.id===${b}).name`),'选择不同分支得到不同终极宠');
+console.log(failures?'TRUE-FORK TESTS FAILED: '+failures:'ALL TRUE-FORK TESTS PASSED');process.exit(failures?1:0)
+})().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

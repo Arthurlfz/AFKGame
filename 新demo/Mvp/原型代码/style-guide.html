@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge of Souls · UI 视觉规范 v2（暗黑挂机版）</title>
+<link rel="stylesheet" href="css/design-tokens.css">
+<style>
+  /* ===== 展示页自身排版（不属于规范，仅用于预览） ===== */
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--fs-md);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+  .page-title {
+    font-family: var(--font-title); font-weight: 900;
+    font-size: var(--fs-2xl); letter-spacing: 3px;
+    color: var(--accent-hi);
+    text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 0 12px rgba(240,169,46,.35);
+    margin: 0 0 4px;
+  }
+  .page-sub { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 28px; }
+  section { margin-bottom: 40px; }
+  .sec-title {
+    font-family: var(--font-title); font-weight: 900;
+    font-size: var(--fs-xl); letter-spacing: 2px;
+    color: var(--accent-hi);
+    text-shadow: 0 1px 0 rgba(0,0,0,.6);
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 16px;
+  }
+  .sec-title::before { content: ''; width: 4px; height: 1.1em; background: var(--accent); box-shadow: 0 0 8px rgba(240,169,46,.6); }
+  .sec-desc { color: var(--text-dim); font-size: var(--fs-sm); margin: 0 0 14px; }
+  .sec-sub { font-family: var(--font-title); font-weight: 900; font-size: var(--fs-lg); letter-spacing: 1px; color: var(--text-hi); margin: 20px 0 10px; }
+
+  /* 色板 */
+  .sw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .sw { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .sw__chip { height: 44px; border-bottom: 1px solid var(--line); }
+  .sw__name { padding: 6px 8px 2px; font-size: var(--fs-sm); color: var(--text); font-weight: 700; }
+  .sw__hex { padding: 0 8px 8px; font-size: var(--fs-xs); color: var(--text-dim); font-family: var(--font-num); }
+
+  /* 字体层展示 */
+  .type-row { display: flex; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line-weak); }
+  .type-tag { flex: none; width: 150px; font-size: var(--fs-xs); color: var(--text-dim); font-family: var(--font-num); }
+  .type-sample--display { font-size: var(--fs-display); font-family: var(--font-title); font-weight: 900; letter-spacing: 3px; color: var(--accent-hi); text-shadow: 0 0 10px rgba(240,169,46,.3); }
+  .type-sample--2xl { font-size: var(--fs-2xl); font-family: var(--font-title); font-weight: 900; letter-spacing: 2px; color: var(--text-hi); }
+  .type-sample--xl { font-size: var(--fs-xl); font-family: var(--font-title); font-weight: 900; letter-spacing: 1px; color: var(--accent); }
+  .type-sample--lg { font-size: var(--fs-lg); font-family: var(--font-title); font-weight: 900; letter-spacing: 1px; color: var(--text); }
+  .type-sample--md { font-size: var(--fs-md); font-family: var(--font-body); }
+  .type-sample--sm { font-size: var(--fs-sm); font-family: var(--font-body); color: var(--text-dim); }
+  .type-sample--xs { font-size: var(--fs-xs); font-family: var(--font-body); color: var(--text-faint); }
+  .type-sample--num { font-size: var(--fs-md); font-family: var(--font-num); font-weight: 700; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+
+  /* 间距 / 圆角示意 */
+  .sp-demo { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .sp-block { flex: none; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .sp-label { font-size: var(--fs-xs); color: var(--text-dim); font-family: var(--font-num); }
+  .rd-demo { display: flex; align-items: flex-end; gap: 16px; }
+  .rd-box { width: 72px; height: 72px; background: var(--panel-2); border: 1px solid var(--line-hi); }
+
+  /* 组件演示行 */
+  .demo-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .demo-cell { min-width: 180px; }
+  .demo-cell .cell-label { font-size: var(--fs-xs); color: var(--text-faint); margin-bottom: 5px; letter-spacing: .5px; }
+
+  /* 血条宽度演示 */
+  .bar-wrap { display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
+
+  /* 品质示例 */
+  .q-demo { display: flex; flex-direction: column; gap: 10px; }
+  .q-line { font-family: var(--font-title); font-weight: 900; font-size: var(--fs-lg); letter-spacing: 2px; }
+  .item-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .fs-item { min-width: 180px; }
+  .fs-item .item-name { font-family: var(--font-title); font-weight: 900; font-size: var(--fs-lg); letter-spacing: 1px; }
+  .fs-item .item-sub { color: var(--text-dim); font-size: var(--fs-xs); margin-top: 3px; font-family: var(--font-num); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="page-title">FORGE OF SOULS · UI 视觉规范</h1>
+  <p class="page-sub">暗黑挂机网游 · 地下城冒险感 —— 规范 v2（2026-08-23）· 唯一权威文件：css/design-tokens.css</p>
+
+  <!-- ================= 1 颜色 ================= -->
+  <section>
+    <h2 class="sec-title">1 · 颜色变量</h2>
+    <p class="sec-desc">暖黑打底（去灰蓝）+ 熔岩金强调 + 血晶红 / 幽蓝魔力；辉光仅限金蓝品质与熔炉元素。</p>
+
+    <h3 class="sec-sub">底与面 / 边框 / 文字 / 金属</h3>
+    <div class="sw-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--bg)"></div><div class="sw__name">--bg</div><div class="sw__hex">暖黑底</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--bg-deep)"></div><div class="sw__name">--bg-deep</div><div class="sw__hex">更深底</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--panel)"></div><div class="sw__name">--panel</div><div class="sw__hex">皮革面板底</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--panel-2)"></div><div class="sw__name">--panel-2</div><div class="sw__hex">次级面板</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--inset)"></div><div class="sw__name">--inset</div><div class="sw__hex">凹槽</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--line)"></div><div class="sw__name">--line</div><div class="sw__hex">旧铁描边</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--line-hi)"></div><div class="sw__name">--line-hi</div><div class="sw__hex">暗金高亮</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--line-weak)"></div><div class="sw__name">--line-weak</div><div class="sw__hex">弱分隔</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--text)"></div><div class="sw__name">--text</div><div class="sw__hex">暖米白</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--text-hi)"></div><div class="sw__name">--text-hi</div><div class="sw__hex">亮暖白</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--text-dim)"></div><div class="sw__name">--text-dim</div><div class="sw__hex">次文字</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--text-faint)"></div><div class="sw__name">--text-faint</div><div class="sw__hex">弱文字</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--metal)"></div><div class="sw__name">--metal</div><div class="sw__hex">旧铁钢</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--metal-dim)"></div><div class="sw__name">--metal-dim</div><div class="sw__hex">哑光铁</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--steel)"></div><div class="sw__name">--steel</div><div class="sw__hex">锻铁灰</div></div>
+    </div>
+
+    <h3 class="sec-sub">熔岩金 / 血晶红 / 幽蓝魔力 / 经验</h3>
+    <div class="sw-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--accent)"></div><div class="sw__name">--accent</div><div class="sw__hex">熔岩金</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--accent-hi)"></div><div class="sw__name">--accent-hi</div><div class="sw__hex">灵魂金</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--accent-dim)"></div><div class="sw__name">--accent-dim</div><div class="sw__hex">深金</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--hp)"></div><div class="sw__name">--hp</div><div class="sw__hex">血晶红</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--hp-hi)"></div><div class="sw__name">--hp-hi</div><div class="sw__hex">低血告警</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--danger)"></div><div class="sw__name">--danger</div><div class="sw__hex">危险</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--danger-hi)"></div><div class="sw__name">--danger-hi</div><div class="sw__hex">危险告警</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--energy)"></div><div class="sw__name">--energy</div><div class="sw__hex">幽蓝魔力</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--exp)"></div><div class="sw__name">--exp</div><div class="sw__hex">经验暗绿</div></div>
+    </div>
+
+    <h3 class="sec-sub">稀有度（铁灰 / 幽蓝 / 熔金）</h3>
+    <div class="sw-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--r-white)"></div><div class="sw__name">--r-white</div><div class="sw__hex">铁灰</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--r-blue)"></div><div class="sw__name">--r-blue</div><div class="sw__hex">幽冷蓝</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--r-gold)"></div><div class="sw__name">--r-gold</div><div class="sw__hex">熔金（炸眼）</div></div>
+    </div>
+
+    <h3 class="sec-sub">按钮三态（锻铁 · hover 加热）</h3>
+    <div class="sw-grid">
+      <div class="sw"><div class="sw__chip" style="background:var(--btn-bg)"></div><div class="sw__name">--btn-bg</div><div class="sw__hex">默认锻铁</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--btn-bg-hover)"></div><div class="sw__name">--btn-bg-hover</div><div class="sw__hex">hover 加热</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--btn-bg-active)"></div><div class="sw__name">--btn-bg-active</div><div class="sw__hex">按下锻压</div></div>
+      <div class="sw"><div class="sw__chip" style="background:var(--btn-bg-disabled)"></div><div class="sw__name">--btn-bg-disabled</div><div class="sw__hex">禁用</div></div>
+    </div>
+  </section>
+
+  <!-- ================= 2 字体 ================= -->
+  <section>
+    <h2 class="sec-title">2 · 字体规范</h2>
+    <div class="type-row"><span class="type-tag">--fs-display 26px</span><span class="type-sample--display">熔 炉 之 魂</span></div>
+    <div class="type-row"><span class="type-tag">--fs-2xl 20px</span><span class="type-sample--2xl">地下城深处</span></div>
+    <div class="type-row"><span class="type-tag">--fs-xl 16px</span><span class="type-sample--xl">稀有掉落</span></div>
+    <div class="type-row"><span class="type-tag">--fs-lg 14px</span><span class="type-sample--lg">装备属性</span></div>
+    <div class="type-row"><span class="type-tag">--fs-md 12px 正文</span><span class="type-sample--md">属性、描述、列表正文</span></div>
+    <div class="type-row"><span class="type-tag">--fs-sm 11px</span><span class="type-sample--sm">辅助说明 / 时间戳</span></div>
+    <div class="type-row"><span class="type-tag">--fs-xs 10px</span><span class="type-sample--xs">徽标 / 角标</span></div>
+    <div class="type-row"><span class="type-tag">--font-num 数值</span><span class="type-sample--num">12,480  ·  3,200  ·  T1 92%  ·  64.2</span></div>
+  </section>
+
+  <!-- ================= 3 间距与圆角 ================= -->
+  <section>
+    <h2 class="sec-title">3 · 间距与圆角</h2>
+    <div class="sp-demo"><span class="sp-label">--gap-2xs 2</span><div class="sp-block" style="width:2px;height:24px"></div></div>
+    <div class="sp-demo"><span class="sp-label">--gap-xs 4</span><div class="sp-block" style="width:4px;height:24px"></div></div>
+    <div class="sp-demo"><span class="sp-label">--gap-sm 8</span><div class="sp-block" style="width:8px;height:24px"></div></div>
+    <div class="sp-demo"><span class="sp-label">--gap-md 12</span><div class="sp-block" style="width:12px;height:24px"></div></div>
+    <div class="sp-demo"><span class="sp-label">--gap-lg 16（页面/卡片间距）</span><div class="sp-block" style="width:16px;height:24px"></div></div>
+    <div class="sp-demo"><span class="sp-label">--gap-xl 24（页面区块）</span><div class="sp-block" style="width:24px;height:24px"></div></div>
+    <p class="sec-desc" style="margin-top:16px;">圆角：硬朗金属系，上限 4px，禁大圆角。</p>
+    <div class="rd-demo">
+      <div class="rd-box" style="border-radius:var(--radius-xs)"></div>
+      <div class="rd-box" style="border-radius:var(--radius-sm)"></div>
+      <div class="rd-box" style="border-radius:var(--radius-md)"></div>
+      <span class="sp-label">1px（标签）· 2px（按钮/面板/血条）· 4px（仅弹窗）</span>
+    </div>
+  </section>
+
+  <!-- ================= 4 按钮 ================= -->
+  <section>
+    <h2 class="sec-title">4 · 按钮（锻铁 · hover 加热）</h2>
+    <div class="demo-row">
+      <div class="demo-cell"><div class="cell-label">默认</div><button class="fs-btn">锻 造</button></div>
+      <div class="demo-cell"><div class="cell-label">hover（烧红）/ 按下（凹陷）</div><button class="fs-btn">鉴 定</button></div>
+      <div class="demo-cell"><div class="cell-label">禁用</div><button class="fs-btn" disabled>已锁定</button></div>
+      <div class="demo-cell"><div class="cell-label">主按钮（熔岩金）</div><button class="fs-btn fs-btn--primary">进入地下城</button></div>
+      <div class="demo-cell"><div class="cell-label">主按钮禁用</div><button class="fs-btn fs-btn--primary" disabled>材料不足</button></div>
+      <div class="demo-cell"><div class="cell-label">幽灵（次级）</div><button class="fs-btn fs-btn--ghost">取消</button></div>
+      <div class="demo-cell"><div class="cell-label">危险操作（血晶红）</div><button class="fs-btn" style="background:var(--danger);border-color:var(--danger);color:#f0d8d2;">出售</button></div>
+    </div>
+    <p class="sec-desc">质感实现：锻铁凸起 = 纯色 + 顶部 1px 内高光 + 底部内阴影；hover 底色变暗红橙（被炉火加热）+ 热辐射微光；按下内阴影加深 = 锻压凹陷。</p>
+  </section>
+
+  <!-- ================= 5 面板 ================= -->
+  <section>
+    <h2 class="sec-title">5 · 面板（皮革颗粒 + 做旧锻铁）</h2>
+    <div class="demo-row" style="align-items:flex-start;">
+      <div class="fs-panel" style="width:330px;">
+        <div class="fs-panel__head">宠物属性</div>
+        <div class="fs-panel__body" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="fs-panel__inset" style="font-size:var(--fs-sm);color:var(--text-dim);">内嵌凹槽区 · 数值面板 / 列表</div>
+          <div style="margin-top:4px;">
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line-weak);"><span class="fs-tag">成长值</span><span style="font-family:var(--font-num);font-weight:700;color:var(--text-hi);">12.4</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line-weak);"><span class="fs-tag">生命</span><span style="font-family:var(--font-num);font-weight:700;color:var(--text-hi);">2,480</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;"><span class="fs-tag">攻击</span><span style="font-family:var(--font-num);font-weight:700;color:var(--text-hi);">620</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-cell" style="min-width:200px;">
+        <div class="cell-label">分隔线 .fs-hr</div>
+        <div style="font-size:var(--fs-sm);color:var(--text-dim);">上方区块</div>
+        <hr class="fs-hr">
+        <div style="font-size:var(--fs-sm);color:var(--text-dim);">下方区块</div>
+      </div>
+      <div class="demo-cell" style="min-width:220px;">
+        <div class="cell-label">输入框 .fs-input（聚焦见熔金描边）</div>
+        <input class="fs-input" style="width:190px;" placeholder="搜索装备 / 宠物">
+        <div class="cell-label" style="margin-top:12px;">标签 .fs-tag</div>
+        <div class="demo-row" style="margin-top:4px;">
+          <span class="fs-tag">T1</span>
+          <span class="fs-tag">词缀 x3</span>
+          <span class="fs-tag">可交易</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6 血条 ================= -->
+  <section>
+    <h2 class="sec-title">6 · 血条 / 状态条（金属槽 + 血晶填充）</h2>
+    <div class="demo-row" style="align-items:flex-start;">
+      <div class="bar-wrap">
+        <div class="fs-bar fs-bar--hp"><div class="fs-bar__fill" style="width:78%"></div></div>
+        <div class="fs-bar fs-bar--energy"><div class="fs-bar__fill" style="width:52%"></div></div>
+        <div class="fs-bar fs-bar--exp"><div class="fs-bar__fill" style="width:88%"></div></div>
+        <div class="fs-bar fs-bar--hp is-low"><div class="fs-bar__fill" style="width:18%"></div></div>
+      </div>
+      <div class="demo-cell" style="min-width:200px;">
+        <div class="cell-label">说明</div>
+        <p class="sec-desc" style="margin:0;">金属槽 = 凹槽底 + 旧铁颗粒 + 细边框 + 内阴影；填充带顶部高光（血晶 / 液态金属感）。</p>
+        <p class="sec-desc" style="margin:6px 0 0;">最下方为低血量（≤25%）状态：填充变亮红 + 慢脉动告警，由 JS 加 .is-low。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 7 装备品质 ================= -->
+  <section>
+    <h2 class="sec-title">7 · 装备品质（铁灰 / 幽蓝 / 熔金）</h2>
+    <div class="q-demo" style="margin-bottom:16px;">
+      <div class="q-line fs-q--white">铁 剑</div>
+      <div class="q-line fs-q--blue">寒霜护腕</div>
+      <div class="q-line fs-q--gold">熔金指环</div>
+    </div>
+    <div class="item-row">
+      <div class="fs-item">
+        <div class="item-name fs-q--white">铁剑</div>
+        <div class="item-sub">T1 · 攻击 12-18 · 可交易</div>
+      </div>
+      <div class="fs-item fs-item--blue">
+        <div class="item-name fs-q--blue">寒霜护腕</div>
+        <div class="item-sub">T2 · 防御 +8 · 冰抗 +3%</div>
+      </div>
+      <div class="fs-item fs-item--gold">
+        <div class="item-name fs-q--gold">熔金指环</div>
+        <div class="item-sub">T1 · 全属性 +5% · 稀有</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 8 禁则 ================= -->
+  <section>
+    <h2 class="sec-title">8 · 使用禁则</h2>
+    <div class="fs-panel__inset" style="max-width:660px;line-height:1.8;font-size:var(--fs-sm);color:var(--text-dim);">
+      · 禁灰蓝（所有底色 RGB 暖调或中性，R ≥ G ≥ B）<br>
+      · 禁铜锈 / 塑料感（暗金必须亮，用熔岩金 #f0a92e 系；金属色一律暖灰）<br>
+      · 禁后台 / 文档风（无白色大面板、无大圆角堆叠、无彩色标签轰炸）<br>
+      · 禁紫色渐变 / 玻璃拟态（背景只允许纯色 + 皮革颗粒纹理，不做毛玻璃）<br>
+      · 禁 emoji（图标用文字符号 / 矢量 / 程序化图形）<br>
+      · 禁粒子特效与大动画（动画仅限状态反馈：hover 加热、按下凹陷、低血量脉动）<br>
+      · 信息密度优先：基础字号 12px，圆角 ≤4px，分隔用 1px 弱线<br>
+      · 强调色只有熔岩金；危险操作走血晶红；幽蓝仅限魔力与蓝装，不参与按钮主色
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "pack_id": "av-5-rotten",
+  "style": "dark head-and-shoulders avatar (clean, no gore)",
+  "job_id": "job_ead0e890b9094c089a5ffe25841e3417",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "腐沼兽.png",
+      "name": "腐沼兽"
+    },
+    {
+      "file": "毒噜兽.png",
+      "name": "毒噜兽"
+    },
+    {
+      "file": "腐沼王.png",
+      "name": "腐沼王"
+    },
+    {
+      "file": "毒沼霸主.png",
+      "name": "毒沼霸主"
+    },
+    {
+      "file": "腐烂之母.png",
+      "name": "腐烂之母"
+    },
+    {
+      "file": "剧毒魔君.png",
+      "name": "剧毒魔君"
+    }
+  ]
+}

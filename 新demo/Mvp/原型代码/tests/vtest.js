@@ -1,0 +1,51 @@
+﻿const fs=require('fs'),vm=require('vm');
+const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
+function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+const els={};
+const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el()},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+ctx.window=ctx;vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+const A=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('PASS: '+m)};
+const S=ms=>new Promise(r=>setTimeout(r,ms));
+const C=code=>vm.runInContext(code,ctx);
+const mk=async(r)=>{C('var e=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="'+r+'"))');C('Equipment.addToInventory(e)');await C('(async()=>{e.cloudId=(await Items.saveItem(e)).data.id})()');await S(50);};
+(async()=>{
+await S(300);await C('Game.onLogin("alice@test.com","123456")');await S(300);
+await mk('white');await mk('white');await mk('blue');await mk('gold');
+let r=await C('Salvage.salvageAll()');
+A(r.ok===true&&r.count===4,'分解4件成功');
+A(C('rpcCalls.filter(n=>n==="add_material").length')===2,'材料RPC合并2次');
+A(C('delCalls.length')===1&&C('delCalls[0]===4'),'删除合并1次IN(4)');
+A(C('Materials.getQuantity(Config.craft.augment.name)')===1&&C('Materials.getQuantity(Config.craft.reforge.name)')===1,'增缀石/重铸石+1');
+await mk('blue');await mk('gold');
+C('globalThis.failDelete=true');
+r=await C('Salvage.salvageAll()');
+A(r.ok===false&&r.rolledBack===true&&C('Equipment.getInventory().length')===2,'分解云失败回滚复原');
+C('globalThis.failDelete=false');
+// 用蓝装测打造（重铸：本地成功 / 云失败回滚）
+C('var eq=Equipment.getInventory().find(e=>e.rarity.id==="blue")');
+await C('Materials.gainLocal(Config.craft.reforge.name,3)');
+const bA=C('JSON.stringify(eq.affixes)');
+C('globalThis.failUpdate=true');
+r=await C('Craft.reforge(eq)');
+A(r.ok===false&&r.rolledBack===true&&C('JSON.stringify(eq.affixes)')===bA,'打造云失败词缀还原');
+C('globalThis.failUpdate=false');
+r=await C('Craft.reforge(eq)');
+A(r.ok===true,'打造成功（重铸）');
+await C('(async()=>{const p=Pet.createPet("待售","🐹",6,100,20,10,8);p.level=10;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id})()');await S(100);
+await C('Market.refresh()');
+await C('Market.listPet(Pet.getPets().find(p=>p.name==="待售"),"重铸石",5)');
+const pb=C('Pet.getPets().length');
+await C('Materials.gainLocal("重铸石",20)');
+r=await C('Market.buy(Market.getListings()[0].id)');
+A(r.ok===true&&r.petId&&C('Market.getListings().length')===0,'购买本地移除+返回petId');
+const matBefore=C('Materials.getQuantity("重铸石")');
+await C('Materials.spendLocal("重铸石",5)'); // 模拟 UI trade-ok 回调的本地扣减
+A(C('Materials.getQuantity("重铸石")')===matBefore-5,'买家扣5材料');
+const pid=r.petId;
+await C('window.Game.afterBuyPet("'+pid+'")');await S(100);
+A(C('Pet.getPets().some(p=>p.name==="待售")')===true,'单条拉取入列/防重正常');
+console.log('ALL TESTS PASSED');process.exit(0);
+})().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

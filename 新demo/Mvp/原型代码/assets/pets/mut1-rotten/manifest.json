@@ -1,0 +1,37 @@
+{
+  "pack_id": "mut1-rotten",
+  "family": "腐噜兽家族异变",
+  "style": "dark mutant full-body sprite (clean, no gore)",
+  "job_id": "job_575e89f056774e23a5c7eeeec84a19fb",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "mut-00.png",
+      "name": "腐噜兽·异变"
+    },
+    {
+      "file": "mut-01.png",
+      "name": "腐沼兽·异变"
+    },
+    {
+      "file": "mut-02.png",
+      "name": "毒噜兽·异变"
+    },
+    {
+      "file": "mut-03.png",
+      "name": "腐沼王·异变"
+    },
+    {
+      "file": "mut-04.png",
+      "name": "毒沼霸主·异变"
+    },
+    {
+      "file": "mut-05.png",
+      "name": "腐烂之母·异变"
+    },
+    {
+      "file": "mut-06.png",
+      "name": "剧毒魔君·异变"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "pack_id": "av-0-base",
+  "style": "dark head-and-shoulders avatar (clean, no gore)",
+  "job_id": "job_0d381c2b1ce94fb9b11ca4c72f8dcc3e",
+  "credit_cost": null,
+  "assets": [
+    {
+      "file": "腐噜兽.png",
+      "name": "腐噜兽"
+    },
+    {
+      "file": "血狐.png",
+      "name": "血狐"
+    },
+    {
+      "file": "瘟熊.png",
+      "name": "瘟熊"
+    },
+    {
+      "file": "疫毛兽.png",
+      "name": "疫毛兽"
+    },
+    {
+      "file": "骨狼.png",
+      "name": "骨狼"
+    },
+    {
+      "file": "毒沼蛙.png",
+      "name": "毒沼蛙"
+    },
+    {
+      "file": "尸犬.png",
+      "name": "尸犬"
+    },
+    {
+      "file": "幽影兔.png",
+      "name": "幽影兔"
+    }
+  ]
+}

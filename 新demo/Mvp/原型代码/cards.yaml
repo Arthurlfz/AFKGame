@@ -1,0 +1,224 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]: ⚒ 宠物养成循环原型
+    - generic [ref=e4]:
+      - button "🎒 背包" [ref=e5] [cursor=pointer]
+      - button "🏡 牧场" [ref=e6] [cursor=pointer]
+      - button "📜 任务" [ref=e7] [cursor=pointer]
+      - button "💬 消息" [ref=e8] [cursor=pointer]
+      - button "⚙️ 设置" [ref=e9] [cursor=pointer]
+    - generic [ref=e10]: 玩家 铁匠 ｜ 未登录
+  - generic [ref=e11]:
+    - navigation [ref=e12]:
+      - button "⚔️ 野外探险" [ref=e13] [cursor=pointer]:
+        - generic [ref=e14]: ⚔️
+        - generic [ref=e15]: 野外探险
+      - button "🐾 宠物资料" [ref=e16] [cursor=pointer]:
+        - generic [ref=e17]: 🐾
+        - generic [ref=e18]: 宠物资料
+      - button "🎒 背包" [ref=e19] [cursor=pointer]:
+        - generic [ref=e20]: 🎒
+        - generic [ref=e21]: 背包
+      - button "🛠️ 装备打造" [ref=e22] [cursor=pointer]:
+        - generic [ref=e23]: 🛠️
+        - generic [ref=e24]: 装备打造
+      - button "💰 交易市场" [ref=e25] [cursor=pointer]:
+        - generic [ref=e26]: 💰
+        - generic [ref=e27]: 交易市场
+      - button "📦 我的上架" [ref=e28] [cursor=pointer]:
+        - generic [ref=e29]: 📦
+        - generic [ref=e30]: 我的上架
+    - main [ref=e31]:
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: 背包装备 · 装备打造
+            - generic [ref=e36]: 点卡片或【打造】打开面板 · 资源可拖拽到选中装备
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e39]: 稀有度
+              - button "白" [ref=e40] [cursor=pointer]
+              - button "蓝" [ref=e41] [cursor=pointer]
+              - button "金" [ref=e42] [cursor=pointer]
+            - generic [ref=e43]:
+              - generic [ref=e44]: T阶
+              - button "T1" [ref=e45] [cursor=pointer]
+              - button "T2" [ref=e46] [cursor=pointer]
+              - button "T3" [ref=e47] [cursor=pointer]
+              - button "T4" [ref=e48] [cursor=pointer]
+              - button "T5" [ref=e49] [cursor=pointer]
+            - generic [ref=e50]:
+              - generic [ref=e51]: 锁定
+              - button "🔒 已锁" [ref=e52] [cursor=pointer]
+              - button "未锁" [ref=e53] [cursor=pointer]
+            - button "重置" [ref=e54] [cursor=pointer]
+          - generic [ref=e55]:
+            - generic [ref=e56]: 筛选 12 / 共 12 件
+            - button "全选" [ref=e57] [cursor=pointer]
+            - button "批量分解（0）" [disabled] [ref=e58]
+          - generic [ref=e59]:
+            - generic [ref=e60]: 🥚
+            - generic [ref=e61]:
+              - generic [ref=e62]: 宠物蛋 ×3
+              - generic [ref=e63]: 挂机打怪掉落 · 孵化新伙伴
+            - button "孵化" [ref=e64] [cursor=pointer]
+          - generic [ref=e65]:
+            - generic [ref=e66] [cursor=pointer]:
+              - generic [ref=e67]:
+                - text: 铁质短剑
+                - generic [ref=e68]: 🔒
+              - generic [ref=e69]: 白色装 · T4
+              - generic [ref=e70]: 武器｜攻击+6
+              - generic [ref=e71]: 攻击 +6%（T5）
+              - generic [ref=e73]:
+                - button "穿上" [ref=e74]
+                - button "打造" [ref=e75]
+                - button "上架" [ref=e76]
+                - button "🔒" [ref=e77]
+              - generic: 松开应用
+            - generic [ref=e78] [cursor=pointer]:
+              - generic [ref=e79]: 布质皮甲
+              - generic [ref=e80]: 白色装 · T4
+              - generic [ref=e81]: 防具｜防御+4
+              - generic [ref=e82]: 生命 +8%（T4）
+              - generic [ref=e84]:
+                - button "穿上" [ref=e85]
+                - button "打造" [ref=e86]
+                - button "上架" [ref=e87]
+                - button "🔓" [ref=e88]
+              - generic: 松开应用
+            - generic [ref=e89] [cursor=pointer]:
+              - generic [ref=e90]: 木制护符
+              - generic [ref=e91]: 白色装 · T4
+              - generic [ref=e92]: 饰品｜速度+2
+              - generic [ref=e93]: 速度 +5%（T5）
+              - generic [ref=e95]:
+                - button "穿上" [ref=e96]
+                - button "打造" [ref=e97]
+                - button "上架" [ref=e98]
+                - button "🔓" [ref=e99]
+              - generic: 松开应用
+            - generic [ref=e100] [cursor=pointer]:
+              - generic [ref=e101]:
+                - generic [ref=e102]: 新
+                - text: 铁质长枪
+              - generic [ref=e103]: 白色装 · T4
+              - generic [ref=e104]: 武器｜攻击+7
+              - generic [ref=e105]: 攻击 +7%（T4）
+              - generic [ref=e107]:
+                - button "穿上" [ref=e108]
+                - button "打造" [ref=e109]
+                - button "上架" [ref=e110]
+                - button "🔓" [ref=e111]
+              - generic: 松开应用
+            - generic [ref=e112] [cursor=pointer]:
+              - generic [ref=e113]: 精铁战斧
+              - generic [ref=e114]: 蓝色装 · T2
+              - generic [ref=e115]: 武器｜攻击+8
+              - generic [ref=e116]:
+                - generic [ref=e117]: 攻击 +11%（T3）
+                - generic [ref=e118]: 速度 +9%（T4）
+              - generic [ref=e119]:
+                - button "穿上" [ref=e120]
+                - button "打造" [ref=e121]
+                - button "上架" [ref=e122]
+                - button "🔓" [ref=e123]
+              - generic: 松开应用
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]: 锁甲胸衣
+              - generic [ref=e126]: 蓝色装 · T2
+              - generic [ref=e127]: 防具｜防御+5
+              - generic [ref=e128]:
+                - generic [ref=e129]: 生命 +10%（T4）
+                - generic [ref=e130]: 防御 +9%（T4）
+              - generic [ref=e131]:
+                - button "穿上" [ref=e132]
+                - button "打造" [ref=e133]
+                - button "上架" [ref=e134]
+                - button "🔓" [ref=e135]
+              - generic: 松开应用
+            - generic [ref=e136] [cursor=pointer]:
+              - generic [ref=e137]: 幽蓝戒指
+              - generic [ref=e138]: 蓝色装 · T2
+              - generic [ref=e139]: 饰品｜速度+3
+              - generic [ref=e140]: 暴击率 +13%（T3）
+              - generic [ref=e142]:
+                - button "穿上" [ref=e143]
+                - button "打造" [ref=e144]
+                - button "上架" [ref=e145]
+                - button "🔓" [ref=e146]
+              - generic: 松开应用
+            - generic [ref=e147] [cursor=pointer]:
+              - generic [ref=e148]:
+                - text: 精钢长弓
+                - generic [ref=e149]: 🔒
+              - generic [ref=e150]: 蓝色装 · T2
+              - generic [ref=e151]: 武器｜攻击+8
+              - generic [ref=e152]:
+                - generic [ref=e153]: 攻击 +12%（T3）
+                - generic [ref=e154]: 吸血 +9%（T4）
+              - generic [ref=e155]:
+                - button "穿上" [ref=e156]
+                - button "打造" [ref=e157]
+                - button "上架" [ref=e158]
+                - button "🔒" [ref=e159]
+              - generic: 松开应用
+            - generic [ref=e160] [cursor=pointer]:
+              - generic [ref=e161]:
+                - generic [ref=e162]: 新
+                - text: 熔金战斧
+              - generic [ref=e163]: 金色装 · T1
+              - generic [ref=e164]: 武器｜攻击+9
+              - generic [ref=e165]:
+                - generic [ref=e166]: 攻击 +27%（T1）
+                - generic [ref=e167]: 生命 +18%（T3）
+                - generic [ref=e168]: 速度 +14%（T2）
+              - generic [ref=e169]:
+                - button "穿上" [ref=e170]
+                - button "打造" [ref=e171]
+                - button "上架" [ref=e172]
+                - button "🔓" [ref=e173]
+              - generic: 松开应用
+            - generic [ref=e174] [cursor=pointer]:
+              - generic [ref=e175]: 龙鳞胸甲
+              - generic [ref=e176]: 金色装 · T1
+              - generic [ref=e177]: 防具｜防御+6
+              - generic [ref=e178]:
+                - generic [ref=e179]: 防御 +20%（T2）
+                - generic [ref=e180]: 生命 +28%（T1）
+              - generic [ref=e181]:
+                - button "穿上" [ref=e182]
+                - button "打造" [ref=e183]
+                - button "上架" [ref=e184]
+                - button "🔓" [ref=e185]
+              - generic: 松开应用
+            - generic [ref=e186] [cursor=pointer]:
+              - generic [ref=e187]: 灵魂护符
+              - generic [ref=e188]: 金色装 · T1
+              - generic [ref=e189]: 饰品｜速度+4
+              - generic [ref=e190]:
+                - generic [ref=e191]: 攻击 +25%（T2）
+                - generic [ref=e192]: 暴击率 +16%（T1）
+                - generic [ref=e193]: 吸血 +15%（T2）
+              - generic [ref=e194]:
+                - button "穿上" [ref=e195]
+                - button "打造" [ref=e196]
+                - button "上架" [ref=e197]
+                - button "🔓" [ref=e198]
+              - generic: 松开应用
+            - generic [ref=e199] [cursor=pointer]:
+              - generic [ref=e200]: 神圣徽章
+              - generic [ref=e201]: 金色装 · T1
+              - generic [ref=e202]: 饰品｜攻击+4
+              - generic [ref=e203]:
+                - generic [ref=e204]: 攻击 +22%（T2）
+                - generic [ref=e205]: 暴击率 +24%（T1）
+                - generic [ref=e206]: 吸血 +12%（T3）
+              - generic [ref=e207]:
+                - button "穿上" [ref=e208]
+                - button "打造" [ref=e209]
+                - button "上架" [ref=e210]
+                - button "🔓" [ref=e211]
+              - generic: 松开应用
+        - complementary [ref=e212]:
+          - button "✕" [ref=e214] [cursor=pointer]
