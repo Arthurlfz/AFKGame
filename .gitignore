@@ -10,6 +10,23 @@ __pycache__/
 relay-selfcheck.*
 *.log
 
+# ===== 内部开发配置 / 设计文档（本地留档，不入库）=====
+新demo/agents/
+新demo/多Agent协作架构方案.md
+新demo/游戏设计理念，所有Agent必须阅读.md
+新demo/游戏数据地图 v1.md
+新demo/大陆地图规划 v1.md
+新demo/大陆世界观设计.md
+新demo/第1大陆完整设计 v1.md
+新demo/第1大陆设计-素材分层 v1.md
+新demo/战斗界面Redesign说明.md
+新demo/战斗界面-怪物悬浮提示需求.md
+新demo/Mvp/原型代码/装备打造多样性方案*.md
+
+# ===== CodeBuddy / WorkBuddy 内部记忆与配置（不入库）=====
+.codebuddy/
+.workbuddy/
+
 # ===== 系统 / 编辑器 =====
 .DS_Store
 Thumbs.db
