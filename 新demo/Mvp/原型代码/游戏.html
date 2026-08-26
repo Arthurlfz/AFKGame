@@ -577,15 +577,19 @@
     const sb = document.getElementById('btn-salvage');
     if (sb) sb.onclick = () => window.UI.openSalvagePanel();
 
-    // 新手引导：localStorage 记录，只显示一次
-    if (!localStorage.getItem('pet_guide_seen_v1')) {
-      const gm = document.getElementById('guide-modal');
-      gm.style.display = 'flex';
-      document.getElementById('guide-ok').onclick = () => {
-        localStorage.setItem('pet_guide_seen_v1', '1');
-        gm.style.display = 'none';
-      };
-    }
+    // 新手引导：登录进入游戏后才弹（由 main.js startGameRuntime 触发），localStorage 记录只显示一次
+    window.showPetGuide = function () {
+      if (!localStorage.getItem('pet_guide_seen_v1')) {
+        const gm = document.getElementById('guide-modal');
+        if (!gm) return;
+        gm.style.display = 'flex';
+        const ok = document.getElementById('guide-ok');
+        if (ok) ok.onclick = () => {
+          localStorage.setItem('pet_guide_seen_v1', '1');
+          gm.style.display = 'none';
+        };
+      }
+    };
   });
 </script>
 
