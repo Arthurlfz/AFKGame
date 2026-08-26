@@ -419,4 +419,14 @@ window.Config = {
     // 停止战斗后每秒恢复最大生命的比例（0.02 = 每秒回 2%，约 50 秒回满；0.2 = 5 秒回满）
     hpPerSecRatio: 0.2
   },
+
+  /* ================= 注册限制 ================= */
+  auth: {
+    // 邀请码列表（小范围拉人试玩用）。填这个才能注册；空数组 = 关闭邀请码限制（任何邮箱都能注册）
+    inviteCodes: ['SOUL2026'],
+    // 注册密码强度：minLen 最少位数；requireLetter 必须含字母；requireDigit 必须含数字
+    pwdMinLen: 6,
+    pwdRequireLetter: true,
+    pwdRequireDigit: true
+  },
 };

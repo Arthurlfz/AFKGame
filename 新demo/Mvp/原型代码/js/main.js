@@ -273,8 +273,19 @@
       showToast('❌ 注册失败', error.message);
       return { error };
     }
-    if (password.length < 6) {
-      const error = { message: '密码至少 6 位' };
+    const a = (window.Config && window.Config.auth) || {};
+    if (password.length < (a.pwdMinLen || 6)) {
+      const error = { message: '密码至少 ' + (a.pwdMinLen || 6) + ' 位' };
+      showToast('❌ 注册失败', error.message);
+      return { error };
+    }
+    if (a.pwdRequireLetter && !/[A-Za-z]/.test(password)) {
+      const error = { message: '密码需包含字母' };
+      showToast('❌ 注册失败', error.message);
+      return { error };
+    }
+    if (a.pwdRequireDigit && !/[0-9]/.test(password)) {
+      const error = { message: '密码需包含数字' };
       showToast('❌ 注册失败', error.message);
       return { error };
     }
