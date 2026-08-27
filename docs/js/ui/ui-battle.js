@@ -52,15 +52,16 @@
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
       : '🐣 先选一张地图，即可自动挂机打怪、掉装备和宠物蛋';
-    // 切换战斗舞台背景图（按 data-area-id 触发 CSS 选择器）
-    const stage = document.querySelector('#tab-battle .battle-stage');
-    if (stage) {
-      if (area && area.id) stage.setAttribute('data-area-id', area.id);
-      else stage.removeAttribute('data-area-id');
-      // 背景无缝横向卷轴滚动：设置一层图宽（舞台高 × 素材 1376/768），位移一个图宽即无缝循环
-      const h = stage.offsetHeight || 0;
-      stage.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
-      if (!stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
+    // 切换全屏地图背景（data-area-id + 滚动动画挂在 #tab-battle 上，覆盖整个战斗页）
+    const tab = document.getElementById('tab-battle');
+    if (tab && typeof tab.setAttribute === 'function') {
+      if (area && area.id) tab.setAttribute('data-area-id', area.id);
+      else tab.removeAttribute('data-area-id');
+      // 背景无缝横向卷轴滚动：设置一层图宽（页面高 × 素材 1376/768），位移一个图宽即无缝循环
+      const docEl = document.documentElement;
+      const h = tab.offsetHeight || (docEl ? docEl.clientHeight : 0) || 0;
+      if (tab.style && tab.style.setProperty) tab.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
+      if (tab.classList && !tab.classList.contains('stage-scroll')) tab.classList.add('stage-scroll');
     }
   }
   function renderAreaSelector() {
