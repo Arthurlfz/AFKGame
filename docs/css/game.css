@@ -966,14 +966,14 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   align-items:flex-start;
 }
 #tab-battle .fighter-pet .stage-avatar {
-  position:absolute; left:26px; bottom:44px; align-items:flex-start;
+  position:absolute; left:26px; bottom:64px; align-items:flex-start;
 }
 /* 敌方：立绘在右下贴地（站到 front 前景上）；信息块在右上角 */
 #tab-battle .fighter-enemy {
   align-items:flex-end;
 }
 #tab-battle .fighter-enemy .stage-avatar {
-  position:absolute; right:20px; bottom:44px; align-items:flex-end;
+  position:absolute; right:20px; bottom:64px; align-items:flex-end;
 }
 /* 立绘容器（我方 280 / 敌方 260），保留原 attacking/hit 动效（撞/受击闪红抖） */
 #tab-battle .fighter-pet .stage-avatar {
