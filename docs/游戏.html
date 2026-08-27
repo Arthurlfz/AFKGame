@@ -93,41 +93,41 @@
                 <!-- 我方立绘角色：左下方，info 块在立绘上方（血量放上放） -->
                 <div class="fighter fighter-pet">
                   <div class="fighter-info">
-                    <div class="combat-name" id="pet-icon-name">莱姆</div>
+                    <div class="combat-name" id="pet-icon-name">我的宠物</div>
                     <div class="bar-row">
                       <div class="hp-shell"><div class="hp-bar pet-hp" id="pet-hp-bar" style="width:100%"></div></div>
-                      <div class="hp-text" id="pet-hp-text">100/100</div>
+                      <div class="hp-text" id="pet-hp-text">?/?</div>
                     </div>
                     <div class="battle-exp" aria-label="宠物经验"><div class="battle-exp-meta"><span id="pet-exp-text">经验 0 / 0</span><b id="pet-exp-percent">0%</b></div><div class="battle-exp-track"><i id="pet-exp-fill" style="width:0%"></i></div></div>
                     <div class="bar-row">
                       <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-pet"></div></div>
                     </div>
                   </div>
-                  <div class="stage-avatar pet" id="pet-icon">🟢</div>
+                  <div class="stage-avatar pet" id="pet-icon">❔</div>
                 </div>
                 <!-- 中央飘字区 -->
                 <div class="stage-mid"></div>
-                <!-- 敌方立绘角色：右上方，info 块在立绘上方 -->
-                <div class="fighter fighter-enemy">
+                <!-- 敌方立绘角色：右上角，info 块在立绘上方（默认隐藏，开战由 resetBattle 显示） -->
+                <div class="fighter fighter-enemy" id="enemy-fighter" style="display:none">
                   <div class="fighter-info">
-                    <div class="combat-name" id="enemy-icon-name">野鼠</div>
+                    <div class="combat-name" id="enemy-icon-name">对手</div>
                     <div class="bar-row">
                       <div class="hp-shell"><div class="hp-bar enemy-hp" id="enemy-hp-bar" style="width:100%"></div></div>
-                      <div class="hp-text" id="enemy-hp-text">60/60</div>
+                      <div class="hp-text" id="enemy-hp-text">?/?</div>
                     </div>
                     <div class="bar-row">
                       <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-enemy"></div></div>
                     </div>
                   </div>
-                  <div class="stage-avatar enemy" id="enemy-icon">🐀</div>
+                  <div class="stage-avatar enemy" id="enemy-icon">❔</div>
                   <div id="enemy-tip" class="enemy-tip" hidden></div>
                 </div>
               </div>
               <!-- 最右 32px：行动条轨道（贴容器右缘，0 顶部 → 100 底部，先到底者出手） -->
               <div class="at-track">
                 <div class="at-fill"></div>
-                <div class="at-racer" id="at-racer-pet">🟢</div>
-                <div class="at-racer at-racer--enemy" id="at-racer-enemy">🐀</div>
+                <div class="at-racer" id="at-racer-pet">❔</div>
+                <div class="at-racer at-racer--enemy" id="at-racer-enemy">❔</div>
                 <div class="at-finish"></div>
               </div>
             </div>
@@ -178,10 +178,10 @@
                 <!-- 立绘区：大头像 + 名字/等级/经验条，横向信息卡 -->
                 <div class="pet-hero">
                   <div class="pet-hero-art">
-                    <div class="pet-avatar" id="pet-avatar">🟢</div>
+                    <div class="pet-avatar" id="pet-avatar">❔</div>
                   </div>
                   <div class="pet-hero-info">
-                    <div class="pet-name"><span id="pet-name">莱姆</span><span class="lv" id="pet-level">Lv.1</span></div>
+                    <div class="pet-name"><span id="pet-name">我的宠物</span><span class="lv" id="pet-level">Lv.1</span></div>
                     <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
                     <div class="exp-text" id="exp-text">0/15</div>
                     <div class="pet-hero-reborn" id="pet-reborn">转生 0 次</div>

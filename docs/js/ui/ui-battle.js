@@ -225,6 +225,8 @@
 
   /* ---------- 战斗视觉（battle.js 调用） ---------- */
   function resetBattle(petName, petIcon, enemyName, enemyIcon, petMaxHp, enemyMaxHp) {
+    const enemyFighter = document.getElementById('enemy-fighter');
+    if (enemyFighter) enemyFighter.style.display = '';
     bindEnemyTip();
     renderEnemyTip(getBattleEnemy());
     mountIcon($('pet-icon'), petName, petIcon);
@@ -379,6 +381,9 @@
     updateBattleExp(pet);
     mountIcon($('pet-icon'), pet.name, pet.icon);
     $('pet-icon-name').textContent = pet.name;
+    // 未开战：隐藏敌方（避免显示占位怪）
+    const enemyFighter = document.getElementById('enemy-fighter');
+    if (enemyFighter) enemyFighter.style.display = 'none';
   }
 
   /* ---------- 左侧出战宠物竖列：悬停看属性 / 点击切换出战（下一场生效） ---------- */
