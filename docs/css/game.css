@@ -878,8 +878,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .bp-arena { flex:1 1 0; min-height:min-content; display:flex; flex-direction:column; }
 /* 面板头右侧提示 */
 #tab-battle .bp-hint { font-family:var(--font-body); font-weight:400; font-size:var(--fs-xs); letter-spacing:0; color:var(--text-faint); }
-/* ---- 全屏地图背景（铺满整个浏览器视口，仅当战斗 tab 激活；宠/怪立绘叠在背景上） ---- */
-body:has(#tab-battle.active) {
+/* ---- 全屏地图背景（铺满整个战斗页 #tab-battle，战斗页全宽后即铺满视口） ---- */
+#tab-battle[data-area-id] {
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.18), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.15), transparent 55%),
@@ -889,14 +889,14 @@ body:has(#tab-battle.active) {
     #0c0b0a;
   background-attachment: fixed;
 }
-body:has(#tab-battle.active).stage-scroll { animation: stage-scroll var(--stage-scroll-dur, 40s) linear infinite; background-attachment: fixed; }
+#tab-battle[data-area-id].stage-scroll { animation: stage-scroll var(--stage-scroll-dur, 40s) linear infinite; background-attachment: fixed; }
 @keyframes stage-scroll {
   from { background-position-x: 0; }
   to   { background-position-x: calc(-1 * var(--bg-w, 0px)); }
 }
-/* 战斗页激活时：页面容器全宽透明，背景从 body 透出 */
-body:has(#tab-battle.active) .page-wrap { max-width:none; background:transparent; padding:8px 12px; }
-body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; }
+/* 战斗页激活时：页面容器全宽，让 #tab-battle 铺满视口 */
+body:has(#tab-battle.active) .page-wrap { max-width:none; padding:8px 12px; }
+body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; width:100%; }
 #tab-battle[data-area-id="corrupted-forest"] {
   --stage-back:  url('../assets/bg/corrupted-forest/back.png');
   --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
