@@ -57,7 +57,9 @@
     if (stage) {
       if (area && area.id) stage.setAttribute('data-area-id', area.id);
       else stage.removeAttribute('data-area-id');
-      // 背景无缝横向循环滚动（不是死图）
+      // 背景无缝横向卷轴滚动：设置一层图宽（舞台高 × 素材 1376/768），位移一个图宽即无缝循环
+      const h = stage.offsetHeight || 0;
+      stage.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
       if (!stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
   }

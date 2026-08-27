@@ -884,7 +884,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 我方（重信息）顶部对齐 / 敌方（轻信息）底部对齐 → 对角线错位，去对称感；
  * 行动条轨道 32px 贴容器右缘。 */
 #tab-battle .battle-arena {
-  position:relative; height:640px; flex:none;
+  position:relative; width:100%; height:auto; flex:none;
+  aspect-ratio: 1376/768; /* 与地图素材同比例：背景完整显示 + 无缝滚动 */
   background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
 }
 /* 左侧出战宠物竖列（悬停看属性 / 点击切换） */
@@ -923,21 +924,20 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
-    var(--stage-front, none) center bottom / contain repeat-x,
-    var(--stage-mid, none) center bottom / contain repeat-x,
-    var(--stage-back, none) center top / contain repeat-x,
+    var(--stage-front, none) center bottom / auto 100% repeat-x,
+    var(--stage-mid, none) center bottom / auto 100% repeat-x,
+    var(--stage-back, none) center top / auto 100% repeat-x,
     #0a0a0c;
   overflow:hidden;
 }
-/* 背景无缝横向循环滚动：平铺图整体横移一个图宽，视觉上像卷轴缓缓掠过（配合 repeat-x） */
+/* 背景无缝横向卷轴滚动：JS 设 --bg-w（一层图宽=舞台高×1376/768），位移一个图宽回到原位无缝循环 */
 #tab-battle .battle-stage.stage-scroll {
-  animation: stage-scroll var(--stage-scroll-dur, 60s) linear infinite;
+  animation: stage-scroll var(--stage-scroll-dur, 40s) linear infinite;
 }
 @keyframes stage-scroll {
   from { background-position-x: 0; }
-  to   { background-position-x: 100%; }
+  to   { background-position-x: calc(-1 * var(--bg-w, 0px)); }
 }
-/* 暂停：宠物/敌人命中抖动、切地图瞬间等不打断滚动（默认始终滚） */
 /* 按 data-area-id 切换各地图三层分层背景（meowa canvas 分层水墨地图） */
 #tab-battle .battle-stage[data-area-id="corrupted-forest"] {
   --stage-back:  url('../assets/bg/corrupted-forest/back.png');
