@@ -929,6 +929,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
     #0a0a0c;
   overflow:hidden;
 }
+/* 背景无缝横向循环滚动：平铺图整体横移一个图宽，视觉上像卷轴缓缓掠过（配合 repeat-x） */
+#tab-battle .battle-stage.stage-scroll {
+  animation: stage-scroll var(--stage-scroll-dur, 60s) linear infinite;
+}
+@keyframes stage-scroll {
+  from { background-position-x: 0; }
+  to   { background-position-x: 100%; }
+}
+/* 暂停：宠物/敌人命中抖动、切地图瞬间等不打断滚动（默认始终滚） */
 /* 按 data-area-id 切换各地图三层分层背景（meowa canvas 分层水墨地图） */
 #tab-battle .battle-stage[data-area-id="corrupted-forest"] {
   --stage-back:  url('../assets/bg/corrupted-forest/back.png');
@@ -948,9 +957,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .fighter-pet {
   left:34px; bottom:14px; align-items:flex-start;
 }
-/* 敌方：右上角，立绘大（对手） */
+/* 敌方：右下角贴地，立绘大（对手）——避免怪物飘在天上，落地与地面接触 */
 #tab-battle .fighter-enemy {
-  right:28px; top:14px; align-items:flex-end;
+  right:28px; bottom:14px; align-items:flex-end;
 }
 /* 立绘容器（我方 280 / 敌方 260），保留原 attacking/hit 动效（撞/受击闪红抖） */
 #tab-battle .fighter-pet .stage-avatar {

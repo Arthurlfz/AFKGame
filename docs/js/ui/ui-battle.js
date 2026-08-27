@@ -57,6 +57,8 @@
     if (stage) {
       if (area && area.id) stage.setAttribute('data-area-id', area.id);
       else stage.removeAttribute('data-area-id');
+      // 背景无缝横向循环滚动（不是死图）
+      if (!stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
   }
   function renderAreaSelector() {
@@ -141,14 +143,10 @@
     if (reward.type === 'equipment') {
       const r = reward.eq.rarity;
       addLootEntry(`<span class="loot-q ${r.id === 'gold' ? 'fs-q--gold' : r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white'}">${r.label}·${escapeHtml(reward.eq.name)}</span>`, r.id);
-      const title = r.id === 'gold' ? '金色装备掉落！' : r.id === 'blue' ? '蓝色装备' : '掉落装备';
-      // showToast(title, `<span style="color:${r.color}">${r.label}·${reward.eq.name}</span><br>${describeItem(reward.eq)}`);
-      // 屏幕中间掉落弹窗（对话气泡）：仅金装掉落弹。已禁用以避免打扰，掉落日志仍记录。
-      // if (r.id === 'gold' && UI.showDialog) UI.showDialog({ icon: '✦', speaker: '掉落', text: `<span style="color:${r.color}">金色装备 ${reward.eq.name}</span><br>${describeItem(reward.eq)}` });
+      if (r.id === 'gold') flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
     } else if (reward.type === 'egg') {
       addLootEntry('宠物蛋 ×1（去「宠物」页或「装备」页背包孵化）');
-      // showToast('掉落宠物蛋', '在背包里点击「孵化」获得新宠物');
-      // if (UI.showDialog) UI.showDialog({ icon: '蛋', speaker: '掉落', text: '宠物蛋 ×1<br><span style="color:var(--text-dim)">去宠物页或装备页背包孵化</span>' });
+      flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
     }
   }
 
@@ -239,6 +237,17 @@
     // 行动条小头像同步本场图标（用头像版，小尺寸更清晰）
     mountIconAvatar($('at-racer-pet'), petName, petIcon);
     mountIconAvatar($('at-racer-enemy'), enemyName, enemyIcon);
+    // 敌人差异化表现：变异怪挂 is-mutant（名字血红+体型大）；上一场的击败淡出还原
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (stage && stage.querySelector) {
+      const enemyBox = stage.querySelector('.fighter-enemy');
+      if (enemyBox && enemyBox.classList) {
+        const enemy = getBattleEnemy();
+        enemyBox.classList.toggle('is-mutant', !!(enemy && enemy.enemyType === 'mutant'));
+        const avatar = enemyBox.querySelector('.stage-avatar');
+        if (avatar && avatar.classList) avatar.classList.remove('defeated');
+      }
+    }
     updateAction(0, 0);
   }
   function updateBars(petHp, petMaxHp, enemyHp, enemyMaxHp) {
@@ -275,6 +284,13 @@
     // 当前最接近底部（行动值更大）的一方获得出手权高亮：放大 1.2x + 发光
     if (action >= other && pct > 0) el.classList.add('leading');
     else el.classList.remove('leading');
+  }
+  // 舞台高光：给 .battle-stage 挂一个短命 class 触发 CSS 动画（震屏/扫光），播完自动摘除
+  function flashStage(cls, ms) {
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (!stage || !stage.classList) return;
+    stage.classList.add(cls);
+    setTimeout(() => stage.classList.remove(cls), ms);
   }
   function animateAttack(attacker) {
     const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
@@ -315,6 +331,7 @@
   }
   // battle.js 结算时调用（伤害/暴击/吸血实际生效那一刻）→ 转飘字；业务计算零改动
   function showDamage(target, damage, type) {
+    if (type === 'crit') flashStage('stage-shake', 300); // 暴击：舞台震屏
     showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : null);
   }
 
@@ -433,6 +450,14 @@
     }
   }
 
+  // 胜利演出：敌人立绘淡出下沉（battle.js endFight 胜利时防御式调用）
+  function animateVictory() {
+    const avatar = document.querySelector('#tab-battle .fighter-enemy .stage-avatar');
+    if (!avatar || !avatar.classList) return;
+    avatar.classList.add('defeated');
+    setTimeout(() => avatar.classList.remove('defeated'), 650);
+  }
+
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
   UI.showLoot = showLoot;
@@ -441,6 +466,7 @@
   UI.updateAction = updateAction;
   UI.animateAttack = animateAttack;
   UI.animateHit = animateHit;
+  UI.animateVictory = animateVictory;
   UI.showDamage = showDamage;
   UI.showFloatingText = showFloatingText;
   UI.updateStatus = updateStatus;
