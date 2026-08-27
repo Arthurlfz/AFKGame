@@ -951,11 +951,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   --stage-back:  url('../assets/bg/corrupted-forest/back.png');
   --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
 }
-#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-mid: url('../assets/bg/plague-swamp/mid.png'); }
+#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-back: url('../assets/bg/plague-swamp/back.png'); --stage-mid: url('../assets/bg/plague-swamp/mid.png'); }
 #tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-back: url('../assets/bg/shadow-mountains/back.png'); --stage-mid: url('../assets/bg/shadow-mountains/mid.png'); }
-#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-front: url('../assets/bg/bone-wastes.png'); }
-#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-front: url('../assets/bg/blood-rift.png'); }
-#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-front: url('../assets/bg/blight-heart.png'); }
+#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-back: url('../assets/bg/bone-wastes/back.png'); --stage-mid: url('../assets/bg/bone-wastes/mid.png'); }
+#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-back: url('../assets/bg/blood-rift/back.png'); --stage-mid: url('../assets/bg/blood-rift/mid.png'); }
+#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-back: url('../assets/bg/blight-heart/back.png'); --stage-mid: url('../assets/bg/blight-heart/mid.png'); }
 /* 立绘角色（我方 / 敌方通用容器）：覆盖整个舞台，info 与立绘分开定位 */
 #tab-battle .fighter {
   position:absolute; inset:0; pointer-events:none;
