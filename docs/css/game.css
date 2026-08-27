@@ -890,7 +890,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 我方（重信息）顶部对齐 / 敌方（轻信息）底部对齐 → 对角线错位，去对称感；
  * 行动条轨道 32px 贴容器右缘。 */
 #tab-battle .battle-arena {
-  position:relative; width:100%; height:560px; flex:none;
+  position:relative; width:100%; height:auto; flex:none;
+  aspect-ratio: 1376/768; /* 与地图素材同比例：contain 时图刚好贴合，少留黑边 */
   background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
 }
 /* 左侧出战宠物竖列（悬停看属性 / 点击切换） */
