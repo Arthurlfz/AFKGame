@@ -25,8 +25,10 @@
     ov.id = 'debug-grid-overlay';
     ov.style.cssText =
       'position:absolute;inset:0;z-index:9999;pointer-events:none;' +
-      'background-image:repeating-linear-gradient(0deg,rgba(255,80,80,.25) 0 1px,transparent 1px 50px),' +
-      'repeating-linear-gradient(90deg,rgba(80,80,255,.25) 0 1px,transparent 1px 50px);';
+      'background-image:repeating-linear-gradient(0deg,rgba(255,120,90,.10) 0 1px,transparent 1px 100px),' +
+      'repeating-linear-gradient(90deg,rgba(120,140,255,.10) 0 1px,transparent 1px 100px),' +
+      'repeating-linear-gradient(0deg,rgba(255,120,90,.06) 0 1px,transparent 1px 20px),' +
+      'repeating-linear-gradient(90deg,rgba(120,140,255,.06) 0 1px,transparent 1px 20px);';
     stage.appendChild(ov);
 
     // 坐标读数标签
