@@ -950,7 +950,6 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .battle-stage[data-area-id="corrupted-forest"] {
   --stage-back:  url('../assets/bg/corrupted-forest/back.png');
   --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
-  --stage-front: url('../assets/bg/corrupted-forest/front.png');
 }
 #tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-mid: url('../assets/bg/plague-swamp/mid.png'); }
 #tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-back: url('../assets/bg/shadow-mountains/back.png'); --stage-mid: url('../assets/bg/shadow-mountains/mid.png'); }
