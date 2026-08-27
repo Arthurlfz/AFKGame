@@ -52,6 +52,12 @@
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
       : '🐣 先选一张地图，即可自动挂机打怪、掉装备和宠物蛋';
+    // 切换战斗舞台背景图（按 data-area-id 触发 CSS 选择器）
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (stage) {
+      if (area && area.id) stage.setAttribute('data-area-id', area.id);
+      else stage.removeAttribute('data-area-id');
+    }
   }
   function renderAreaSelector() {
     const box = $('battle-area-selector');

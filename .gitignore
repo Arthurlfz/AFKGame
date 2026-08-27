@@ -31,3 +31,4 @@ relay-selfcheck.*
 .DS_Store
 Thumbs.db
 *.swp
+.zcode/

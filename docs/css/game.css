@@ -329,7 +329,7 @@ body {
 
 /* ---------- 对战视觉（紧凑） ---------- */
 .battle-arena {
-  position:relative; background:#111114; border:1px solid rgba(212,168,67,.3); border-radius:3px;
+  position:relative; background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
   margin-bottom:8px;
 }
 .stage-avatar {
@@ -885,7 +885,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 行动条轨道 32px 贴容器右缘。 */
 #tab-battle .battle-arena {
   position:relative; height:500px; flex:none;
-  background:#111114; border:1px solid rgba(212,168,67,.3); border-radius:3px;
+  background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
 }
 /* 左侧出战宠物竖列（悬停看属性 / 点击切换） */
 #tab-battle .pet-roster {
@@ -923,9 +923,17 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
+    var(--stage-bg, none) center / contain no-repeat,
     #0a0a0c;
   overflow:hidden;
 }
+/* 按 data-area-id 切换各地图背景图（meowa 水彩横版场景，叠加在深色渐变底上） */
+#tab-battle .battle-stage[data-area-id="corrupted-forest"]  { --stage-bg: url('../assets/bg/corrupted-forest.png'); }
+#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-bg: url('../assets/bg/plague-swamp.png'); }
+#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-bg: url('../assets/bg/shadow-mountains.png'); }
+#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-bg: url('../assets/bg/bone-wastes.png'); }
+#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-bg: url('../assets/bg/blood-rift.png'); }
+#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-bg: url('../assets/bg/blight-heart.png'); }
 /* 立绘角色（我方 / 敌方通用容器） */
 #tab-battle .fighter {
   position:absolute; display:flex; flex-direction:column; align-items:center;
@@ -970,7 +978,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 信息块（名字/血条/经验/攻击条）：现在在立绘上方（血量上放） */
 #tab-battle .fighter-info {
   position:relative; z-index:5; padding:10px 12px; min-width:160px;
-  background:rgba(8,8,10,.85); border:1px solid rgba(212,168,67,.4); border-radius:4px;
+  background:rgba(8,8,10,.85); border:1px solid rgb(var(--action-gold-rgb)/.4); border-radius:4px;
   box-shadow:0 6px 18px rgba(0,0,0,.55);
   margin-bottom:8px;
 }
@@ -995,7 +1003,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   font-variant-numeric:tabular-nums; white-space:nowrap;
 }
 #tab-battle .atk-shell { width:120px; height:11px; background:#0a0a0c; border-radius:2px; overflow:hidden; }
-#tab-battle .atk-bar { height:100%; width:0%; background:#d4a843; min-width:0; }
+#tab-battle .atk-bar { height:100%; width:0%; background:var(--action-gold); min-width:0; }
 /* 中央飘字区：整舞台居中，伤害/经验飘字在此浮现 */
 #tab-battle .stage-mid {
   position:absolute; inset:0; pointer-events:none; z-index:4;
@@ -1005,7 +1013,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .enemy-tip {
   position:absolute; z-index:8; left:64px; bottom:92px; width:218px;
   padding:12px 14px; color:#d8d2c8; background:rgba(14,14,16,.98);
-  border:1px solid rgba(212,168,67,.55); border-radius:3px;
+  border:1px solid rgb(var(--action-gold-rgb)/.55); border-radius:3px;
   box-shadow:0 8px 20px rgba(0,0,0,.55); pointer-events:none; font-size:12px;
 }
 #tab-battle .enemy-tip.enemy-tip-left { left:auto; right:64px; }
@@ -1025,13 +1033,13 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* ---- 最右 32px：行动条轨道（贴容器右缘） ---- */
 #tab-battle .at-track {
   position:absolute; top:0; right:0; bottom:0; width:32px;
-  background:#0a0a0c; border-left:1px solid rgba(212,168,67,.18);
+  background:#0a0a0c; border-left:1px solid rgb(var(--action-gold-rgb)/.18);
   overflow:hidden;
 }
 /* 轨道金色进度填充：从顶到底渐变，高度 = 当前领先方进度（JS 驱动） */
 #tab-battle .at-fill {
   position:absolute; top:0; left:0; right:0; height:0%;
-  background:linear-gradient(to bottom, rgba(212,168,67,.12), rgba(212,168,67,.45));
+  background:linear-gradient(to bottom, rgb(var(--action-gold-rgb)/.12), rgb(var(--action-gold-rgb)/.45));
 }
 /* 行动条小头像：24 圆形，我方金边 / 敌方红边；
    top = 行动值（0 顶部 → 100 底部，JS 设 --pct，CSS min 防溢出） */
@@ -1039,7 +1047,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   position:absolute; left:50%; top:min(var(--pct,0%), calc(100% - 26px));
   transform:translateX(-50%);
   width:26px; height:26px; line-height:24px; font-size:1.083rem; text-align:center;
-  background:#0e0e10; border:2px solid #d4a843; border-radius:50%;
+  background:#0e0e10; border:2px solid var(--action-gold); border-radius:50%;
   box-shadow:0 0 6px rgba(0,0,0,.6); z-index:2;
   transition:top .1s linear;
   will-change:top;
@@ -1048,14 +1056,14 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 最接近底部者：放大 1.2x + 发光（当前领先出手权） */
 #tab-battle .at-racer.leading {
   transform:translateX(-50%) scale(1.2);
-  box-shadow:0 0 8px rgba(212,168,67,.65), 0 0 14px rgba(212,168,67,.3);
+  box-shadow:0 0 8px rgb(var(--action-gold-rgb)/.65), 0 0 14px rgb(var(--action-gold-rgb)/.3);
   z-index:3;
 }
 #tab-battle .at-racer--enemy.leading { box-shadow:0 0 8px rgba(192,57,43,.65), 0 0 14px rgba(192,57,43,.3); }
 /* 底部终点线：2px 金色横线 */
 #tab-battle .at-finish {
   position:absolute; left:0; right:0; bottom:0; height:2px;
-  background:#d4a843; box-shadow:0 0 8px rgba(212,168,67,.5);
+  background:var(--action-gold); box-shadow:0 0 8px rgb(var(--action-gold-rgb)/.5);
   z-index:1;
 }
 /* 战斗飘字（showFloatingText 生成，带类型标签）：普通白 / 技能金 / 暴击红放大 / 吸血绿侧边 */
@@ -1066,7 +1074,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.4);
   animation:fs-float-up .8s ease-out forwards;
 }
-#tab-battle .fs-float.skill { color:#d4a843; }              /* 技能：金 */
+#tab-battle .fs-float.skill { color:var(--action-gold); }              /* 技能：金 */
 #tab-battle .fs-float.crit  { color:#e74c3c; font-size:1.8rem; } /* 暴击：红，比普通大 20% */
 #tab-battle .fs-float.lifesteal { color:#6b8847; }           /* 吸血：绿 */
 #tab-battle .fs-float.side-right {
