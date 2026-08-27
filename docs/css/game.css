@@ -882,16 +882,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle.active { min-height: 100vh; box-sizing: border-box; }
 body:has(#tab-battle.active) .page-wrap { min-height: 100vh; max-width:none; padding:8px 12px; }
 body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; width:100%; }
-/* ---- 全屏地图背景（铺满整个战斗页 #tab-battle = 整个视口） ---- */
+/* ---- 全屏地图背景（铺满整个战斗页 #tab-battle = 整个视口，cover 模式：按比例铺满可能裁切两侧/上下） ---- */
 #tab-battle[data-area-id] {
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.18), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.15), transparent 55%),
-    var(--stage-front, none) center bottom / auto 100% repeat-x,
-    var(--stage-mid, none) center bottom / auto 100% repeat-x,
-    var(--stage-back, none) center top / auto 100% repeat-x,
+    var(--stage-front, none) center bottom / cover no-repeat,
+    var(--stage-mid, none) center bottom / cover no-repeat,
+    var(--stage-back, none) center top / cover no-repeat,
     #0c0b0a;
-  background-attachment: fixed;
 }
 #tab-battle[data-area-id].stage-scroll { animation: stage-scroll var(--stage-scroll-dur, 40s) linear infinite; background-attachment: fixed; }
 @keyframes stage-scroll {
