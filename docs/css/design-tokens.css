@@ -76,6 +76,7 @@
   --r-blue: #4a6fa8;        /* 蓝装：幽冷蓝 */
   --r-blue-rgb: 74, 111, 168; /* 幽冷蓝 RGB 三通道（配 / alpha 用） */
   --r-gold: #f2b632;        /* 金装：熔金（亮，炸眼） */
+  --r-gold-rgb: 242, 182, 50; /* 熔金 RGB 三通道（配 / alpha 用） */
   --r-purple: #8b5cf6;      /* 紫装/神圣系通货：神圣石 / 重铸（需求指定 #8b5cf6） */
 
   /* ---------- 按钮三态（锻铁；hover 像被加热） ---------- */
@@ -144,6 +145,27 @@
   --z-login: 90;
   --z-dialog: 150;
   --z-toast: 200;
+
+  /* ============================================================
+   * 水墨 UI 主题（meowa 生成的素材接入；body 加 .ink-ui 才生效）
+   * 默认不启用，加 .ink-ui 切换为水墨风，可回退暗黑
+   * ============================================================ */
+  /* 关闭态下保持 none/不变，加 .ink-ui 后才指向真实素材 */
+  --ui-paper-texture: none;
+  --ui-panel-frame:   none;
+  --ui-btn-default:   none;
+  --ui-btn-hover:     none;
+  --ui-groove:        none;
+  --ui-ink-line:      #3a332a;     /* 水墨风边框色（墨灰） */
+  --ui-ink-text:      #d8d0c0;     /* 水墨风文字色（暖宣纸白） */
+  --ui-ink-gold:      #b8923a;     /* 水墨风强调金（淡金，暗于现在的 #f0a92e） */
+}
+body.ink-ui {
+  --ui-paper-texture: url('../assets/ui/paper-texture.png');
+  --ui-panel-frame:   url('../assets/ui/panel-frame.png');
+  --ui-btn-default:   url('../assets/ui/btn-default.png');
+  --ui-btn-hover:     url('../assets/ui/btn-hover.png');
+  --ui-groove:        url('../assets/ui/groove.png');
 }
 
 /* ========================================================
@@ -273,6 +295,39 @@
   box-shadow: none;
 }
 .fs-btn--ghost:active:not(:disabled) { background: var(--panel-2); box-shadow: var(--shadow-btn-active); }
+
+/* ============================================================
+ * 水墨 UI 主题样式（body.ink-ui 激活时覆盖）
+ * 仅改"面板/按钮"两个最常用组件，先验证风格 OK 再推广
+ * ============================================================ */
+body.ink-ui .fs-panel {
+  background-color: #1d1914;
+  background-image: var(--ui-paper-texture);
+  background-size: cover;
+  border: 1px solid var(--ui-ink-line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+}
+body.ink-ui .fs-btn {
+  background-image: var(--ui-btn-default);
+  background-size: 100% 100%;
+  background-color: transparent;
+  border: 1px solid var(--ui-ink-line);
+  color: var(--ui-ink-text);
+  box-shadow: none;
+}
+body.ink-ui .fs-btn:hover:not(:disabled) {
+  background-image: var(--ui-btn-hover);
+  border-color: var(--ui-ink-gold);
+  color: #ffe9d0;
+  box-shadow: 0 0 8px rgba(184,146,58,.3);
+}
+body.ink-ui .fs-btn--primary { /* 主按钮：水墨金 */
+  background-image: var(--ui-btn-hover);   /* 用 hover 那张（更亮） */
+  border-color: var(--ui-ink-gold);
+  color: #1a1206;
+  font-weight: 800;
+}
 
 /* ---------- 血条：金属槽 + 血晶/熔岩填充，低血量变亮红 ---------- */
 .fs-bar {
