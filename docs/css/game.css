@@ -880,8 +880,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .bp-hint { font-family:var(--font-body); font-weight:400; font-size:var(--fs-xs); letter-spacing:0; color:var(--text-faint); }
 /* 战斗页激活时：#tab-battle 占满整个视口，让背景铺满全屏 */
 /* 战斗页激活时：.page-wrap 全宽（去掉 1600px 居中限制），让背景横向延伸到浏览器左右边缘 */
-body:has(#tab-battle.active) .page-wrap { max-width:none; padding:8px 12px; }
+body:has(#tab-battle.active) .page-wrap { min-width:0; max-width:none; padding:8px 0; }
 body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; width:100%; }
+body:has(#tab-battle.active) .page-wrap > #tab-battle .battle-page { max-width:none; }
 /* 让内部 UI 透出地图背景（面板/战斗框改为半透明深底，但战斗舞台保留背景图） */
 #tab-battle .bp-arena,
 #tab-battle .battle-arena { background: transparent; border-color: rgba(212,168,67,.2); }
