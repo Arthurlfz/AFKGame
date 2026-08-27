@@ -878,11 +878,6 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .bp-arena { flex:1 1 0; min-height:min-content; display:flex; flex-direction:column; }
 /* 面板头右侧提示 */
 #tab-battle .bp-hint { font-family:var(--font-body); font-weight:400; font-size:var(--fs-xs); letter-spacing:0; color:var(--text-faint); }
-/* 战斗页激活时：#tab-battle 占满整个视口，让背景铺满全屏 */
-/* 战斗页激活时：三层容器全部去掉 1600px 宽度限制 + 取消居中，让背景横向贴满浏览器左右边缘 */
-body.battle-active .page-container { max-width:none; margin:0; padding:8px 0; }
-body.battle-active .page-wrap { min-width:0; max-width:none; margin:0; padding:8px 0; }
-body.battle-active .battle-page { max-width:none; }
 /* 让内部 UI 透出地图背景（面板/战斗框改为半透明深底，但战斗舞台保留背景图） */
 #tab-battle .bp-arena,
 #tab-battle .battle-arena { background: transparent; border-color: rgba(212,168,67,.2); }
@@ -934,9 +929,9 @@ body.battle-active .battle-page { max-width:none; }
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
-    var(--stage-front, none) center bottom / cover no-repeat,
-    var(--stage-mid, none) center bottom / cover no-repeat,
-    var(--stage-back, none) center top / cover no-repeat,
+    var(--stage-front, none) center bottom / contain no-repeat,
+    var(--stage-mid, none) center bottom / contain no-repeat,
+    var(--stage-back, none) center top / contain no-repeat,
     #0a0a0c;
   overflow:hidden;
 }
