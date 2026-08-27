@@ -6,10 +6,12 @@
 <title>宠物养成循环原型</title>
 <!-- 设计变量（颜色/尺寸/字体统一在 vars.css；v2 视觉规范 design-tokens.css 后加载覆盖同名变量，全站升级 v2 配色） -->
 <link rel="stylesheet" href="css/vars.css?v=20260827f">
-<link rel="stylesheet" href="css/design-tokens.css?v=20260827f">
+<link rel="stylesheet" href="css/design-tokens.css?v=20260827m">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260827f">
-<link rel="stylesheet" href="css/game.css?v=20260827f">
+<link rel="stylesheet" href="css/game.css?v=20260828b">
+<!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
+<link rel="stylesheet" href="css/ui-polish.css?v=20260828c">
 </head>
 <body>
 
@@ -625,7 +627,7 @@ window.PetSprites = {
 <script src="js/pet/pet_merge.js"></script>
 <script src="js/pet/pet_evolve.js"></script>
 <script src="js/core/quest.js"></script>
-<script src="js/core/battle.js"></script>
+<script src="js/core/battle.js?v=20260827m"></script>
 <script src="js/ui/ui-common.js"></script>
 <script src="js/ui/ui-console.js?v=20260827k"></script>
 <script src="js/ui/ui-shell.js"></script>
@@ -633,13 +635,15 @@ window.PetSprites = {
 <script src="js/ui/ui-dialog.js"></script>
 <script src="js/ui/ui-popover.js"></script>
 <script src="js/ui/ui-quest.js"></script>
-<script src="js/ui/ui-battle.js?v=20260827h"></script>
+<script src="js/ui/ui-battle.js?v=20260827m"></script>
 <script src="js/ui/ui-pet.js?v=20260827i"></script>
 <script src="js/ui/ui-bag.js"></script>
 <script src="js/ui/ui-equipment.js"></script>
 <script src="js/ui/ui-craft.js"></script>
 <script src="js/ui/ui-market.js"></script>
 <script src="js/main.js?v=20260827k"></script>
+<!-- DEBUG: 战斗舞台边界/坐标调试工具（用完删除此行） -->
+<script src="debug-grid.js?v=debug1"></script>
 <!-- 战斗页宠物竖列共享 tooltip（body 层，fixed，不随竖列重建，避免被 overflow 裁掉/状态丢失） -->
 <div class="roster-tooltip" id="roster-tooltip"></div>
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息） -->
