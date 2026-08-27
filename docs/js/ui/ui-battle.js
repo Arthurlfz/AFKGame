@@ -57,6 +57,10 @@
     if (stage && typeof stage.setAttribute === 'function') {
       if (area && area.id) stage.setAttribute('data-area-id', area.id);
       else stage.removeAttribute('data-area-id');
+      // 背景滚动：设一层图宽 = 舞台高 × 1376/768（auto 100% 时图宽=舞台高×1.79），位移一个图宽无缝循环
+      const h = stage.offsetHeight || 0;
+      if (stage.style && stage.style.setProperty) stage.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
+      if (stage.classList && !stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
   }
   function renderAreaSelector() {

@@ -894,12 +894,14 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   aspect-ratio: 1376/768; /* 与地图素材同比例：contain 时图刚好贴合，少留黑边 */
   background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
 }
-/* 左侧出战宠物竖列（悬停看属性 / 点击切换） */
+/* 左侧出战宠物竖列（悬停看属性 / 点击切换）：贴紧左边框，半透明不遮战斗画面 */
 #tab-battle .pet-roster {
-  position:absolute; left:8px; top:0; bottom:0; width:52px; z-index:6;
-  display:flex; flex-direction:column; gap:6px; padding:8px 0;
+  position:absolute; left:6px; top:8px; bottom:8px; width:56px; z-index:6;
+  display:flex; flex-direction:column; gap:6px; padding:6px 2px;
   overflow-y:auto;
+  background:rgba(10,9,8,.55); border:1px solid rgba(212,168,67,.18); border-radius:4px;
 }
+#tab-battle .pet-roster .roster-pet { background:rgba(14,14,16,.72); }
 #tab-battle .pet-roster::-webkit-scrollbar{width:4px;}
 #tab-battle .pet-roster::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px;}
 #tab-battle .roster-pet {
@@ -926,15 +928,23 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .roster-tooltip .rt-row span:last-child { color:var(--text); font-family:var(--font-num); font-variant-numeric:tabular-nums; }
 /* ---- 立绘战斗舞台：宠物/怪物放大成对战角色，背景三层分层水墨 ---- */
 #tab-battle .battle-stage {
-  position:absolute; left:8px; right:8px; top:0; bottom:0;
+  position:absolute; left:70px; right:10px; top:0; bottom:0;
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
-    var(--stage-front, none) center bottom / contain no-repeat,
-    var(--stage-mid, none) center bottom / contain no-repeat,
-    var(--stage-back, none) center top / contain no-repeat,
+    var(--stage-front, none) center bottom / auto 100% repeat-x,
+    var(--stage-mid, none) center bottom / auto 100% repeat-x,
+    var(--stage-back, none) center top / auto 100% repeat-x,
     #0a0a0c;
   overflow:hidden;
+}
+/* 背景缓慢横向滚动（卷轴效果）：background-position-x 平移一个图宽无缝循环 */
+#tab-battle .battle-stage.stage-scroll {
+  animation: stage-scroll var(--stage-scroll-dur, 40s) linear infinite;
+}
+@keyframes stage-scroll {
+  from { background-position-x: 0; }
+  to   { background-position-x: calc(-1 * var(--bg-w, 0px)); }
 }
 /* 按 data-area-id 切换各地图三层分层背景（meowa canvas 分层水墨地图） */
 #tab-battle .battle-stage[data-area-id="corrupted-forest"] {
@@ -947,17 +957,23 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-front: url('../assets/bg/bone-wastes.png'); }
 #tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-front: url('../assets/bg/blood-rift.png'); }
 #tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-front: url('../assets/bg/blight-heart.png'); }
-/* 立绘角色（我方 / 敌方通用容器） */
+/* 立绘角色（我方 / 敌方通用容器）：覆盖整个舞台，info 与立绘分开定位 */
 #tab-battle .fighter {
-  position:absolute; display:flex; flex-direction:column; align-items:center;
+  position:absolute; inset:0; pointer-events:none;
 }
-/* 我方：左下角，立绘大（主角） */
+/* 我方：立绘在左下贴地；信息块在左上角 */
 #tab-battle .fighter-pet {
-  left:34px; bottom:14px; align-items:flex-start;
+  align-items:flex-start;
 }
-/* 敌方：右下角贴地，立绘大（对手）——避免怪物飘在天上，落地与地面接触 */
+#tab-battle .fighter-pet .stage-avatar {
+  position:absolute; left:26px; bottom:14px; align-items:flex-start;
+}
+/* 敌方：立绘在右下贴地（站到 front 前景上）；信息块在右上角 */
 #tab-battle .fighter-enemy {
-  right:28px; bottom:14px; align-items:flex-end;
+  align-items:flex-end;
+}
+#tab-battle .fighter-enemy .stage-avatar {
+  position:absolute; right:20px; bottom:14px; align-items:flex-end;
 }
 /* 立绘容器（我方 280 / 敌方 260），保留原 attacking/hit 动效（撞/受击闪红抖） */
 #tab-battle .fighter-pet .stage-avatar {
@@ -988,14 +1004,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   width:34px; height:34px; object-fit:contain; display:block; margin:0 auto;
   filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));
 }
-/* 信息块（名字/血条/经验/攻击条）：现在在立绘上方（血量上放） */
+/* 信息块（名字/血条/经验/攻击条）：我方左上角 / 敌方右上角 */
 #tab-battle .fighter-info {
-  position:relative; z-index:5; padding:10px 12px; min-width:160px;
-  background:rgba(8,8,10,.85); border:1px solid rgb(var(--action-gold-rgb)/.4); border-radius:4px;
+  position:absolute; z-index:7; padding:8px 12px; min-width:170px;
+  background:rgba(8,8,10,.78); border:1px solid rgb(var(--action-gold-rgb)/.4); border-radius:4px;
   box-shadow:0 6px 18px rgba(0,0,0,.55);
-  margin-bottom:8px;
+  pointer-events:auto;
 }
-#tab-battle .fighter-enemy .fighter-info { margin-top:0; }
+#tab-battle .fighter-pet .fighter-info { left:12px; top:10px; }
+#tab-battle .fighter-enemy .fighter-info { right:12px; top:10px; }
 /* 名字 */
 #tab-battle .combat-name {
   font-family:var(--font-title); font-size:1.25rem; font-weight:700; color:#fff;
