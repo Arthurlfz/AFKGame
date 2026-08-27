@@ -884,7 +884,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 我方（重信息）顶部对齐 / 敌方（轻信息）底部对齐 → 对角线错位，去对称感；
  * 行动条轨道 32px 贴容器右缘。 */
 #tab-battle .battle-arena {
-  position:relative; height:500px; flex:none;
+  position:relative; height:640px; flex:none;
   background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3); border-radius:3px;
 }
 /* 左侧出战宠物竖列（悬停看属性 / 点击切换） */
@@ -923,9 +923,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
-    var(--stage-front, none) center bottom / cover no-repeat,
-    var(--stage-mid, none) center bottom / cover no-repeat,
-    var(--stage-back, none) center top / cover no-repeat,
+    var(--stage-front, none) center bottom / contain repeat-x,
+    var(--stage-mid, none) center bottom / contain repeat-x,
+    var(--stage-back, none) center top / contain repeat-x,
     #0a0a0c;
   overflow:hidden;
 }
