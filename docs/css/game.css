@@ -871,7 +871,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle.active { display:flex; flex-direction:column; }
 #tab-battle .battle-page {
   display:flex; flex-direction:column; gap:16px;
-  max-width:1200px; margin:0 auto; width:100%;
+  max-width:1600px; margin:0 auto; width:100%; /* 占满可用区域（同 .page-wrap，不再限 1200px） */
   flex:1 0 auto; min-height:min-content; /* 至少内容高：空间足时撑满，不足时撑开产生滚动 */
 }
 /* 对战区独占整页（属性/背包已移到独立页面，战斗页只留对战画面） */
