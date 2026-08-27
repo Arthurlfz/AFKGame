@@ -952,8 +952,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
   --stage-front: url('../assets/bg/corrupted-forest/front.png');
 }
-#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-front: url('../assets/bg/plague-swamp.png'); }
-#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-front: url('../assets/bg/shadow-mountains.png'); }
+#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-mid: url('../assets/bg/plague-swamp/mid.png'); }
+#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-back: url('../assets/bg/shadow-mountains/back.png'); --stage-mid: url('../assets/bg/shadow-mountains/mid.png'); }
 #tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-front: url('../assets/bg/bone-wastes.png'); }
 #tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-front: url('../assets/bg/blood-rift.png'); }
 #tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-front: url('../assets/bg/blight-heart.png'); }
