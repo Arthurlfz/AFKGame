@@ -923,17 +923,23 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   background:
     radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
     radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
-    var(--stage-bg, none) center / contain no-repeat,
+    var(--stage-front, none) center bottom / cover no-repeat,
+    var(--stage-mid, none) center bottom / cover no-repeat,
+    var(--stage-back, none) center top / cover no-repeat,
     #0a0a0c;
   overflow:hidden;
 }
-/* 按 data-area-id 切换各地图背景图（meowa 水彩横版场景，叠加在深色渐变底上） */
-#tab-battle .battle-stage[data-area-id="corrupted-forest"]  { --stage-bg: url('../assets/bg/corrupted-forest.png'); }
-#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-bg: url('../assets/bg/plague-swamp.png'); }
-#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-bg: url('../assets/bg/shadow-mountains.png'); }
-#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-bg: url('../assets/bg/bone-wastes.png'); }
-#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-bg: url('../assets/bg/blood-rift.png'); }
-#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-bg: url('../assets/bg/blight-heart.png'); }
+/* 按 data-area-id 切换各地图三层分层背景（meowa canvas 分层水墨地图） */
+#tab-battle .battle-stage[data-area-id="corrupted-forest"] {
+  --stage-back:  url('../assets/bg/corrupted-forest/back.png');
+  --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
+  --stage-front: url('../assets/bg/corrupted-forest/front.png');
+}
+#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-front: url('../assets/bg/plague-swamp.png'); }
+#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-front: url('../assets/bg/shadow-mountains.png'); }
+#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-front: url('../assets/bg/bone-wastes.png'); }
+#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-front: url('../assets/bg/blood-rift.png'); }
+#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-front: url('../assets/bg/blight-heart.png'); }
 /* 立绘角色（我方 / 敌方通用容器） */
 #tab-battle .fighter {
   position:absolute; display:flex; flex-direction:column; align-items:center;
@@ -1223,3 +1229,100 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .starter-card small { color:var(--text-faint); margin-top:3px; }
 .starter-card .starter-stats { color:var(--text-dim); font-size:.78rem; line-height:1.4; margin-top:6px; border-top:1px dashed var(--line); padding-top:5px; }
 
+
+/* ============================================================
+ * 打磨：战斗高光时刻（暴击震屏 / 掉落金光 / 击杀淡出 / 刀光）
+ * 全部纯 CSS 表现层，颜色取自 design-tokens，不动战斗逻辑
+ * ============================================================ */
+/* 缓慢漂移的雾气氛围层（叠在场景背景上、立绘下方） */
+#tab-battle .battle-stage::before {
+  content:''; position:absolute; inset:-20%;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgb(var(--action-gold-rgb) / .05), transparent 50%),
+    radial-gradient(ellipse at 70% 60%, rgba(90,110,130,.10), transparent 55%);
+  animation:stage-fog 26s ease-in-out infinite alternate;
+  pointer-events:none;
+}
+@keyframes stage-fog {
+  0%   { transform:translate(-3%, -2%) scale(1); }
+  50%  { transform:translate(3%, 2%) scale(1.06); }
+  100% { transform:translate(-2%, 3%) scale(1.02); }
+}
+/* 暴击震屏：整个舞台抖一下 */
+#tab-battle .battle-stage.stage-shake { animation:stage-shake .28s ease; }
+@keyframes stage-shake {
+  0% { transform:translate(0,0); }
+  20% { transform:translate(-5px,3px); }
+  40% { transform:translate(4px,-4px); }
+  60% { transform:translate(-3px,-2px); }
+  80% { transform:translate(2px,3px); }
+  100% { transform:translate(0,0); }
+}
+/* 掉落高光：金光 / 幽蓝光扫过全屏（金装=金，宠物蛋=蓝） */
+#tab-battle .battle-stage.loot-flash-gold::after,
+#tab-battle .battle-stage.loot-flash-blue::after {
+  content:''; position:absolute; inset:0; z-index:10; pointer-events:none;
+  opacity:0; animation:loot-flash .9s ease-out forwards;
+}
+#tab-battle .battle-stage.loot-flash-gold::after {
+  background:
+    linear-gradient(115deg, transparent 30%, rgb(var(--action-gold-rgb) / .38) 46%, rgb(var(--r-gold-rgb) / .55) 50%, rgb(var(--action-gold-rgb) / .38) 54%, transparent 70%),
+    radial-gradient(ellipse at 50% 45%, rgb(var(--action-gold-rgb) / .22), transparent 70%);
+}
+#tab-battle .battle-stage.loot-flash-blue::after {
+  background:
+    linear-gradient(115deg, transparent 30%, rgb(var(--r-blue-rgb,74,111,168) / .34) 47%, rgb(var(--r-blue-rgb,74,111,168) / .5) 50%, rgb(var(--r-blue-rgb,74,111,168) / .34) 53%, transparent 70%),
+    radial-gradient(ellipse at 50% 45%, rgb(var(--r-blue-rgb,74,111,168) / .2), transparent 70%);
+}
+@keyframes loot-flash {
+  0%   { opacity:0; transform:translateX(-24%); }
+  35%  { opacity:1; }
+  100% { opacity:0; transform:translateX(24%); }
+}
+/* 敌人被击败：淡出 + 下沉消散（下一场 resetBattle 时移除还原） */
+#tab-battle .fighter-enemy .stage-avatar.defeated {
+  animation:defeated .55s ease-in forwards;
+}
+@keyframes defeated {
+  0%   { opacity:1; transform:translateY(0) scale(1); filter:drop-shadow(0 12px 30px rgba(0,0,0,.75)); }
+  100% { opacity:0; transform:translateY(26px) scale(.86) rotate(6deg); filter:drop-shadow(0 4px 10px rgba(0,0,0,.5)) grayscale(.8); }
+}
+/* 出手刀光：攻击动作期间在立绘上划一道弧光（我方从左上劈向右下，敌方反向） */
+#tab-battle .fighter-pet .stage-avatar.attacking::after,
+#tab-battle .fighter-enemy .stage-avatar.attacking::after {
+  content:''; position:absolute; left:12%; top:18%; width:76%; height:64%;
+  border-radius:50%; border:3px solid transparent;
+  border-top-color:rgb(var(--action-gold-rgb) / .85);
+  filter:blur(1px) drop-shadow(0 0 8px rgb(var(--action-gold-rgb) / .6));
+  opacity:0; animation:slash-arc .3s ease-out forwards;
+  pointer-events:none;
+}
+#tab-battle .fighter-enemy .stage-avatar.attacking::after { transform:scaleX(-1) rotate(14deg); }
+@keyframes slash-arc {
+  0%   { opacity:0; transform:rotate(-40deg) scale(.7); }
+  35%  { opacity:1; }
+  100% { opacity:0; transform:rotate(30deg) scale(1.12); }
+}
+#tab-battle .fighter-enemy .stage-avatar.attacking::after { animation-name:slash-arc-enemy; }
+@keyframes slash-arc-enemy {
+  0%   { opacity:0; transform:scaleX(-1) rotate(40deg) scale(.7); }
+  35%  { opacity:1; }
+  100% { opacity:0; transform:scaleX(-1) rotate(-30deg) scale(1.12); }
+}
+/* 敌人差异化：变异怪名字血红 + 体型稍大（表现层） */
+#tab-battle .fighter-enemy.is-mutant .combat-name { color:var(--hp-hi); text-shadow:0 0 8px rgb(var(--hp-hi-rgb) / .5); }
+#tab-battle .fighter-enemy.is-mutant .stage-avatar {
+  width:286px; height:286px; font-size:8.8rem; line-height:286px;
+}
+/* 矮视口适配：立绘缩小，保证「血量上放」的信息块（名字/血条/经验）完整落在舞台内 */
+@media (max-height: 880px) {
+  #tab-battle .fighter-pet .stage-avatar { width:200px; height:200px; font-size:6.5rem; line-height:200px; }
+  #tab-battle .fighter-enemy .stage-avatar { width:190px; height:190px; font-size:6rem; line-height:190px; }
+  #tab-battle .fighter-enemy.is-mutant .stage-avatar { width:208px; height:208px; font-size:6.6rem; line-height:208px; }
+  #tab-battle .fighter-info { min-width:138px; padding:7px 9px; }
+  #tab-battle .fighter-info .combat-name { font-size:1.05rem; }
+  #tab-battle .fighter-enemy .fighter-info .combat-name { font-size:.95rem; }
+  #tab-battle .fighter-pet { bottom:8px; left:22px; }
+  #tab-battle .fighter-enemy { top:8px; right:18px; }
+  #tab-battle .fighter-enemy .fighter-info { margin-bottom:6px; }
+}
