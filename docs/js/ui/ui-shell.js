@@ -31,6 +31,10 @@
     if (target) target.classList.add('active');
     const btns = document.querySelectorAll('.sb-btn');
     btns.forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    // 给 body 打 battle-active 类（战斗页全宽背景用，避免依赖 :has() 选择器兼容性）
+    if (document.body && document.body.classList) {
+      document.body.classList.toggle('battle-active', page === 'battle');
+    }
   }
   // 从当前 hash 解析出目标页（非法/空 → 默认战斗页）
   function pageFromHash() {
