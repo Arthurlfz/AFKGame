@@ -879,31 +879,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 面板头右侧提示 */
 #tab-battle .bp-hint { font-family:var(--font-body); font-weight:400; font-size:var(--fs-xs); letter-spacing:0; color:var(--text-faint); }
 /* 战斗页激活时：#tab-battle 占满整个视口，让背景铺满全屏 */
-#tab-battle.active { min-height: 100vh; box-sizing: border-box; }
-body:has(#tab-battle.active) .page-wrap { min-height: 100vh; max-width:none; padding:8px 12px; }
-body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; width:100%; }
-/* ---- 全屏地图背景：直接写死 url（不用 CSS 变量，避免 background shorthand 解析坑），按地图切换 ---- */
-#tab-battle[data-area-id] { background-color:#0c0b0a; }
-/* 枯荣之地：三层分层水墨（后/中/前） */
-#tab-battle[data-area-id="corrupted-forest"] {
-  background-image:
-    url('../assets/bg/corrupted-forest/back.png'),
-    url('../assets/bg/corrupted-forest/mid.png'),
-    url('../assets/bg/corrupted-forest/front.png');
-  background-position: center top, center bottom, center bottom;
-  background-size: cover, cover, cover;
-  background-repeat: no-repeat;
-}
-/* 其余地图暂用单图（替换为分层后补 back/mid/front） */
-#tab-battle[data-area-id="plague-swamp"]     { background-image: url('../assets/bg/plague-swamp.png'); background-position:center bottom; background-size:cover; background-repeat:no-repeat; }
-#tab-battle[data-area-id="shadow-mountains"] { background-image: url('../assets/bg/shadow-mountains.png'); background-position:center bottom; background-size:cover; background-repeat:no-repeat; }
-#tab-battle[data-area-id="bone-wastes"]      { background-image: url('../assets/bg/bone-wastes.png'); background-position:center bottom; background-size:cover; background-repeat:no-repeat; }
-#tab-battle[data-area-id="blood-rift"]       { background-image: url('../assets/bg/blood-rift.png'); background-position:center bottom; background-size:cover; background-repeat:no-repeat; }
-#tab-battle[data-area-id="blight-heart"]     { background-image: url('../assets/bg/blight-heart.png'); background-position:center bottom; background-size:cover; background-repeat:no-repeat; }
-/* 让内部 UI 透出地图背景（面板/战斗框改为半透明深底） */
+/* 让内部 UI 透出地图背景（面板/战斗框改为半透明深底，但战斗舞台保留背景图） */
 #tab-battle .bp-arena,
-#tab-battle .battle-arena,
-#tab-battle .battle-stage { background: transparent; border-color: rgba(212,168,67,.2); }
+#tab-battle .battle-arena { background: transparent; border-color: rgba(212,168,67,.2); }
 #tab-battle .fs-panel__head,
 #tab-battle .fight-control,
 #tab-battle .stat-row { background: rgba(12,11,10,.72); border-color: rgba(212,168,67,.22); }
@@ -947,11 +925,29 @@ body:has(#tab-battle.active) .page-wrap > #tab-battle { max-width:none; width:10
 .roster-tooltip .rt-name { font-family:var(--font-title); font-weight:900; font-size:var(--fs-sm); color:var(--text-hi); margin-bottom:6px; }
 .roster-tooltip .rt-row { display:flex; justify-content:space-between; padding:1px 0; }
 .roster-tooltip .rt-row span:last-child { color:var(--text); font-family:var(--font-num); font-variant-numeric:tabular-nums; }
-/* ---- 立绘战斗舞台：宠物/怪物放大成对战角色（背景已上移到 #tab-battle 全屏，此处透明） ---- */
+/* ---- 立绘战斗舞台：宠物/怪物放大成对战角色，背景三层分层水墨 ---- */
 #tab-battle .battle-stage {
   position:absolute; left:70px; right:42px; top:0; bottom:0;
-  background:transparent; overflow:hidden;
+  background:
+    radial-gradient(ellipse at 20% 70%, rgba(120,40,20,.28), transparent 55%),
+    radial-gradient(ellipse at 80% 20%, rgba(30,60,90,.24), transparent 55%),
+    var(--stage-front, none) center bottom / cover no-repeat,
+    var(--stage-mid, none) center bottom / cover no-repeat,
+    var(--stage-back, none) center top / cover no-repeat,
+    #0a0a0c;
+  overflow:hidden;
 }
+/* 按 data-area-id 切换各地图三层分层背景（meowa canvas 分层水墨地图） */
+#tab-battle .battle-stage[data-area-id="corrupted-forest"] {
+  --stage-back:  url('../assets/bg/corrupted-forest/back.png');
+  --stage-mid:   url('../assets/bg/corrupted-forest/mid.png');
+  --stage-front: url('../assets/bg/corrupted-forest/front.png');
+}
+#tab-battle .battle-stage[data-area-id="plague-swamp"]     { --stage-front: url('../assets/bg/plague-swamp.png'); }
+#tab-battle .battle-stage[data-area-id="shadow-mountains"] { --stage-front: url('../assets/bg/shadow-mountains.png'); }
+#tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-front: url('../assets/bg/bone-wastes.png'); }
+#tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-front: url('../assets/bg/blood-rift.png'); }
+#tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-front: url('../assets/bg/blight-heart.png'); }
 /* 立绘角色（我方 / 敌方通用容器） */
 #tab-battle .fighter {
   position:absolute; display:flex; flex-direction:column; align-items:center;

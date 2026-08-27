@@ -52,15 +52,11 @@
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
       : '🐣 先选一张地图，即可自动挂机打怪、掉装备和宠物蛋';
-    // 切换全屏地图背景：data-area-id + 滚动动画挂 #tab-battle（战斗页全宽后背景铺满视口）
-    const tab = document.getElementById('tab-battle');
-    if (tab && typeof tab.setAttribute === 'function') {
-      if (area && area.id) tab.setAttribute('data-area-id', area.id);
-      else tab.removeAttribute('data-area-id');
-      // 一层图宽 = #tab-battle 高 × 1376/768（背景铺满战斗页，卷轴滚动一个图宽无缝）
-      const h = tab.offsetHeight || (document.documentElement ? document.documentElement.clientHeight : 0) || 0;
-      if (tab.style && tab.style.setProperty) tab.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
-      if (tab.classList && !tab.classList.contains('stage-scroll')) tab.classList.add('stage-scroll');
+    // 切换战斗舞台背景图（data-area-id 设在 .battle-stage，触发 CSS 三层背景）
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (stage && typeof stage.setAttribute === 'function') {
+      if (area && area.id) stage.setAttribute('data-area-id', area.id);
+      else stage.removeAttribute('data-area-id');
     }
   }
   function renderAreaSelector() {
