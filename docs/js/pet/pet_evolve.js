@@ -13,7 +13,7 @@
 
   const Config = window.Config;
   const { getPets, getStats } = window.Pet;
-  const { randInt } = window.Util;
+  const { randInt, randFloat } = window.Util;
   const Materials = window.Materials;
   const Supabase = window.Supabase;
   const Market = window.Market;
@@ -105,7 +105,7 @@
 
     // ---- 计算结果；先不改本地，等云端更新成功后再提交 ----
     const oldGrowth = pet.growth;
-    const boost = randInt(cfg.growthBoost[0], cfg.growthBoost[1]);
+    const boost = randFloat(cfg.growthBoost[0], cfg.growthBoost[1]);
     const newGrowth = Math.round((oldGrowth + boost) * 10) / 10;
     const keepForm = !!route.keepForm;
     const nextName = keepForm ? pet.name : route.to;

@@ -4,9 +4,9 @@
 // 复用 vstub.js 的 VM 桩
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
-function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},dataset:{},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},dataset:{},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
 const els={};
-const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el()},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelector:()=>el(),querySelectorAll:()=>[]},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
@@ -72,7 +72,14 @@ C('Pet.getPets().find(p=>p.id==='+chainId+').level=40');
 await C('Materials.gain("进化素材",1)');await S(80);
 const chain3=await C('Evolve.evolve('+chainId+',0)');
 A(chain3.ok===true&&chain3.result==='血月魔狐','血狐第3阶 Lv.40 进化成功并到达终点');
-A(C('Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id==='+chainId+')).length')===0,'第3阶终点无后续路线');
+const endRoutes=C('Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id==='+chainId+'))');
+A(endRoutes.length===1&&endRoutes[0].keepForm===true,'第3阶终点形态只剩「继续进化（成长+）」占位路线');
+// 终点后仍可进化：形态/名字不变，只涨成长（次数 3→4，需精粹进化素材）
+await C('Materials.gain("精粹进化素材",1)');await S(80);
+const chain4=await C('Evolve.evolve('+chainId+',0)');
+A(chain4.ok===true&&chain4.result==='血月魔狐'&&chain4.keepForm===true,'终点后强化进化：名字保持 血月魔狐（keepForm）');
+A(C('Pet.getPets().find(p=>p.id==='+chainId+').evolveTimes')===4,'终点后强化进化次数 +1（3 → 4）');
+A(C('Pet.getPets().find(p=>p.id==='+chainId+').growth')>chain3.newGrowth,'终点后强化进化成长继续提升');
 
 /* ============ 4c. 融合=转生：重置次数；变异配置核对 ============ */
 A(C('Config.synthesize.mutation.chance===0.5'),'合成变异概率为设计要求 50%（当前配置='+C('Config.synthesize.mutation.chance')+'）');

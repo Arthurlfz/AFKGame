@@ -146,28 +146,7 @@
   --z-dialog: 150;
   --z-toast: 200;
 
-  /* ============================================================
-   * 水墨 UI 主题（meowa 生成的素材接入；body 加 .ink-ui 才生效）
-   * 默认不启用，加 .ink-ui 切换为水墨风，可回退暗黑
-   * ============================================================ */
-  /* 关闭态下保持 none/不变，加 .ink-ui 后才指向真实素材 */
-  --ui-paper-texture: none;
-  --ui-panel-frame:   none;
-  --ui-btn-default:   none;
-  --ui-btn-hover:     none;
-  --ui-groove:        none;
-  --ui-ink-line:      #3a332a;     /* 水墨风边框色（墨灰） */
-  --ui-ink-text:      #d8d0c0;     /* 水墨风文字色（暖宣纸白） */
-  --ui-ink-gold:      #b8923a;     /* 水墨风强调金（淡金，暗于现在的 #f0a92e） */
-}
-body.ink-ui {
-  --ui-paper-texture: url('../assets/ui/paper-texture.png');
-  --ui-panel-frame:   url('../assets/ui/panel-frame.png');
-  --ui-btn-default:   url('../assets/ui/btn-default.png');
-  --ui-btn-hover:     url('../assets/ui/btn-hover.png');
-  --ui-groove:        url('../assets/ui/groove.png');
-}
-
+  /* 旧版图片切片已停用，正式界面统一使用下方纯 CSS 暗黑锻铁组件。 */
 /* ========================================================
  * Part B —— 组件规范（示例样式，类名带 fs- 前缀）
  * ======================================================== */
@@ -309,24 +288,32 @@ body.ink-ui .fs-panel {
   box-shadow: var(--shadow-panel);
 }
 body.ink-ui .fs-btn {
-  background-image: var(--ui-btn-default);
-  background-size: 100% 100%;
-  background-color: transparent;
-  border: 1px solid var(--ui-ink-line);
-  color: var(--ui-ink-text);
-  box-shadow: none;
+  background-image: none;
+  background-color: var(--btn-bg);
+  background-size: auto;
+  border: 1px solid var(--btn-border);
+  color: var(--btn-text);
+  box-shadow: var(--shadow-btn);
 }
 body.ink-ui .fs-btn:hover:not(:disabled) {
-  background-image: var(--ui-btn-hover);
-  border-color: var(--ui-ink-gold);
+  background-image: none;
+  background-color: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
   color: #ffe9d0;
-  box-shadow: 0 0 8px rgba(184,146,58,.3);
+  box-shadow: var(--shadow-btn-hover);
 }
-body.ink-ui .fs-btn--primary { /* 主按钮：水墨金 */
-  background-image: var(--ui-btn-hover);   /* 用 hover 那张（更亮） */
-  border-color: var(--ui-ink-gold);
+body.ink-ui .fs-btn--primary {
+  background-image: none;
+  background-color: var(--accent);
+  border-color: var(--accent-dim);
   color: #1a1206;
   font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+}
+body.ink-ui .fs-btn--primary:hover:not(:disabled) {
+  background-image: none;
+  background-color: var(--accent-hi);
+  color: #120c03;
 }
 
 /* ---------- 血条：金属槽 + 血晶/熔岩填充，低血量变亮红 ---------- */

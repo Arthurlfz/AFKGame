@@ -108,9 +108,12 @@
   }
 
   // 词缀展示：如「攻击 +12%（T4）」，带 T 阶颜色
+  // 命中/闪避/速度为固定值词缀（fixed），不显示 %，其余（atk/hp/def/crit/critDamage/lifesteal/dropQty/dropRare/matDrop）为百分比
+  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd']);
   function affixText(aff) {
     const color = TIER_COLORS[aff.tier] || '#9a9a9a';
-    return `<span style="color:${color}">${aff.label} +${aff.value}%（T${aff.tier}）</span>`;
+    const suffix = FIXED_AFFIX_TYPES.has(aff.type) ? '' : '%';
+    return `<span style="color:${color}">${aff.label} +${aff.value}${suffix}（T${aff.tier}）</span>`;
   }
 
   /* ---------- 神圣石：重 Roll 装备【全部】词缀数值（类型/T 阶不变） ---------- */

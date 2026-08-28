@@ -18,6 +18,7 @@
   const Materials = window.Materials;
   const { getPets } = window.Pet;
   const { getInventory, flattenAffixes, rarityOf } = window.Equipment;
+  const EQUIP_SLOTS = (window.Equipment.SLOTS || []); // 12 部位（武器/戒指/项链/头盔/护甲/盾牌/靴子/腰带/斗篷/饰品/护符/徽章）
 
   const MARKET_FILTER_KEY = 'marketFilters';
   const MARKET_FILTER_DEFAULT = {
@@ -25,8 +26,10 @@
     slot: 'all',
     rarity: 'all',
     tier: 'all',
+    baseTier: 'all',      // 底材T阶 all/'1'~'5'
     growth: 'desc',
     sort: 'latest',
+    affixFilters: [],     // POE式词缀条件：[{type, min, max}]，可与/或组合（默认与）
   };
 
   let marketFilters = loadMarketFilters();
@@ -74,7 +77,25 @@
     if (l.item_id) {
       if (marketFilters.slot !== 'all' && String(l.item_slot || l.slot || '').toLowerCase() !== marketFilters.slot) return false;
       if (marketFilters.rarity !== 'all' && String(l.item_rarity || '').toLowerCase() !== marketFilters.rarity) return false;
+      // 底材T = item_tier（eq.tier 即 materialTier）
       if (marketFilters.tier !== 'all' && normalizeTier(l.item_tier || l.tier) !== Number(marketFilters.tier.slice(1))) return false;
+      const affs = flattenAffixes(l.item_affixes || l.affixes || []);
+      // 词缀T = 装备里最高词缀T（best=数字最小），作为"词缀T阶"筛选
+      if (marketFilters.baseTier !== 'all') {
+        let best = Infinity;
+        for (const a of affs) best = Math.min(best, a.tier || 5);
+        if (best === Infinity) best = 5;
+        if (best > Number(marketFilters.baseTier)) return false;
+      }
+      const condOk = af => {
+        const aff = affs.find(a => a.type === af.type);
+        if (!aff) return false;
+        const v = Number(aff.value);
+        if (af.min != null && v < Number(af.min)) return false;
+        if (af.max != null && v > Number(af.max)) return false;
+        return true;
+      };
+      if ((marketFilters.affixFilters || []).some(af => !condOk(af))) return false;
     }
     return true;
   }
@@ -114,6 +135,60 @@
     });
   }
 
+  // POE式词缀条件行：typeahead 选词缀 + min/max 数值范围，可加多条（默认"与"=全部满足）
+  function renderAffixFilterRows(panel) {
+    const body = panel.querySelector('.filter-group[data-group="affix"] .filter-body');
+    if (!body) return;
+    body.innerHTML = '';
+    const AFFIX_POOL = window.Equipment.AFFIX_POOL || [];
+    const filters = marketFilters.affixFilters || [];
+    const wrap = document.createElement('div');
+    wrap.className = 'affix-filter-wrap';
+
+    const renderRow = (af, idx) => {
+      const row = document.createElement('div');
+      row.className = 'affix-filter-row';
+      const sel = document.createElement('select');
+      sel.className = 'affix-type-sel';
+      sel.setAttribute('aria-label', '词缀类型');
+      sel.innerHTML = AFFIX_POOL.map(a => `<option value="${a.type}" ${a.type === af.type ? 'selected' : ''}>${a.label}</option>`).join('');
+      sel.onchange = () => { af.type = sel.value; saveMarketFilters(); UI.renderAll(); };
+      const min = document.createElement('input');
+      min.className = 'affix-min'; min.type = 'number'; min.placeholder = 'min';
+      min.value = af.min != null ? af.min : '';
+      min.setAttribute('aria-label', '最小值');
+      min.oninput = () => { af.min = min.value === '' ? null : Number(min.value); saveMarketFilters(); UI.renderAll(); };
+      const max = document.createElement('input');
+      max.className = 'affix-max'; max.type = 'number'; max.placeholder = 'max';
+      max.value = af.max != null ? af.max : '';
+      max.setAttribute('aria-label', '最大值');
+      max.oninput = () => { af.max = max.value === '' ? null : Number(max.value); saveMarketFilters(); UI.renderAll(); };
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'btn-mini ghost affix-del'; del.textContent = '✕';
+      del.setAttribute('aria-label', '删除该词缀条件');
+      del.onclick = () => { marketFilters.affixFilters.splice(idx, 1); saveMarketFilters(); UI.renderAll(); };
+      row.appendChild(sel); row.appendChild(min); row.appendChild(max); row.appendChild(del);
+      return row;
+    };
+
+    filters.forEach((af, i) => wrap.appendChild(renderRow(af, i)));
+    if (!filters.length) {
+      const hint = document.createElement('div');
+      hint.className = 'hint affix-empty';
+      hint.textContent = '选词缀 + 数值范围，可叠加多条（全部满足才算命中）';
+      wrap.appendChild(hint);
+    }
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'btn-mini alt affix-add'; add.textContent = '+ 添加词缀条件';
+    add.onclick = () => {
+      const pool = AFFIX_POOL[0];
+      marketFilters.affixFilters = [...(marketFilters.affixFilters || []), { type: pool ? pool.type : 'atk', min: null, max: null }];
+      saveMarketFilters(); UI.renderAll();
+    };
+    wrap.appendChild(add);
+    body.appendChild(wrap);
+  }
+
   function renderMarketFilterPanel() {
     const panel = $('market-filters');
     if (!panel) return;
@@ -124,9 +199,7 @@
     ]);
     fillFilterGroup(panel, 'slot', [
       { key: 'slot', val: 'all', label: '全部' },
-      { key: 'slot', val: 'weapon', label: '武器' },
-      { key: 'slot', val: 'armor', label: '防具' },
-      { key: 'slot', val: 'accessory', label: '饰品' },
+      ...EQUIP_SLOTS.map(s => ({ key: 'slot', val: s, label: s })),
     ]);
     fillFilterGroup(panel, 'rarity', [
       { key: 'rarity', val: 'all', label: '全部' },
@@ -138,6 +211,12 @@
       { key: 'tier', val: 'all', label: '全部' },
       ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ key: 'tier', val: t, label: t })),
     ]);
+    fillFilterGroup(panel, 'baseTier', [
+      { key: 'baseTier', val: 'all', label: '全部' },
+      ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ key: 'baseTier', val: t, label: `含 T${t}` })),
+    ]);
+    // POE式词缀条件行（typeahead 选词缀 + 数值范围，可加多条）
+    renderAffixFilterRows(panel);
     // 价格范围分组：复用现有排序（价格低→高 / 高→低 / 最新）
     fillFilterGroup(panel, 'price', [
       { key: 'sort', val: 'price-asc', label: '价格低→高' },
@@ -226,7 +305,7 @@
       const info = document.createElement('div');
       info.className = 'm-info';
       const color = Config.equipment.rarities.find(r => r.id === l.item_rarity)?.color || '#d8d8d8';
-      const affixText = flattenAffixes(l.item_affixes || []).map(a => `${a.label}+${a.value}%`).join(' ');
+      const affixText = flattenAffixes(l.item_affixes || []).map(a => Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label}+${a.value}%`).join(' ');
       info.innerHTML = `
         <div class="m-name" style="color:${color}">${escapeHtml(l.item_name)} <span style="font-size:0.833rem">${RARITY_LABEL[l.item_rarity] || l.item_rarity}·T${l.item_tier}</span></div>
         <div class="m-desc">${escapeHtml(affixText)}</div>`;
@@ -733,6 +812,19 @@
     const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
+  // 交易对手显示：只区分「真人」还是「NPC 流浪商人」。
+  // 游戏里市场本就不暴露真实玩家身份（挂单只存 seller_id，不显示名字），
+  // 所以这里也不显示对方 uuid —— 等 profiles 昵称系统做好、且玩家自己公开昵称后，再换成昵称。
+  function counterLabel(v) {
+    if (!v) return '';
+    return v === '流浪商人' ? '流浪商人' : '玩家';
+  }
+  // 对手那一格：老记录没有 counterparty 就不显示这一格（历史数据不回填）
+  function counterCell(r) {
+    if (!r.counterparty) return '';
+    const verb = r.role === 'sell' ? '卖给' : '买自';
+    return `<span class="tr-who">${verb} ${escapeHtml(counterLabel(r.counterparty))}</span>`;
+  }
   function renderTradeRecords() {
     const recs = Market.getTradeRecords();
     const sells = recs.filter(r => r.role === 'sell');
@@ -767,6 +859,7 @@
         row.innerHTML = `
           <span class="tr-time">${formatTime(r.created_at)}</span>
           <span class="tr-name">${escapeHtml(r.item_name)}</span>
+          ${counterCell(r)}
           <span class="tr-price">${r.price_qty} ${mat.icon} ${mat.name}</span>
           <span class="tr-tax">税 -${r.tax_qty}</span>`;
         sellBox.appendChild(row);
@@ -785,6 +878,7 @@
         row.innerHTML = `
           <span class="tr-time">${formatTime(r.created_at)}</span>
           <span class="tr-name">${escapeHtml(r.item_name)}</span>
+          ${counterCell(r)}
           <span class="tr-price">${r.price_qty} ${mat.icon} ${mat.name}</span>`;
         buyBox.appendChild(row);
       }

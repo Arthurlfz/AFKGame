@@ -1,7 +1,7 @@
 // vtest_bag.js —— 背包分类页最小回归
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
-function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
 const els={};
 const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){}},els,session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
 ctx.window=ctx;vm.createContext(ctx);
@@ -14,7 +14,7 @@ const C=code=>vm.runInContext(code,ctx);
 (async()=>{
 await S(300);await C('Game.onLogin("bag@test.com","123456")');await S(300);
 // 准备一些数据
-await C('(async()=>{const p=Pet.createPet("血狐","🦊",6,100,20,10,8);Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;Equipment.addToInventory(Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="blue")));Materials.gainLocal(Config.craft.reforge.name,2);Materials.gainLocal("测试素材",3);await Drop.setEggCount(2);})()');
+await C('(async()=>{const p=Pet.createPet("血狐","🦊",6,100,20,10,8);Pet.addPet(p);Pet.setActive(p.id);const s=await Supabase.savePet(p);p.cloudId=s.data.id;Equipment.addToInventory(Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="blue")));Materials.gainLocal(Config.craft.reforge.name,2);Materials.gainLocal("测试素材",3);await Drop.setEggCount(2);})()');
 await S(120);
 C('UI.renderAll()');
 A(!!els['bag-root'],'背包页容器存在');

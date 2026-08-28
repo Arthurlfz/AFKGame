@@ -30,6 +30,32 @@
     renderStats(getTotalFights(), getTotalEquipDrops());
   }
 
+  /* ---------- 经验 / 等级云端同步 ----------
+   * 等级和经验条都要存云端（不然刷新后等级在、经验条清零）。
+   * 但每场战斗都写一次太频繁（1~3 秒一场），所以做节流：
+   *   平时 15 秒最多写一次；升级 / 停止挂机 / 登出 / 切后台 时立即补写一次。
+   */
+  const EXP_SYNC_MS = 15000;
+  let expSyncTimer = null;
+  let expSyncPet = null;
+  // immediate=true 立即写云端（升级、停手、登出、切后台）
+  function syncPetProgress(pet, immediate) {
+    if (!pet || !pet.cloudId) return;
+    expSyncPet = pet; // 存引用：节流期间宠物继续升级，写的时候取到的是最新值
+    if (immediate) { flushPetProgress(); return; }
+    if (expSyncTimer) return; // 已有待触发的定时器，等它即可
+    expSyncTimer = setTimeout(flushPetProgress, EXP_SYNC_MS);
+  }
+  async function flushPetProgress() {
+    if (expSyncTimer) { clearTimeout(expSyncTimer); expSyncTimer = null; }
+    const pet = expSyncPet;
+    if (!pet || !pet.cloudId) return;
+    const { error } = await Supabase.updatePet(pet.cloudId, {
+      level: pet.level, exp: Math.max(0, Math.round(pet.exp || 0))
+    });
+    if (error) addLog('⚠️ 进度云端同步失败：' + (error.message || '未知错误'));
+  }
+
   /* ---------- 每场结算（由 battle.js 每场结束调用） ---------- */
   async function handleFightEnd({ win, enemy }) {
     if (win) {
@@ -40,12 +66,11 @@
       if (info.leveled) {
         addLog(`✨ ${pet.name} 升级到 Lv.${info.newLevel}！属性大幅提升！`);
         if (info.maxed) addLog(`👑 ${pet.name} 已达到等级上限 Lv.${Config.pet.maxLevel}！`);
-        // 等级持久化：升级后同步云端 level，刷新页面等级不丢
-        // （config 经验倍率只影响攒经验速度，不影响已保存的等级）
-        if (pet.cloudId) {
-          const { error } = await Supabase.updatePet(pet.cloudId, { level: pet.level });
-          if (error) addLog('⚠️ 等级云端同步失败：' + (error.message || '未知错误'));
-        }
+        // 升级是大事：等级 + 经验立即写云端，刷新页面都不丢
+        syncPetProgress(pet, true);
+      } else {
+        // 没升级也要存经验，走节流（15 秒一次），避免每场都打一次数据库
+        syncPetProgress(pet);
       }
       showLoot(await rollReward(enemy, window.Battle.getCurrentArea())); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料
       // 任务进度上报：当前图的 type=kill 任务进度 +1（打怪类任务）
@@ -78,9 +103,12 @@
       const spd = Config.pet.speeds[s.name] || B.spd || 40;
       // 用 Lv.1 真实属性展示（每只基宠差异化 baseHp/baseAtk/baseDef），让新玩家看清定位
       const st = getStats(createPet(s.name, s.icon, s.growth, s.baseHp || B.hp, s.baseAtk || B.atk, s.baseDef || B.def, spd));
-      // 大白话定位：按成长/速度/肉度给一句标签，帮新手做选择
-      const role = s.growth >= 5.5 ? '后期猛将 · 成长超高' : (spd >= 55 ? '先手刺客 · 速度快' : (st.hp >= 120 ? '肉盾前排 · 很耐打' : '均衡好上手'));
-      return `<button class="starter-card" data-index="${i}"><span class="starter-icon">${s.icon}</span><b>${s.name}</b>
+      // 定位标签直接读 config.petProfiles（每只基宠都写了 role/description），
+      // 不要用规则现猜——曾导致 8 只里 6 只都显示「先手刺客 · 速度快」，选宠标签毫无信息量
+      const profile = (Config.pet.petProfiles && Config.pet.petProfiles[s.name]) || Config.pet.defaultPetProfile;
+      const role = profile.role || '均衡型';
+      const desc = profile.description || '';
+      return `<button class="starter-card" data-index="${i}" title="${desc}"><span class="starter-icon">${s.icon}</span><b>${s.name}</b>
         <small>成长 ${Number(s.growth).toFixed(1)}</small>
         <small class="starter-role">${role}</small>
         <small class="starter-stats">生命 ${Math.round(st.hp)} · 攻击 ${Math.round(st.atk)}<br>防御 ${Math.round(st.def)} · 速度 ${Math.round(st.spd)}</small></button>`;
@@ -117,6 +145,7 @@
 
   function clearAccountState() {
     stopAutoBattle();
+    flushPetProgress();                                // 登出/切账号前把经验补写云端
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
     runtimeStarted = false;                            // 允许下次登录重新启动运行时
     clearPets();
@@ -221,6 +250,19 @@
     const { data, error } = await Items.loadCloudItems();
     if (error) { addLog('⚠️ 读取云端装备失败：' + (error.message || '未知错误')); return; }
     Items.setCloudItems(data || []);
+    // 背包加载完后，把宠物装备槽的 cloudId 引用还原成背包里的装备对象（F5 后不脱落）
+    // 装备槽引用单独读（loadPetEquipment），兼容旧库无列
+    if (window.Pet && window.Pet.restoreEquipment && window.Equipment && window.Equipment.getInventory && Supabase.loadPetEquipment) {
+      const inv = window.Equipment.getInventory();
+      for (const pet of getPets()) {
+        if (pet.cloudId) {
+          const eqMap = await Supabase.loadPetEquipment(pet.cloudId);
+          pet.equipment = {};
+          for (const [slot, cid] of Object.entries(eqMap || {})) pet.equipment[slot] = cid ? { cloudId: cid } : null;
+          window.Pet.restoreEquipment(pet, inv);
+        }
+      }
+    }
     renderAll();
   }
 
@@ -338,6 +380,7 @@
     if (battleBtn) battleBtn.addEventListener('click', () => {
       if (isRunning()) {
         stopAutoBattle();                // 挂机中 → 手动停止
+        flushPetProgress();              // 停手时把攒的经验补写云端（否则要等下一次节流）
       } else if (getCurHp(getActivePet()) >= getStats(getActivePet()).hp) {
         if (!window.Battle.getCurrentArea()) {
           addLog('⚠️ 请先选择挂机地图。', false, true);
@@ -346,6 +389,12 @@
         startAutoBattle(handleFightEnd); // 满血才允许开始
       }
       syncButton();
+    });
+
+    // 切后台 / 关标签页前补写一次经验
+    // （beforeunload 里的异步请求常被浏览器掐掉，visibilitychange 更可靠）
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushPetProgress();
     });
 
     // 非战斗回血时钟（每秒驱动一次；挂机中「等待回血」状态也回血，回满后 battle 自动继续）

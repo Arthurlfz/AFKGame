@@ -125,7 +125,9 @@
 
     // 主宠成长/等级同步云端
     const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount };
-    if (M.resetLevel) patch.level = main.level;
+    // 等级重置时必须连 exp 一起清零并同步：否则云端留着旧经验，
+    // 刷新后会变成「Lv1 + 几千经验」，打一场直接连升几十级
+    if (M.resetLevel) { patch.level = main.level; patch.exp = 0; }
     const { error: updErr } = await Supabase.updatePet(main.cloudId, patch);
     if (updErr) console.warn('云端更新宠物失败：', updErr.message);
 

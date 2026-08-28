@@ -6,9 +6,9 @@
 // 复用 vtest.js 的 VM 桩（vstub.js）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
-function el(){return{textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
+function el(){return{dataset:{},setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
 const els={};
-const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el()},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelector:()=>el(),querySelectorAll:()=>[]},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
@@ -18,14 +18,19 @@ const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
 (async()=>{
 await S(300);await C('Game.onLogin("affix@test.com","123456")');await S(300);
-// 1) AFFIX_POOL 结构：6 条 + 每条带 category
+// 1) AFFIX_POOL 结构：12 条（前缀 atk/hp/def + 后缀 spd/crit/critDamage/hit/dodge/lifesteal/dropQty/dropRare/matDrop）
 const poolLen=C('Equipment.AFFIX_POOL.length');
-A(poolLen===6,'词缀池共 6 条');
-const cats=C('JSON.stringify(Equipment.AFFIX_POOL.map(a=>({t:a.type,c:a.category})))');
-A(cats==='[{"t":"atk","c":"prefix"},{"t":"hp","c":"prefix"},{"t":"def","c":"prefix"},{"t":"spd","c":"suffix"},{"t":"crit","c":"suffix"},{"t":"lifesteal","c":"suffix"}]','词缀池归类正确（前缀 atk/hp/def，后缀 spd/crit/lifesteal）');
+A(poolLen===12,'词缀池共 12 条（前缀3 + 后缀9，含暴击伤害/掉落数量/掉落稀有度/材料掉率）');
+// 前缀恰好 3、后缀恰好 9（结构约束：前缀数值类，后缀机制/资源类）
+A(C('Equipment.AFFIX_POOL.filter(a=>a.category==="prefix").length')===3,'前缀恰好 3 条（atk/hp/def）');
+A(C('Equipment.AFFIX_POOL.filter(a=>a.category==="suffix").length')===9,'后缀恰好 9 条（spd/crit/critDamage/hit/dodge/lifesteal/dropQty/dropRare/matDrop）');
+// 关键类型必须都在池中（不只比总数，防漏新增词缀）
+const needTypes=['atk','hp','def','spd','crit','critDamage','hit','dodge','lifesteal','dropQty','dropRare','matDrop'];
+const inPool=C('JSON.stringify(Equipment.AFFIX_POOL.map(a=>a.type))');
+A(needTypes.every(t=>JSON.parse(inPool).includes(t)),'词缀池包含全部 12 个关键类型');
 // 2) affixCategory 映射
-const map=C(`JSON.stringify(['atk','hp','def','spd','crit','lifesteal'].map(t=>Equipment.affixCategory(t)))`);
-A(map==='["prefix","prefix","prefix","suffix","suffix","suffix"]','affixCategory 归类正确');
+const map=C(`JSON.stringify(['atk','hp','def','spd','crit','critDamage','hit','dodge','lifesteal','dropQty','dropRare','matDrop'].map(t=>Equipment.affixCategory(t)))`);
+A(map==='["prefix","prefix","prefix","suffix","suffix","suffix","suffix","suffix","suffix","suffix","suffix","suffix"]','affixCategory 归类正确（前缀3/后缀9）');
 // 3) 生成装备：大量采样，验证归类完整 + 结构上限
 C('var golds=[],blues=[],whites=[]');
 for(let i=0;i<120;i++){await C('whites.push(Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="white")))');}

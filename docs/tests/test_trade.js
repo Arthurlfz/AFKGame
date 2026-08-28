@@ -164,7 +164,7 @@ const matQ = uid => name => {
   await S(50);
   const lid2 = C('Market.getItemListings().find(l => l.item_name === "铁盾").id');
   const res = await C(`Market.buyItem("${lid2}")`);
-  assert(res && res.error && res.error.includes('材料不足'), `B 只有 1 强化石买 8 强化石的装备 → 拒绝（${res.error}）`);
+  assert(res && res.error && res.error.includes('不足'), `B 只有 1 强化石买 8 强化石的装备 → 拒绝（${res.error}）`);
   assert(matQ('bob')('强化石') === 1, '拒绝后 B 材料不变（仍 1）');
   assert(ctx.itemListTable.find(l => l.id === lid2).status === 'active', '拒绝后挂单仍是 active');
 

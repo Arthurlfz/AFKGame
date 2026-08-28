@@ -43,6 +43,23 @@
     return Math.random() < 0.85 ? 'white' : 'blue';
   }
 
+  // 底材T阶随机：图越高，越好底材（数字小）概率越高。
+  // 权重 = (1-p)*T + p*(6-T)，p = (areaTier-1)/5 线性插值：
+  //   图1 → 偏向 T5（烂底为主，好底稀有）；图6 → 偏向 T1（优底为主）。
+  function rollMaterialTier(areaTier) {
+    const tiers = [1, 2, 3, 4, 5];
+    const a = (areaTier || 1) - 1;
+    const p = Math.max(0, Math.min(1, a / 5));
+    const weights = tiers.map(T => (1 - p) * T + p * (6 - T));
+    const total = weights.reduce((s, w) => s + w, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < tiers.length; i++) {
+      r -= weights[i];
+      if (r < 0) return tiers[i];
+    }
+    return 5;
+  }
+
   // 宠物蛋按品种计数：{ '血狐': 2, '骨狼': 1 }（已登录以云端 pet_egg 为准，本地同步）
   let eggMap = {};
   let totalEquipDrops = 0;  // 累计获得装备数（跨挂机累计）
@@ -60,9 +77,15 @@
     const D = Config.drop;
     const r = Math.random();
     let reward;
-    if (r < D.equipmentChance) { // 装备：稀有度按当前怪的等级段倾向
+    if (r < D.equipmentChance) { // 装备：稀有度按当前怪的等级段倾向；基底=当前图档 × 随机底材T阶
       const rarity = pickDropRarity(enemy);
-      const eq = generateEquipment(rarity);
+      // areaTier = 当前图在 config.battle.areas 里的序号+1（图1→1档 ... 图6→6档）
+      const areaList = Config.battle.areas || [];
+      const areaIdx = area && area.id ? areaList.findIndex(a => a.id === area.id) : -1;
+      const areaTier = Math.max(1, Math.min(6, (areaIdx >= 0 ? areaIdx + 1 : 1)));
+      // materialTier = 底材T阶，图越高越好底材概率越高：以 1/T 为权重偏向优底，高图偏移更明显
+      const matTier = rollMaterialTier(areaTier);
+      const eq = generateEquipment(rarity, areaTier, matTier);
       addToInventory(eq);
       totalEquipDrops++;
       const { error } = await Items.saveItem(eq); // 未登录时 saveItem 返回"未登录"，静默忽略

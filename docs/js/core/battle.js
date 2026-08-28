@@ -164,11 +164,15 @@
     state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
     state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal };
     state.enemy = enemyStats;
-    // 敌人机制属性：命中/闪避均为固定值；无专属闪避的敌人按零处理。
+    // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
+    // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
     if (state.enemy.critRate == null) state.enemy.critRate = Config.battle.critRate;
     if (state.enemy.critDamage == null) state.enemy.critDamage = Config.battle.critMultiplier;
     if (state.enemy.hit == null) state.enemy.hit = 90;
-    if (state.enemy.dodge == null) state.enemy.dodge = 0;
+    if (state.enemy.dodge == null) {
+      const et = state.enemy.enemyType || 'normal';
+      state.enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
+    }
     if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
     state.petAction = 0;
     state.enemyAction = 0;
@@ -221,13 +225,14 @@
     }, 150);
   }
   // 完整伤害结算：命中判定 → 攻防减法 → 暴击 → 吸血
-  // att/defStats 需带 hit/dodge/lifesteal（小数）；缺失则回退默认，保持兼容
+  // 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
   function calcDamage(att, defStats) {
     const atk = att.atk, def = defStats.def;
-    // 命中判定：命中率 = 攻击者命中 - 防御者闪避（封顶 95%，保底 20%）
-    const hit = att.hit == null ? 0.9 : att.hit;
-    const dodge = defStats.dodge == null ? 0.05 : defStats.dodge;
-    const hitChance = Math.max(0.2, Math.min(0.95, hit - dodge));
+    const hit = Math.max(0, att.hit || 0);
+    const dodge = Math.max(0, defStats.dodge || 0);
+    const hitChance = hit + dodge > 0
+      ? Math.max(0.05, Math.min(0.95, hit / (hit + dodge)))
+      : 0.05;
     if (Math.random() >= hitChance) {
       return { damage: 0, isCrit: false, isMiss: true, heal: 0 };
     }
@@ -253,6 +258,7 @@
     totalFights++; // 累计战斗场数（跨挂机累计）
     window.UI.addLog(win ? `🏆 第${fightCount}场胜利！` : '💀 战斗失败……', false, true, !win);
     window.UI.updateStatus('fighting', fightCount);
+    if (win && window.UI.animateVictory) window.UI.animateVictory(); // 胜利演出：敌人淡出（表现层）
 
     if (onFightEnd) onFightEnd({ win, fightCount, enemy: state.enemy }); // main：结算经验/掉落/刷新UI
     // 经验/掉落归属「当前出战」宠物（main.js handleFightEnd 用 getActivePet），切换后即给新宠物

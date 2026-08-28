@@ -58,9 +58,9 @@ const matQ = uid => name => {
   await C('Supabase.signIn("alice@test.com","123456")');
   await S(30);
   assert(C('session.user.id') === 'user-a', 'A(alice) 登录');
-  await C('Materials.gain("强化石", 200)');
+  await C('Materials.gain("重铸石", 200)');
   await S(50);
-  assert(matQ('user-a')('强化石') === 200, 'A 持有 200 强化石');
+  assert(matQ('user-a')('重铸石') === 200, 'A 持有 200 重铸石');
 
   // --- 2. start() 立即补货：在售假货 ≥ minActive(20)，市场打开不是空的 ---
   await C('MarketBot.start()');
@@ -81,22 +81,23 @@ const matQ = uid => name => {
 
   // --- 4. 低价漏：Math.random 归零 → 必出漏，价格 = 该档最低价 × leakDiscount ---
   C('var __origRandom = Math.random'); // 先存原始引用（vm 内变量，native 函数不能 toString 还原）
-  C('Math.random = () => 0');          // randInt→最小值、pickWeighted→第一项(enhance)、random<leakChance 恒真
-  C('MarketBot.tick()');               // 生成一批（全白装 + 强化石 + 漏）
+  C('Math.random = () => 0');          // randInt→最小值、pickWeighted→第一项(reforge/重铸石)、random<leakChance 恒真
+  C('MarketBot.tick()');               // 生成一批（全白装 + 重铸石 + 漏）
   C('Math.random = __origRandom');     // 还原
   await S(30);
   const leak = C('Market.getBotListings().find(l => l.isLeak)');
   assert(!!leak, '随机归零时生成出低价漏（isLeak=true）');
-  // enhance.white range=[2,6] → 漏价 = max(1, floor(2×0.5)) = 1
-  assert(leak.item_rarity === 'white' && leak.material_type === '强化石' && leak.material_qty === 1,
-    `漏价 = 该档最低价×折扣：白装强化石 1 个（实际 ${leak.material_qty} ${leak.material_type}）`);
+  // reforge.white range=[2,6] → 漏价 = max(1, floor(2×0.5)) = 1
+  assert(leak.item_rarity === 'white' && leak.material_type === '重铸石' && leak.material_qty === 1,
+    `漏价 = 该档最低价×折扣：白装重铸石 1 个（实际 ${leak.material_qty} ${leak.material_type}）`);
 
   // --- 5. 购买假单：扣材料（云端）+ 装备入包 + 写买家存档 + 假单移除 ---
-  const buyId = C('Market.getBotListings()[0].id');
-  const beforeMat = matQ('user-a')('强化石');
+  // 买「低价漏」单（材料类型已知：白装重铸石 1 个），余额断言才可靠
+  const buyId = C('Market.getBotListings().find(l => l.isLeak).id');
+  const beforeMat = matQ('user-a')('重铸石');
   const r = await C(`Market.buyBotItem("${buyId}")`);
   assert(r.ok === true, '购买假单成功');
-  assert(matQ('user-a')('强化石') === beforeMat - 1, `购买扣 1 强化石（云端：${beforeMat}→${matQ('user-a')('强化石')}）`);
+  assert(matQ('user-a')('重铸石') === beforeMat - 1, `购买扣 1 重铸石（云端：${beforeMat}→${matQ('user-a')('重铸石')}）`);
   assert(C('Equipment.getInventory().length') === 1, '装备已入买家背包');
   assert(C('Equipment.getInventory()[0].cloudId') !== null, '购买装备已写买家存档（cloudId 回写）');
   assert(ctx.itemsTable.some(x => x.user_id === 'user-a' && x.id === C('Equipment.getInventory()[0].cloudId')),
@@ -104,22 +105,22 @@ const matQ = uid => name => {
   assert(!C('Market.getBotListings().some(l => l.id === "' + buyId + '")'), '假单已从市场移除');
 
   // --- 6. 材料不足 → 拒绝且假单保留 ---
-  // 先买掉大部分假单（每件 1 强化石），同时验证批量购买
-  const cheap = C('Market.getBotListings().filter(l => l.material_qty === 1 && l.material_type === "强化石").length');
+  // 先买掉大部分假单（每件 1 重铸石），同时验证批量购买
+  const cheap = C('Market.getBotListings().filter(l => l.material_qty === 1 && l.material_type === "重铸石").length');
   for (let i = 0; i < Math.min(cheap, 15); i++) {
-    const id = C('Market.getBotListings().find(l => l.material_qty === 1 && l.material_type === "强化石").id');
+    const id = C('Market.getBotListings().find(l => l.material_qty === 1 && l.material_type === "重铸石").id');
     await C(`Market.buyBotItem("${id}")`);
   }
   await S(30);
   const afterBuy = C('Market.getBotListings().length');
   assert(afterBuy >= 1, `批量购买后假单剩 ${afterBuy} 件`);
   // 材料清零后买任何在售假单都该拒绝
-  await C('Materials.gain("强化石", 1000)'); // 先补足，避免干扰下一步补货断言
+  await C('Materials.gain("重铸石", 1000)'); // 先补足，避免干扰下一步补货断言
   await S(50);
   const spendId = C('Market.getBotListings()[0].id');
   // 直接清空云端材料
   const uid = 'user-a';
-  const mrow = ctx.materialsTable.find(x => x.user_id === uid && x.name === '强化石');
+  const mrow = ctx.materialsTable.find(x => x.user_id === uid && x.name === '重铸石');
   if (mrow) mrow.quantity = 0;
   await C('Materials.setCloudMaterials([])'); // 本地也清零
   const poor = await C(`Market.buyBotItem("${spendId}")`);
@@ -140,7 +141,8 @@ const matQ = uid => name => {
   await S(30);
   const after1 = C('Market.getBotListings().length');
   if (cur < 20) {
-    assert(after1 === 20, `少于 20 补货到 20（${cur} → ${after1}）`);
+    // 实现规则：每轮至少上架 perTick(5) 件，缺口大于 5 时补足 minActive → after = max(cur+5, 20)
+    assert(after1 === Math.max(cur + 5, 20), `补货：至少 +5、缺口大时补足 20（${cur} → ${after1}）`);
   } else {
     assert(after1 === cur + 5, `≥ 20 每轮固定 +5（${cur} → ${after1}）`);
   }
@@ -157,7 +159,7 @@ const matQ = uid => name => {
       const eq = Equipment.generateEquipment(Config.equipment.rarities.find(x => x.id === "gold"));
       Equipment.addToInventory(eq);
       eq.cloudId = (await Items.saveItem(eq)).data.id;
-      await Market.listItem(eq, "强化石", 8);
+      await Market.listItem(eq, "重铸石", 8);
     })()
   `);
   await S(50);

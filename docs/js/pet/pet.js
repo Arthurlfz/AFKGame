@@ -154,30 +154,51 @@
     };
   }
   // 总属性 = 宠物本体 + 每件装备独立贡献。装备词缀只放大该件装备的放大后基底，绝不乘宠物成长。
+  // 机制属性：宠物本体保留基础值（否则裸装打不中人），装备词缀在此基础上加成。
+  //  - 命中/闪避：固定数值（命中基础90，闪避基础0，裸装命中率≈95%封顶）
+  //  - 暴击/暴伤/吸血：小数/倍率，来自宠物 profile 基础 + 装备加成
   function getStats(pet) {
     const base = baseStats(pet);
     const { flat = {} } = getEquipBonuses(pet) || {};
+    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
+    const baseHit = prof.hit != null ? Number(prof.hit) : 90;     // 基础命中（固定数值）
+    const baseDodge = prof.dodge != null ? Number(prof.dodge) : 0; // 基础闪避（固定数值）
+    const baseCrit = (prof.critRate != null ? Number(prof.critRate) : 5) / 100;
+    const baseCritDmg = (prof.critDamage != null ? Number(prof.critDamage) : 150) / 100; // 145% → 1.45 倍
+    const baseLs = (prof.lifesteal != null ? Number(prof.lifesteal) : 0) / 100;
     return {
       atk: base.atk + (flat.atk || 0),
       hp: base.hp + (flat.hp || 0),
       def: base.def + (flat.def || 0),
       spd: base.spd + (flat.spd || 0),
-      // 机制属性仅来自装备；命中、闪避是固定值，其他值转为战斗读取的小数/倍率。
-      critRate: (flat.crit || 0) / 100,
-      critDamage: 1 + (flat.critDamage || 0) / 100,
-      hit: flat.hit || 0,
-      dodge: flat.dodge || 0,
-      lifesteal: (flat.lifesteal || 0) / 100
+      critRate: baseCrit + (flat.crit || 0) / 100,
+      critDamage: baseCritDmg + (flat.critDamage || 0) / 100,
+      hit: baseHit + (flat.hit || 0),
+      dodge: baseDodge + (flat.dodge || 0),
+      lifesteal: baseLs + (flat.lifesteal || 0) / 100
     };
   }
-  // 面板"装备加成"文案，如 "攻击+7 生命+20"
+  // 面板"装备加成"文案，如 "攻击+7 生命+20"。
+  // 基底经 materialTier 相乘后是小数（如 30.23），故加成统一取整显示，避免出现 118.88499999999999 这类长小数。
   function getBonusText(pet) {
     const base = baseStats(pet), s = getStats(pet);
     const parts = [];
-    if (s.atk !== base.atk) parts.push('攻击+' + (s.atk - base.atk));
-    if (s.hp !== base.hp) parts.push('生命+' + (s.hp - base.hp));
-    if (s.def !== base.def) parts.push('防御+' + (s.def - base.def));
-    if (s.spd !== base.spd) parts.push('速度+' + (s.spd - base.spd));
+    const diff = k => Math.round(s[k] - base[k]);
+    if (diff('atk')) parts.push('攻击+' + diff('atk'));
+    if (diff('hp')) parts.push('生命+' + diff('hp'));
+    if (diff('def')) parts.push('防御+' + diff('def'));
+    if (diff('spd')) parts.push('速度+' + diff('spd'));
+    // 机制属性（命中/闪避为固定数值，暴击/暴伤/吸血为百分比）：对比 profile 基础值
+    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
+    const bHit = prof.hit != null ? Number(prof.hit) : 90;
+    const bDodge = prof.dodge != null ? Number(prof.dodge) : 0;
+    const bCrit = (prof.critRate != null ? Number(prof.critRate) : 5) / 100;
+    const bLs = (prof.lifesteal != null ? Number(prof.lifesteal) : 0) / 100;
+    const d = s.dodge - bDodge, h = s.hit - bHit;
+    if (Math.round(d)) parts.push('闪避+' + Math.round(d));
+    if (Math.round(h)) parts.push('命中+' + Math.round(h));
+    if (Math.round((s.critRate - bCrit) * 100)) parts.push('暴击+' + Math.round((s.critRate - bCrit) * 100) + '%');
+    if (Math.round((s.lifesteal - bLs) * 100)) parts.push('吸血+' + Math.round((s.lifesteal - bLs) * 100) + '%');
     return parts.length ? parts.join(' ') : '无';
   }
 
@@ -255,11 +276,34 @@
     const pet = createPet(row.name, row.icon, num(row.growth), num(row.hp), num(row.attack), num(row.defense), num(row.speed), lineId);
     pet.cloudId = row.id; // 云端 id，市场上架用
     pet.level = num(row.level) || 1;
+    pet.exp = num(row.exp); // 云端经验（旧库缺 exp 列时为 0，等于刷新后重攒，不会算成 NaN）
     pet.evolveTimes = Math.max(0, Math.floor(num(row.evolve_times)));
     pet.rebornCount = Math.max(0, Math.floor(num(row.reborn_count)));
     pet.curHp = num(row.cur_hp);
     pet.isActive = !!row.is_active; // 出战标记（DB 权威，刷新后据此还原出战宠物）
+    // 装备槽：云端存 {部位: 装备cloudId}，先保存引用，等背包加载后用 restoreEquipment 填回装备对象
+    if (row.equipment && typeof row.equipment === 'object') {
+      pet.equipment = {};
+      for (const [slot, cid] of Object.entries(row.equipment)) pet.equipment[slot] = cid ? { cloudId: cid } : null;
+    }
     return pet;
+  }
+  // 恢复装备：背包加载完后调用，按 cloudId 从背包匹配装备对象填回宠物各部位（无匹配则空）
+  function restoreEquipment(pet, inventory) {
+    if (!pet || !pet.equipment) return;
+    const inv = inventory || [];
+    const byCloud = {};
+    for (const eq of inv) if (eq.cloudId) byCloud[eq.cloudId] = eq;
+    for (const slot of Object.keys(pet.equipment)) {
+      const ref = pet.equipment[slot];
+      if (ref && ref.cloudId && byCloud[ref.cloudId]) {
+        pet.equipment[slot] = byCloud[ref.cloudId]; // 穿上背包里的那件
+        const idx = inv.indexOf(byCloud[ref.cloudId]);
+        if (idx >= 0) inv.splice(idx, 1); // 从背包移除（已穿身上）
+      } else {
+        pet.equipment[slot] = null; // 装备没了（被分解/出售），空槽
+      }
+    }
   }
   // 用云端列表整体替换本地宠物（云端是权威）；优先选 is_active=true 的出战宠物，
   // 没有标记时回退到第一只（兼容旧数据 / 首次建档）
@@ -275,6 +319,6 @@
   window.Pet = {
     createPet, addPet, getPets, getActivePet, setActive, removePet, petFromRow, clearPets,
     baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, createBaby, setCloudPets,
-    getCurHp, setCurHp, regenTick, getBaseSpeed
+    getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment
   };
 })();

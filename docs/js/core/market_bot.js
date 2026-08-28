@@ -162,13 +162,12 @@
   }
 
   // 执行一次假买家购买（规则1：随机买 1 件；规则5：无玩家挂单则不购买）
+  // 只收购装备挂单（bot_buy_equip RPC 只支持装备；宠物挂单不收购）
   async function tryBuyOnce() {
     if (!MB.enabled || B.enabled === false) return { bought: false };
-    const all = Market.getRealListings ? Market.getRealListings() : [];
     const realItems = Market.getRealItemListings ? Market.getRealItemListings() : [];
-    const realPets = all.filter(x => !x.item_id); // 兼容旧数据：宠物挂单没有 item_id
-    if (!realItems.length && !realPets.length) return { bought: false };
-    const target = pickBuyCandidate(realItems, realPets);
+    if (!realItems.length) return { bought: false };
+    const target = pickBuyCandidate(realItems, []);
     if (!target) return { bought: false };
     const res = await Market.buyAsBotAny(target);
     if (!res.ok) return { bought: false, error: res.error };
@@ -218,5 +217,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.MarketBot = { start, stop, tick, getBotListings: () => (window.Market && window.Market.getBotListings ? window.Market.getBotListings() : []), tryBuyOnce, pickBuyTarget };
+  window.MarketBot = { start, stop, tick, getBotListings: () => (window.Market && window.Market.getBotListings ? window.Market.getBotListings() : []), tryBuyOnce, pickBuyTarget, pickBuyCandidate };
 })();

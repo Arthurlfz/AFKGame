@@ -12,7 +12,7 @@
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
   const Config = window.Config;
-  const { getInventory, equipItem, describeItem, rarityOf } = window.Equipment;
+  const { getInventory, equipItem, describeItem, rarityOf, flattenAffixes } = window.Equipment;
   const { getEggCount, hatchEgg } = window.Drop;
   const { getActivePet } = window.Pet;
   const Materials = window.Materials;
@@ -24,9 +24,15 @@
     { name: Config.craft.augment.name, icon: '➕', desc: '新增词缀' }
   ];
   // 背包搜索词 / 品质筛选 / 当前 tab（renderAll 高频重建，用 state 保存）
-  const RARITY_ORDER = { gold: 0, purple: 1, blue: 2, white: 3 };
+  const RARITY_ORDER = { gold: 0, blue: 1, white: 2 };
+  const EQUIP_SLOTS = window.Equipment.SLOTS || [];
+  const BAG_TIERS = [1, 2, 3, 4, 5];
   let bagSearch = '';
-  let bagRarity = 'all'; // all / gold / purple / blue / white
+  let bagRarity = 'all'; // all / gold / blue / white
+  let bagSlot = 'all';   // all / 12部位中文名
+  let bagBaseTier = 'all'; // all / '1'~'5'（底材T阶）
+  let bagAffixTier = 'all'; // all / '1'~'5'（最高词缀T阶）
+  let bagAffixType = 'all'; // all / 词缀类型（atk/dropQty等）
 
   // 通用格子 tooltip 浮层（悬停显示完整信息，body 层 fixed 不被裁）
   function showBagTip(card, html) {
@@ -62,7 +68,7 @@
     const eggCount = getEggCount();
     const totalCount = equipList.length + matEntries.length + consEntries.length + eggCount;
 
-    // 顶部工具条：搜索 + 品质筛选（仅装备 tab 生效）
+    // 顶部工具条：搜索 + 筛选（部位/稀有度/底材T/词缀T/词缀类型，仅装备 tab 生效）
     const toolbar = document.createElement('div');
     toolbar.className = 'bag-toolbar';
     const searchInput = document.createElement('input');
@@ -71,17 +77,32 @@
     searchInput.value = bagSearch;
     searchInput.oninput = () => { bagSearch = searchInput.value.trim().toLowerCase(); renderBag(); };
     toolbar.appendChild(searchInput);
-    const raritySel = document.createElement('select');
-    raritySel.className = 'bag-rarity-sel';
-    raritySel.innerHTML = `
-      <option value="all">品质：全部</option>
-      <option value="gold">品质：金</option>
-      <option value="purple">品质：紫</option>
-      <option value="blue">品质：蓝</option>
-      <option value="white">品质：白</option>`;
-    raritySel.value = bagRarity;
-    raritySel.onchange = () => { bagRarity = raritySel.value; renderBag(); };
-    toolbar.appendChild(raritySel);
+    const mkSel = (label, options, cur, onSet) => {
+      const s = document.createElement('select');
+      s.className = 'bag-filter-sel';
+      s.setAttribute('aria-label', label);
+      s.innerHTML = options.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('');
+      s.onchange = () => onSet(s.value);
+      return s;
+    };
+    toolbar.appendChild(mkSel('稀有度', [
+      ['all', '品质：全部'], ['gold', '品质：金'], ['blue', '品质：蓝'], ['white', '品质：白']
+    ], bagRarity, v => { bagRarity = v; renderBag(); }));
+    toolbar.appendChild(mkSel('部位', [
+      ['all', '部位：全部'], ...EQUIP_SLOTS.map(s => [s, `部位：${s}`])
+    ], bagSlot, v => { bagSlot = v; renderBag(); }));
+    toolbar.appendChild(mkSel('底材T阶', [
+      ['all', '底材T：全部'], ...BAG_TIERS.map(t => [String(t), `底材 T${t}`])
+    ], bagBaseTier, v => { bagBaseTier = v; renderBag(); }));
+    toolbar.appendChild(mkSel('词缀T阶', [
+      ['all', '词缀T：全部'], ...BAG_TIERS.map(t => [String(t), `含 T${t} 词缀`])
+    ], bagAffixTier, v => { bagAffixTier = v; renderBag(); }));
+    // 词缀类型 typeahead：打关键字联想词缀池
+    const affixTypeSel = mkSel('词缀类型', [
+      ['all', '词缀：全部'],
+      ...(window.Equipment.AFFIX_POOL || []).map(a => [a.type, `含「${a.label}」`])
+    ], bagAffixType, v => { bagAffixType = v; renderBag(); });
+    toolbar.appendChild(affixTypeSel);
     root.appendChild(toolbar);
 
     const tabs = document.createElement('div');
@@ -140,15 +161,28 @@
     const eqGrid = document.createElement('div');
     eqGrid.className = 'bag-grid';
     const pet = getActivePet();
-    // 搜索 + 品质过滤
+    // 搜索 + 品质 + 部位 + 底材T + 词缀T + 词缀类型过滤
+    const highestAffixTier = eq => {
+      let best = Infinity;
+      for (const aff of flattenAffixes(eq.affixes)) best = Math.min(best, aff.tier || 5);
+      return best === Infinity ? 5 : best;
+    };
+    const hasAffixType = (eq, type) => flattenAffixes(eq.affixes).some(a => a.type === type);
     let eqList = equipList.filter(eq => {
       if (bagSearch && !eq.name.toLowerCase().includes(bagSearch)) return false;
       if (bagRarity !== 'all' && (!eq.rarity || eq.rarity.id !== bagRarity)) return false;
+      if (bagSlot !== 'all' && eq.slot !== bagSlot) return false;
+      if (bagBaseTier !== 'all' && Number(eq.materialTier) !== Number(bagBaseTier)) return false;
+      if (bagAffixTier !== 'all' && highestAffixTier(eq) > Number(bagAffixTier)) return false;
+      if (bagAffixType !== 'all' && !hasAffixType(eq, bagAffixType)) return false;
       return true;
     });
-    // 按品质排序：金 → 紫 → 蓝 → 白
-    eqList = eqList.slice().sort((a, b) =>
-      (RARITY_ORDER[a.rarity && a.rarity.id || 'white'] - RARITY_ORDER[b.rarity && b.rarity.id || 'white']));
+    // 按品质排序：金 → 蓝 → 白；同品质按底材T阶（T1最优先）
+    eqList = eqList.slice().sort((a, b) => {
+      const r = (RARITY_ORDER[a.rarity && a.rarity.id || 'white'] - RARITY_ORDER[b.rarity && b.rarity.id || 'white']);
+      if (r !== 0) return r;
+      return (Number(a.materialTier) || 3) - (Number(b.materialTier) || 3);
+    });
     for (const eq of eqList) {
       const card = document.createElement('div');
       card.className = 'bag-card bag-equip q-' + (eq.rarity && eq.rarity.id || 'white');
@@ -171,7 +205,7 @@
       card.appendChild(actions);
       // 悬停 tooltip：完整属性面板
       const affixHtml = (eq.affixes && eq.affixes.length)
-        ? `<div class="bt-affix">${eq.affixes.map(a => `${escapeHtml(a.label)} +${a.value}%`).join(' · ')}</div>` : '';
+        ? `<div class="bt-affix">${eq.affixes.map(a => escapeHtml(Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label} +${a.value}%`)).join(' · ')}</div>` : '';
       bindTip(card, `<div class="bt-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div>
         <div class="bt-line">${rarityOf(eq).label}装 · T${eq.tier} · 槽位 ${eq.slot}</div>
         <div class="bt-line">${describeItem(eq)}</div>${affixHtml}

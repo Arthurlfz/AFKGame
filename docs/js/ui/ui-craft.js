@@ -87,8 +87,8 @@
         if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnStrip.disabled = false; return; }
         const removed = res.changed.removed;
         box.innerHTML = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）`;
-        addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${removed.label}+${removed.value}%（T${removed.tier}）`);
-        showToast('✂️ 剥离成功', `移除 ${removed.label} +${removed.value}%`);
+        addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
+        showToast('✂️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
         render(); // 重建按钮：恢复可用
         if (UI.renderInventory) UI.renderInventory();
         if (UI.renderInvToolbar) UI.renderInvToolbar();
@@ -121,8 +121,8 @@
         if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnAug.disabled = false; return; }
         const n = res.changed.new;
         box.innerHTML = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）`;
-        addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${n.label}+${n.value}%（T${n.tier}）`);
-        showToast('➕ 增缀成功', `新增 ${n.label} +${n.value}%<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
+        addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
+        showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
         render(); // 重建按钮：未满恢复可用，已满则保持 disabled（前后缀都满时本就禁用）
         UI.renderAll();
       };

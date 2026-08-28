@@ -235,7 +235,7 @@
 .market-quick-types{display:flex;gap:6px;flex-wrap:wrap;}
 .filter-group{border:1px solid var(--line);border-radius:10px;background:rgba(0,0,0,.12);overflow:hidden;}
 .filter-head{width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--text);padding:10px 12px;cursor:pointer;text-align:left;}
-.filter-head .arrow{color:var(--accent-hi);width:12px;display:inline-block}
+.filter-head .arrow{color:var(--accent-hi);flex:none;display:inline-block}
 .filter-body{display:none;padding:0 12px 12px;}
 .filter-group.is-open .filter-body{display:block;}
 .market-results .panel{margin-bottom:12px;}
@@ -246,7 +246,7 @@
 .market-group{border:1px solid var(--line);border-radius:var(--radius-lg);background:var(--panel);overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.16);min-width:0}
 .market-group-head{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;font-weight:700;color:var(--text);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0));user-select:none}
 .market-group-head:hover{color:var(--accent-hi)}
-.market-group-head .arrow{color:var(--accent-hi);width:12px;display:inline-block}
+.market-group-head .arrow{color:var(--accent-hi);flex:none;display:inline-block}
 .market-group-head .count{margin-left:auto;color:var(--text-dim);font-size:1rem;font-weight:400}
 .market-group-toggle{flex:none}
 .market-group-body{display:block;padding:10px 12px;border-top:1px solid var(--line)}

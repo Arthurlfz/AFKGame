@@ -1,0 +1,20 @@
+  [diag] {"running":true,"fights":0,"area":"corrupted-forest","handler":true,"curHp":135,"maxHp":135}
+  [diag2] 首场耗时约 500ms，战斗数 1
+PASS: 宠物已云端建档
+PASS: 挂机后确实升级了（Lv13）
+PASS: 升级后等级已写入云端（level 同步）
+PASS: 停止挂机时经验条已写入云端（exp=116，刷新不再清零）
+PASS: 云端 exp 与本地一致（没有多扣/少存）
+PASS: 刷新后从云端恢复等级和经验条（Lv7 / exp 77）
+PASS: 旧库缺 exp 列：updatePet 自动降级重试，不报错
+PASS: 旧库缺 exp 列：等级照样写进去（level=9）
+PASS: 旧库缺 exp 列：exp 不再硬写（保持原值 77）
+PASS: 旧库缺 exp 列：loadPets 自动降级重试，宠物照样读得到（1 只）
+PASS: 旧库缺 exp 列：savePet 自动降级重试，宠物本体存成功
+PASS: 旧库缺 exp 列：新宠物行不含 exp 字段（不硬写）
+PASS: 卖出记录显示交易对手（卖给 流浪商人）
+PASS: 买入记录显示交易对手（买自 玩家#xxxx）
+PASS: 交易记录查询已带 listing_id / counterparty
+PASS: pets 查询保留缺列降级（PET_COLUMNS_LEGACY）
+
+ALL EXP + TRADE-REF TESTS PASSED

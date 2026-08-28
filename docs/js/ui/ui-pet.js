@@ -15,7 +15,7 @@
 
   const Config = window.Config;
   const { getActivePet, getPets, getStats, getCurHp, getBonusText, expNeed, setActive } = window.Pet;
-  const { SLOTS, unequip, describeItem, rarityOf, equipItem, getInventory } = window.Equipment;
+  const { SLOTS, unequip, describeItem, rarityOf, equipItem, getInventory, flattenAffixes } = window.Equipment;
   const Materials = window.Materials;
   const Market = window.Market;
   const Merge = window.Merge;
@@ -61,8 +61,9 @@
     $('pet-hp').textContent = hpText;
     ['atk', 'def', 'spd'].forEach(k => {
       const el = $('pet-' + k);
-      if (el.textContent !== String(s[k])) flashStat('pet-' + k);
-      el.textContent = s[k];
+      const txt = String(Math.round(s[k])); // 取整
+      if (el.textContent !== txt) flashStat('pet-' + k);
+      el.textContent = txt;
     });
     // 暴击率/暴击伤害（真实属性，来自 getStats）
     const critEl = $('pet-crit');
@@ -77,15 +78,20 @@
       if (cdEl.textContent !== txt) flashStat('pet-critdmg');
       cdEl.textContent = txt;
     }
-    // 命中/闪避/吸血
-    ['hit', 'dodge', 'ls'].forEach((key, i) => {
+    // 命中/闪避为固定数值（非百分比），直接显示数值；吸血为百分比
+    ['hit', 'dodge'].forEach(key => {
       const el = $('pet-' + key);
       if (!el) return;
-      const statKey = key === 'ls' ? 'lifesteal' : key;
-      const txt = Math.round(s[statKey] * 100) + '%';
+      const txt = String(Math.round(s[key]));
       if (el.textContent !== txt) flashStat('pet-' + key);
       el.textContent = txt;
     });
+    const lsEl = $('pet-ls');
+    if (lsEl) {
+      const txt = Math.round(s.lifesteal * 100) + '%';
+      if (lsEl.textContent !== txt) flashStat('pet-ls');
+      lsEl.textContent = txt;
+    }
     const bonus = $('pet-bonus');
     if (bonus) {
       const equip = getBonusText(pet);
@@ -105,6 +111,52 @@
           `<span class="hint">攻击决定单次伤害，速度决定出手频率；高攻速宠物会压低攻击和暴击乘区。</span>`;
       }
     }
+  }
+
+  /* ---------- 装备 tab 三连屏：左列属性面板（与资料页一致，id 前缀 eqp-） ---------- */
+  // 更新宠物属性面板：prefix 决定元素 id 前缀（资料页 'pet-' / 装备页 'eqp-'）
+  // 攻击/防御/速度保留两位小数；生命显示 当前/上限（整数）；百分比属性（暴击/命中/闪避/吸血）取整%
+  function updatePetStatsPanel(pet, prefix) {
+    const $id = id => document.getElementById(prefix + id);
+    if (!pet) return;
+    const s = getStats(pet);
+    const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
+    const av = $id('avatar');
+    if (av) { if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {} else av.textContent = pet.icon; }
+    const nm = $id('name'); if (nm) nm.textContent = pet.name;
+    const lv = $id('level'); if (lv) lv.textContent = 'Lv.' + pet.level;
+    const eb = $id('exp-bar'); if (eb) eb.style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
+    const et = $id('exp-text'); if (et) et.textContent = `${pet.exp}/${expNeed(pet.level)}`;
+    const gr = $id('growth'); if (gr) gr.textContent = pet.growth.toFixed(1);
+    const rn = $id('reborn'); if (rn) rn.textContent = `转生 ${pet.rebornCount || 0} 次`;
+    const hp = $id('hp'); if (hp) hp.textContent = `${Math.round(getCurHp(pet))}/${Math.round(s.hp)}`;
+    // 攻击/防御/速度：取整显示（基底经 materialTier 相乘为小数，取整更干净）
+    ['atk', 'def', 'spd'].forEach(k => { const el = $id(k); if (el) el.textContent = Math.round(s[k]); });
+    const crit = $id('crit'); if (crit) crit.textContent = Math.round(s.critRate * 100) + '%';
+    const cd = $id('critdmg'); if (cd) cd.textContent = Math.round(s.critDamage * 100) + '%';
+    // 命中/闪避是固定数值（非百分比），直接显示数值；吸血是百分比
+    const hitEl = $id('hit'); if (hitEl) hitEl.textContent = Math.round(s.hit);
+    const dgEl = $id('dodge'); if (dgEl) dgEl.textContent = Math.round(s.dodge);
+    const lsEl = $id('ls'); if (lsEl) lsEl.textContent = Math.round(s.lifesteal * 100) + '%';
+    const bn = $id('bonus'); if (bn) {
+      const equip = getBonusText(pet);
+      bn.textContent = equip === '无' ? '无' : equip.split(' ').slice(0, 2).join(' ');
+      const pop = $id('bonus-pop');
+      if (pop) {
+        const coeff = window.Pet.getStatCoeff ? window.Pet.getStatCoeff(pet) : (Config.pet.statCoeff || { hp: 5, atk: 2, def: 1 });
+        const growthLine = `成长贡献：生命 +${Math.round(pet.level * pet.growth * coeff.hp)} · 攻击 +${Math.round(pet.level * pet.growth * coeff.atk)} · 防御 +${Math.round(pet.level * pet.growth * coeff.def)} · 速度不受成长影响`;
+        pop.innerHTML =
+          `<b>${profile.role}</b>：${profile.description}<br>` +
+          `${growthLine}<br>` +
+          `装备贡献：${equip}<br>` +
+          `暴击：${Math.round(s.critRate * 100)}% · 暴击伤害 ${Math.round(s.critDamage * 100)}%<br>` +
+          `<span class="hint">攻击决定单次伤害，速度决定出手频率；高攻速宠物会压低攻击和暴击乘区。</span>`;
+      }
+    }
+  }
+  // 装备 tab 三连屏：渲染左列完整属性面板（eqp- 前缀）
+  function renderEquipPetStats() {
+    updatePetStatsPanel(getActivePet(), 'eqp-');
   }
 
   /* ---------- 宠物栏（切换出战 / 上架） ---------- */
@@ -476,7 +528,7 @@
     const route = routes[i];
     if (!route) return;
     const cur = getStats(pet);
-    const boost = window.Util.randInt(E.growthBoost[0], E.growthBoost[1]);
+    const boost = window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]);
     const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
     const next = getStats({ ...pet, growth: nextGrowth });
     const row = (label, a, b) => {
@@ -515,60 +567,113 @@
     };
   }
 
-  /* ---------- 当前装备（点击已穿装备 = 脱下；另配显式「脱下」按钮） ---------- */
+  /* ---------- 当前装备（12 槽沿宠物立绘四边环绕） ---------- */
   function renderEquipSlots() {
+    renderEquipPetStats(); // 三连屏左列属性面板（与资料页一致，eqp- 前缀）
     const wrap = $('equip-slots');
+    if (!wrap) return;
     wrap.innerHTML = '';
     const pet = getActivePet();
-    for (const slot of SLOTS) {
-      const eq = pet.equipment[slot];
+    if (!pet) return;
+    const orbit = document.createElement('div');
+    orbit.className = 'equip-orbit';
+    const center = document.createElement('div');
+    center.className = 'equip-orbit-center';
+    center.innerHTML = '<div class="equip-orbit-art" id="equip-orbit-art"></div><div class="equip-orbit-name">' + escapeHtml(pet.name) + '</div>';
+    orbit.appendChild(center);
+    const groups = { output: ['武器', '戒指', '项链'], defense: ['头盔', '护甲', '盾牌'], mobility: ['靴子', '腰带', '斗篷'], utility: ['饰品', '护符', '徽章'] };
+    const groupOf = (slot) => Object.keys(groups).find(k => groups[k].includes(slot)) || 'utility';
+    const slots = Object.values(groups).flat();
+    slots.forEach((slot, index) => {
+      const eq = pet.equipment && pet.equipment[slot];
       const div = document.createElement('div');
-      div.className = 'equip-slot' + (eq ? '' : ' empty');
-      const slotItem = document.createElement('div');
-      slotItem.className = 'slot-item';
+      const rarity = eq ? rarityOf(eq) : null;
+      div.className = 'equip-slot equip-slot-' + (index + 1) + (eq ? ' equipped rarity-' + ((eq.rarity && eq.rarity.id) || 'white') : ' empty');
+      div.dataset.group = groupOf(slot);
+      div.innerHTML = `<div class="slot-label">${escapeHtml(slot)}</div><div class="slot-item"></div>`;
+      const item = div.querySelector('.slot-item');
       if (eq) {
-        slotItem.style.color = rarityOf(eq).color;
-        slotItem.innerHTML = `${eq.name}<span class="sub">${describeItem(eq)}</span>`;
-        // 装备属性面板（悬停 + 点击看）
+        item.style.color = rarity.color;
+        item.innerHTML = `<span class="slot-name">${escapeHtml(eq.name)}</span><span class="sub">${escapeHtml(describeItem(eq))}</span>`;
         const tip = document.createElement('div');
         tip.className = 'equip-tip';
-        tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div>
-          <div class="tip-line">${rarityOf(eq).label}装 · T${eq.tier} · 槽位：${slot}</div>
-          <div class="tip-line">${describeItem(eq)}</div>
-          ${eq.affixes && eq.affixes.length ? `<div class="tip-affix">${eq.affixes.map(a => `${escapeHtml(a.label)} +${a.value}%`).join(' · ')}</div>` : ''}`;
-        slotItem.appendChild(tip);
-        // 显式「脱下」按钮（取消装备）：比「点击整块」更直观
+        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">${rarity.label}装 · T${eq.tier || 1} · ${escapeHtml(slot)}</div><div class="tip-line">基底：${escapeHtml(describeItem(eq))}</div>${eq.affixes && eq.affixes.length ? `<hr class="tip-divider"><div class="tip-affix">${eq.affixes.map(a => escapeHtml(Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label} +${a.value}${a.unit || '%'}`)).join(' · ')}</div>` : ''}`;
+        item.appendChild(tip);
         const takeBtn = document.createElement('button');
         takeBtn.className = 'btn-sm ghost slot-unequip';
         takeBtn.textContent = '脱下';
-        takeBtn.onclick = (e) => {
-          e.stopPropagation();
-          const taken = unequip(pet, slot);
-          if (taken) { addLog(`🔧 脱下 ${taken.name}，放回背包`); UI.renderAll(); }
-        };
-        slotItem.appendChild(takeBtn);
+        takeBtn.onclick = (e) => { e.stopPropagation(); const taken = unequip(pet, slot); if (taken) { addLog(`脱下 ${taken.name}，放回背包`); UI.renderAll(); } };
+        item.appendChild(takeBtn);
+        div.title = '点击脱下';
+        div.onclick = () => { const taken = unequip(pet, slot); if (taken) { addLog(`脱下 ${taken.name}，放回背包`); UI.renderAll(); } };
       } else {
-        slotItem.textContent = '空';
+        item.textContent = '空槽';
+        div.title = '空装备槽';
       }
-      div.innerHTML = `<div class="slot-label">${slot}</div>`;
-      div.appendChild(slotItem);
-      div.title = eq ? '点击脱下' : '';
-      div.onclick = () => {
-        if (!eq) return;
-        const taken = unequip(pet, slot);
-        if (taken) { addLog(`🔧 脱下 ${taken.name}，放回背包`); UI.renderAll(); }
-      };
-      wrap.appendChild(div);
-    }
+      orbit.appendChild(div);
+    });
+    wrap.appendChild(orbit);
+    const art = orbit.querySelector('#equip-orbit-art');
+    if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {} else art.textContent = pet.icon || '未知';
   }
 
   /* ---------- 换装背包（装备 tab：给当前出战宠物穿上背包里的装备，悬停看属性面板） ---------- */
+  // 换装背包筛选状态（模块级，避免 renderAll 高频重建时重置）
+  const equipInvFilter = { slot: 'all', rarity: 'all', baseTier: 'all', affixTier: 'all', affixType: 'all' };
+  const EQUIP_INV_SLOTS = window.Equipment.SLOTS || [];
+
   function renderPetEquipInv() {
+    renderEquipPetStats(); // 换装/穿装备后属性面板实时刷新
     const box = $('pet-equip-inv');
     if (!box) return;
     box.innerHTML = '';
     const pet = getActivePet();
     const inv = getInventory ? getInventory() : [];
+
+    // 筛选工具条（紧凑，三连屏右列空间有限）
+    const bar = document.createElement('div');
+    bar.className = 'equip-inv-filter';
+    const mkSel = (label, options, cur, onSet) => {
+      const s = document.createElement('select');
+      s.className = 'bag-filter-sel';
+      s.setAttribute('aria-label', label);
+      s.innerHTML = options.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('');
+      s.onchange = () => { onSet(s.value); renderPetEquipInv(); };
+      return s;
+    };
+    bar.appendChild(mkSel('部位', [
+      ['all', '部位全部'], ...EQUIP_INV_SLOTS.map(s => [s, s])
+    ], equipInvFilter.slot, v => { equipInvFilter.slot = v; }));
+    bar.appendChild(mkSel('稀有度', [
+      ['all', '品质全部'], ['gold', '金'], ['blue', '蓝'], ['white', '白']
+    ], equipInvFilter.rarity, v => { equipInvFilter.rarity = v; }));
+    bar.appendChild(mkSel('底材T', [
+      ['all', '底材T'], ...['1', '2', '3', '4', '5'].map(t => [t, 'T' + t])
+    ], equipInvFilter.baseTier, v => { equipInvFilter.baseTier = v; }));
+    bar.appendChild(mkSel('词缀T', [
+      ['all', '词缀T'], ...['1', '2', '3', '4', '5'].map(t => [t, '含T' + t])
+    ], equipInvFilter.affixTier, v => { equipInvFilter.affixTier = v; }));
+    bar.appendChild(mkSel('词缀类型', [
+      ['all', '词缀类型'], ...(window.Equipment.AFFIX_POOL || []).map(a => [a.type, a.label])
+    ], equipInvFilter.affixType, v => { equipInvFilter.affixType = v; }));
+    box.appendChild(bar);
+
+    // 过滤逻辑（与独立背包页一致）
+    const highestAffixTier = eq => {
+      let best = Infinity;
+      for (const a of flattenAffixes(eq.affixes)) best = Math.min(best, a.tier || 5);
+      return best === Infinity ? 5 : best;
+    };
+    const hasAffixType = (eq, type) => flattenAffixes(eq.affixes).some(a => a.type === type);
+    const list = inv.filter(eq => {
+      if (equipInvFilter.slot !== 'all' && eq.slot !== equipInvFilter.slot) return false;
+      if (equipInvFilter.rarity !== 'all' && (!eq.rarity || eq.rarity.id !== equipInvFilter.rarity)) return false;
+      if (equipInvFilter.baseTier !== 'all' && Number(eq.materialTier) !== Number(equipInvFilter.baseTier)) return false;
+      if (equipInvFilter.affixTier !== 'all' && highestAffixTier(eq) > Number(equipInvFilter.affixTier)) return false;
+      if (equipInvFilter.affixType !== 'all' && !hasAffixType(eq, equipInvFilter.affixType)) return false;
+      return true;
+    });
+
     if (!inv.length) {
       const empty = document.createElement('div');
       empty.className = 'quick-empty';
@@ -576,7 +681,14 @@
       box.appendChild(empty);
       return;
     }
-    for (const eq of inv) {
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'quick-empty';
+      empty.textContent = '没有符合条件的装备';
+      box.appendChild(empty);
+      return;
+    }
+    for (const eq of list) {
       const row = document.createElement('div');
       row.className = 'quick-eq q-' + (eq.rarity && eq.rarity.id ? eq.rarity.id : 'white');
       // 装备属性面板（悬停 + 点击看）
@@ -585,7 +697,7 @@
       tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div>
         <div class="tip-line">${rarityOf(eq).label}装 · T${eq.tier}</div>
         <div class="tip-line">${describeItem(eq)}</div>
-        ${eq.affixes && eq.affixes.length ? `<div class="tip-affix">${eq.affixes.map(a => `${escapeHtml(a.label)} +${a.value}%`).join(' · ')}</div>` : ''}`;
+        ${eq.affixes && eq.affixes.length ? `<div class="tip-affix">${eq.affixes.map(a => escapeHtml(Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label} +${a.value}%`)).join(' · ')}</div>` : ''}`;
       row.appendChild(tip);
       const name = document.createElement('span');
       name.className = 'qe-name';
@@ -897,7 +1009,7 @@
         const i = Number(btn.dataset.i);
         const route = routes[i];
         const cur = getStats(pet);
-        const boost = window.Util.randInt(E.growthBoost[0], E.growthBoost[1]);
+        const boost = window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]);
         const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
         const next = getStats({ ...pet, growth: nextGrowth }); // 等级不变，仅成长提升
         const row = (label, a, b) => {
@@ -942,6 +1054,8 @@
   /* ---------- 对外 API（宠物页） ---------- */
   UI.renderPetPanel = renderPetPanel;
   UI.renderPetList = renderPetList;
+  UI.updatePetStatsPanel = updatePetStatsPanel;
+  UI.renderEquipPetStats = renderEquipPetStats;
   UI.renderEquipSlots = renderEquipSlots;
   UI.renderMergeHint = renderMergeHint;
   UI.renderEvolveHint = renderEvolveHint;

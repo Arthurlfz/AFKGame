@@ -69,22 +69,22 @@ const matQ = uid => name => {
   };
 
   // --- 1. pickBuyTarget：优先「低于市场参考价」的挂单 ---
-  // 白装强化石参考价 enhance.white range=[2,6]；5 便宜、8 不便宜
-  await mk('低价的剑', 'white', '强化石', 5);
-  await mk('贵价的盾', 'white', '强化石', 8);
+  // 白装重铸石参考价 enhance.white range=[2,6]；5 便宜、8 不便宜
+  await mk('低价的剑', 'white', '重铸石', 5);
+  await mk('贵价的盾', 'white', '重铸石', 8);
   await C('Market.refresh()');
   await S(50);
-  const picked = C('MarketBot.pickBuyTarget(Market.getRealItemListings())');
+  const picked = C('MarketBot.pickBuyCandidate(Market.getRealItemListings(), [])');
   assert(picked && picked.item_name === '低价的剑', `优先买低于市场参考价的挂单（选中：${picked && picked.item_name}，qty=${picked && picked.material_qty}）`);
   // 全都不便宜 → 选最便宜的
-  const cheapest = C('MarketBot.pickBuyTarget(Market.getRealItemListings().filter(l => l.item_name !== "低价的剑"))');
+  const cheapest = C('MarketBot.pickBuyCandidate(Market.getRealItemListings().filter(l => l.item_name !== "低价的剑"), [])');
   assert(cheapest.item_name === '贵价的盾', '无低价时买最便宜的（选中贵价的盾）');
 
   // --- 2. tryBuyOnce 集成：买走 1 件 → 卖家收材料 → 挂单移除 → 双写记录 → 装备行删除 ---
-  const before = matQ('user-a')('强化石');
+  const before = matQ('user-a')('重铸石');
   const r = await C('MarketBot.tryBuyOnce()');
   assert(r.bought === true && r.itemName === '低价的剑', `假买家买走 1 件（${r.itemName}）`);
-  assert(matQ('user-a')('强化石') === before + 5, `卖家收到 5 强化石（${before} → ${matQ('user-a')('强化石')}）`);
+  assert(matQ('user-a')('重铸石') === before + 5, `卖家收到 5 重铸石（${before} → ${matQ('user-a')('重铸石')}）`);
   assert(!C('Market.getRealItemListings().some(l => l.item_name === "低价的剑")'), '被买走的挂单已从市场消失');
   assert(!ctx.itemsTable.some(x => x.name === '低价的剑'), '装备行已删除（NPC 买走不占玩家账号）');
   const botRecs = ctx.tradeTable.filter(x => x.item_name === '低价的剑');
@@ -93,14 +93,14 @@ const matQ = uid => name => {
   assert(botRecs.some(x => x.player_id === 'user-a' && x.role === 'sell' && x.price_qty === 5 && x.tax_qty === 0 && x.net_qty === 5),
     '交易记录：卖家 sell 5（5<8 不满税）');
 
-  // --- 3. 带税的购买（每满8收1）：上架 10 强化石 → 卖家实收 9 ---
-  await mk('玄铁剑', 'blue', '强化石', 10);
+  // --- 3. 带税的购买（每满8收1）：上架 10 重铸石 → 卖家实收 9 ---
+  await mk('玄铁剑', 'blue', '重铸石', 10);
   await C('Market.refresh()');
   await S(50);
-  const before2 = matQ('user-a')('强化石');
+  const before2 = matQ('user-a')('重铸石');
   const r2 = await C('MarketBot.tryBuyOnce()');
   assert(r2.bought === true && r2.itemName === '玄铁剑', `假买家再买 1 件（${r2.itemName}）`);
-  assert(matQ('user-a')('强化石') === before2 + 9, `卖家实收 9 强化石（标价10-税1，${before2} → ${matQ('user-a')('强化石')}）`);
+  assert(matQ('user-a')('重铸石') === before2 + 9, `卖家实收 9 重铸石（标价10-税1，${before2} → ${matQ('user-a')('重铸石')}）`);
   const sellRec = ctx.tradeTable.find(x => x.item_name === '玄铁剑' && x.role === 'sell');
   assert(sellRec && sellRec.tax_qty === 1 && sellRec.net_qty === 9, '交易记录：玄铁剑 sell 税1 实收9');
 
@@ -114,7 +114,7 @@ const matQ = uid => name => {
   assert(C('rpcCalls.filter(n => n === "bot_buy_equip").length') === rpcBefore, '未调用 bot_buy_equip RPC');
 
   // --- 5. 挂单已被真人买走（RPC notfound）→ 本轮跳过 ---
-  await mk('已售盾', 'white', '强化石', 3);
+  await mk('已售盾', 'white', '重铸石', 3);
   await C('Market.refresh()');
   await S(50);
   const lid = C('Market.getRealItemListings()[0].id');

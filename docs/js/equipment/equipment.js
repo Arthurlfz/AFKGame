@@ -40,13 +40,20 @@
     bases: Object.entries(B[slot] || {}).map(([type, value]) => ({ type, label: LABELS[type] || type, value }))
   }]));
   // 前缀≤3：攻击/生命/防御；后缀≤3：机制属性与资源属性。
+  // 词缀权重（POE 式：基础战斗词缀权重高常出，机制中，资源/极品词缀权重低稀出）
   const AFFIX_POOL = [
-    { type: 'atk', label: '攻击', category: 'prefix' }, { type: 'hp', label: '生命', category: 'prefix' },
-    { type: 'def', label: '防御', category: 'prefix' }, { type: 'spd', label: '速度', category: 'suffix' },
-    { type: 'crit', label: '暴击率', category: 'suffix' }, { type: 'critDamage', label: '暴击伤害', category: 'suffix' },
-    { type: 'hit', label: '命中', category: 'suffix' }, { type: 'dodge', label: '闪避', category: 'suffix' },
-    { type: 'lifesteal', label: '吸血', category: 'suffix' }, { type: 'dropQty', label: '掉落数量', category: 'suffix' },
-    { type: 'dropRare', label: '掉落稀有度', category: 'suffix' }, { type: 'matDrop', label: '材料掉率', category: 'suffix' }
+    { type: 'atk', label: '攻击', category: 'prefix', weight: 100 },
+    { type: 'hp', label: '生命', category: 'prefix', weight: 100 },
+    { type: 'def', label: '防御', category: 'prefix', weight: 100 },
+    { type: 'spd', label: '速度', category: 'suffix', weight: 60 },
+    { type: 'crit', label: '暴击率', category: 'suffix', weight: 55 },
+    { type: 'critDamage', label: '暴击伤害', category: 'suffix', weight: 45 },
+    { type: 'hit', label: '命中', category: 'suffix', weight: 50 },
+    { type: 'dodge', label: '闪避', category: 'suffix', weight: 40 },
+    { type: 'lifesteal', label: '吸血', category: 'suffix', weight: 35 },
+    { type: 'dropQty', label: '掉落数量', category: 'suffix', weight: 15 },
+    { type: 'dropRare', label: '掉落稀有度', category: 'suffix', weight: 12 },
+    { type: 'matDrop', label: '材料掉率', category: 'suffix', weight: 10 }
   ];
   // 词缀归类：按 type 返回 'prefix' | 'suffix'（未知类型兜底为前缀）
   function affixCategory(type) {
@@ -124,8 +131,15 @@
     affixes.suffix.push(baseline);
     const pool = AFFIX_POOL.filter(a => a.type !== baselineType);
     const range = Config.equipment.affixTierByRarity[rarity.id] || [4, 5];
-    while (affixCount({ affixes }) < count && pool.length) {
-      const aff = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    // 补词缀：targetCount 为词缀总条数上限（含基础词缀）。每次只选「目标桶未满(≤3)」的类型，
+    // 避免前缀/后缀超过单桶上限 3 条（金装 4~6 条时若全堆一个桶会爆结构）。
+    const targetCount = Math.min(count, 7); // 结构上限：基础1 + 前缀3 + 后缀3 = 7
+    while (affixCount({ affixes }) < targetCount && pool.length) {
+      const available = pool.filter(a => (affixes[a.category] || []).length < 3);
+      if (!available.length) break;
+      // 按词缀权重加权抽取：基础战斗词缀常出、资源/极品词缀稀出（POE 式）
+      const aff = Util.pickWeighted(available.map(a => ({ ...a, weight: a.weight || 50 })));
+      pool.splice(pool.indexOf(aff), 1);
       const tier = Util.randInt(range[0], range[1]);
       const tiers = aff.type === 'spd' ? Config.equipment.speedAffixTiers : Config.equipment.affixTiers;
       const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
@@ -151,6 +165,18 @@
 
   /* ---------- 穿脱（pet 对象由调用方传入，本模块不持有宠物状态） ---------- */
   // 返回 { equipped, replaced }，replaced 为被顶替回背包的旧装备（可能为 null）
+  // 穿/脱装备后把装备槽同步到云端 pets.equipment（{部位: cloudId}），防抖合并多次操作
+  let _equipSyncTimer = null;
+  function syncEquipToCloud(pet) {
+    if (!pet || !pet.cloudId) return;
+    const S = window.Supabase;
+    if (!S || !S.petEquipmentToCloud) return;
+    clearTimeout(_equipSyncTimer);
+    _equipSyncTimer = setTimeout(() => {
+      S.updatePet(pet.cloudId, { equipment: S.petEquipmentToCloud(pet) });
+    }, 300);
+  }
+
   function equipItem(pet, id) {
     const i = inventory.findIndex(e => e.id === id);
     if (i < 0) return null;
@@ -165,6 +191,7 @@
     if (old) inventory[i] = old;      // 同部位旧装备回背包
     else inventory.splice(i, 1);
     pet.equipment[eq.slot] = eq;
+    syncEquipToCloud(pet); // 装备槽同步云端（F5 不脱落）
     return { equipped: eq, replaced: old };
   }
   // 返回脱下的装备（null 表示该部位本来就空）
@@ -173,6 +200,7 @@
     if (!eq) return null;
     pet.equipment[slot] = null;
     inventory.unshift(eq);
+    syncEquipToCloud(pet); // 脱下同步云端
     return eq;
   }
 
@@ -203,8 +231,13 @@
   }
 
   /* ---------- 展示文案 ---------- */
+  // 词缀展示统一入口：命中/闪避/速度为固定值词缀，不显示 %；其余（atk/hp/def/crit/critDamage/lifesteal/dropQty/dropRare/matDrop）为百分比。
+  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd']);
+  function formatAffix(a) {
+    return `${a.label} +${a.value}${FIXED_AFFIX_TYPES.has(a.type) ? '' : '%'}`;
+  }
   function describeItem(eq) {
-    const affixes = flattenAffixes(eq.affixes).map(a => `${a.label}+${a.value}%`).join(' ');
+    const affixes = flattenAffixes(eq.affixes).map(formatAffix).join(' ');
     const b = baseOf(eq);
     return `${eq.slot}｜${b.label}+${b.value}｜${affixes}`;
   }
@@ -231,6 +264,6 @@
   window.Equipment = {
     SLOTS, AFFIX_POOL, affixCategory, normalizeAffixes, flattenAffixes, affixCount, affixLocations,
     pickRarity, generateEquipment, getInventory, addToInventory, removeFromInventory, replaceInventory,
-    equipItem, unequip, getEquipBonuses, describeItem, rarityOf, baseOf
+    equipItem, unequip, getEquipBonuses, describeItem, formatAffix, rarityOf, baseOf
   };
 })();

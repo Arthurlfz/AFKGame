@@ -54,27 +54,89 @@
   }
 
   /* ---------- 宠物存档（pets 表） ---------- */
-  const PET_COLUMNS = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
+  const PET_COLUMNS = 'id,name,icon,growth,level,exp,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
+  // 兼容旧库：未执行 migrate_pet_exp.sql 时 pets 没有 exp 列，带 exp 查询会 400。
+  // 探测到缺列就自动降级成这份列集，宠物本体照常读取（经验条退化为刷新后清零，其它功能不受影响）。
+  const PET_COLUMNS_LEGACY = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
+  let expColMissing = false; // 旧库缺 exp 列：置 true 后所有 pets 查询/写入自动去掉 exp
+  // 判断错误是否为「exp 列不存在」（Postgres 42703 / PostgREST PGRST204）
+  function isMissingExpColumn(error) {
+    if (!error) return false;
+    const code = String(error.code || '');
+    const msg = String(error.message || '');
+    return (code === '42703' || code === 'PGRST204') && msg.indexOf('exp') >= 0;
+  }
+  // pets 查询统一入口：先按当前列集查，遇到缺列就记下并重试一次（降级对调用方透明）
+  async function queryPets(build) {
+    const res = await build(expColMissing ? PET_COLUMNS_LEGACY : PET_COLUMNS);
+    if (res && res.error && !expColMissing && isMissingExpColumn(res.error)) {
+      expColMissing = true;
+      return build(PET_COLUMNS_LEGACY);
+    }
+    return res;
+  }
+  // 装备槽列查询：单独查（兼容旧库未执行迁移时列不存在 → 返回空，不影响宠物本体读取）
+  const PET_EQUIP_QUERY = async (builder) => builder.select('equipment');
   async function loadPets() {
-    return client.from('pets').select(PET_COLUMNS).order('created_at', { ascending: true });
+    return queryPets(cols => client.from('pets').select(cols).order('created_at', { ascending: true }));
   }
   // 单条查询（购买后精准拉取新宠物；RLS：宠物已转移给买家，买家可查）
   async function fetchPetById(id) {
-    return client.from('pets').select(PET_COLUMNS).eq('id', id).maybeSingle();
+    return queryPets(cols => client.from('pets').select(cols).eq('id', id).maybeSingle());
   }
-  // savePet(pet)：把宠物写入当前用户的存档；未登录返回 error
-  // 成功后返回 data（含云端 id），调用方应回写到 pet.cloudId 供市场上架使用
-  async function savePet(pet) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: new Error('未登录') };
-    return client.from('pets').insert({
-      user_id: user.id,
+  // 宠物对象 → 云端行；includeExp=false 时不带 exp（旧库缺列场景）
+  function petToRow(pet, includeExp) {
+    const row = {
       name: pet.name, icon: pet.icon,
       growth: pet.growth, level: pet.level,
       evolve_times: pet.evolveTimes || 0, reborn_count: pet.rebornCount || 0,
       hp: pet.baseHp, attack: pet.baseAtk, defense: pet.baseDef, speed: pet.baseSpd,
       cur_hp: Math.round(pet.curHp)
-    }).select(PET_COLUMNS).single();
+    };
+    if (includeExp) row.exp = Math.max(0, Math.round(pet.exp || 0));
+    return row;
+  }
+  // 装备槽 → 云端 jsonb：{ 部位: 装备cloudId }（只存引用，装备本体在 equip_items）
+  // eq 可能是装备对象（有 cloudId）或已存的 cloudId 字符串；无 cloudId 的本地装备记 ''（刷新后不恢复）
+  function petEquipmentToCloud(pet) {
+    const eq = pet.equipment || {};
+    const out = {};
+    for (const [slot, item] of Object.entries(eq)) {
+      if (!item) { out[slot] = null; continue; }
+      out[slot] = (typeof item === 'string') ? item : (item.cloudId || '');
+    }
+    return out;
+  }
+  // savePet(pet)：把宠物写入当前用户的存档；未登录返回 error
+  // 成功后返回 data（含云端 id），调用方应回写到 pet.cloudId 供市场上架使用
+  // 装备槽分两步：先存宠物本体（必成功，兼容旧库），再单独更新 equipment（列不存在则忽略，不影响宠物）
+  async function savePet(pet) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: new Error('未登录') };
+    let res = await client.from('pets')
+      .insert(Object.assign({ user_id: user.id }, petToRow(pet, !expColMissing)))
+      .select(expColMissing ? PET_COLUMNS_LEGACY : PET_COLUMNS).single();
+    // 旧库缺 exp 列：去掉 exp 重试一次，宠物本体必须存成功
+    if (res.error && !expColMissing && isMissingExpColumn(res.error)) {
+      expColMissing = true;
+      res = await client.from('pets')
+        .insert(Object.assign({ user_id: user.id }, petToRow(pet, false)))
+        .select(PET_COLUMNS_LEGACY).single();
+    }
+    if (!res.error && res.data && res.data.id) {
+      try {
+        await client.from('pets').update({ equipment: petEquipmentToCloud(pet) }).eq('id', res.data.id);
+      } catch (e) { /* 旧库无 equipment 列：忽略，宠物本体已保存 */ }
+    }
+    return res;
+  }
+  // 单独读某只宠物的装备槽（兼容旧库无列 → 返回空）
+  async function loadPetEquipment(cloudId) {
+    try {
+      const { data, error } = await client.from('pets').select('equipment').eq('id', cloudId).maybeSingle();
+      if (error) return {};
+      return (data && data.equipment) || {};
+    } catch (e) { return {}; }
   }
 
   // 删除宠物（融合消耗副宠等用；RLS 保证只能删自己的）
@@ -84,7 +146,16 @@
   // 更新宠物字段（融合后成长值/等级变化；RLS 保证只能改自己的）
   // patch 示例：{ growth: 10, level: 1 }
   async function updatePet(cloudId, patch) {
-    return client.from('pets').update(patch).eq('id', cloudId);
+    const p = Object.assign({}, patch);
+    if (expColMissing && 'exp' in p) delete p.exp;
+    let res = await client.from('pets').update(p).eq('id', cloudId);
+    // 旧库缺 exp 列：去掉 exp 重试一次，保证等级等其它字段照常写入
+    if (res.error && !expColMissing && isMissingExpColumn(res.error) && 'exp' in p) {
+      expColMissing = true;
+      delete p.exp;
+      res = await client.from('pets').update(p).eq('id', cloudId);
+    }
+    return res;
   }
 
   /* ---------- 市场（pet_listings 表 + buy_pet RPC） ---------- */
@@ -217,7 +288,7 @@
     const user = await getCurrentUser();
     if (!user) return { data: [], error: null };
     return client.from('trade_records')
-      .select('id,player_id,role,item_name,material_type,price_qty,tax_qty,net_qty,created_at')
+      .select('id,player_id,role,item_name,material_type,price_qty,tax_qty,net_qty,listing_id,counterparty,created_at')
       .eq('player_id', user.id)
       .order('created_at', { ascending: false });
   }
@@ -324,7 +395,7 @@
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
-    loadPets, fetchPetById, savePet, deletePet, updatePet,
+    loadPets, fetchPetById, savePet, deletePet, updatePet, petEquipmentToCloud, loadPetEquipment,
     listPet, fetchMarket, fetchMyListedIds, buyPet, cancelPetListing,
     listItem, fetchItemMarket, fetchMyListedItemIds, buyItem, cancelEquipListing, botBuyEquip, botBuyPet,
     updateEquipItem, fetchItemById, loadTradeRecords,

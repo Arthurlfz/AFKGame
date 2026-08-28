@@ -39,19 +39,16 @@
     return false;
   }
 
-  /* 二级跳转：未选图自动弹出浮层；已选图只显示顶部地图条，点「换图」再打开浮层 */
-  function setMapOverlay(show) {
-    const ov = $('map-select-overlay');
-    if (!ov || !ov.classList) return;
-    if (typeof ov.classList.toggle === 'function') ov.classList.toggle('show', !!show);
-    else ov.classList[show ? 'add' : 'remove']('show');
-  }
+  /* 三级菜单：选图已迁移到「世界地图页」（ui-worldmap.js）。
+   * 战斗页只显示当前地图条 + 顶部「返回地图」按钮（回到世界地图页选图）。
+   * v20260828：删除旧的 map-select-overlay 浮层。renderAreaSelector 保留为空实现，
+   * 兼容 ui-common.js / ui-worldmap.js 的调用（选图逻辑已不在战斗页）。 */
   function updateBattleArea(area) {
     const box = $('battle-area-info');
     if (!box) return;
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
-      : '🐣 先选一张地图，即可自动挂机打怪、掉装备和宠物蛋';
+      : '🐣 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
     // 切换战斗舞台背景图（data-area-id 设在 .battle-stage，触发 CSS 三层背景）
     const stage = document.querySelector('#tab-battle .battle-stage');
     if (stage && typeof stage.setAttribute === 'function') {
@@ -63,42 +60,16 @@
       if (stage.classList && !stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
   }
-  function renderAreaSelector() {
-    const box = $('battle-area-selector');
-    const Battle = window.Battle;
-    if (!box || !Battle) return;
-    const selected = Battle.getCurrentArea();
-    box.innerHTML = Battle.getAreas().map(area => `
-      <button class="area-card${selected?.id === area.id ? ' is-selected' : ''}" data-area-id="${escapeHtml(area.id)}">
-        <b>${escapeHtml(area.name)}</b><span>建议等级：${escapeHtml(area.recommended)}</span>
-      </button>`).join('');
-    box.querySelectorAll('[data-area-id]').forEach(button => {
-      button.addEventListener('click', () => {
-        if (!Battle.selectArea(button.dataset.areaId)) return;
-        renderAreaSelector();
-        updateBattleArea(Battle.getCurrentArea());
-        setMapOverlay(false); // 选完收起浮层，回到战斗画面
-      });
-    });
-    // 首次进入且未选图 → 自动弹出浮层引导选图
-    if (!selected) setMapOverlay(true);
-  }
-  /* 换图 / 关闭浮层按钮绑定（只绑一次；用元素自身标记避免依赖 dataset） */
-  (function bindMapOverlay() {
+  // 空实现：选图已迁移到世界地图页，保留导出兼容旧调用
+  function renderAreaSelector() { /* no-op：选图在世界地图页进行 */ }
+  /* 顶部「返回地图」按钮：回到世界地图页（二级菜单）选图（只绑一次） */
+  (function bindReturnMap() {
     const openBtn = $('btn-change-map');
-    const closeBtn = $('map-select-close');
-    const ov = $('map-select-overlay');
     if (openBtn && !openBtn.__mapBound) {
       openBtn.__mapBound = true;
-      openBtn.addEventListener('click', () => setMapOverlay(true));
-    }
-    if (closeBtn && !closeBtn.__mapBound) {
-      closeBtn.__mapBound = true;
-      closeBtn.addEventListener('click', () => setMapOverlay(false));
-    }
-    if (ov && !ov.__mapBound) {
-      ov.__mapBound = true;
-      ov.addEventListener('click', e => { if (e.target === ov) setMapOverlay(false); });
+      openBtn.addEventListener('click', () => {
+        if (window.UI && window.UI.switchPage) window.UI.switchPage('worldmap');
+      });
     }
   })();
 
@@ -175,19 +146,41 @@
     const type = ENEMY_TYPE[enemy.enemyType] || ENEMY_TYPE.normal;
     const weights = enemy.rarityWeights || {};
     const experience = Math.round((enemy.level * 5 + enemy.maxHp * 0.1) * enemy._diff);
+    // 战斗属性：显示完整（生命/攻击/防御/速度 + 暴击/暴伤/命中/闪避/吸血）
+    const pct = (v) => Math.round((Number(v) || 0) * 100) + '%';
+    const num = (v) => enemyStat(v);
     tip.innerHTML = `
-      <div class="enemy-tip-title"><strong>${escapeHtml(enemy.name || '未知怪物')}</strong><span>Lv.${enemyStat(enemy.level)}</span><b class="enemy-type ${type.className}">${type.label}</b></div>
-      <div class="enemy-tip-group"><div class="enemy-tip-heading">基础属性</div>
-        <div class="enemy-tip-row" data-enemy-hp>生命：${enemyStat(enemy.hp)} / ${enemyStat(enemy.maxHp)}</div>
-        <div class="enemy-tip-row">攻击：${enemyStat(enemy.atk)}</div>
-        <div class="enemy-tip-row">防御：${enemyStat(enemy.def)}</div>
-        <div class="enemy-tip-row">速度：${enemyStat(enemy.spd)}</div>
+      <div class="enemy-tip-title">
+        <strong>${escapeHtml(enemy.name || '未知怪物')}</strong>
+        <span>Lv.${num(enemy.level)}</span>
+        <b class="enemy-type ${type.className}">${type.label}</b>
       </div>
-      <div class="enemy-tip-group enemy-tip-drop"><div class="enemy-tip-heading">掉落信息</div>
-        <div class="enemy-tip-row">怪物类型：${type.label}</div>
-        <div class="enemy-tip-row">地图难度：×${Number(enemy._diff || 0).toFixed(2)}</div>
-        <div class="enemy-tip-row">掉落品质：<span class="rarity-white">白 ${Number(weights.white || 0)}%</span> · <span class="rarity-blue">蓝 ${Number(weights.blue || 0)}%</span> · <span class="rarity-gold">金 ${Number(weights.gold || 0)}%</span></div>
-        <div class="enemy-tip-row">经验：+${enemyStat(experience)}</div>
+      <div class="enemy-tip-group">
+        <div class="enemy-tip-heading">基础属性</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row" data-enemy-hp>生命<b>${num(enemy.hp)} / ${num(enemy.maxHp)}</b></div>
+          <div class="enemy-tip-row">攻击<b>${num(enemy.atk)}</b></div>
+          <div class="enemy-tip-row">防御<b>${num(enemy.def)}</b></div>
+          <div class="enemy-tip-row">速度<b>${num(enemy.spd)}</b></div>
+        </div>
+      </div>
+      <div class="enemy-tip-group">
+        <div class="enemy-tip-heading">战斗属性</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row">暴击<b>${pct(enemy.critRate)}</b></div>
+          <div class="enemy-tip-row">暴伤<b>${pct(enemy.critDamage)}</b></div>
+          <div class="enemy-tip-row">命中<b>${num(enemy.hit)}</b></div>
+          <div class="enemy-tip-row">闪避<b>${num(enemy.dodge)}</b></div>
+          <div class="enemy-tip-row">吸血<b>${pct(enemy.lifesteal)}</b></div>
+        </div>
+      </div>
+      <div class="enemy-tip-group enemy-tip-drop">
+        <div class="enemy-tip-heading">掉落信息</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row">难度<b>×${Number(enemy._diff || 0).toFixed(2)}</b></div>
+          <div class="enemy-tip-row">经验<b>+${num(experience)}</b></div>
+          <div class="enemy-tip-row" style="grid-column:1/-1">掉落品质：<span class="rarity-white">白 ${Number(weights.white || 0)}%</span> · <span class="rarity-blue">蓝 ${Number(weights.blue || 0)}%</span> · <span class="rarity-gold">金 ${Number(weights.gold || 0)}%</span></div>
+        </div>
       </div>`;
   }
   function updateEnemyTipHp(enemy) {
@@ -198,9 +191,21 @@
     const tip = $('enemy-tip');
     const icon = $('enemy-icon');
     if (!tip || !icon) return;
-    const box = icon.closest('.stage-enemy');
-    if (!box) return;
-    tip.classList.toggle('enemy-tip-left', icon.getBoundingClientRect().right + tip.offsetWidth > window.innerWidth - 8);
+    const GAP = 14; // tip 与立绘的间距
+    const ar = icon.getBoundingClientRect();
+    const tw = tip.offsetWidth || 280, th = tip.offsetHeight;
+    // 优先放在立绘的**左侧偏上**（怪物在舞台右下 → tip 在立绘左边且不挡画面）
+    let left = ar.left - tw - GAP;
+    let top = ar.top - th + ar.height * 0.4; // 立绘中部偏上对齐
+    // 超左缘 → 翻到立绘右侧
+    if (left < 8) left = ar.right + GAP;
+    // 超右缘 → 贴右缘
+    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+    // 上下夹边
+    if (top < 8) top = 8;
+    if (top + th > window.innerHeight - 8) top = window.innerHeight - th - 8;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
   }
   function bindEnemyTip() {
     const icon = $('enemy-icon');
@@ -434,10 +439,10 @@
           <div class="rt-row"><span>速度</span><span>${s.spd}</span></div>
           <div class="rt-row"><span>暴击</span><span>${Math.round(s.critRate * 100)}%</span></div>
           <div class="rt-row"><span>暴伤</span><span>${Math.round(s.critDamage * 100)}%</span></div>
-          <div class="rt-row"><span>命中</span><span>${Math.round(s.hit * 100)}%</span></div>
-          <div class="rt-row"><span>闪避</span><span>${Math.round(s.dodge * 100)}%</span></div>
+          <div class="rt-row"><span>命中</span><span>${Math.round(s.hit)}</span></div>
+          <div class="rt-row"><span>闪避</span><span>${Math.round(s.dodge)}</span></div>
           <div class="rt-row"><span>吸血</span><span>${Math.round(s.lifesteal * 100)}%</span></div>
-          <div class="rt-row"><span>装备</span><span>${equipCount}/3${bonusText && bonusText !== '无' ? '（' + bonusText + '）' : ''}</span></div>
+          <div class="rt-row"><span>装备</span><span>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + bonusText + '）' : ''}</span></div>
           ${active && pet.id === active.id ? '<div class="rt-row"><span style="color:var(--accent-hi)">当前出战</span></div>' : ''}`;
         const r = anchor.getBoundingClientRect();
         tipBox.style.left = (r.right + 8) + 'px';

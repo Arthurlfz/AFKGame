@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>背景图加载测试</title>
+<style>
+  body { margin:0; padding:20px; background:#222; color:#fff; font-family:sans-serif; }
+  .box { width:800px; height:450px; border:2px solid red; background-image:url('assets/bg/corrupted-forest/back.png'); background-size:cover; background-position:center; }
+  img { width:400px; display:block; }
+</style>
+</head>
+<body>
+  <h1>背景图加载测试</h1>
+  <p>下面是 CSS background 引用 back.png：</p>
+  <div class="box"></div>
+  <p>下面是 img 标签直接引用 back.png：</p>
+  <img src="assets/bg/corrupted-forest/back.png" alt="back.png">
+  <p>mid.png：</p>
+  <img src="assets/bg/corrupted-forest/mid.png" alt="mid.png">
+  <p>front.png：</p>
+  <img src="assets/bg/corrupted-forest/front.png" alt="front.png">
+</body>
+</html>
