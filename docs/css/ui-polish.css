@@ -111,8 +111,8 @@
 #tab-pet .equip-orbit {
   position:relative; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:repeat(5,minmax(64px,1fr));
   gap:8px; width:min(100%,560px); min-height:440px; margin:0 auto; padding:18px;
-  background:radial-gradient(circle, rgb(var(--action-gold-rgb) / .06), transparent 58%), var(--inset);
-  border:1px solid var(--line); box-shadow:var(--shadow-inset);
+  background:radial-gradient(circle at center, rgb(var(--action-gold-rgb) / .11), transparent 52%), linear-gradient(180deg, var(--panel-2), var(--inset));
+  border:1px solid var(--line-hi); box-shadow:var(--shadow-inset), 0 8px 24px rgba(0,0,0,.3);
 }
 #tab-pet .equip-orbit::before {
   content:''; position:absolute; inset:74px; border:1px solid rgb(var(--action-gold-rgb) / .2); pointer-events:none;
@@ -138,13 +138,16 @@
 #tab-pet .equip-orbit > .equip-slot:nth-of-type(12) { grid-column:3; grid-row:5; }
 #tab-pet .equip-orbit > .equip-slot:nth-of-type(13) { grid-column:4; grid-row:5; }
 #tab-pet .equip-slot.empty { border-style:dashed; color:var(--text-faint); opacity:.8; }
+#tab-pet .equip-slot.equipped { background-color:rgb(var(--action-gold-rgb) / .045); }
 #tab-pet .equip-slot.equipped.rarity-white { border-color:var(--r-white); }
 #tab-pet .equip-slot.equipped.rarity-blue { border-color:var(--r-blue); box-shadow:var(--shadow-inset), var(--shadow-glow-blue); }
 #tab-pet .equip-slot.equipped.rarity-gold { border-color:var(--r-gold); box-shadow:var(--shadow-inset), var(--shadow-glow-gold); }
 #tab-pet .equip-slot:hover { border-color:var(--accent-hi); box-shadow:var(--shadow-inset), 0 0 10px rgb(var(--action-gold-rgb) / .3); }
 #tab-pet .equip-slot .slot-label { color:var(--text-faint); font-size:var(--fs-xs); letter-spacing:1px; }
-#tab-pet .equip-slot .slot-item { min-height:38px; margin-top:3px; font-size:var(--fs-xs); line-height:1.35; overflow:visible; }
-#tab-pet .equip-slot .slot-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#tab-pet .equip-slot .slot-item { min-height:38px; margin-top:4px; display:flex; align-items:center; gap:6px; font-size:var(--fs-xs); line-height:1.35; overflow:visible; }
+#tab-pet .equip-slot .slot-icon { flex:none; display:flex; align-items:center; justify-content:center; width:28px; height:28px; color:var(--accent-hi); font-size:1.2rem; filter:drop-shadow(0 2px 4px rgba(0,0,0,.55)); }
+#tab-pet .equip-slot .slot-copy { min-width:0; flex:1; }
+#tab-pet .equip-slot .slot-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
 #tab-pet .equip-slot .slot-item .sub { display:block; overflow:hidden; color:var(--text-dim); text-overflow:ellipsis; white-space:nowrap; }
 #tab-pet .equip-slot .slot-unequip { display:none; }
 #tab-pet .equip-slot:hover .slot-unequip { display:block; }

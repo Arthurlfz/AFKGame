@@ -376,6 +376,8 @@ body {
   padding:6px 8px; border:1px solid var(--line); border-radius:1px; background:var(--inset);
 }
 .quick-eq .qe-name { flex:1; min-width:0; font-size:0.917rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.quick-eq .qe-icon { display:inline-flex; align-items:center; justify-content:center; width:24px; margin-right:5px; color:var(--accent-hi); font-size:1rem; }
+.quick-eq .qe-copy { overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
 .quick-eq .qe-meta { font-size:0.833rem; color:var(--text-faint); flex:none; }
 .quick-eq .btn-sm { flex:none; padding:2px 6px; }
 /* 穿上预览浮层（hover 显示，避开页面边缘由 JS 定位） */
@@ -449,33 +451,62 @@ body {
 .equip-card .ec-slot { font-size:0.833rem; color:var(--text-faint); margin-top:1px; }
 .equip-card .ec-actions { display:flex; gap:4px; margin-top:8px; }
 .equip-card .ec-actions .btn-sm { flex:1; padding:2px 0; font-size:0.833rem; }
-/* 装备详情浮层（hover 弹出，流放式 tooltip） */
+/* 装备详情浮层（hover 弹出，暗黑鉴定面板） */
 .equip-card .equip-tip {
-  display:none; position:absolute; left:50%; bottom:calc(100% + 6px);
-  transform:translateX(-50%); z-index:60; width:250px;
-  background:#16191f; border:1px solid var(--accent); border-radius:2px;
-  padding:10px 12px; font-size:0.917rem; line-height:1.8; color:var(--text);
-  box-shadow:0 8px 24px rgba(0,0,0,.6);
+  display:none; position:absolute; left:50%; bottom:calc(100% + 8px);
+  transform:translateX(-50%); z-index:60; width:300px;
+  background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .08), transparent 34%), var(--inset);
+  background-image:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .08), transparent 34%), var(--tex-grain);
+  border:1px solid rgb(var(--action-gold-rgb) / .38); border-top:2px solid var(--accent-hi);
+  border-radius:var(--radius-sm); padding:14px 16px 15px; font-size:0.917rem; line-height:1.65; color:var(--text);
+  box-shadow:var(--shadow-panel), inset 0 1px 0 rgba(255,255,255,.05);
 }
 .equip-card:hover .equip-tip { display:block; }
 .equip-card.open .equip-tip {
   display:block; position:static; transform:none; width:auto; margin-top:8px; box-shadow:none;
 }
-.equip-tip .tip-name { font-size:1.083rem; font-weight:700; margin-bottom:6px; }
-.equip-tip .tip-line { color:var(--text-dim); }
-.equip-tip .tip-line b { color:var(--text); font-weight:600; }
-.equip-tip .tip-prefix { color:#7fae7f; }
-.equip-tip .tip-suffix { color:#7f9fc4; }
-.equip-tip .tip-affix { color:var(--accent-hi); margin-top:4px; }
+.equip-tip .tip-name {
+  position:relative; font-size:1.167rem; font-weight:800; margin-bottom:10px; padding-bottom:9px;
+  line-height:1.35; text-align:center; letter-spacing:.5px; text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .28);
+}
+.equip-tip .tip-name::after {
+  content:""; position:absolute; left:18%; right:18%; bottom:0; height:1px;
+  background:linear-gradient(90deg, transparent, rgb(var(--action-gold-rgb) / .55), transparent);
+}
+.equip-tip .tip-line {
+  display:flex; justify-content:space-between; align-items:center; padding:3px 0 6px;
+  color:var(--text-dim); border-bottom:1px solid rgb(var(--action-gold-rgb) / .1);
+}
+.equip-tip .tip-line b { color:var(--text-hi); font-weight:700; font-family:var(--font-num); }
+.equip-tip .tip-section {
+  display:flex; align-items:center; gap:7px; margin-top:11px; padding-top:7px;
+  border-top:1px solid rgb(var(--action-gold-rgb) / .22); color:var(--accent);
+  font-size:0.8rem; font-weight:700; letter-spacing:1.5px;
+}
+.equip-tip .tip-section::before { content:"◆"; font-size:.55rem; color:var(--accent-hi); }
+.equip-tip .tip-base, .equip-tip .tip-prefix, .equip-tip .tip-suffix {
+  display:flex; align-items:center; gap:8px; padding:4px 0 2px 16px; min-height:27px;
+}
+.equip-tip .tip-base { color:var(--accent-hi); font-weight:700; }
+.equip-tip .tip-prefix { color:#9bc49b; }
+.equip-tip .tip-suffix { color:#9bb7dc; }
+.equip-tip .tip-tier {
+  margin-left:auto; min-width:28px; padding:1px 5px; border:1px solid rgb(var(--action-gold-rgb) / .28);
+  color:var(--accent-hi); font-family:var(--font-num); font-size:.8rem; line-height:1.35; text-align:center;
+  background:rgb(var(--action-gold-rgb) / .06);
+}
+.equip-tip .tip-empty { padding:4px 0 2px 16px; color:var(--text-faint); }
+.equip-tip .tip-affix { color:var(--accent-hi); margin-top:5px; }
+.equip-tip .tip-divider { border:none; border-top:1px solid rgb(var(--action-gold-rgb) / .18); margin:7px 0; }
 /* 装备 tab：换装背包 + 当前装备槽 也支持悬停/点击看属性面板 */
 .equip-inv { display:flex; flex-direction:column; gap:6px; }
 .equip-inv .quick-eq .equip-tip,
 #equip-slots .slot-item .equip-tip {
   display:none; position:absolute; left:50%; bottom:calc(100% + 8px);
-  transform:translateX(-50%); z-index:60; width:230px;
-  background:var(--panel-2); background-image:var(--tex-grain);
-  border:1px solid var(--line-hi); border-radius:var(--radius-sm);
-  padding:10px 12px; font-size:0.917rem; line-height:1.7; color:var(--text);
+  transform:translateX(-50%); z-index:60; width:250px;
+  background:var(--inset); background-image:var(--tex-grain);
+  border:1px solid var(--line-hi); border-top:2px solid var(--accent); border-radius:var(--radius-sm);
+  padding:10px 12px; font-size:0.917rem; line-height:1.65; color:var(--text);
   box-shadow:var(--shadow-panel);
 }
 .equip-inv .quick-eq:hover .equip-tip,
@@ -484,8 +515,6 @@ body {
 #equip-slots .slot-item.open .equip-tip { display:block; }
 /* 装备 tab 去打造按钮 */
 .equip-go-craft { margin-top:12px; text-align:center; }
-/* 装备详情：前缀/后缀分隔线 */
-.equip-tip .tip-divider { border:none; border-top:1px solid rgba(255,255,255,.12); margin:6px 0; }
 /* 锁定 / 新掉落标记 */
 .equip-card .ec-name { position:relative; padding-right:18px; }
 .eq-new {

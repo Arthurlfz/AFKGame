@@ -594,10 +594,14 @@
       const item = div.querySelector('.slot-item');
       if (eq) {
         item.style.color = rarity.color;
-        item.innerHTML = `<span class="slot-name">${escapeHtml(eq.name)}</span><span class="sub">${escapeHtml(describeItem(eq))}</span>`;
+        item.innerHTML = `<span class="slot-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span><span class="sub">${escapeHtml(describeItem(eq))}</span></span>`;
         const tip = document.createElement('div');
         tip.className = 'equip-tip';
-        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">${rarity.label}装 · T${eq.tier || 1} · ${escapeHtml(slot)}</div><div class="tip-line">基底：${escapeHtml(describeItem(eq))}</div>${eq.affixes && eq.affixes.length ? `<hr class="tip-divider"><div class="tip-affix">${eq.affixes.map(a => escapeHtml(Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label} +${a.value}${a.unit || '%'}`)).join(' · ')}</div>` : ''}`;
+        const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
+        const detailLine = (list, cls) => (list || []).map(a => `<div class="${cls}">${escapeHtml(a.label || '?')} +${a.value || 0}${['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%'} <span class="tip-tier">T${a.tier || '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
+        const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
+        const base = eq.base || { label: '攻击', value: 0 };
+        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
         item.appendChild(tip);
         const takeBtn = document.createElement('button');
         takeBtn.className = 'btn-sm ghost slot-unequip';
@@ -694,15 +698,16 @@
       // 装备属性面板（悬停 + 点击看）
       const tip = document.createElement('div');
       tip.className = 'equip-tip';
-      tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div>
-        <div class="tip-line">${rarityOf(eq).label}装 · T${eq.tier}</div>
-        <div class="tip-line">${describeItem(eq)}</div>
-        ${eq.affixes && eq.affixes.length ? `<div class="tip-affix">${eq.affixes.map(a => escapeHtml(Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label} +${a.value}%`)).join(' · ')}</div>` : ''}`;
-      row.appendChild(tip);
+      const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
+      const detailLine = (list, cls) => (list || []).map(a => `<div class="${cls}">${escapeHtml(a.label || '?')} +${a.value || 0}${['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%'} <span class="tip-tier">T${a.tier || '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
+      const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
+      const base = eq.base || { label: '攻击', value: 0 };
+      tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
+
       const name = document.createElement('span');
       name.className = 'qe-name';
+      name.innerHTML = `<span class="qe-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="qe-copy">${escapeHtml(eq.name)}</span>`;
       name.style.color = rarityOf(eq).color;
-      name.textContent = eq.name;
       row.appendChild(name);
       const meta = document.createElement('span');
       meta.className = 'qe-meta';

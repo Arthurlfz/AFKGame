@@ -304,21 +304,24 @@
     };
   }
 
-  // 装备详情浮层内容：名/基底/前缀/后缀/T阶/稀有度
-  // 词缀按前后缀分桶显示（前缀在上、后缀在下，中间分隔线分开）
+  // 装备详情浮层内容：按“等级 / 基底词缀 / 前缀 / 后缀”分段展示
   function buildEquipTip(eq) {
-    const prefix = (eq.affixes && eq.affixes.prefix) || [];
-    const suffix = (eq.affixes && eq.affixes.suffix) || [];
+    const affixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
+    const prefix = affixes.prefix || [];
+    const suffix = affixes.suffix || [];
     const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
     const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
-    const line = (a, cls) => a.map(x => `<span class="${cls}">${(x && x.label) || '?'} +${x ? (x.value || 0) : 0}%（T${x ? (x.tier || '?') : '?'}）</span>`).join('<br>') || '无';
+    const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
+    const line = (a, cls) => a.map(x => `<div class="${cls}">${escapeHtml((x && x.label) || '?')} +${x ? (x.value || 0) : 0}${['hit', 'dodge', 'spd'].includes(x && x.type) ? '' : '%'} <span class="tip-tier">T${x ? (x.tier || '?') : '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
     return `
       <div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}</div>
-      <div class="tip-line">${eq.slot || '武器'}｜基底：<b>${b.label}+${b.value}</b></div>
-      <div class="tip-line">稀有度：<b>${r.label}</b>｜T阶：<b>T${eq.tier ?? 4}</b></div>
-      <div class="tip-line">前缀：<br>${line(prefix, 'tip-prefix')}</div>
-      <hr class="tip-divider">
-      <div class="tip-line">后缀：<br>${line(suffix, 'tip-suffix')}</div>`;
+      <div class="tip-line">等级：<b>${itemLevel}</b></div>
+      <div class="tip-section">基底词缀</div>
+      <div class="tip-base">${escapeHtml(b.label)} +${b.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div>
+      <div class="tip-section">前缀</div>
+      ${line(prefix, 'tip-prefix')}
+      <div class="tip-section">后缀</div>
+      ${line(suffix, 'tip-suffix')}`;
   }
 
   /* ---------- 对外 API（装备页） ---------- */
