@@ -1,5 +1,5 @@
 /* ============================================================
- * equipment.js —— 装备系统
+ * equipment.js v2.0.0 —— 装备系统
  * 职责：
  *  1. 装备随机生成（部位 / 基底属性 / 稀有度白蓝金 / 1~3条随机词缀）
  *  2. 背包管理（掉落入库、穿脱进出）
@@ -15,6 +15,7 @@
   /* ---------- 通用工具（本文件最先加载，故放这里） ---------- */
   const Util = {
     randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); },
+    randFloat(a, b) { return a + Math.random() * (b - a); }, // 小数区间随机（randInt 是取整的，传小数边界会出错值）
     pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
     pickWeighted(items) { // items: [{weight,...}]，按权重随机
       let total = items.reduce((s, i) => s + i.weight, 0), r = Math.random() * total;
@@ -25,30 +26,26 @@
   window.Util = Util;
 
   /* ---------- 装备规则（数值来自 config.js，名字/词缀池留在本地） ---------- */
-  const SLOTS = ['武器', '防具', '饰品'];
+  const SLOTS = ['武器', '戒指', '项链', '头盔', '护甲', '盾牌', '靴子', '腰带', '斗篷', '饰品', '护符', '徽章'];
   const B = Config.equipment.baseValues;
-  const SLOT_INFO = {
-    武器: { names: ['短剑', '战斧', '长弓', '法杖', '铁锤', '长枪'],
-            bases: [{ type: 'atk', label: '攻击', min: B.武器.atk[0], max: B.武器.atk[1] }] },
-    防具: { names: ['皮甲', '锁甲', '铁盾', '胸甲', '披风'],
-            bases: [{ type: 'def', label: '防御', min: B.防具.def[0], max: B.防具.def[1] },
-                    { type: 'hp',  label: '生命', min: B.防具.hp[0],  max: B.防具.hp[1] }] },
-    饰品: { names: ['护符', '戒指', '项链', '徽章', '坠饰'],
-            bases: [{ type: 'spd', label: '速度', min: B.饰品.spd[0], max: B.饰品.spd[1] },
-                    { type: 'atk', label: '攻击', min: B.饰品.atk[0], max: B.饰品.atk[1] }] }
+  const LABELS = { atk: '攻击', hp: '生命', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血' };
+  const NAMES = {
+    武器: ['短剑', '战斧', '长弓', '法杖'], 戒指: ['铁戒', '骨戒'], 项链: ['狼牙项链', '灵魂项链'],
+    头盔: ['铁盔', '骨盔'], 护甲: ['锁甲', '胸甲'], 盾牌: ['圆盾', '塔盾'],
+    靴子: ['战靴', '影靴'], 腰带: ['重腰带', '猎手腰带'], 斗篷: ['黑斗篷', '影纱'],
+    饰品: ['徽记坠饰', '战斗饰品'], 护符: ['生命护符', '吸血护符'], 徽章: ['铁徽章', '王者徽章']
   };
-  // 词缀池：每条词缀带 category（前缀 prefix / 后缀 suffix）
-  // 前缀：攻击 / 生命 / 防御（最多 3 条）；后缀：速度 / 暴击率 / 吸血（最多 3 条）
-  // 装备总词缀上限 6 条（生成数量仍由各 rarity 的 affixMin/affixMax 控制，见 generateEquipment）
+  const SLOT_INFO = Object.fromEntries(SLOTS.map(slot => ({
+    0: slot, 1: { names: NAMES[slot] || [slot], bases: Object.entries(B[slot]).map(([type, value]) => ({ type, label: LABELS[type] || type, value })) }
+  })).map(x => [x[0], x[1]]));
+  // 前缀≤3：攻击/生命/防御；后缀≤3：机制属性与资源属性。
   const AFFIX_POOL = [
-    { type: 'atk', label: '攻击', category: 'prefix' },
-    { type: 'hp', label: '生命', category: 'prefix' },
-    { type: 'def', label: '防御', category: 'prefix' },
-    { type: 'spd', label: '速度', category: 'suffix' },
-    { type: 'crit', label: '暴击率', category: 'suffix' },
-    { type: 'lifesteal', label: '吸血', category: 'suffix' },
-    { type: 'hit', label: '命中', category: 'suffix' },
-    { type: 'dodge', label: '闪避', category: 'suffix' }
+    { type: 'atk', label: '攻击', category: 'prefix' }, { type: 'hp', label: '生命', category: 'prefix' },
+    { type: 'def', label: '防御', category: 'prefix' }, { type: 'spd', label: '速度', category: 'suffix' },
+    { type: 'crit', label: '暴击率', category: 'suffix' }, { type: 'critDamage', label: '暴击伤害', category: 'suffix' },
+    { type: 'hit', label: '命中', category: 'suffix' }, { type: 'dodge', label: '闪避', category: 'suffix' },
+    { type: 'lifesteal', label: '吸血', category: 'suffix' }, { type: 'dropQty', label: '掉落数量', category: 'suffix' },
+    { type: 'dropRare', label: '掉落稀有度', category: 'suffix' }, { type: 'matDrop', label: '材料掉率', category: 'suffix' }
   ];
   // 词缀归类：按 type 返回 'prefix' | 'suffix'（未知类型兜底为前缀）
   function affixCategory(type) {
@@ -105,37 +102,39 @@
   }
   // T 阶按稀有度映射（展示用；金色=最强档）：金→T1、蓝→T2、白→T4
   const TIER_BY_RARITY = { gold: 1, blue: 2, white: 4 };
-  // generateEquipment(rarity)：按指定稀有度生成装备（rarity 来自 pickRarity）
-  // 白装 1 条词缀、蓝装 1~2 条、金装 2~3 条；词缀从池中抽取不重复
-  // 每条词缀带 T 阶（T1 最强 → T5 最弱，范围按稀有度），数值由 T 阶决定（config.equipment.affixTiers）
-  function generateEquipment(rarity) {
+  // generateEquipment(rarity, areaTier=1, materialTier=3)：基底=部位基准×地图档次×底材 T 阶系数。
+  // 基础词缀必带并计入总条数；其余词缀按稀有度补齐，前/后缀各最多 3 条。
+  function generateEquipment(rarity, areaTier, materialTier) {
+    rarity = rarity || Config.equipment.rarities[0];
+    areaTier = Math.max(1, Math.min(6, areaTier || 1));
+    materialTier = Math.max(1, Math.min(5, materialTier || 3));
     const slot = Util.pick(SLOTS);
     const info = SLOT_INFO[slot];
-    const base = Util.pick(info.bases);
-    const baseVal = Util.randInt(base.min, base.max);
+    const multiplier = (Config.equipment.baseTierMultipliers[areaTier - 1] || 1) *
+      (Config.equipment.materialTierMultipliers[materialTier] || 1);
+    const baseStats = {};
+    for (const b of info.bases) baseStats[b.type] = Math.round(b.value * multiplier * 100) / 100;
+    const firstBase = info.bases[0];
+    const base = { type: firstBase.type, label: firstBase.label, value: baseStats[firstBase.type] };
     const count = Util.randInt(rarity.affixMin, rarity.affixMax);
-    const pool = [...AFFIX_POOL];
+    const affixes = { prefix: [], suffix: [] };
+    const baselineType = baseStats.hit !== undefined ? 'hit' : 'crit';
+    const baseline = { type: baselineType, label: LABELS[baselineType], tier: 5, value: baselineType === 'hit' ? 5 : 2, base: true };
+    affixes.suffix.push(baseline);
+    const pool = AFFIX_POOL.filter(a => a.type !== baselineType);
     const range = Config.equipment.affixTierByRarity[rarity.id] || [4, 5];
-    const affixes = { prefix: [], suffix: [] }; // 词缀按前后缀分桶（各最多 3 条）
-    for (let i = 0; i < count && pool.length; i++) {
-      const aff = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; // 去重
+    while (affixCount({ affixes }) < count && pool.length) {
+      const aff = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
       const tier = Util.randInt(range[0], range[1]);
-      const T = Config.equipment.affixTiers.find(t => t.tier === tier);
-      affixes[affixCategory(aff.type)].push({
-        type: aff.type, label: aff.label,
-        tier,
-        value: Util.randInt(T.min, T.max) // 数值 = 该 T 阶区间随机
-      });
+      const tiers = aff.type === 'spd' ? Config.equipment.speedAffixTiers : Config.equipment.affixTiers;
+      const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
+      const fixed = ['hit', 'dodge', 'spd'].includes(aff.type);
+      affixes[aff.category].push({ type: aff.type, label: aff.label, tier, value: Util.randInt(T.min, T.max), fixed });
     }
     return {
-      id: uid++, name: Util.pick(info.names), slot,
-      tier: TIER_BY_RARITY[rarity.id] || 4,
-      rarity: { id: rarity.id, label: rarity.label, color: rarity.color },
-      base: { type: base.type, label: base.label, value: baseVal },
-      affixes,
-      cloudId: null, // 云端 items.id（存档/市场上架用）
-      locked: false, // 锁定：一键分解跳过（状态存库 equip_items.locked）
-      fresh: true    // 新掉落标记：查看详情后清除（纯本地，不存库）
+      id: uid++, name: Util.pick(info.names), slot, areaTier, materialTier,
+      tier: materialTier, rarity: { id: rarity.id, label: rarity.label, color: rarity.color },
+      base, baseStats, affixes, cloudId: null, locked: false, fresh: true
     };
   }
 
@@ -180,15 +179,26 @@
   // 返回 { flat: {atk,hp,def,spd}, pct: {...} }，词缀数组逐条累加
   // 防御：旧/脏数据装备缺 base 或缺 value 时跳过该条，保证属性计算不抛错、不产生 NaN
   function getEquipBonuses(pet) {
-    const flat = { atk: 0, hp: 0, def: 0, spd: 0 };
+    const flat = { atk: 0, hp: 0, def: 0, spd: 0, crit: 0, critDamage: 0, hit: 0, dodge: 0, lifesteal: 0 };
     const pct = { atk: 0, hp: 0, def: 0, spd: 0 };
+    const resources = { dropQty: 1, dropRare: 1, matDrop: 1 };
+    const contributions = [];
     for (const slot of SLOTS) {
-      const eq = pet.equipment[slot];
-      if (!eq || !eq.base) continue;
-      flat[eq.base.type] = (flat[eq.base.type] || 0) + (eq.base.value || 0);
-      for (const aff of flattenAffixes(eq.affixes)) pct[aff.type] = (pct[aff.type] || 0) + (aff.value || 0);
+      const eq = pet.equipment && pet.equipment[slot];
+      if (!eq) continue;
+      const stats = eq.baseStats || (eq.base ? { [eq.base.type]: eq.base.value || 0 } : {});
+      const affixes = flattenAffixes(eq.affixes);
+      const own = {};
+      for (const [type, value] of Object.entries(stats)) own[type] = value;
+      for (const aff of affixes) {
+        if (['dropQty', 'dropRare', 'matDrop'].includes(aff.type)) resources[aff.type] *= 1 + (aff.value || 0) / 100;
+        else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        else own[aff.type] = (own[aff.type] || 0) + (stats[aff.type] || 0) * (aff.value || 0) / 100;
+      }
+      for (const [type, value] of Object.entries(own)) flat[type] = (flat[type] || 0) + value;
+      contributions.push({ slot, stats: own });
     }
-    return { flat, pct };
+    return { flat, pct, resources, contributions };
   }
 
   /* ---------- 展示文案 ---------- */

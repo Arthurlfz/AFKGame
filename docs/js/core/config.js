@@ -1,5 +1,5 @@
 /* ============================================================
- * config.js —— 全部游戏数值集中配置（最先加载）
+ * config.js v2.0.0 —— 全部游戏数值集中配置（最先加载）
  * 用法：改这里的数字即可调数值，无需动任何逻辑代码。
  * 注意：本文件必须在所有模块之前加载（游戏.html 中第一个 script）。
  * ============================================================ */
@@ -238,29 +238,29 @@ window.Config = {
 
   /* ================= 装备 ================= */
   equipment: {
-    // 各部位基底属性数值范围 [最小, 最大]
+    // 每个部位的 1 档基底固定值；生成时再乘 baseTierMultipliers（图 1~6）与 materialTierMultipliers（底材 T1~T5）。
     baseValues: {
-      武器: { atk: [5, 9] },
-      防具: { def: [3, 6], hp: [20, 40] },
-      饰品: { spd: [2, 4], atk: [2, 5] }   // 饰品带少量速度基底（基础速度 20~110，+2~4 属"少量加速"）
+      武器: { atk: 30 }, 戒指: { atk: 15, crit: 2 }, 项链: { atk: 15, critDamage: 8 },
+      头盔: { def: 15 }, 护甲: { hp: 80, def: 8 }, 盾牌: { def: 15, dodge: 5 },
+      靴子: { spd: 8 }, 腰带: { hp: 60, spd: 5 }, 斗篷: { dodge: 10, hp: 50 },
+      饰品: { atk: 12, hit: 5 }, 护符: { lifesteal: 4 }, 徽章: { crit: 3, critDamage: 10 }
     },
-    // 词缀 T 阶表：T1 最强 → T5 最弱（打造「强化石」把词缀 T 阶提升 1 级，即数值升一档）
-    // value 范围 = 该 T 阶下词缀百分比数值的随机区间
-    affixTiers: [
-      { tier: 1, min: 25, max: 30 },  // T1 封顶，不能再强化
-      { tier: 2, min: 19, max: 24 },
-      { tier: 3, min: 14, max: 18 },
-      { tier: 4, min: 9,  max: 13 },
-      { tier: 5, min: 5,  max: 8 }
+    baseTierMultipliers: [1, 1.25, 1.55, 1.9, 2.3, 2.75],
+    materialTierMultipliers: { 1: 1.5, 2: 1.3, 3: 1, 4: 0.8, 5: 0.6 },
+    speedAffixTiers: [
+      { tier: 1, min: 12, max: 16 }, { tier: 2, min: 9, max: 11 }, { tier: 3, min: 6, max: 8 },
+      { tier: 4, min: 3, max: 5 }, { tier: 5, min: 1, max: 2 }
     ],
-    // 词缀 T 阶的随机范围 [最小, 最大]，按稀有度区分（白装差、金装好）
+    affixTiers: [
+      { tier: 1, min: 25, max: 30 }, { tier: 2, min: 19, max: 24 }, { tier: 3, min: 14, max: 18 },
+      { tier: 4, min: 9, max: 13 }, { tier: 5, min: 5, max: 8 }
+    ],
     affixTierByRarity: { white: [4, 5], blue: [3, 4], gold: [1, 3] },
-    // 稀有度（白/蓝/金）：affixMin~affixMax = 词缀条数范围；color = 展示颜色（design-tokens v2 规范色）
-    // 白装：铁灰；蓝装：幽蓝；金装：熔金（普通词缀常见 → 稀有词缀）
+    // 稀有度由词缀总条数驱动：基础 1 条白，2~3 条蓝，4~6 条金。
     rarities: [
       { id: 'white', label: '白色', color: '#b2aa9c', affixMin: 1, affixMax: 1 },
-      { id: 'blue',  label: '蓝色', color: '#4a6fa8', affixMin: 1, affixMax: 2 },
-      { id: 'gold',  label: '金色', color: '#f2b632', affixMin: 2, affixMax: 3 }
+      { id: 'blue', label: '蓝色', color: '#4a6fa8', affixMin: 2, affixMax: 3 },
+      { id: 'gold', label: '金色', color: '#f2b632', affixMin: 4, affixMax: 6 }
     ]
   },
 

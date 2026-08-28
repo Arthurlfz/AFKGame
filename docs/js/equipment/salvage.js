@@ -1,5 +1,5 @@
 /* ============================================================
- * salvage.js —— 装备管理：锁定 + 一键分解
+ * salvage.js v2.0.0 —— 装备管理：锁定 + 一键分解
  * 职责：
  *  1. 锁定/解锁装备（locked 状态存库 equip_items.locked，防分解）
  *  2. 一键分解预览：统计可分解件数与预计产出（按稀有度，config.salvage）
@@ -14,7 +14,15 @@
   'use strict';
 
   const Config = window.Config;
-  const { getInventory, addToInventory, removeFromInventory } = window.Equipment;
+  const { getInventory, addToInventory, removeFromInventory, rarityOf, affixCount } = window.Equipment;
+  function rarityForCount(eq) {
+    const count = affixCount({ affixes: eq && eq.affixes });
+    return count >= 4 ? 'gold' : count >= 2 ? 'blue' : 'white';
+  }
+  function syncedRarity(eq) {
+    const id = rarityForCount(eq);
+    return (Config.equipment.rarities || []).find(r => r.id === id) || rarityOf(eq);
+  }
   const { gainLocal, spendLocal, cloudGain } = window.Materials;
   const isItemListed = () => window.Market && window.Market.isItemListed ? window.Market.isItemListed.apply(window.Market, arguments) : false;
   const Items = window.Items;
@@ -45,8 +53,9 @@
     const gains = {};
     for (const eq of equips || []) {
       if (!isSalvageable(eq)) { skipped++; continue; }
-      const r = S[eq.rarity.id] || S.white;
-      byRarity[eq.rarity.id] = (byRarity[eq.rarity.id] || 0) + 1;
+      const rarity = syncedRarity(eq);
+      const r = S[rarity.id] || S.white;
+      byRarity[rarity.id] = (byRarity[rarity.id] || 0) + 1;
       for (const k in r) gains[k] = (gains[k] || 0) + r[k];
     }
     const count = byRarity.white + byRarity.blue + byRarity.gold;
@@ -65,7 +74,8 @@
     const gains = {};
     const cloudIds = [];
     for (const eq of targets) {
-      const r = S[eq.rarity.id] || S.white;
+      const rarity = syncedRarity(eq);
+      const r = S[rarity.id] || S.white;
       for (const k in r) gains[k] = (gains[k] || 0) + r[k];
       if (eq.cloudId) cloudIds.push(eq.cloudId);
       removeFromInventory(eq.id);
