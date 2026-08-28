@@ -39,7 +39,10 @@
       baseHp, baseAtk, baseDef, baseSpd,
       curHp: baseHp, // 持久血量：跨场战斗延续，非战斗时自动恢复
       cloudId: null, // 云端 pets.id（存档/市场上架用；本地孵化后由 savePet 回写）
-      equipment: { 武器: null, 防具: null, 饰品: null }
+      // 12 部位装备槽；旧存档缺失部位会按空槽处理
+      equipment: Object.fromEntries((window.Equipment && window.Equipment.SLOTS ||
+        ['武器', '戒指', '项链', '头盔', '护甲', '盾牌', '靴子', '腰带', '斗篷', '饰品', '护符', '徽章'])
+        .map(slot => [slot, null]))
     };
   }
   function addPet(pet) {
@@ -150,34 +153,23 @@
       spd: getBaseSpeed(pet)
     };
   }
-  // 总属性 = 基础 + 装备固定值 + 装备百分比（百分比以基础值为基准）
+  // 总属性 = 宠物本体 + 每件装备独立贡献。装备词缀只放大该件装备的放大后基底，绝不乘宠物成长。
   function getStats(pet) {
     const base = baseStats(pet);
-    const { flat, pct } = getEquipBonuses(pet);
-    const s = {
-      atk: base.atk + flat.atk,
-      hp:  base.hp + flat.hp,
-      def: base.def + flat.def,
-      spd: base.spd + flat.spd
+    const { flat = {} } = getEquipBonuses(pet) || {};
+    return {
+      atk: base.atk + (flat.atk || 0),
+      hp: base.hp + (flat.hp || 0),
+      def: base.def + (flat.def || 0),
+      spd: base.spd + (flat.spd || 0),
+      // 机制属性仅来自装备；命中、闪避是固定值，其他值转为战斗读取的小数/倍率。
+      critRate: (flat.crit || 0) / 100,
+      critDamage: 1 + (flat.critDamage || 0) / 100,
+      hit: flat.hit || 0,
+      dodge: flat.dodge || 0,
+      lifesteal: (flat.lifesteal || 0) / 100
     };
-    for (const k of ['atk', 'hp', 'def', 'spd']) {
-      if (pct[k] > 0) s[k] += Math.floor(base[k] * pct[k] / 100);
-    }
-    // 暴击/命中/闪避/吸血：由种类预设决定基础值 + 装备词缀加算（真实属性，战斗读取）。
-    // 命中/闪避/吸血返回小数(0.95=95%)，装备词缀为百分数(+8 转 0.08)。
-    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
-    s.critRate = (prof.critRate == null ? 10 : prof.critRate) / 100;
-    s.critDamage = (prof.critDamage == null ? 150 : prof.critDamage) / 100;
-    const affHit = (pct.hit || 0) / 100;
-    const affDodge = (pct.dodge || 0) / 100;
-    const affLs = (pct.lifesteal || 0) / 100;
-    s.hit = clampPct((prof.hit == null ? 90 : prof.hit) / 100 + affHit);
-    s.dodge = clampPct((prof.dodge == null ? 5 : prof.dodge) / 100 + affDodge);
-    s.lifesteal = clampPct((prof.lifesteal == null ? 0 : prof.lifesteal) / 100 + affLs);
-    return s;
   }
-  // 属性封顶：命中/闪避/吸血 0~1
-  function clampPct(v) { return Math.max(0, Math.min(1, v)); }
   // 面板"装备加成"文案，如 "攻击+7 生命+20"
   function getBonusText(pet) {
     const base = baseStats(pet), s = getStats(pet);

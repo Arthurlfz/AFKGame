@@ -9,9 +9,9 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260828d">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260827f">
-<link rel="stylesheet" href="css/game.css?v=20260828b">
+<link rel="stylesheet" href="css/game.css?v=20260828e">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260828c">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260828n">
 </head>
 <body>
 
@@ -52,7 +52,7 @@
   <div class="app-body">
     <!-- 左侧边栏：主导航 + 任务/设置 -->
     <nav class="sidebar" id="sidebar">
-      <button class="sb-btn active" data-page="battle"><span class="sb-icon">⚔️</span><span class="sb-label">野外探险</span></button>
+      <button class="sb-btn active" data-page="worldmap"><span class="sb-icon">🗺️</span><span class="sb-label">世界地图</span></button>
       <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
       <button class="sb-btn" data-page="equip"><span class="sb-icon">🛠️</span><span class="sb-label">装备打造</span></button>
       <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">交易市场</span></button>
@@ -61,29 +61,48 @@
       <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon">⚙️</span><span class="sb-label">设置</span></button>
     </nav>
 
-    <!-- 页面容器：4 个页面，display 显隐切换（DOM 常驻，不销毁） -->
+    <!-- 页面容器：display 显隐切换（DOM 常驻，不销毁） -->
     <main class="page-container">
 
-      <!-- ============ 战斗页（野外探险）：对战主画面 + 属性/装备 + 掉落日志（v2 三段式） ============ -->
-      <section class="tab-page active" id="tab-battle">
+      <!-- ============ 世界地图页（二级菜单：选图 → 进战斗/主城） ============ -->
+      <section class="tab-page active" id="tab-worldmap">
+        <div class="worldmap-page">
+          <!-- 页眉：返回主菜单（侧边栏已在左侧，这里不放多余按钮） -->
+          <div class="worldmap-head">
+            <span class="worldmap-title">暗黑大陆 · 世界地图</span>
+            <span class="worldmap-hint">点击地图上的标记进入对应区域 · 主城可回血休整</span>
+          </div>
+          <!-- 地图铺满区：底图 + 点位标记（渲染由 worldmap.js 负责；外层 wrap 提供真实高度，canvas 16:9 居中） -->
+          <div class="worldmap-canvas-wrap" id="worldmap-canvas-wrap">
+            <div class="worldmap-canvas" id="worldmap-canvas"></div>
+            <!-- 点位信息卡（悬停弹出）：放 wrap 内，absolute 相对 wrap 定位，与 JS 坐标基准一致 -->
+            <div class="worldmap-tip" id="worldmap-tip" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 战斗页（野外探险）：对战主画面（三级菜单，由世界地图进入） ============ -->
+      <section class="tab-page" id="tab-battle">
         <div class="battle-page">
           <!-- 区域一：对战主画面（约 55% 高度） -->
           <div class="fs-panel bp-arena">
             <div class="fs-panel__head">野外探险
               <span class="bp-hint">选好地图即自动挂机打怪</span>
             </div>
-            <!-- 顶部：当前地图条 + 换图按钮（二级跳转入口） -->
+            <!-- 顶部：挂机控制（状态 + 开始/停止挂机按钮） -->
+            <div class="fight-control">
+              <div class="fight-status">
+                <span class="status-badge idle" id="status-badge">空闲</span>
+                <span class="fight-count">连续战斗 <b id="fight-count">0</b> 场</span>
+              </div>
+              <div class="fight-action">
+                <button class="fs-btn fs-btn--primary" id="btn-battle">开始自动战斗</button>
+              </div>
+            </div>
+            <!-- 第二行：当前地图条 + 返回地图按钮（回到世界地图页选图） -->
             <div class="battle-area-topbar">
               <div id="battle-area-info" class="battle-area-info"></div>
-              <button type="button" class="fs-btn fs-btn--ghost" id="btn-change-map">换图</button>
-            </div>
-            <!-- 地图选择浮层：首次未选图自动弹出，平时隐藏，点「换图」打开 -->
-            <div class="map-select-overlay" id="map-select-overlay" aria-label="选择挂机地图">
-              <div class="map-select-panel">
-                <div class="map-select-title">选择挂机地图</div>
-                <div id="battle-area-selector" class="battle-area-selector"></div>
-                <button type="button" class="fs-btn fs-btn--ghost map-select-close" id="map-select-close">关闭</button>
-              </div>
+              <button type="button" class="fs-btn fs-btn--ghost" id="btn-change-map">返回地图</button>
             </div>
             <div class="battle-arena">
               <!-- 最左 56px：出战宠物竖列（悬停看属性 / 点击切换，下一场生效） -->
@@ -129,15 +148,6 @@
                 <div class="at-racer" id="at-racer-pet">❔</div>
                 <div class="at-racer at-racer--enemy" id="at-racer-enemy">❔</div>
                 <div class="at-finish"></div>
-              </div>
-            </div>
-            <div class="fight-control">
-              <div class="fight-status">
-                <span class="status-badge idle" id="status-badge">空闲</span>
-                <span class="fight-count">连续战斗 <b id="fight-count">0</b> 场</span>
-              </div>
-              <div class="fight-action">
-                <button class="fs-btn fs-btn--primary" id="btn-battle">开始自动战斗</button>
               </div>
             </div>
             <div class="stat-row">
@@ -614,6 +624,8 @@ window.PetSprites = {
 };
 </script>
 <script src="js/pet/enemy-data.js?v=20260827f"></script>
+<!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
+<script src="js/core/worldmap.js?v=20260828a"></script>
 <script src="js/core/supabase.js?v=20260827k"></script>
 <script src="js/equipment/equipment.js"></script>
 <script src="js/pet/pet.js"></script>
@@ -627,15 +639,17 @@ window.PetSprites = {
 <script src="js/pet/pet_merge.js"></script>
 <script src="js/pet/pet_evolve.js"></script>
 <script src="js/core/quest.js"></script>
-<script src="js/core/battle.js?v=20260827m"></script>
+<script src="js/core/battle.js?v=20260828a"></script>
 <script src="js/ui/ui-common.js"></script>
 <script src="js/ui/ui-console.js?v=20260827k"></script>
-<script src="js/ui/ui-shell.js"></script>
+<script src="js/ui/ui-shell.js?v=20260828c"></script>
+<script src="js/ui/ui-worldmap.js?v=20260828h"></script>
+
 <script src="js/ui/ui-login.js?v=20260827k"></script>
 <script src="js/ui/ui-dialog.js"></script>
 <script src="js/ui/ui-popover.js"></script>
 <script src="js/ui/ui-quest.js"></script>
-<script src="js/ui/ui-battle.js?v=20260827m"></script>
+<script src="js/ui/ui-battle.js?v=20260828b"></script>
 <script src="js/ui/ui-pet.js?v=20260827i"></script>
 <script src="js/ui/ui-bag.js"></script>
 <script src="js/ui/ui-equipment.js"></script>

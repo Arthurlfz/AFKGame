@@ -164,11 +164,11 @@
     state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
     state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal };
     state.enemy = enemyStats;
-    // 敌人暴击/命中/闪避/吸血：无预设时用全局默认（敌我一致体验），有预设则按其值
+    // 敌人机制属性：命中/闪避均为固定值；无专属闪避的敌人按零处理。
     if (state.enemy.critRate == null) state.enemy.critRate = Config.battle.critRate;
     if (state.enemy.critDamage == null) state.enemy.critDamage = Config.battle.critMultiplier;
-    if (state.enemy.hit == null) state.enemy.hit = 0.9;
-    if (state.enemy.dodge == null) state.enemy.dodge = 0.05;
+    if (state.enemy.hit == null) state.enemy.hit = 90;
+    if (state.enemy.dodge == null) state.enemy.dodge = 0;
     if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
     state.petAction = 0;
     state.enemyAction = 0;

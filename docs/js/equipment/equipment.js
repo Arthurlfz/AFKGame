@@ -35,9 +35,10 @@
     靴子: ['战靴', '影靴'], 腰带: ['重腰带', '猎手腰带'], 斗篷: ['黑斗篷', '影纱'],
     饰品: ['徽记坠饰', '战斗饰品'], 护符: ['生命护符', '吸血护符'], 徽章: ['铁徽章', '王者徽章']
   };
-  const SLOT_INFO = Object.fromEntries(SLOTS.map(slot => ({
-    0: slot, 1: { names: NAMES[slot] || [slot], bases: Object.entries(B[slot]).map(([type, value]) => ({ type, label: LABELS[type] || type, value })) }
-  })).map(x => [x[0], x[1]]));
+  const SLOT_INFO = Object.fromEntries(SLOTS.map(slot => [slot, {
+    names: NAMES[slot] || [slot],
+    bases: Object.entries(B[slot] || {}).map(([type, value]) => ({ type, label: LABELS[type] || type, value }))
+  }]));
   // 前缀≤3：攻击/生命/防御；后缀≤3：机制属性与资源属性。
   const AFFIX_POOL = [
     { type: 'atk', label: '攻击', category: 'prefix' }, { type: 'hp', label: '生命', category: 'prefix' },
