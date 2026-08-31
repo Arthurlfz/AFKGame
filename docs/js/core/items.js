@@ -10,7 +10,7 @@
   'use strict';
 
   const Config = window.Config;
-  const { replaceInventory, normalizeAffixes } = window.Equipment;
+  const { replaceInventory, normalizeAffixes, syncRarity } = window.Equipment;
   const Supabase = window.Supabase;
   const db = () => Supabase.getClient();
 
@@ -50,27 +50,27 @@
   // 旧数据兼容：历史词缀没有 tier 字段，按稀有度补默认档（金 T2 / 蓝 T4 / 白 T5）
   const DEFAULT_AFFIX_TIER = { gold: 2, blue: 4, white: 5 };
   function fromCloud(row) {
-    const rarity = Config.equipment.rarities.find(r => r.id === row.rarity) || Config.equipment.rarities[0];
-    const dTier = DEFAULT_AFFIX_TIER[rarity.id] || 4;
-    const fix = a => (a && a.type ? (a.tier ? a : { ...a, tier: dTier }) : null); // 清洗 null/缺 type 脏词缀
     const norm = normalizeAffixes(row.affixes);
     // 云端 base_stat 兜底（早期数据可能为 null/缺字段）：给默认攻击基底，避免属性计算炸（曾导致回血时钟中断）
     const base = (row.base_stat && row.base_stat.type)
       ? row.base_stat
       : { type: 'atk', label: '攻击', value: 0 };
-    return {
+    const eq = {
       id: Date.now() + Math.floor(Math.random() * 1000), // 本地唯一 id（与 uid++ 错开）
       cloudId: row.id,
       name: row.name || '旧装备', slot: row.slot || '武器',
       tier: row.tier || 4,
-      rarity: { id: rarity.id, label: rarity.label, color: rarity.color },
+      rarity: { id: 'white', label: '白', color: '#b2aa9c' }, // 占位，下面按词缀条数统一重算
       base,
-      affixes: {
-        prefix: norm.prefix.map(fix).filter(Boolean).map(a => ({ ...a, value: a.value || 0 })),
-        suffix: norm.suffix.map(fix).filter(Boolean).map(a => ({ ...a, value: a.value || 0 }))
-      },
+      affixes: { prefix: norm.prefix, suffix: norm.suffix },
       locked: !!row.locked // 锁定状态（防分解，存库）
     };
+    syncRarity(eq); // 颜色一律按词缀条数推导（单一来源），覆盖旧数据或任何写入偏差，刷新页面也不回退
+    const dTier = DEFAULT_AFFIX_TIER[eq.rarity.id] || 4;
+    const fix = a => (a && a.type ? (a.tier ? a : { ...a, tier: dTier }) : null); // 清洗 null/缺 type 脏词缀
+    eq.affixes.prefix = eq.affixes.prefix.map(fix).filter(Boolean).map(a => ({ ...a, value: a.value || 0 }));
+    eq.affixes.suffix = eq.affixes.suffix.map(fix).filter(Boolean).map(a => ({ ...a, value: a.value || 0 }));
+    return eq;
   }
   // 用云端列表整体替换本地背包（云端是权威）
   function setCloudItems(rows) {

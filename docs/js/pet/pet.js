@@ -153,13 +153,13 @@
       spd: getBaseSpeed(pet)
     };
   }
-  // 总属性 = 宠物本体 + 每件装备独立贡献。装备词缀只放大该件装备的放大后基底，绝不乘宠物成长。
-  // 机制属性：宠物本体保留基础值（否则裸装打不中人），装备词缀在此基础上加成。
+  // 总属性 = 宠物成长后裸属性 × 装备 atk/hp/def 百分比 + 装备固定基底与机制属性。
+  // 装备底材/地图档次只在生成时放大装备基底，不参与宠物成长公式。
   //  - 命中/闪避：固定数值（命中基础90，闪避基础0，裸装命中率≈95%封顶）
   //  - 暴击/暴伤/吸血：小数/倍率，来自宠物 profile 基础 + 装备加成
   function getStats(pet) {
     const base = baseStats(pet);
-    const { flat = {} } = getEquipBonuses(pet) || {};
+    const { flat = {}, pct = {} } = getEquipBonuses(pet) || {};
     const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
     const baseHit = prof.hit != null ? Number(prof.hit) : 90;     // 基础命中（固定数值）
     const baseDodge = prof.dodge != null ? Number(prof.dodge) : 0; // 基础闪避（固定数值）
@@ -167,9 +167,9 @@
     const baseCritDmg = (prof.critDamage != null ? Number(prof.critDamage) : 150) / 100; // 145% → 1.45 倍
     const baseLs = (prof.lifesteal != null ? Number(prof.lifesteal) : 0) / 100;
     return {
-      atk: base.atk + (flat.atk || 0),
-      hp: base.hp + (flat.hp || 0),
-      def: base.def + (flat.def || 0),
+      atk: Math.round(base.atk * (1 + (pct.atk || 0)) + (flat.atk || 0)),
+      hp: Math.round(base.hp * (1 + (pct.hp || 0)) + (flat.hp || 0)),
+      def: Math.round(base.def * (1 + (pct.def || 0)) + (flat.def || 0)),
       spd: base.spd + (flat.spd || 0),
       critRate: baseCrit + (flat.crit || 0) / 100,
       critDamage: baseCritDmg + (flat.critDamage || 0) / 100,
@@ -202,15 +202,57 @@
     return parts.length ? parts.join(' ') : '无';
   }
 
-  /* ---------- 经验与升级 ---------- */
+  /* ---------- 经验与升级 ----------
+   * 经验规则全部收在这里，是唯一事实源：实发（main.js）与预览（怪物 tooltip）都调同一套函数，
+   * 结构上杜绝"tooltip 写一套公式、发放写另一套"导致显示与实发对不上。
+   * 曲线设计见 config.exp 的注释（产出与需求同量纲）。
+   */
   // 每级所需经验 = needBase × 等级^needExponent（公式参数在 config.js）
   const expNeed = lv => Math.round(Config.exp.needBase * Math.pow(lv, Config.exp.needExponent));
-  // 返回 { leveled, newLevel, maxed }，由调用方决定是否播报
-  // maxed=true 表示本次调用时已达等级上限（经验条保持满）
+  // 单场胜利的经验基准：coef × 怪物等级^指数 × 区域难度 × 全局倍率
+  function expBase(enemy, area) {
+    const E = Config.exp;
+    const lv = Math.max(1, Number(enemy && enemy.level) || 1);
+    const diff = Number(area && area.difficulty) || 1;
+    const rate = Number(E.rate) || 1;
+    return E.perWinCoef * Math.pow(lv, E.perWinExponent) * diff * rate;
+  }
+  // 实发经验：基准 ± jitter 随机，保底 perWinMin
+  function expFromBattle(enemy, area) {
+    const base = expBase(enemy, area);
+    const j = Number(Config.exp.perWinJitter) || 0;
+    const factor = 1 + (Math.random() * 2 - 1) * j;
+    return Math.max(Config.exp.perWinMin || 1, Math.round(base * factor));
+  }
+  // 预览区间（怪物 tooltip）：与实发同源，保证玩家"看到的 = 拿到的"
+  function expRange(enemy, area) {
+    const base = expBase(enemy, area);
+    const j = Number(Config.exp.perWinJitter) || 0;
+    const min = Number(Config.exp.perWinMin) || 1;
+    return {
+      min: Math.max(min, Math.round(base * (1 - j))),
+      max: Math.max(min, Math.round(base * (1 + j)))
+    };
+  }
+  /* ---------- 满级经验池 ----------
+   * 溢出经验（满级后的、以及升到满级时多出来的）攒进 pet.expPool，
+   * 每满 perCrystal 凝 1 颗晶石（走 Materials，账号级、云端同步）；返回本次凝出的数量。 */
+  function addExpPool(pet, amt) {
+    const EP = Config.pet.expPool;
+    if (!EP || amt <= 0) return 0;
+    pet.expPool = (pet.expPool || 0) + amt;
+    const n = Math.floor(pet.expPool / EP.perCrystal);
+    if (n <= 0) return 0;
+    pet.expPool -= n * EP.perCrystal;
+    if (window.Materials) window.Materials.gain(EP.material, n);
+    return n;
+  }
+  // 返回 { leveled, newLevel, maxed, crystal }，由调用方决定是否播报
+  // maxed=true 表示本次调用时已达等级上限（经验条保持满，经验转入经验池）
   function grantExp(pet, amt) {
     if (pet.level >= Config.pet.maxLevel) {
       pet.exp = expNeed(pet.level);
-      return { leveled: false, newLevel: pet.level, maxed: true };
+      return { leveled: false, newLevel: pet.level, maxed: true, crystal: addExpPool(pet, amt) };
     }
     pet.exp += amt;
     let leveled = false;
@@ -219,10 +261,14 @@
       pet.level++;
       leveled = true;
     }
-    if (pet.level >= Config.pet.maxLevel) pet.exp = expNeed(pet.level); // 满级封顶
+    let crystal = 0;
+    if (pet.level >= Config.pet.maxLevel) {
+      crystal = addExpPool(pet, pet.exp - expNeed(pet.level)); // 升到满级多出来的经验不蒸发
+      pet.exp = expNeed(pet.level); // 满级封顶
+    }
     // 升级回满血：升级后按新等级/新成长的上限把血量补满（提升体验，避免升级后残血）
     if (leveled) pet.curHp = getStats(pet).hp;
-    return { leveled, newLevel: pet.level, maxed: pet.level >= Config.pet.maxLevel };
+    return { leveled, newLevel: pet.level, maxed: pet.level >= Config.pet.maxLevel, crystal };
   }
 
   /* ---------- 随机婴儿（孵化用） ---------- */
@@ -318,7 +364,7 @@
   /* ---------- 对外 API ---------- */
   window.Pet = {
     createPet, addPet, getPets, getActivePet, setActive, removePet, petFromRow, clearPets,
-    baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, createBaby, setCloudPets,
-    getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment
+    baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, expFromBattle, expRange, createBaby, setCloudPets,
+    getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment, addExpPool
   };
 })();

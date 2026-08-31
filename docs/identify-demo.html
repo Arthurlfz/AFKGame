@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>鉴定系统 Demo（基于原项目风格）</title>
+<style>
+  :root{
+    --bg:#15110d; --panel:#1d1812; --line:#3a322a; --gold:#b89b59; --blue:#5b8fb0;
+    --white:#9a948c; --txt:#cfc6b8; --dim:#7d756a;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--txt); font:14px/1.5 "Segoe UI",system-ui,sans-serif; }
+  h2{ color:var(--gold); font-size:15px; letter-spacing:1px; margin:0 0 10px; }
+  .wrap{ max-width:920px; margin:0 auto; padding:18px; display:grid; grid-template-columns:1fr 224px; gap:14px; }
+  .col{ display:flex; flex-direction:column; gap:14px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  .btn{ background:#2c251c; color:var(--gold); border:1px solid var(--gold); border-radius:6px; padding:8px 12px; cursor:pointer; font-size:13px; }
+  .btn:active{ transform:scale(.97); }
+  .bag-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; min-height:120px; }
+  .bag-card{ position:relative; border:1px solid var(--line); border-radius:6px; padding:10px 8px; background:#191510; min-height:86px; cursor:grab; transition:transform .12s; }
+  .bag-card:hover{ transform:translateY(-2px); }
+  .bag-card.q-white{ border-color:var(--white); }
+  .bag-card.q-blue{ border-color:var(--blue); }
+  .bag-card.q-gold{ border-color:var(--gold); box-shadow:0 0 14px rgba(184,155,89,.25); }
+  .bag-card.q-unid{ filter:grayscale(1) brightness(.6); }
+  .bc-name{ font-size:13px; } .bc-meta{ font-size:11px; color:var(--dim); margin-top:4px; }
+  .bc-affix{ font-size:11px; color:#8fae8a; margin-top:6px; }
+  .bc-idfy{ margin-top:6px; background:#2c251c; color:var(--gold); border:1px solid var(--gold); border-radius:5px; padding:4px 8px; cursor:pointer; font-size:12px; }
+  .scar{ display:flex; align-items:center; gap:8px; border:1px solid var(--gold); border-radius:6px; padding:8px; cursor:grab; background:#211b12; }
+  .scar .dot{ width:18px; height:18px; border-radius:3px; background:radial-gradient(circle at 30% 30%, #e7d39a, #b89b59); }
+  .slots{ display:flex; flex-direction:column; gap:8px; }
+  .slot{ border:1px dashed var(--line); border-radius:6px; padding:12px 8px; text-align:center; color:var(--dim); font-size:12px; }
+  .slot.drag{ border-color:var(--gold); color:var(--gold); }
+  .mlist{ font-size:12px; margin-top:8px; } .mlist div{ padding:3px 0; border-bottom:1px solid var(--line); }
+  .bc-scan{ position:absolute; inset:0; border-radius:6px; overflow:hidden; pointer-events:none; }
+  .bc-scan::before{ content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 35%, rgba(231,211,154,.85) 50%, transparent 65%); transform:translateX(-120%); animation:bcScan .6s ease-out; }
+  @keyframes bcScan{ to{ transform:translateX(120%); } }
+  #flash{ position:fixed; inset:0; pointer-events:none; background:radial-gradient(circle, rgba(231,211,154,.35), transparent 60%); opacity:0; }
+  #flash.on{ animation:fl .8s ease-out; } @keyframes fl{ 0%{ opacity:0; } 30%{ opacity:1; } 100%{ opacity:0; } }
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#2c251c; border:1px solid var(--gold); color:var(--gold); padding:8px 14px; border-radius:6px; opacity:0; transition:opacity .2s; }
+  .toast.on{ opacity:1; }
+</style>
+</head>
+<body>
+<div id="flash"></div>
+<div class="toast" id="toast"></div>
+<div class="wrap">
+  <div class="col">
+    <div class="panel">
+      <h2>战斗（模拟掉落）</h2>
+      <button class="btn" id="fight">打一场（掉未鉴定装备 / 概率掉鉴定石）</button>
+    </div>
+    <div class="panel">
+      <h2>背包 · 装备</h2>
+      <div class="bag-grid" id="bag"></div>
+    </div>
+    <div class="panel">
+      <h2>市场（拖已鉴定装备上架）</h2>
+      <div class="slot" id="market">拖到此处上架</div>
+      <div class="mlist" id="mlist"></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="panel">
+      <h2>鉴定石 <span id="scarN">5</span></h2>
+      <div class="scar" id="scar" draggable="true"><span class="dot"></span><span>鉴定石（拖到装备上鉴定）</span></div>
+    </div>
+    <div class="panel">
+      <h2>商人（回收垃圾换材料）</h2>
+      <div class="slot" id="vendor">拖到此处回收</div>
+      <div style="margin-top:8px;font-size:12px">材料：<span id="matN">0</span></div>
+    </div>
+  </div>
+</div>
+<script>
+  /* ===== 贴原项目装备数据结构（generateEquipment 风格）===== */
+  const RAR = [
+    { id:'white', label:'白装', color:'#9a948c', w:70 },
+    { id:'blue',  label:'蓝装', color:'#5b8fb0', w:26 },
+    { id:'gold',  label:'金装', color:'#b89b59', w:4 }
+  ];
+  const NAMES = ['锈蚀匕首','骨制法杖','腐皮护甲','幽影斗篷','血纹长剑','诅咒指环','碎骨护手','瘟毒腰带'];
+  const AFFIX_POOL = [
+    { label:'攻击', unit:'' }, { label:'防御', unit:'' }, { label:'生命', unit:'' },
+    { label:'暴击', unit:'%' }, { label:'暴伤', unit:'%' }, { label:'命中', unit:'' },
+    { label:'吸血', unit:'%' }, { label:'速度', unit:'' }
+  ];
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const weightedPick = arr => { let t=arr.reduce((s,x)=>s+x.w,0), r=Math.random()*t; for(const x of arr){ if((r-=x.w)<0) return x; } return arr[arr.length-1]; };
+  const sample = (arr,n) => [...arr].sort(()=>Math.random()-.5).slice(0,n);
+
+  let scarN = 5, matN = 0, eqId = 0;
+  const EQUIPS = {};
+  const bag = document.getElementById('bag');
+  bag.dataset.list = '';
+  const scar = document.getElementById('scar');
+
+  function makeEquip(){
+    const rar = weightedPick(RAR);
+    const n = rar.id==='gold' ? 4 : rar.id==='blue' ? 3 : 2;
+    const affixes = sample(AFFIX_POOL, n).map(a => ({ label:a.label, value: 5 + Math.floor(Math.random()*40), unit:a.unit }));
+    return { id:++eqId, name:pick(NAMES), rarity:rar, affixes, identified:false };
+  }
+  const fmt = a => `${a.label} +${a.value}${a.unit}`;
+  const render = () => {
+    bag.innerHTML = '';
+    bag.dataset.list.split(',').filter(Boolean).forEach(id => {
+      const e = EQUIPS[id]; if(!e) return;
+      const unid = e.identified === false;
+      const d = document.createElement('div');
+      d.className = `bag-card q-${e.rarity.id}` + (unid ? ' q-unid' : '');
+      d.draggable = true; d.dataset.id = id;
+      d.innerHTML = `
+        <div class="bc-name">${e.name}</div>
+        <div class="bc-meta" style="color:${e.rarity.color}">${e.rarity.label}${unid ? ' · 未鉴定' : ''}</div>
+        ${unid
+          ? '<div class="bc-affix">？？？ （未鉴定）</div><button class="bc-idfy">鉴定（耗 1 鉴定石）</button>'
+          : `<div class="bc-affix">${e.affixes.map(fmt).join(' · ')}</div>`}`;
+      if (unid) d.querySelector('.bc-idfy').onclick = () => identify(e, d);
+      d.addEventListener('dragstart', ev => ev.dataTransfer.setData('text/plain', 'eq:' + id));
+      bag.appendChild(d);
+    });
+  };
+  function identify(e, el){
+    if (scarN <= 0) { toast('没有鉴定石'); return; }
+    scarN--; document.getElementById('scarN').textContent = scarN;
+    e.identified = true;
+    const s = document.createElement('div'); s.className = 'bc-scan'; el.appendChild(s);
+    setTimeout(() => { render(); toast('鉴定揭晓：' + e.affixes[0] && ('鉴定揭晓：' + fmt(e.affixes[0]))); }, 600);
+  }
+  function toast(t){ const x=document.getElementById('toast'); x.textContent=t; x.classList.add('on'); setTimeout(()=>x.classList.remove('on'),1400); }
+  function flash(){ const f=document.getElementById('flash'); f.classList.add('on'); setTimeout(()=>f.classList.remove('on'),800); }
+  function removeEq(id){ bag.dataset.list = bag.dataset.list.split(',').filter(x=>x!==id).join(','); render(); }
+  function addMarket(e, price){ const m=document.getElementById('mlist'); const d=document.createElement('div'); d.textContent=`${e.name}（${e.rarity.label}）· ${price} 材料`; m.appendChild(d); }
+
+  document.getElementById('fight').addEventListener('click', () => {
+    // 掉未鉴定装备
+    const e = makeEquip(); EQUIPS[e.id] = e;
+    bag.dataset.list = bag.dataset.list ? bag.dataset.list + ',' + e.id : e.id;
+    flash(); render(); toast('掉落未鉴定' + e.rarity.label);
+    // 概率掉鉴定石（演示：前期好掉）
+    if (Math.random() < 0.5) { scarN++; document.getElementById('scarN').textContent = scarN; toast('捡到 鉴定石 ×1'); }
+  });
+
+  scar.addEventListener('dragstart', ev => ev.dataTransfer.setData('text/plain', 'scar'));
+  bag.addEventListener('dragover', ev => ev.preventDefault());
+  bag.addEventListener('drop', ev => {
+    ev.preventDefault();
+    if (ev.dataTransfer.getData('text/plain') !== 'scar') return;
+    const id = ev.target.closest('.bag-card')?.dataset.id;
+    if (id && EQUIPS[id] && EQUIPS[id].identified === false) identify(EQUIPS[id], ev.target.closest('.bag-card'));
+  });
+
+  function setupSlot(el, kind){
+    el.addEventListener('dragover', ev => { ev.preventDefault(); el.classList.add('drag'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag'));
+    el.addEventListener('drop', ev => {
+      ev.preventDefault(); el.classList.remove('drag');
+      const raw = ev.dataTransfer.getData('text/plain');
+      const id = ev.target.closest('.bag-card')?.dataset.id || raw.replace('eq:','');
+      const e = EQUIPS[id]; if (!e || e.identified === false) return;
+      if (kind === 'vendor') {
+        const g = e.rarity.id==='gold'?20 : e.rarity.id==='blue'?8 : 3;
+        matN += g; document.getElementById('matN').textContent = matN; removeEq(id);
+        toast('回收 ' + e.name + ' → 材料 +' + g);
+      } else {
+        const price = prompt('上架定价（材料）：', e.rarity.id==='gold'?50 : e.rarity.id==='blue'?20 : 8);
+        if (price) { addMarket(e, price); removeEq(id); toast('已上架 ' + e.name); }
+      }
+    });
+  }
+  setupSlot(document.getElementById('vendor'), 'vendor');
+  setupSlot(document.getElementById('market'), 'market');
+
+  // 初始塞两件未鉴定 + 几颗鉴定石观感
+  [makeEquip(), makeEquip()].forEach(e => { EQUIPS[e.id] = e; bag.dataset.list = bag.dataset.list ? bag.dataset.list+','+e.id : e.id; });
+  render();
+</script>
+</body>
+</html>

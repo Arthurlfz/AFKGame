@@ -7,7 +7,7 @@
   'use strict';
 
   const UI = window.UI;
-  const { $, showToast, addLog } = UI;
+  const { $, showToast, addLog, runWithLoading } = UI;
 
   const Config = window.Config;
   const Craft = window.Craft;
@@ -64,69 +64,88 @@
       // 打造按钮统一防连点：点击后立即禁用（云同步期间再点无效），完成后恢复。
       // 不这么做时快速连点会并发触发多次打造，词缀被连续改多次 + 材料重复扣（曾报"卡顿/突破上限"）
       const btnReforge = body.querySelector('#craft-reforge');
-      if (btnReforge) btnReforge.onclick = async () => {
+      if (btnReforge) btnReforge.onclick = () => {
         if (inSell) return;
-        btnReforge.disabled = true; // 立即禁用：云同步期间防连点
-        const res = await Craft.reforge(eq);
-        const box = $('craft-result');
-        if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnReforge.disabled = false; return; }
-        const ns = flattenAffixes(res.changed.new);
-        box.innerHTML = `🎲 重铸完成：全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-        addLog(`🎲 重铸成功：${eq.name} 词缀全部重洗`);
-        showToast('🎲 重铸完成', `词条已全部随机重洗`);
-        render(); // 重建按钮：恢复可用
-        if (UI.renderInventory) UI.renderInventory();
-        if (UI.renderInvToolbar) UI.renderInvToolbar();
+        return craftOptimistic(btnReforge, '🎲 重铸中…',
+          (onApplied) => Craft.reforge(eq, onApplied),
+          (r) => {
+            const ns = flattenAffixes(r.changed.new);
+            $('craft-result').innerHTML = `🎲 重铸完成：全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+            addLog(`🎲 重铸成功：${eq.name} 词缀全部重洗`);
+            showToast('🎲 重铸完成', `词条已全部随机重洗`);
+            render(); // 重建按钮：恢复可用
+            if (UI.renderInventory) UI.renderInventory();
+            if (UI.renderInvToolbar) UI.renderInvToolbar();
+          });
       };
       const btnStrip = body.querySelector('#craft-strip');
-      if (btnStrip) btnStrip.onclick = async () => {
+      if (btnStrip) btnStrip.onclick = () => {
         if (inSell) return;
-        btnStrip.disabled = true; // 立即禁用：云同步期间防连点
-        const res = await Craft.strip(eq);
-        const box = $('craft-result');
-        if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnStrip.disabled = false; return; }
-        const removed = res.changed.removed;
-        box.innerHTML = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）`;
-        addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
-        showToast('✂️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
-        render(); // 重建按钮：恢复可用
-        if (UI.renderInventory) UI.renderInventory();
-        if (UI.renderInvToolbar) UI.renderInvToolbar();
+        return craftOptimistic(btnStrip, '✂️ 剥离中…',
+          (onApplied) => Craft.strip(eq, onApplied),
+          (r) => {
+            const removed = r.changed.removed;
+            $('craft-result').innerHTML = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）`;
+            addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
+            showToast('✂️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
+            render(); // 重建按钮：恢复可用
+            if (UI.renderInventory) UI.renderInventory();
+            if (UI.renderInvToolbar) UI.renderInvToolbar();
+          });
       };
       const btnHoly = body.querySelector('#craft-holy');
-      btnHoly.onclick = async () => {
+      if (btnHoly) btnHoly.onclick = () => {
         if (inSell) return;
-        btnHoly.disabled = true; // 立即禁用：云同步期间防连点
-        const res = await Craft.reroll(eq);
-        const box = $('craft-result');
-        if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnHoly.disabled = false; return; }
-        const os = flattenAffixes(res.changed.old);
-        const ns = flattenAffixes(res.changed.new);
-        const lines = os.map((o, i) =>
-          `${o.label} +${o.value}%（T${o.tier}）→ ${Craft.affixText(ns[i])}`
-        ).join('<br>');
-        box.innerHTML = `🔮 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}`;
-        addLog(`🔮 重铸成功：${eq.name} 词缀数值重 Roll（类型 / T 阶不变）`);
-        showToast('🔮 重铸成功', `数值已重 Roll<br><small>类型 / T 阶不变</small>`);
-        render(); // 重建按钮：恢复可用
-        if (UI.renderInventory) UI.renderInventory();
-        if (UI.renderInvToolbar) UI.renderInvToolbar();
+        return craftOptimistic(btnHoly, '🔮 重铸中…',
+          (onApplied) => Craft.reroll(eq, onApplied),
+          (r) => {
+            const os = flattenAffixes(r.changed.old);
+            const ns = flattenAffixes(r.changed.new);
+            const lines = os.map((o, i) =>
+              `${o.label} +${o.value}%（T${o.tier}）→ ${Craft.affixText(ns[i])}`
+            ).join('<br>');
+            $('craft-result').innerHTML = `🔮 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}`;
+            addLog(`🔮 重铸成功：${eq.name} 词缀数值重 Roll（类型 / T 阶不变）`);
+            showToast('🔮 重铸成功', `数值已重 Roll<br><small>类型 / T 阶不变</small>`);
+            render(); // 重建按钮：恢复可用
+            if (UI.renderInventory) UI.renderInventory();
+            if (UI.renderInvToolbar) UI.renderInvToolbar();
+          });
       };
       const btnAug = body.querySelector('#craft-augment');
-      if (btnAug) btnAug.onclick = async () => {
+      if (btnAug) btnAug.onclick = () => {
         if (inSell || (eq.affixes.prefix.length >= 3 && eq.affixes.suffix.length >= 3)) return;
-        btnAug.disabled = true; // 立即禁用：云同步期间防连点卡顿/重复触发
-        const res = await Craft.augment(eq);
-        const box = $('craft-result');
-        if (res.error) { box.innerHTML = `<span class="err">❌ ${res.error}</span>`; btnAug.disabled = false; return; }
-        const n = res.changed.new;
-        box.innerHTML = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）`;
-        addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
-        showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
-        render(); // 重建按钮：未满恢复可用，已满则保持 disabled（前后缀都满时本就禁用）
-        UI.renderAll();
+        return craftOptimistic(btnAug, '➕ 增缀中…',
+          (onApplied) => Craft.augment(eq, onApplied),
+          (r) => {
+            const n = r.changed.new;
+            $('craft-result').innerHTML = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）`;
+            addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
+            showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
+            render(); // 重建按钮：未满恢复可用，已满则保持 disabled（前后缀都满时本就禁用）
+            UI.renderAll();
+          });
       };
     };
+    /* ---------- 乐观 UI（打造的四种石头共用） ----------
+     * 词缀在本地算好、石头在本地扣掉的那一刻（0ms）就刷新界面，不等云端往返
+     * （实测 getUser + rpc 约 0.9 秒）。石头够不够、词缀怎么变，本地全知道，没什么好等的。
+     * 云端失败时 applyCraft 内部已经回滚了本地数据，这里再 render 一次把界面拉回原样。
+     * 按钮在整段期间保持禁用 —— 连点会重复扣石头，这个坑踩过。
+     */
+    function craftOptimistic(btn, loadingText, craftFn, showResult) {
+      return runWithLoading(btn, loadingText, async () => {
+        let appliedEarly = false;
+        const res = await craftFn((r) => { appliedEarly = true; showResult(r); });
+        if (res.error) {
+          if (appliedEarly) render(); // 本地已回滚：把乐观显示的结果撤回去
+          $('craft-result').innerHTML = `<span class="err">❌ ${res.error}</span>`;
+          return;
+        }
+        if (!appliedEarly) showResult(res); // 兜底：没走回调也别漏了刷新
+      });
+    }
+
     render();
     $('craft-modal').style.display = 'block';
     $('craft-modal').classList.add('is-open');
@@ -144,5 +163,4 @@
   /* ---------- 对外 API（打造页） ---------- */
   UI.openCraftPanel = openCraftPanel;
   UI.closeCraftPanel = closeCraftPanel;
-  UI.getActiveCraftEqId = () => activeCraftEq && activeCraftEq.id;
 })();

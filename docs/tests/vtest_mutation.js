@@ -5,7 +5,7 @@
 //   涅槃 nirvana（= Merge.merge 别名）：主宠保留吸副宠成长，不变异、不改名
 //     吸收 = 副成长×0.5×(1+(副等级-40)×0.01)；副成长<主×0.5 打 0.2 折；
 //     主成长≥60 吸收减半；≥100 不再涨；等级重置 1、进化次数清零、转生+1；消耗涅磐兽
-// 复用 vtest.js 的 VM 桩（vstub.js）
+// 复用 vstub.js 的 VM 桩（vstub.js）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
@@ -20,7 +20,7 @@ const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
 // 建一只 40 级宠物（建档 + 云端）
 async function mkPet(name, icon, growth, tag){
-  await C('(async()=>{const p=Pet.createPet("'+name+'","'+icon+'",'+growth+',100,20,10,8);p.level=40;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__'+tag+'=p.id})()');
+  await C('(async()=>{const p=Pet.createPet("'+name+'","'+icon+'",'+growth+',100,20,10,8);p.level=60;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__'+tag+'=p.id})()');
   await S(60);
 }
 (async()=>{
@@ -74,7 +74,7 @@ await C('(function(){const p=Pet.getPets().find(p=>p.id===globalThis.__nf);p.evo
 const nfId=C('globalThis.__nf'), nsubId=C('globalThis.__nsub');
 r=await C('Merge.nirvana('+nfId+','+nsubId+')');
 A(r&&r.ok===true,'涅槃：成功');
-// 吸收 = 8×0.5×(1+(40-40)×0.01) = 4 → 6+4 = 10
+// 吸收 = 8×0.5×(1+(60-60)×0.01) = 4 → 6+4 = 10（门槛 60 后基准副宠 60 级，无加成）
 A(r&&r.newGrowth===10&&C('Pet.getPets().find(p=>p.id==='+nfId+').growth')===10,'涅槃成长 = 6 + 8×0.5 = 10');
 A(C('Pet.getPets().find(p=>p.id==='+nfId+').name')==='血狐','涅槃不变异：名字保持「血狐」（无·异变后缀）');
 A(r&&r.mutated===undefined,'涅槃结果不再有 mutated 概念（undefined）');
@@ -87,10 +87,10 @@ A(!C('Pet.getPets().some(p=>p.id==='+nsubId+')'),'涅槃后副宠消失');
 /* ============ 5. 涅槃：副宠等级加成（练得越高肥料越值钱） ============ */
 await mkPet('血狐','🦊',6,'lf');
 await mkPet('骨狼','🐺',8,'lsub');
-await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__lsub);q.level=50;Pet.addPet(q)})()');
+await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__lsub);q.level=70;Pet.addPet(q)})()');
 r=await C('Merge.nirvana('+C('globalThis.__lf')+','+C('globalThis.__lsub')+')');
-// 吸收 = 8×0.5×(1+(50-40)×0.01) = 8×0.5×1.1 = 4.4 → 10.4
-A(r&&r.ok===true&&r.newGrowth===10.4,'涅槃副宠 Lv50 等级加成：6 + 8×0.5×1.1 = 10.4');
+// 吸收 = 8×0.5×(1+(70-60)×0.01) = 8×0.5×1.1 = 4.4 → 10.4（2026-08-31 门槛 40→60，等级加成从门槛起算）
+A(r&&r.ok===true&&r.newGrowth===10.4,'涅槃副宠 Lv70 等级加成：6 + 8×0.5×1.1 = 10.4');
 
 /* ============ 6. 涅槃：副宠成长不足下限 → 吸收打 0.2 折 ============ */
 await mkPet('血狐','🦊',20,'pf');

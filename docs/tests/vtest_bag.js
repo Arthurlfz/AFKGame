@@ -14,7 +14,7 @@ const C=code=>vm.runInContext(code,ctx);
 (async()=>{
 await S(300);await C('Game.onLogin("bag@test.com","123456")');await S(300);
 // 准备一些数据
-await C('(async()=>{const p=Pet.createPet("血狐","🦊",6,100,20,10,8);Pet.addPet(p);Pet.setActive(p.id);const s=await Supabase.savePet(p);p.cloudId=s.data.id;Equipment.addToInventory(Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="blue")));Materials.gainLocal(Config.craft.reforge.name,2);Materials.gainLocal("测试素材",3);await Drop.setEggCount(2);})()');
+await C('(async()=>{const p=Pet.createPet("血狐","🦊",6,100,20,10,8);Pet.addPet(p);Pet.setActive(p.id);const s=await Supabase.savePet(p);p.cloudId=s.data.id;Equipment.addToInventory(Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="blue")));Materials.gainLocal(Config.craft.reforge.name,2);Materials.gainLocal("测试素材",3);await Drop.setEggs({"血狐":2});})()');
 await S(120);
 C('UI.renderAll()');
 A(!!els['bag-root'],'背包页容器存在');

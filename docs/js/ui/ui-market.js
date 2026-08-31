@@ -309,6 +309,13 @@
       info.innerHTML = `
         <div class="m-name" style="color:${color}">${escapeHtml(l.item_name)} <span style="font-size:0.833rem">${RARITY_LABEL[l.item_rarity] || l.item_rarity}·T${l.item_tier}</span></div>
         <div class="m-desc">${escapeHtml(affixText)}</div>`;
+      const marketTip = document.createElement('div');
+      marketTip.className = 'equip-tip';
+      const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
+      const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
+      marketTip.innerHTML = `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
+      info.appendChild(marketTip);
+      info.onclick = () => info.classList.toggle('open');
       const mat = Market.findMaterial(l.material_type);
       const legacy = !l.material_type;
       const price = document.createElement('div');
@@ -339,10 +346,10 @@
   }
 
   // 可折叠分组面板（宠物/装备左右两列）：标题 + 数量 + 「收起/展开」按钮
-  function makeMarketGroup(title, count) {
+  function makeMarketGroup(title, count, open = true) {
     const g = document.createElement('div');
-    g.className = 'market-group is-open';
-    g.innerHTML = `<div class="market-group-head"><span class="arrow">▾</span><span>${title}</span><span class="count">${count} 件</span><button class="btn-mini ghost market-group-toggle">收起</button></div><div class="market-group-body"></div>`;
+    g.className = 'market-group' + (open ? ' is-open' : '');
+    g.innerHTML = `<div class="market-group-head"><span class="arrow">${open ? '▾' : '▸'}</span><span>${title}</span><span class="count">${count} 件</span><button class="btn-mini ghost market-group-toggle">${open ? '收起' : '展开'}</button></div><div class="market-group-body"></div>`;
     const toggle = () => {
       const open = g.classList.toggle('is-open');
       const arrow = g.querySelector('.arrow');
@@ -418,7 +425,7 @@
     }
 
     // 装备分组（可折叠，右列）
-    const itemGroup = makeMarketGroup('⚔️ 装备', items.length);
+    const itemGroup = makeMarketGroup('⚔️ 装备', items.length, false);
     groups.appendChild(itemGroup);
     const itemBody = itemGroup.querySelector('.market-group-body');
     itemBody.id = 'market-items';
@@ -426,7 +433,7 @@
 
     // 宠物蛋分组（可折叠）
     const eggList = Market.getEggListings ? Market.getEggListings() : [];
-    const eggGroup = makeMarketGroup('🥚 宠物蛋', eggList.length);
+    const eggGroup = makeMarketGroup('🥚 宠物蛋', eggList.length, false);
     groups.appendChild(eggGroup);
     const eggBody = eggGroup.querySelector('.market-group-body');
     if (!eggList.length) eggBody.innerHTML = '<div class="inv-empty">还没有宠物蛋在售</div>';
@@ -435,7 +442,7 @@
       const row = document.createElement('div');
       row.className = 'market-item sell-row';
       row.innerHTML = `
-        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(l.egg_type || '')}蛋</span>
+        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(window.Drop.makeEggName(l.egg_type))}</span>
         <span class="m-growth">${escapeHtml(l.material_type || '')} ×${l.material_qty}</span></div>
         ${mine
           ? '<button class="btn-sm alt sell-recall">取回</button>'
@@ -446,7 +453,7 @@
         buyBtn.onclick = async () => {
           const res = await Market.buyEgg(l.id);
           if (res.error) showToast('❌ 购买失败', res.error);
-          else { showToast('🥚 购买成功', `获得 ${l.egg_type}蛋，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
+          else { showToast('🥚 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
         };
       }
       const recall = row.querySelector('.sell-recall');
@@ -454,7 +461,7 @@
         recall.onclick = async () => {
           const res = await Market.cancelEgg(l.id);
           if (res.error) showToast('❌ 取回失败', res.error);
-          else { showToast('↩️ 已取回', `${l.egg_type}蛋 已下架`); UI.renderAll(); }
+          else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
         };
       }
     }
@@ -478,13 +485,14 @@
       return;
     }
     const evoMatName = (Config.pet.evolution && Config.pet.evolution.materialName) || '进化素材';
-    const evolutionItems = Object.keys(Config.drop.evolutionMaterials || {})
-      .map(name => ({ id: name, name, icon: '🧬', category: 'evo' }))
-      .filter(item => item.name === evoMatName); // 通用进化素材只显示一个
+    // 改法一后进化素材不再挂在 Config.drop.evolutionMaterials，统一从交易材料表取（category='evo'）
+    const evolutionItems = Config.trade.materials
+      .filter(m => m.category === 'evo' && m.name === evoMatName)
+      .map(m => ({ id: m.id, name: m.name, icon: m.icon, category: 'evo' }));
     const paymentGroups = [
       { key: 'currency', label: '通货', items: Config.trade.materials.filter(m => m.category === 'stone' && Market.isPaymentMaterial(m.name)) },
       { key: 'evo', label: '进化素材', items: evolutionItems },
-      { key: 'other', label: '其他', items: Config.trade.materials.filter(m => ['egg', 'beast'].includes(m.category) && Market.isPaymentMaterial(m.name)) },
+      { key: 'other', label: '其他', items: Config.trade.materials.filter(m => ['egg', 'beast', 'soul'].includes(m.category) && Market.isPaymentMaterial(m.name)) },
     ];
     const paymentPanel = () => `
       <div class="sell-payment">
@@ -712,7 +720,7 @@
       const row = document.createElement('div');
       row.className = 'market-item sell-row';
       row.innerHTML = `
-        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(baseName)}蛋</span><span class="m-growth">×${n}</span></div>
+        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(Drop.makeEggName(baseName))}</span><span class="m-growth">×${n}</span></div>
         ${expanded
           ? sellForm()
           : (mine ? '<button class="btn-sm alt sell-recall">取回</button>' : '<button class="btn-sm sell-open">上架</button>')}`;
@@ -731,7 +739,7 @@
           if (!my) return;
           const res = await Market.cancelEgg(my.listingId);
           if (res.error) showToast('❌ 取回失败', res.error);
-          else { showToast('↩️ 已取回', `${baseName}蛋 已下架`); UI.renderAll(); }
+          else { showToast('↩️ 已取回', `${Drop.makeEggName(baseName)} 已下架`); UI.renderAll(); }
         };
       }
       const applySearch = () => {
@@ -784,7 +792,7 @@
           const res = await Market.listEgg(baseName, mat, qty);
           expandedEggId = null;
           if (res.error) showToast('❌ 上架失败', res.error);
-          else showToast('📢 上架成功', `${baseName}蛋 已挂到市场，收 ${qty} ${mat}`);
+          else showToast('📢 上架成功', `${Drop.makeEggName(baseName)} 已挂到市场，收 ${qty} ${mat}`);
           UI.renderAll();
         };
       }
@@ -921,13 +929,14 @@
       ${tax > 0 ? '<div class="hint">税由卖家承担，从标价中扣除</div>' : ''}
       <div class="buy-confirm-mine">我的 ${mat.name}：<b>${Materials.getQuantity(mat.name)}</b></div>`;
     $('trade-modal').style.display = 'flex';
-    $('trade-ok').onclick = async () => {
-      $('trade-modal').style.display = 'none';
+    // 等待期间弹窗保留在屏幕上（按钮变「购买中…」），比关掉弹窗干等好得多：
+    // 关掉后玩家只能盯着市场页发呆，1~2 秒里完全不知道进行到哪一步。
+    $('trade-ok').onclick = () => UI.runWithLoading($('trade-ok'), '购买中…', async () => {
       // 假卖家挂单走 buyBotItem/buyBotPet（本地扣材料 + 物品入列）；真实挂单走 buyItem/buy RPC
       const res = isPet
         ? (l.isBot ? await Market.buyBotPet(l.id) : await Market.buy(l.id))
         : (l.isBot ? await Market.buyBotItem(l.id) : await Market.buyItem(l.id));
-      if (res.error) { showToast('❌ 购买失败', res.error); return; }
+      if (res.error) { showToast('❌ 购买失败', res.error); return; } // 失败保留弹窗：让玩家看清商品再重试
       // 本地扣材料（真实购买：云端 RPC 已扣，本地同步减；假单购买 buyBot* 内部已扣，不重复）
       if (l.material_type && !l.isBot) Materials.spendLocal(l.material_type, l.material_qty || 0);
       showToast('🎉 购买成功！', isPet ? `${l.pet_name} 已加入你的宠物列表`
@@ -936,7 +945,8 @@
       if (isPet) { if (!l.isBot) await window.Game.afterBuyPet(res.petId); }
       else if (!l.isBot) await window.Game.afterBuyItem(res.itemId);
       UI.renderAll();
-    };
+      $('trade-modal').style.display = 'none'; // 成功才关
+    });
     $('trade-cancel').onclick = () => { $('trade-modal').style.display = 'none'; };
   }
   function closeBuyPanel() {

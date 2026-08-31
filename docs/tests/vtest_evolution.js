@@ -29,13 +29,16 @@ A(C('Object.keys(Config.pet.evolution.tree).length')===40,'进化树包含 8 条
 A(C('Config.pet.evolution.maxEvolveTimes')===10,'进化次数上限 maxEvolveTimes = 10');
 A(C('Config.pet.evolution.materialName')==='进化素材','通用进化素材名 = 进化素材');
 A(C('(()=>{const t=Config.pet.evolution.tree,s=Config.pet.starters;return s.every(x=>t[x.name]&&t[x.name].length===2&&t[x.name].every(r=>r.minLevel===10))})()'),'8 只基宠均有 2 条 Lv.10 首段路线');
-A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().some(r=>r.minLevel===25)&&Object.values(t).flat().some(r=>r.minLevel===40)})()'),'进化树包含 Lv.25 / Lv.40 后续门槛');
+A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().some(r=>r.minLevel===35)&&Object.values(t).flat().some(r=>r.minLevel===60)})()'),'进化树包含 Lv.35 / Lv.60 后续门槛');
 A(C('Evolve.getEvolutionRoutes({name:"腐噜兽"})[0].to')==='腐沼兽'&&C('Evolve.getEvolutionRoutes({name:"腐沼兽"})[0].to')==='腐沼王'&&C('Evolve.getEvolutionRoutes({name:"腐沼王"})[0].to')==='腐烂之母','腐噜兽可沿链进化至第3阶终点');
-A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().every(r=>!t[r.to]||t[r.to].length===0||t[r.to].every(x=>[25,40].includes(x.minLevel)))})()'),'所有后续路线门槛为 Lv.25 或 Lv.40');
+A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().every(r=>!t[r.to]||t[r.to].length===0||t[r.to].every(x=>[35,60].includes(x.minLevel)))})()'),'所有后续路线门槛为 Lv.35 或 Lv.60');
 
 /* ============ 2. 进化体速度继承 ============ */
-A(C('Pet.getBaseSpeed({name:"腐沼兽"})')===55,'进化体 腐沼兽 速度沿用基宠');
-A(C('Pet.getBaseSpeed({name:"影刃兔"})')===110,'进化体 影刃兔 速度沿用基宠');
+// 期望值不写死：从 Config.pet.speeds 的基宠取，速度带调整后不必改测试
+A(C('Pet.getBaseSpeed({name:"腐沼兽"})')===C('Config.pet.speeds["腐噜兽"]'),
+  '进化体 腐沼兽 速度沿用基宠（' + C('Config.pet.speeds["腐噜兽"]') + '）');
+A(C('Pet.getBaseSpeed({name:"影刃兔"})')===C('Config.pet.speeds["幽影兔"]'),
+  '进化体 影刃兔 速度沿用基宠（' + C('Config.pet.speeds["幽影兔"]') + '）');
 
 /* ============ 3. 进化门槛：等级不足（每段 minLevel=10）不可进化 ============ */
 await mkPet('腐噜兽','🐹',10,'low',5);
@@ -61,17 +64,17 @@ A(C('Materials.getQuantity("进化素材")')===0,'进化后 进化素材 正确�
 const cloud=C('petsTable.find(p=>p.id==="'+C('Pet.getPets().find(p=>p.id==='+evId+').cloudId')+'")');
 A(cloud.name==='血牙狐'&&cloud.growth>10,'云端同步：name=血牙狐 / growth 提升');
 
-/* ============ 4b. 多段进化实际执行：Lv.10 → Lv.25 → Lv.40 ============ */
+/* ============ 4b. 多段进化实际执行：Lv.10 → Lv.35 → Lv.60（2026-08-31 节点重排） ============ */
 const chainId=evId;
-C('Pet.getPets().find(p=>p.id==='+chainId+').level=25');
+C('Pet.getPets().find(p=>p.id==='+chainId+').level=35');
 await C('Materials.gain("进化素材",1)');await S(80);
 const chain2=await C('Evolve.evolve('+chainId+',0)');
-A(chain2.ok===true&&chain2.result==='血灾领主','血狐第2阶 Lv.25 进化成功');
+A(chain2.ok===true&&chain2.result==='血灾领主','血狐第2阶 Lv.35 进化成功');
 A(C('Pet.getPets().find(p=>p.id==='+chainId+').evolveTimes')===2,'多段进化后次数 = 2');
-C('Pet.getPets().find(p=>p.id==='+chainId+').level=40');
+C('Pet.getPets().find(p=>p.id==='+chainId+').level=60');
 await C('Materials.gain("进化素材",1)');await S(80);
 const chain3=await C('Evolve.evolve('+chainId+',0)');
-A(chain3.ok===true&&chain3.result==='血月魔狐','血狐第3阶 Lv.40 进化成功并到达终点');
+A(chain3.ok===true&&chain3.result==='血月魔狐','血狐第3阶 Lv.60 进化成功并到达终点');
 const endRoutes=C('Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id==='+chainId+'))');
 A(endRoutes.length===1&&endRoutes[0].keepForm===true,'第3阶终点形态只剩「继续进化（成长+）」占位路线');
 // 终点后仍可进化：形态/名字不变，只涨成长（次数 3→4，需精粹进化素材）
@@ -83,8 +86,8 @@ A(C('Pet.getPets().find(p=>p.id==='+chainId+').growth')>chain3.newGrowth,'终点
 
 /* ============ 4c. 融合=转生：重置次数；变异配置核对 ============ */
 A(C('Config.synthesize.mutation.chance===0.5'),'合成变异概率为设计要求 50%（当前配置='+C('Config.synthesize.mutation.chance')+'）');
-await mkPet('腐噜兽','🐹',10,'mergeMain',40);
-await mkPet('血狐','🦊',10,'mergeSub',40);
+await mkPet('腐噜兽','🐹',10,'mergeMain',60);
+await mkPet('血狐','🦊',10,'mergeSub',60);
 const mainId=C('globalThis.__mergeMain'),subId=C('globalThis.__mergeSub');
 C('Pet.getPets().find(p=>p.id==='+mainId+').evolveTimes=7');
 await C('Materials.gain("涅磐兽",1)');await S(80);
@@ -111,13 +114,12 @@ C('Pet.getPets().find(p=>p.id==='+ev4Id+').evolveTimes=10');
 let r4=await C('Evolve.evolve('+ev4Id+',0)');
 A(r4.ok!==true&&/上限/.test(r4.error),'次数已满(10)：进化失败并提示需融合转生重置');
 
-/* ============ 6. 进化素材接入战斗掉落 ============ */
-C('Config.drop.evolutionMaterials["进化素材"]=1'); // 拉满掉率便于断言
-C('globalThis.__rnd=Math.random; let __n=0; Math.random=()=>{ if(__n++===0) return 0.999; return 0.0001; }');
-const rr=await C('Drop.rollReward({rarityWeights:{white:70,blue:25,gold:5}})');
-C('Math.random=globalThis.__rnd');
-A(rr.evoMaterials&&rr.evoMaterials.length===1,'rollReward 掉落通用进化素材 ×1');
-A(C('Materials.getQuantity("进化素材")')>=1,'进化素材已计入材料库存（掉落生效）');
+/* ============ 6. 进化素材接入战斗掉落（改法一：单池·一场一抽） ============ */
+C('Config.drop.pool = { none:0, material:1, equipment:0, egg:0 }');
+C('Config.drop.materialWeights = { "进化素材":1 }'); // 只掉进化素材，便于断言
+const rr = await C('Drop.rollReward({ eggBaseName:null })');
+A(rr && rr.type === 'material' && rr.material === '进化素材' && rr.qty === 1, 'rollReward 掉落通用进化素材 ×1');
+A(C('Materials.getQuantity("进化素材")') >= 1, '进化素材已计入材料库存（掉落生效）');
 
 console.log(failures?'EVOLUTION TESTS FAILED: '+failures:'ALL EVOLUTION TESTS PASSED');process.exit(failures?1:0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

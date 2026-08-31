@@ -2,7 +2,7 @@
 //  - 前缀未满（<3）→ 优先加前缀；前缀满（=3）→ 加后缀；前后缀都满（共 6）→ 报错
 //  - 新增词缀：类型随机（不与现有重复、且属于目标桶）、T 阶随机（1~5）、数值按该 T 阶区间随机
 //  - 数量正确扣除 1；云端同步（spend_material RPC）/ 失败回滚
-// 复用 vtest.js 的 VM 桩（vstub.js，name 化的 RPC 天然支持增缀石）
+// 复用 vstub.js 的 VM 桩（name 化的 RPC 天然支持增缀石）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{dataset:{},setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}

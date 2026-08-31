@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "godot-mcp": {
+      "type": "http",
+      "url": "http://localhost:26748/mcp",
+      "headers": {},
+      "disabled": false
+    }
+  }
+}

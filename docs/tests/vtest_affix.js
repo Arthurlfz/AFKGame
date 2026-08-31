@@ -3,7 +3,7 @@
 //  - affixCategory 归类正确
 //  - 生成装备的词缀都能正确归类（无未知类型），且前缀 ≤3、后缀 ≤3（结构上限，先不改数量逻辑）
 //  - 打造面板（openCraftPanel）按需式前后缀分组渲染：含「前缀（n/3）」「后缀（n/3）」与分隔线，不崩
-// 复用 vtest.js 的 VM 桩（vstub.js）
+// 复用 vstub.js 的 VM 桩（vstub.js）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{dataset:{},setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
@@ -62,6 +62,33 @@ for(const kind of ['white','blue','gold']){
   A(/后缀（\d\/3）/.test(html),`[${kind}] 打造面板含「后缀（n/3）」分组标题`);
   A(html.includes('craft-affix-divider'),`[${kind}] 打造面板含前后缀分隔线`);
   A(/前缀 \d\/3 · 后缀 \d\/3/.test(html),`[${kind}] 打造面板含「前缀 n/3 · 后缀 n/3」计数`);
+}
+// 5) POE 式 roll 区间（affixRange / formatAffixHtml，2026-08-30 用户拍板）
+{
+  const r1 = C('JSON.stringify(Equipment.affixRange({type:"atk",tier:1}))');
+  A(r1 === '{"min":6,"max":8}', `攻击 T1 区间 (6~8)（${r1}）`);
+  const r2 = C('JSON.stringify(Equipment.affixRange({type:"spd",tier:1}))');
+  A(r2 === '{"min":12,"max":16}', `速度 T1 走 speedAffixTiers：区间 (12~16)（${r2}）`);
+  const r3 = C('JSON.stringify(Equipment.affixRange({type:"atk",tier:5}))');
+  A(r3 === '{"min":1,"max":1}', `攻击 T5 区间 (1~1)（${r3}）`);
+  A(C('Equipment.affixRange({type:"hit",tier:5,base:true})') === null, '基础词缀（base:true）无区间概念 → null');
+  const h1 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:8,tier:1})');
+  A(h1.indexOf('(6~8)') >= 0 && h1.indexOf('#f2b632') >= 0, 'T1 词缀：显示区间 (6~8) 且金色高亮');
+  const h2 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:4,tier:3})');
+  A(h2.indexOf('(3~4)') >= 0 && h2.indexOf('#f2b632') >= 0, 'T3 满 roll（=区间 max）也金色高亮');
+  const h3 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:3,tier:3})');
+  A(h3.indexOf('(3~4)') >= 0 && h3.indexOf('#f2b632') < 0, 'T3 低 roll 不高亮（正常色）');
+  // 生成的金装：每条真实词缀都能给出区间（高亮逻辑能跑通不崩）
+  const goldsRangeOk = C(`(function(){
+    const eq=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="gold"),6,3);
+    let ok=true;
+    for(const a of Equipment.flattenAffixes(eq.affixes)){
+      if(a.base)continue;
+      if(!Equipment.affixRange(a)) ok=false;
+    }
+    return ok;
+  })()`);
+  A(goldsRangeOk === true, '生成的金装每条词缀都能查到区间（浮层/卡片渲染不会崩）');
 }
 console.log('ALL AFFIX-STRUCTURE TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

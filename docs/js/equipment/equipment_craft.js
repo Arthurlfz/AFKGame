@@ -12,7 +12,7 @@
   'use strict';
 
   const Config = window.Config;
-  const { AFFIX_POOL, flattenAffixes, affixLocations, normalizeAffixes, affixCount } = window.Equipment;
+  const { AFFIX_POOL, flattenAffixes, affixLocations, normalizeAffixes, affixCount, syncRarity } = window.Equipment;
   const Materials = window.Materials;
   const Items = window.Items;
   const Supabase = window.Supabase;
@@ -27,7 +27,7 @@
   //  1. 本地先行：改词缀 + 本地扣材料（界面立即生效）
   //  2. 云端并行：cloudSpend（RPC 扣材料）+ updateCloudItem（单条更新词缀）
   //  3. 任一失败 → 回滚本地（词缀还原 + 材料加回）并提示
-  async function applyCraft(eq, stoneName, stoneAmount, apply, rollback) {
+  async function applyCraft(eq, stoneName, stoneAmount, apply, onApplied) {
     const user = await Supabase.getCurrentUser();
     if (!user) return { error: '请先登录账号' };
     if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
@@ -40,10 +40,24 @@
     const spentLocal = Materials.spendLocal(stoneName, stoneAmount);
     if (!spentLocal.ok) { applied.onFail(); return { error: spentLocal.error || '材料不足' }; }
 
+    // 本地已生效（词缀改好、石头扣了）→ 立刻通知界面刷新，不等云端。
+    // 实测打造要串 getUser + rpc 两次往返（约 0.9 秒），等它回来再刷新，
+    // 玩家点完按钮会有近一秒"没反应"。云端失败时下面会回滚，调用方再刷一次即可。
+    // 用 try/catch 包住：界面回调出错绝不能影响打造本身的落库。
+    if (onApplied) {
+      try { onApplied({ ok: true, changed: applied.changed, stone: stoneName }); }
+      catch (e) { if (window.console) console.warn('[打造] 界面回调出错：', e); }
+    }
+
+    // 扣石头之前，先把掉落攒着还没上报的补到云端（cloudSpend 是云端原子扣减，
+    // 云端还没收到刚掉的那批就会误报「余额不足」）。
+    // pending 通常为空（4 秒自动上报窗口），多数情况这里立即返回，不耽误时间。
+    await Materials.flushMaterials();
+
     // 云端并行同步（材料扣减 + 装备词缀更新，各 1 次请求）
     const [sp, up] = await Promise.all([
       Materials.cloudSpend(stoneName, stoneAmount),
-      Items.updateCloudItem(eq, { affixes: eq.affixes })
+      Items.updateCloudItem(eq, { affixes: eq.affixes, rarity: eq.rarity.id })  // 颜色(增缀/剥离后条数变了)一并回写，否则刷新页面颜色回退
     ]);
     const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null) || (up && up.error);
     if (syncErr) {
@@ -52,15 +66,21 @@
       Materials.gainLocal(stoneName, stoneAmount);
       return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
     }
+    // 任务进度上报：所有 type=craft 的任务 +1（重铸/剥离/神圣/增缀四种石头都算打造）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('craft', 1);
+
     return { ok: true, changed: applied.changed, stone: stoneName };
   }
 
   /* ---------- 重铸：随机重铸装备全部词缀（数量 / 类型 / T 阶 / 数值 全部随机） ---------- */
   // 返回 { ok, changed: {old, new} } 或 { error }
-  async function reforge(eq) {
+  async function reforge(eq, onApplied) {
     const C = Config.craft.reforge;
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);
+      const oldRarity = eq.rarity;
+      // 重铸的 T 阶【必须跟着装备稀有度走】：以前这里写死 randInt(1,5) 且不看成色，
+      // 白装也能洗出全 T1（还能洗到 6 条），稀有度系统被整个绕过。
       const rollBucket = (category) => {
         const pool = AFFIX_POOL.filter(a => a.category === category);
         const chosen = [];
@@ -71,7 +91,7 @@
           if (!avail.length) break;
           const aff = pick(avail);
           used.add(aff.type);
-          const tier = randInt(1, 5);
+          const tier = window.Equipment.rollAffixTier(eq.rarity.id);
           const T = tierOf(tier);
           chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) });
         }
@@ -82,29 +102,32 @@
       if (prefix.length + suffix.length === 0) {
         const bucket = Math.random() < 0.5 ? 'prefix' : 'suffix';
         const aff = pick(AFFIX_POOL.filter(a => a.category === bucket));
-        const tier = randInt(1, 5);
+        const tier = window.Equipment.rollAffixTier(eq.rarity.id);
         const T = tierOf(tier);
         const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
         if (bucket === 'prefix') prefix = [one]; else suffix = [one];
       }
       eq.affixes = { prefix, suffix };
-      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; } };
-    });
+      syncRarity(eq); // 重铸会重摇词缀条数 → 颜色按新条数同步
+      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
+    }, onApplied);
   }
 
   /* ---------- 剥离：随机移除一条词缀（仅剩 1 条时不可用） ---------- */
   // 返回 { ok, changed: {old, removed} } 或 { error }
-  async function strip(eq) {
+  async function strip(eq, onApplied) {
     const C = Config.craft.strip;
     const locs = affixLocations(eq);
     if (locs.length <= 1) return { error: '装备仅剩 1 条词缀，无法剥离' };
     return applyCraft(eq, C.name, C.amount, () => {
       const loc = pick(locs);
       const old = normalizeAffixes(eq.affixes);
+      const oldRarity = eq.rarity;
       const removed = eq.affixes[loc.bucket][loc.index];
       eq.affixes[loc.bucket].splice(loc.index, 1);
-      return { changed: { old, removed }, onFail: () => { eq.affixes = old; } };
-    });
+      syncRarity(eq); // 词缀-1 → 颜色按条数同步（如金→蓝→白）
+      return { changed: { old, removed }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
+    }, onApplied);
   }
 
   // 词缀展示：如「攻击 +12%（T4）」，带 T 阶颜色
@@ -120,7 +143,7 @@
   // 用途：把每条词缀的数值在该词缀自身 T 阶的 [min,max] 区间内重新随机
   //   —— 词缀类型（攻击/生命…）不变，T 阶不变，只改数值（前缀/后缀都重 Roll）
   // 返回 { ok, changed: {old:{prefix,suffix}, new:{prefix,suffix}} } 或 { error }
-  async function reroll(eq) {
+  async function reroll(eq, onApplied) {
     const C = Config.craft.holy;
     if (affixCount(eq) === 0) return { error: '这件装备没有词缀，无法重铸' };
 
@@ -136,7 +159,7 @@
         changed: { old, new: changed },
         onFail: () => { eq.affixes = old; }     // 云同步失败时整组还原
       };
-    });
+    }, onApplied);
   }
 
   /* ---------- 增缀石：按前后缀优先级给装备【新增】一条随机词缀 ---------- */
@@ -146,7 +169,7 @@
   //  - 前后缀都已满（共 6）→ 不能使用
   //  - 新增 1 条词缀：类型随机（不与现有重复、且属于目标桶）、T 阶随机（1~5）、数值按该 T 阶区间随机
   // 返回 { ok, changed: { old:{prefix,suffix}, new:{affix}, target } } 或 { error }
-  async function augment(eq) {
+  async function augment(eq, onApplied) {
     const C = Config.craft.augment;
     const pfx = eq.affixes.prefix, sfx = eq.affixes.suffix;
     // 后端校验：前后缀都已满（共 6 条）不能使用增缀石（双保险，前端也校验）
@@ -161,16 +184,18 @@
 
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);  // 深拷贝嵌套结构，便于回滚与对比
+      const oldRarity = eq.rarity;
       const aff = pick(pool);
-      const tier = randInt(1, 5);
+      const tier = window.Equipment.rollAffixTier(eq.rarity.id); // 按稀有度加权，白/蓝加不出 T1
       const T = tierOf(tier);
       const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
       eq.affixes[target] = [...eq.affixes[target], added];
+      syncRarity(eq); // 词缀+1 → 颜色按条数同步（如白→蓝→金）
       return {
         changed: { old, new: added, target },
-        onFail: () => { eq.affixes = old; }      // 云同步失败时整组还原
+        onFail: () => { eq.affixes = old; eq.rarity = oldRarity; }      // 云同步失败时整组还原
       };
-    });
+    }, onApplied);
   }
 
   /* ---------- 对外 API ---------- */

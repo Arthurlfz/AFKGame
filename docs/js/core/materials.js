@@ -13,11 +13,51 @@
 
   let local = {}; // { name: quantity }
 
-  /* ---------- 获得材料（掉落时由 drop.js 调用） ---------- */
-  // 返回 { ok, cloud }：cloud=true 表示已同步云端；云端失败不阻塞本地（下次登录会覆盖，可接受）
-  async function gain(name, amount) {
+  /* ---------- 待上报队列（掉落是高频的，攒一批再发） ----------
+   * 原来每次掉材料都 await cloudGain（getUser + rpc 两次往返，实测共约 340ms），
+   * 一场战斗连掉好几种就是一串串行等待，全卡在战斗结算里 → 挂机一顿一顿。
+   * 现在：本地立即加（界面 0ms 生效）+ 入队，后台攒 4 秒合并上报。
+   */
+  const FLUSH_MS = 4000;
+  let pending = {};      // { 材料名: 待上报数量 }
+  let flushTimer = null;
+
+  /* ---------- 获得材料（掉落 / 发奖时调用） ---------- */
+  // 本地立即生效；云端走队列（不 await 网络）。
+  // 需要立刻落盘的场景自己调 flushMaterials()：消耗材料前、交任务发奖后、离场前。
+  function gain(name, amount) {
     gainLocal(name, amount);
-    return cloudGain(name, amount);
+    enqueue(name, amount);
+    return { ok: true, cloud: 'pending' };
+  }
+
+  function enqueue(name, amount) {
+    const amt = amount || 1;
+    pending[name] = (pending[name] || 0) + amt;
+    if (flushTimer) return;
+    flushTimer = setTimeout(() => { flushTimer = null; flushMaterials(); }, FLUSH_MS);
+  }
+
+  // 把攒着的材料立即上报云端。三种时机必须调：
+  //   ① 消耗材料前（spend 是云端原子扣减，云端还没收到这笔就会报「余额不足」）
+  //   ② 交任务发奖后（不落盘，玩家一刷新奖励就没了）
+  //   ③ 切后台 / 关页面前（main.js 的 visibilitychange）
+  // 上报失败的品种退回队列等下次重试；未登录的不重试（下次登录以云端为准）。
+  async function flushMaterials() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    const batch = pending;
+    const names = Object.keys(batch);
+    if (!names.length) return;
+    pending = {};
+    const failed = {};
+    await Promise.all(names.map(async (name) => {
+      const r = await cloudGain(name, batch[name]);
+      if (r && r.error) failed[name] = batch[name];
+    }));
+    const failedNames = Object.keys(failed);
+    if (!failedNames.length) return;
+    for (const n of failedNames) pending[n] = (pending[n] || 0) + failed[n];
+    if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushMaterials(); }, FLUSH_MS);
   }
 
   /* ---------- 消耗材料（融合等用途调用） ---------- */
@@ -27,6 +67,9 @@
   async function spend(name, amount) {
     amount = amount || 1;
     if ((local[name] || 0) < amount) return { ok: false, error: `${name} 不足` };
+    // 先把还没上报的材料补上去：spend 是云端原子扣减，
+    // 云端余额里还没有刚掉的这批，直接扣会误报「余额不足」。
+    await flushMaterials();
     const user = await Supabase.getCurrentUser();
     if (!user) return { ok: false, error: '请先登录' };
     const { data, error } = await Supabase.getClient().rpc('spend_material', { p_name: name, p_amount: amount });
@@ -71,8 +114,22 @@
   /* ---------- 云端恢复（登录后 / 购买后调用） ---------- */
   // rows: [{ name, quantity }, ...] → 整体替换本地（云端权威）
   function setCloudMaterials(rows) {
+    const next = {};
+    for (const r of rows || []) next[r.name] = (next[r.name] || 0) + r.quantity;
+    // 把还没上报的补回去：那是当前这个号已经拿到、但云端还没记账的部分。
+    // 不加回去的话，玩家在上报窗口（4 秒）内刷新页面，这批掉落就凭空没了
+    // ——云端查不到（还没报），本地又被云端快照覆盖。
+    // 换号走 clearAll()（先补报再清空），不会串到别的号上。
+    for (const n of Object.keys(pending)) next[n] = (next[n] || 0) + pending[n];
+    local = next;
+  }
+
+  // 登出 / 换号：先把还没上报的补报到当前号（否则这批收益白丢），再彻底清空。
+  async function clearAll() {
+    await flushMaterials();
     local = {};
-    for (const r of rows || []) local[r.name] = (local[r.name] || 0) + r.quantity;
+    pending = {};
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   }
 
   /* ---------- 查询 ---------- */
@@ -90,7 +147,7 @@
 
   /* ---------- 对外 API ---------- */
   window.Materials = {
-    gain, spend, gainLocal, spendLocal, cloudGain, cloudSpend,
+    gain, spend, gainLocal, spendLocal, cloudGain, cloudSpend, flushMaterials, clearAll,
     getQuantity, setCloudMaterials, getLocal, loadCloudMaterials
   };
 })();

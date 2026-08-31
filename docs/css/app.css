@@ -4,39 +4,8 @@
  * 所有颜色/尺寸/字体引用 css/vars.css 变量；布局为弹性结构，便于后续移动端适配。
  * ============================================================ */
 
-/* 顶部当前地图条 + 换图按钮（二级跳转） */
-.battle-area-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line-weak); }
-.battle-area-info { font-size: 0.917rem; color: var(--text-dim); line-height: 1.4; }
-
-/* 地图选择浮层（二级跳转：先选图 → 再打） */
-.map-select-overlay {
-  position: fixed; inset: 0; z-index: 120; display: none;
-  align-items: center; justify-content: center; padding: 24px;
-  background: rgba(8, 9, 11, .86);
-}
-.map-select-overlay.show { display: flex; }
-.map-select-panel {
-  width: min(680px, 100%); max-height: 82vh; overflow-y: auto;
-  padding: 20px; background-color: var(--panel); background-image: var(--tex-grain);
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-panel);
-}
-.map-select-title { font-family: var(--font-title); font-weight: 900; letter-spacing: 2px; color: var(--accent-hi); font-size: var(--fs-lg); margin-bottom: 14px; }
-.battle-area-selector { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.area-card {
-  display: flex; flex-direction: column; gap: 4px; padding: 11px 14px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background-color: var(--panel-2); background-image: var(--tex-grain);
-  color: var(--text); text-align: left; cursor: pointer; font-family: var(--font-body);
-  transition: border-color .15s, transform .15s;
-}
-.area-card b { color: var(--text-hi); font-family: var(--font-title); }
-.area-card span { color: var(--text-dim); font-size: 0.833rem; }
-.area-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.area-card.is-selected { border-color: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent-hi) inset; }
-.map-select-close { margin-top: 14px; width: 100%; }
-
-.battle-exp { margin: 5px 0 7px; max-width: 240px; }
+/* 战斗页信息块内的经验条（宽度跟着信息块收缩，不被 240px 撑开） */
+.battle-exp { margin: 5px 0 7px; max-width: 100%; min-width: 120px; }
 .battle-exp-meta { display: flex; justify-content: space-between; margin: 0 1px 3px; color: #aeb7c8; font-size: 0.833rem; line-height: 1; }
 .battle-exp-meta b { color: #d8ad57; font-weight: 700; }
 .battle-exp-track { height: 5px; overflow: hidden; border: 1px solid #252c38; border-radius: 99px; background: #0b0e13; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .8); }
@@ -147,7 +116,7 @@
 /* 页面容器：切换只显隐（display），不销毁 DOM */
 .page-container {
   flex: 1; min-width: 0; min-height: 0; overflow-y: auto;
-  max-width: var(--page-max-w); margin: 0 auto;
+  width: 100%; max-width: none; margin: 0;
   padding: var(--gap-md) var(--gap-lg);
 }
 
@@ -174,27 +143,7 @@
 .egg-species-qty { font-family: var(--font-num); color: var(--accent-hi); font-weight: 700; }
 .egg-species .btn-sm { flex: none; }
 
-.market-controls {
-  display: flex; flex-wrap: wrap; gap: 10px 14px;
-  padding: 12px; margin-bottom: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
-  border: 1px solid var(--line-hi); border-radius: var(--radius-lg);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
-}
-.market-control-group {
-  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
-  padding-right: 10px; border-right: 1px solid rgba(255,255,255,.05);
-}
-.market-control-group:last-of-type { border-right: 0; }
-.market-control-group label {
-  color: var(--accent-hi); font-size: var(--font-small);
-  white-space: nowrap; min-width: 58px; line-height: 22px;
-}
-.market-control-row { display: flex; gap: 4px; flex-wrap: wrap; }
-.market-control-actions { margin-left: auto; display: flex; align-items: flex-start; }
-.market-controls .btn-mini { white-space: nowrap; }
-.market-controls .btn-mini.primary { box-shadow: 0 0 0 1px rgba(201,141,79,.22) inset; }
-.market-controls .btn-mini.ghost { opacity: .9; }
+/* ================= 市场页 ================= */
 .market-sub-title {
   margin: 14px 0 10px; padding: 0 0 8px;
   color: var(--accent-hi); font-size: 1.083rem; font-weight: 700; letter-spacing: 1px;

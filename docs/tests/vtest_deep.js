@@ -1,6 +1,7 @@
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
-function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',dataset:{},style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:function(){return this.children||[]},children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0',id:'',set onclick(f){this._onclick=f},get onclick(){return this._onclick},click(){this._onclick&&this._onclick()}}}
+// getBoundingClientRect：ui-battle 的冲刺位移要量两个立绘的实际间距，缺了会在挂机 doTurn 里抛错
+function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',dataset:{},getBoundingClientRect:()=>({left:0,right:0,top:0,bottom:0,width:0,height:0,x:0,y:0}),style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:function(){return this.children||[]},children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0',id:'',set onclick(f){this._onclick=f},get onclick(){return this._onclick},click(){this._onclick&&this._onclick()}}}
 const els={};
 const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelector:()=>el(),querySelectorAll:()=>[],addEventListener(){},removeEventListener(){}},session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],tradeTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
 ctx.window=ctx;ctx.addEventListener=()=>{};ctx.removeEventListener=()=>{};vm.createContext(ctx);
@@ -43,18 +44,22 @@ A(fights>0,`挂机确实在自动打怪（${fights}场）`);
 if(lv1>lv0)console.log(`  ✔ 挂机期间升级了 Lv ${lv0}->${lv1}（经验倍率高，升级很快）`);
 else console.log(`  （本局挂机场次少未升级，属随机——核心看掉落/进化/融合/市场）`);
 // 掉落验证（确定性）：循环 rollReward 直到装备入库（最多 60 次），确认装备/蛋都能真正入库
-const dropObj=await C('(async()=>{const area=Battle.getCurrentArea();const e={name:"测试怪",rarity:"普通",level:1,tier:"common"};const inv0=Equipment.getInventory().length;const egg0=Drop.getEggCount();let guard=0;while(Equipment.getInventory().length<=inv0 && guard<200){await Drop.rollReward(e,area);guard++;}const inv1=Equipment.getInventory().length;const egg1=Drop.getEggCount();return {inv0,egg0,inv1,egg1,dropOk:inv1>inv0||egg1>egg0}})()');
+const dropObj=await C('(async()=>{const area=Battle.getCurrentArea();const e={name:"测试怪",rarity:"普通",level:1,tier:"common"};const inv0=Equipment.getInventory().length;const egg0=Drop.getEggCount();let guard=0;while(Equipment.getInventory().length<=inv0 && guard<3000){await Drop.rollReward(e,area);guard++;}const inv1=Equipment.getInventory().length;const egg1=Drop.getEggCount();return {inv0,egg0,inv1,egg1,dropOk:inv1>inv0||egg1>egg0}})()');
 console.log('  [dropDiag] '+JSON.stringify(dropObj));
 A(dropObj&&dropObj.dropOk===true,'rollReward 能掉落并入库（装备/蛋）');
 
 // —— 穿装备（用掉落已入包的装备，确定性）——
-const eqDiag=C('(function(){try{const inv=Equipment.getInventory();if(!inv.length)return "no-item";const p=Pet.getActivePet();Equipment.equipItem(p,inv[0]);const b=Equipment.getEquipBonuses(p);return JSON.stringify({hasItem:!!inv[0],bonusKeys:Object.keys(b),flat:b.flat,atk:b.atk,type:inv[0]&&inv[0].type})}catch(e){return "err:"+e.message}})()');
+// 注意 equipItem(pet, id) 收的是装备 id，不是装备对象。
+// 以前这里传的是 inv[0]（对象）→ findIndex 找不到 → 装备根本没穿上，
+// 而断言只看 getEquipBonuses 返回的对象结构 → 假通过（2026-08-29 修）。
+const eqDiag=C('(function(){try{const inv=Equipment.getInventory();if(!inv.length)return "no-item";const p=Pet.getActivePet();const eq=inv[0];const res=Equipment.equipItem(p,eq.id);const b=Equipment.getEquipBonuses(p);return JSON.stringify({hasItem:!!eq,slot:eq&&eq.slot,equipped:!!(res&&res.equipped),inSlot:!!(p.equipment&&p.equipment[eq.slot]),bonusKeys:Object.keys(b)})}catch(e){return "err:"+e.message}})()');
 console.log('  [eqDiag] '+eqDiag);
-const eqOk=C('(function(){const inv=Equipment.getInventory();if(!inv.length)return false;const p=Pet.getActivePet();Equipment.equipItem(p,inv[0]);const b=Equipment.getEquipBonuses(p);return !!(b&&(b.flat!==undefined||b.atk!==undefined||(b.pct&&b.pct.atk!==undefined)))})()');
-A(eqOk===true,'装备可穿上且有加成');
+// 只穿一次：穿上后装备就从背包移走了，再调一次会拿到空背包
+const d=(()=>{try{return JSON.parse(eqDiag)}catch(e){return {}}})();
+A(d.equipped===true&&d.inSlot===true,'装备可穿上（真的进了槽位，不是只调用了接口）');
 
 // —— 孵化蛋（若没有蛋，手动加一颗再孵）——
-await C('(async()=>{if(Drop.getEggCount()<=0)Drop.setEggCount(1);return await Drop.hatchEgg()})()');
+await C('(async()=>{if(Drop.getEggCount()<=0)Drop.setEggs({"血狐":1});return await Drop.hatchEgg(Object.keys(Drop.getEggs())[0])})()');
 await S(200);
 const petN2=C('Pet.getPets().length');
 A(petN2>=2,`孵化后宠物数增加（${petN2}只）`);

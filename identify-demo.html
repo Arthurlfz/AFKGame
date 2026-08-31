@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鉴定效果 Demo · 流放之路风格</title>
+<style>
+  :root{
+    --bg:#1b1916; --panel:#211e1a; --panel2:#2a2620;
+    --line:#3a342b; --gold:#c8a45b; --text:#cdc4b0; --faint:#8a8068;
+    --rare:#d4b24a; --magic:#6a8cff; --normal:#b8b0a0; --good:#7fae5a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(circle at 50% -10%,#2a251d,#141210 70%);
+    color:var(--text);font-family:"Segoe UI",system-ui,"Microsoft YaHei",sans-serif;min-height:100vh}
+  header{padding:22px 28px 6px}
+  header h1{margin:0;font-size:19px;letter-spacing:.04em;color:var(--gold);font-weight:600}
+  header p{margin:6px 0 0;color:var(--faint);font-size:13px}
+  main{display:flex;gap:26px;padding:18px 28px 40px;flex-wrap:wrap;align-items:flex-start}
+  .col h3{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin:0 0 12px;font-weight:600}
+  .bag{display:grid;grid-template-columns:repeat(3,118px);gap:10px}
+  .stash{width:200px}
+
+  /* 物品卡 */
+  .item{position:relative;height:148px;border:1px solid var(--line);border-radius:3px;
+    background:linear-gradient(180deg,#26221c,#1c1915);display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;padding:8px 6px 6px;text-align:center;cursor:default;
+    transition:border-color .2s,box-shadow .2s,transform .2s}
+  .item.q-rare{border-color:#5a4d28}
+  .item.q-magic{border-color:#33406a}
+  .item.q-normal{border-color:#46413a}
+  .item .frame{position:relative;width:56px;height:56px;margin:2px 0 6px;display:flex;align-items:center;justify-content:center}
+  .item .gear{width:52px;height:52px;opacity:0;transform:scale(.9);transition:.3s}
+  .item .seal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .25s}
+  .item .name{font-size:12.5px;font-weight:600;line-height:1.25;min-height:32px}
+  .item .hint{font-size:11px;color:var(--faint);margin-top:2px}
+  .item .props{display:none;margin-top:4px;font-size:11px;line-height:1.45;width:100%}
+  .item .props .p{opacity:0;transform:translateY(4px)}
+  .item .props .p.rare{color:var(--rare)}
+  .item .props .p.magic{color:var(--magic)}
+  .item .props .p.base{color:var(--text)}
+  .item .props .p.imp{color:var(--good)}
+
+  /* 封印态 */
+  .item.sealed .gear{opacity:0}
+  .item.sealed .seal{opacity:1;filter:grayscale(.2)}
+  .item.sealed .name{color:var(--faint)}
+
+  /* 解封动画 */
+  .item.identifying{overflow:hidden;animation:unsealClear .6s ease-out forwards}
+  @keyframes unsealClear{0%{filter:blur(2px) brightness(.55)}55%{filter:blur(0) brightness(1.25)}100%{filter:none}}
+  .item.identifying .seal{opacity:0}
+  .item.identifying .gear{opacity:1;transform:scale(1)}
+  .unseal-sweep{position:absolute;left:0;right:0;top:0;height:42%;pointer-events:none;opacity:0;
+    background:linear-gradient(180deg,transparent,rgba(200,164,91,.55),rgba(255,240,200,.85),rgba(200,164,91,.4),transparent);
+    mix-blend-mode:screen}
+  .item.identifying .unseal-sweep{animation:sweep .6s ease-in-out}
+  @keyframes sweep{0%{transform:translateY(-120%);opacity:0}18%{opacity:1}100%{transform:translateY(260%);opacity:0}}
+
+  /* 已鉴定：稀有度点亮 */
+  .item.identified .gear{opacity:1;transform:scale(1)}
+  .item.identified .seal{opacity:0}
+  .item.identified.q-rare{border-color:var(--rare);box-shadow:0 0 14px rgba(212,178,74,.35)}
+  .item.identified.q-magic{border-color:var(--magic);box-shadow:0 0 14px rgba(106,140,255,.3)}
+  .item.identified.q-normal{border-color:var(--normal)}
+  .item.identified .props{display:block}
+  .item.identified .props .p{animation:propIn .32s ease forwards}
+  .item.identified .props .p:nth-child(1){animation-delay:.30s}
+  .item.identified .props .p:nth-child(2){animation-delay:.38s}
+  .item.identified .props .p:nth-child(3){animation-delay:.46s}
+  .item.identified .props .p:nth-child(4){animation-delay:.54s}
+  @keyframes propIn{to{opacity:1;transform:none}}
+
+  .item.bc-drop{outline:2px solid var(--gold);outline-offset:2px}
+  .item.drop-ok{outline:2px solid var(--good)}
+
+  /* 鉴定按钮 / 卷轴 */
+  .identify-btn{margin-top:auto;width:100%;padding:4px;border:1px solid var(--gold);border-radius:2px;
+    background:rgba(200,164,91,.12);color:var(--gold);font-size:11px;cursor:pointer;transition:.15s}
+  .identify-btn:hover{background:rgba(200,164,91,.25)}
+  .scroll{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--gold);
+    border-radius:4px;background:rgba(200,164,91,.07);color:var(--gold);font-size:13px;cursor:grab;user-select:none}
+  .scroll:active{cursor:grabbing}
+  .scroll svg{width:26px;height:26px}
+  .stash .tip{margin-top:10px;font-size:11px;color:var(--faint);line-height:1.5}
+  .stash .tip b{color:var(--text)}
+  .fly{position:fixed;width:26px;height:26px;pointer-events:none;z-index:50;transition:transform .35s ease,opacity .35s}
+</style>
+</head>
+<body>
+<header>
+  <h1>鉴定效果 Demo · 流放之路风格</h1>
+  <p>封印卷轴样式图标 + 卷轴展开解封（0.6s 中等节奏）。交互：把右侧「鉴定卷轴」拖到装备上，或点装备的「鉴定」按钮。卷轴用掉 1 张。</p>
+</header>
+<main>
+  <div class="col">
+    <h3>背包 · 未鉴定装备</h3>
+    <div class="bag" id="bag"></div>
+  </div>
+  <div class="col stash">
+    <h3>鉴定卷轴 <span id="cnt">×3</span></h3>
+    <div class="scroll" id="scroll" draggable="true">
+      <svg viewBox="0 0 64 64"><rect x="16" y="10" width="32" height="44" rx="3" fill="#2a2620" stroke="#7a6a4a"/><rect x="11" y="8" width="7" height="48" rx="3.5" fill="#6b5a3a"/><rect x="46" y="8" width="7" height="48" rx="3.5" fill="#6b5a3a"/><circle cx="32" cy="32" r="6" fill="#c8a45b"/></svg>
+      <span>鉴定卷轴（拖我 / 点装备鉴定）</span>
+    </div>
+    <div class="tip">
+      <b>流放交互：</b>未鉴定物品显示封印卷轴 + 问号，属性完全隐藏；鉴定卷轴（Scroll of Wisdom）从背包拖到物品触发开封，或右键式点「鉴定」。<br><br>
+      开封面板：金色卷轴光带自上而下扫过（0.6s）→ 稀有度边框点亮（普通灰 / 魔法蓝 / 稀有金）→ 词缀逐条展开。
+    </div>
+  </div>
+</main>
+
+<script>
+const sealSVG = `<svg viewBox="0 0 64 64"><rect x="15" y="12" width="34" height="40" rx="3" fill="#241f18" stroke="#7a6a4a"/><rect x="10" y="9" width="8" height="46" rx="4" fill="#6b5a3a"/><rect x="46" y="9" width="8" height="46" rx="4" fill="#6b5a3a"/><text x="32" y="41" text-anchor="middle" font-size="28" fill="#c8a45b" font-family="serif">?</text></svg>`;
+const gearSVG = (c)=>`<svg class="gear" viewBox="0 0 64 64"><path d="M32 8 L40 16 L24 16 Z M16 32 L24 24 L24 40 Z M48 32 L40 24 L40 40 Z M32 56 L24 48 L40 48 Z" fill="${c}"/><circle cx="32" cy="32" r="7" fill="${c}"/></svg>`;
+
+// 模拟掉落数据：普通/魔法/稀有
+const items = [
+  {rarity:'normal', label:'普通', name:'生锈的铁剑', slot:'单手剑', tier:1,
+    props:[['base','物理伤害：8-14'],['base','攻击速度：1.2 次/秒']]},
+  {rarity:'magic', label:'魔法', name:'牢固的皮甲', slot:'胸甲', tier:2,
+    props:[['base','护甲：24'],['magic','+12 最大生命'],['magic','+8% 火焰抗性']]},
+  {rarity:'rare', label:'稀有', name:'焰心之握', slot:'手套', tier:3,
+    props:[['base','护甲：31'],['rare','+24 力量'],['rare','+15% 暴击几率'],['rare','命中时 8% 点燃']]},
+];
+const rarColor = {normal:'#b8b0a0', magic:'#6a8cff', rare:'#d4b24a'};
+
+let scrolls = 3;
+const bag = document.getElementById('bag');
+const cntEl = document.getElementById('cnt');
+const scrollEl = document.getElementById('scroll');
+
+items.forEach((it, i)=>{
+  const el = document.createElement('div');
+  el.className = `item sealed q-${it.rarity}`;
+  el.dataset.i = i;
+  el.innerHTML = `
+    <div class="frame">
+      <div class="gear" style="color:${rarColor[it.rarity]}">${gearSVG(rarColor[it.rarity])}</div>
+      <div class="seal">${sealSVG}</div>
+      <div class="unseal-sweep"></div>
+    </div>
+    <div class="name">未鉴定物品</div>
+    <div class="hint">${it.slot} · T${it.tier}</div>
+    <div class="props"></div>
+    <button class="identify-btn">鉴定（卷轴）</button>`;
+  // 点按钮鉴定
+  el.querySelector('.identify-btn').addEventListener('click', e=>{ e.stopPropagation(); doIdentify(el, i); });
+  // 拖放目标
+  el.addEventListener('dragover', e=>{ if(el.classList.contains('sealed')){e.preventDefault(); el.classList.add('bc-drop');}});
+  el.addEventListener('dragleave', ()=> el.classList.remove('bc-drop'));
+  el.addEventListener('drop', e=>{
+    e.preventDefault(); el.classList.remove('bc-drop');
+    if(e.dataTransfer.getData('text/plain')==='wisdom' && el.classList.contains('sealed')) doIdentify(el, i);
+  });
+  bag.appendChild(el);
+});
+
+// 拖鉴定卷轴
+scrollEl.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain','wisdom'); });
+
+function doIdentify(el, i){
+  if(!el.classList.contains('sealed')) return;
+  if(scrolls <= 0){ flash('鉴定卷轴不足'); return; }
+  scrolls--; cntEl.textContent = '×'+scrolls;
+  // 卷轴飞向装备的小演出
+  flyScroll(el);
+  el.classList.remove('sealed');
+  el.classList.add('identifying');
+  setTimeout(()=>{
+    el.classList.remove('identifying');
+    el.classList.add('identified');
+    const it = items[i];
+    el.querySelector('.name').textContent = it.name;
+    el.querySelector('.name').style.color = rarColor[it.rarity];
+    el.querySelector('.hint').textContent = `${it.label} · ${it.slot} · T${it.tier}`;
+    const props = el.querySelector('.props');
+    props.innerHTML = it.props.map(([k,v])=>`<div class="p ${k}">${v}</div>`).join('');
+    el.querySelector('.identify-btn').remove();
+  }, 600);
+}
+
+function flyScroll(target){
+  const r = scrollEl.getBoundingClientRect();
+  const t = target.getBoundingClientRect();
+  const f = scrollEl.querySelector('svg').cloneNode(true);
+  f.classList.add('fly'); f.style.left = r.left+'px'; f.style.top = r.top+'px';
+  document.body.appendChild(f);
+  const dx = (t.left+t.width/2) - (r.left+13);
+  const dy = (t.top+t.height/2) - (r.top+13);
+  requestAnimationFrame(()=>{ f.style.transform = `translate(${dx}px,${dy}px) scale(.6)`; f.style.opacity = '0'; });
+  setTimeout(()=> f.remove(), 360);
+}
+
+function flash(msg){
+  const n = document.createElement('div');
+  n.textContent = msg; n.style.cssText='position:fixed;left:50%;top:24px;transform:translateX(-50%);background:#3a2222;color:#e9b4b4;padding:6px 14px;border:1px solid #7a4a4a;border-radius:3px;font-size:13px;z-index:99';
+  document.body.appendChild(n); setTimeout(()=>n.remove(),1400);
+}
+</script>
+</body>
+</html>

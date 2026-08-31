@@ -24,9 +24,18 @@
   let totalFights = 0;     // 累计战斗场数（跨挂机累计，只增不减）
   let interval = null;     // 当前场的行动条时钟
   let nextFightTimer = null;
+  /* 行动条冻结：一次出手 = 前摇(蓄力) → 冲刺(扑到对方脸上) → 命中结算 → 后摇(收招归位)。
+   * 老逻辑是 tick 恒温 100ms 一直累加，于是"人还在半路，下一次已在蓄力"——
+   * 演出和数值各走各的，看起来是连招乱放而不是回合制。
+   * 现在谁出手谁冻结，时长 = hitAt（前摇+冲刺，到命中）+ backMs（后摇归位），归位才解冻。
+   * ⚠️ 只冻结出手那一方，对手照常蓄力：试过全场冻结，双方轮流播演出等于每回合串行等，
+   *   实测 60 秒从 9 场掉到 7 场（8.6s/场），节奏砍半 —— 挂机游戏拖不起这个。 */
+  const freeze = { pet: false, enemy: false };
+  const unfreezeTimer = { pet: null, enemy: null };
+  let fightEnded = false;   // 本场是否已结算（tick 与伤害结算都可能触发，防重复）
   let onFightEnd = null;   // main.js 注入的每场结算回调
   let selectedAreaId = null;
-  const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0 };
+  const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
 
   /* ---------- 开始 / 停止 ---------- */
   // startAutoBattle(callback)：callback({win, fightCount}) 每场结束调用
@@ -45,6 +54,7 @@
     if (!autoRunning) return;
     autoRunning = false;
     waitingRecover = false;
+    clearFreeze('pet'); clearFreeze('enemy');
     clearInterval(interval);   interval = null;
     clearTimeout(nextFightTimer); nextFightTimer = null;
     clearInterval(recoverTimer); recoverTimer = null;
@@ -63,7 +73,7 @@
   function enterRecover(reason) {
     waitingRecover = true;
     window.UI.updateStatus('recovering', fightCount);
-    window.UI.addLog(reason, false, true);
+    window.UI.addLog(reason);
     clearInterval(recoverTimer);
     recoverTimer = setInterval(() => {
       const pet = getActivePet();
@@ -99,64 +109,82 @@
   function getAreas() {
     return (Config.battle.areas || []).slice();
   }
-  function getLevelBand(level, area) {
-    const [areaMin, areaMax] = area?.levelRange || [1, 60];
-    const effectiveLevel = Math.min(areaMax, Math.max(areaMin, level || areaMin));
-    const bandMin = Math.max(areaMin, Math.floor((effectiveLevel - 1) / 5) * 5 + 1);
-    return [bandMin, Math.min(areaMax, bandMin + 4)];
+  /* 怪物等级 = 宠物等级【钳进】地图等级段（2026-08-30 用户拍板：匹配地图的等级，而不是宠物等级）。
+   * 公式：怪等级 = clamp(宠物等级, 图下限, 图上限)。
+   *   图决定「范围」，宠物等级决定「范围内的具体值」，走到边界就停住。
+   * 为什么要钳：老逻辑「怪等级 = 玩家等级」不设边界，Lv60 打图 1 也出 Lv60 的怪 ——
+   *   图的等级段形同虚设，图与图没有区别，玩家赖在低级图也能拿满经验
+   *   （经验 = coef × 怪等级，见 pet.js expBase）。钳住之后图1 封顶 6 级、图10 是 55~60，
+   *   想拿高级经验就必须去高级图，图的推进感回来了。
+   * 为什么不改成「图段内纯随机」（曾实现过，实测后被推翻）：
+   *   低级图的等级段相对中点跨度极大 —— 图1 是 [1,6]、中点 3.5，强度按 怪等级/图中点 缩放后
+   *   段内跨度达 5.6 倍（1级=0.29 倍 ↔ 6级=1.6 倍）。实测新手 Lv1 在图1 遇 Lv3 怪就 5/8 只打不过、
+   *   遇 Lv4~6 全灭，只有 2/6 ≈ 33% 的场次能赢，Lv1→Lv2 要打约 30 场。能推进但前期是煎熬。
+   *   （高级图不受影响：图10 [55,60] 中点 57.5，段内跨度仅 1.04 倍。）
+   * ⚠️ 越级进高级图（如 Lv1 进 55-60 的魂渊）：怪取图下限 55，必输 —— 这是图的门槛，
+   *   选图时给确认提示（ui-worldmap.js），玩家仍可硬闯。
+   */
+  function rollEnemyLevel(area, playerLevel) {
+    const range = (area && area.levelRange) || [1, 6];
+    const a = Math.max(1, Number(range[0]) || 1), b = Math.max(1, Number(range[1]) || 1);
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    const lv = Math.max(1, Number(playerLevel) || 1);
+    return Math.min(hi, Math.max(lo, lv));
   }
-  function getAreaEnemyPool(area, playerLevel) {
+  // 怪池 = 该图 enemyIds ∩ 怪自身等级段与图等级段重叠。
+  // 不再按玩家等级取 band：怪等级已由地图定，整池对这张图都合适。
+  function getAreaEnemyPool(area) {
     const enemies = getEnemyPool();
-    const [areaMin, areaMax] = area?.levelRange || [1, 60];
-    const [bandMin, bandMax] = getLevelBand(playerLevel || areaMin, area);
-    const areaIds = new Set(area?.enemyIds || []);
+    const [areaMin, areaMax] = (area && area.levelRange) || [1, 60];
+    const areaIds = new Set((area && area.enemyIds) || []);
+    if (!areaIds.size) return [];
     const inArea = enemy => {
       const [enemyMin, enemyMax] = enemy.levelRange || [enemy.level || 1, enemy.level || 1];
       return enemyMax >= areaMin && enemyMin <= areaMax;
     };
-    const inBand = enemy => {
-      const [enemyMin, enemyMax] = enemy.levelRange || [enemy.level || 1, enemy.level || 1];
-      return enemyMax >= bandMin && enemyMin <= bandMax;
-    };
-    const areaPool = areaIds.size ? enemies.filter(enemy => areaIds.has(enemy.id) && inArea(enemy)) : [];
-    const bandPool = areaPool.filter(inBand);
-    return bandPool.length ? bandPool : areaPool;
+    return enemies.filter(enemy => areaIds.has(enemy.id) && inArea(enemy));
   }
   function setEncounterLevel(enemy, playerLevel, area) {
-    const [bandMin, bandMax] = getLevelBand(playerLevel, area);
-    const level = bandMin + Math.floor(Math.random() * (bandMax - bandMin + 1));
-    return { ...enemy, level };
+    return { ...enemy, level: rollEnemyLevel(area, playerLevel) };
   }
-  // 怪的成长值按区域 growthRange 取（config.battle.areas 每图配），没有则回退随机 3~6。
-  // 怪的攻击成长系数独立用 ENEMY_ATK_COEFF=3（高于玩家 def 成长），保证怪攻能稳定破玩家防御，
-  // 避免"怪物破不了玩家防御"（伤害压到 1）的失衡。生命/防御沿用全局系数。
-  const ENEMY_ATK_COEFF = 3;
+  // 怪物数值（2026-08-30 用户拍板：直接定死，不随成长算）。
+  // 每图一套基准数值（config.battle.areaEnemyStats，按图中点等级校准），
+  // 实际值 = 基准 × 玩家等级/图中点等级 —— 图强度带固定（图1永远最弱、图6最强），
+  // 玩家在带内随等级成长：Lv1 打图1 = 1级强度，Lv5 打图1 = 5级强度。
+  //   裸装正常玩家 ≈ 5 刀（能推、慢但不死）→ 穿装备 ≈ 3.5 刀 → 融合/涅槃叠成长 → 一刀秒。
+  // 怪类型强度（普通/进化/变异）由 config.battle.typeMult 乘算。
   function scaleEnemyStats(enemy, area) {
-    const level = enemy.level || 1;
     const diff = (area && area.difficulty) || 1.0;
-    const gr = (area && area.growthRange) || [3, 6];
-    const growth = enemy.growth ?? (gr[0] + Math.floor(Math.random() * (gr[1] - gr[0] + 1)));
-    const C = Config.pet.statCoeff;
-    const hp = Math.round((enemy.hp + level * growth * C.hp) * diff);
-    const atk = Math.round((enemy.atk + level * growth * ENEMY_ATK_COEFF) * diff);
-    const def = Math.round((enemy.def + level * growth * C.def) * diff);
+    const base = (Config.battle.areaEnemyStats || {})[area && area.id] || { hp: 320, atk: 72, def: 30 };
+    const tm = (Config.battle.typeMult || {})[enemy.enemyType] || 1.0;
+    const [lo, hi] = (area && area.levelRange) || [1, 10];
+    const mid = (lo + hi) / 2;
+    const level = enemy.level || 1;
+    // 玩家等级低于图中点 → 按比例降强度（保底 25%，Lv1 也能打），高于中点 → 上限压制（越级碾压有限）
+    // clamp 边界在 config.battle.levelScaleClamp（2026-08-31 上限 1.6→1.25，修图1 后段新手打不过）
+    const clampCfg = Config.battle.levelScaleClamp || [0.25, 1.6];
+    const ratio = Math.max(clampCfg[0], Math.min(clampCfg[1], level / mid));
+    const hp  = Math.round(base.hp * ratio * tm * diff);
+    const def = Math.round(base.def * ratio * tm * diff);
+    const atk = Math.round(base.atk * ratio * tm * diff);
     const spd = enemy.spd;
-    return { ...enemy, growth, hp, maxHp: hp, atk, def, spd, _diff: diff };
+    return { ...enemy, growth: (area && area.recGrowth) || 3, hp, maxHp: hp, atk, def, spd, _diff: diff };
   }
-  function pickEnemyByLevel() {
-    const level = getPlayerLevel();
+  // 怪等级 = 宠物等级钳进图等级段（rollEnemyLevel），故保留 playerLevel 入参
+  function pickEnemy() {
     const area = getCurrentArea();
     if (!area) return null;
-    const enemies = getAreaEnemyPool(area, level);
+    const level = getPlayerLevel();
+    const enemies = getAreaEnemyPool(area);
     const picked = enemies.length ? pickWeighted(enemies, item => item.weight || 1) : null;
     return picked ? { enemy: setEncounterLevel(picked, level, area), area, enemies } : null;
   }
   function beginFight() {
     const pet = getActivePet();
     const stats = getStats(pet);
-    const picked = pickEnemyByLevel();
+    const picked = pickEnemy();
     if (!picked) {
-      window.UI.addLog(getCurrentArea() ? '⚠️ 当前地图没有可用野怪，请检查怪物池配置。' : '⚠️ 请先选择挂机地图。', false, true);
+      window.UI.addLog(getCurrentArea() ? '⚠️ 当前地图没有可用野怪，请检查怪物池配置。' : '⚠️ 请先选择挂机地图。');
       return;
     }
     const { enemy: ENEMY, area } = picked;
@@ -176,53 +204,89 @@
     if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
     state.petAction = 0;
     state.enemyAction = 0;
+    const skill = Config.pet.evolution.activeSkills?.[pet.name];
+    state.activeSkill = skill && state.pet.level >= skill.minLevel ? skill : null;
+    state.skillCooldown = 0;
+    state.skillQueued = false;
+    clearFreeze('pet'); clearFreeze('enemy');
+    fightEnded = false;
     const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
     const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
     window.UI.resetBattle(petLabel, state.pet.icon, enemyLabel, state.enemy.icon, state.pet.maxHp, state.enemy.maxHp);
     window.UI.updateBattleArea(area);
     window.UI.updateStatus('fighting', fightCount);
-    window.UI.addLog(`⚔️ 第${fightCount + 1}场：${state.pet.name} 遭遇${state.enemy.name}！`);
     window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
 
     interval = setInterval(tick, 100);
   }
   function tick() {
     // 进度条满值固定 100，累加 = 速度 / speedScale（config 校正攻速量级，改这一个数即调整体快慢）
+    // 谁在演出谁就冻在当前位置（立绘还在对方脸上/收招回位的路上），对手不受牵连
     const scale = Config.battle.speedScale || 1;
-    state.petAction += state.pet.spd / scale;
-    state.enemyAction += state.enemy.spd / scale;
+    if (!freeze.pet)   state.petAction += state.pet.spd / scale;
+    if (!freeze.enemy) state.enemyAction += state.enemy.spd / scale;
     window.UI.updateAction(state.petAction, state.enemyAction);
-    if (state.petAction >= 100)   { state.petAction = 0;   doTurn('pet'); }
-    if (state.enemyAction >= 100) { state.enemyAction = 0; doTurn('enemy'); }
-    if (state.pet.hp <= 0 || state.enemy.hp <= 0) endFight();
+    if (!freeze.pet && state.petAction >= 100)     { state.petAction = 0;   doTurn('pet'); }
+    if (!freeze.enemy && state.enemyAction >= 100) { state.enemyAction = 0; doTurn('enemy'); }
+    if (!fightEnded && (state.pet.hp <= 0 || state.enemy.hp <= 0)) endFight();
+  }
+  // 冻结某一方的行动条 ms 毫秒（= 它这一次出手的完整演出时长），到点自动解冻
+  function freezeAction(side, ms) {
+    clearTimeout(unfreezeTimer[side]);
+    if (!(ms > 0)) return;
+    freeze[side] = true;
+    unfreezeTimer[side] = setTimeout(() => { freeze[side] = false; unfreezeTimer[side] = null; }, ms);
+  }
+  function clearFreeze(side) {
+    clearTimeout(unfreezeTimer[side]);
+    unfreezeTimer[side] = null;
+    freeze[side] = false;
   }
   function doTurn(attacker) {
     if (state.pet.hp <= 0 || state.enemy.hp <= 0) return;
     const isPet = attacker === 'pet';
     const atkData = isPet ? state.pet : state.enemy;
     const defData = isPet ? state.enemy : state.pet;
-    window.UI.animateAttack(attacker);
-    setTimeout(() => { // 攻击动画演出后结算普通攻击伤害
-      const { damage, isCrit, isMiss, heal } = calcDamage(atkData, defData);
+    const skill = isPet && state.skillQueued ? state.activeSkill : null;
+    if (skill) {
+      state.skillQueued = false;
+      state.skillCooldown = skill.cooldownTurns;
+      window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    }
+    // 伤害结算对齐"扑到对方脸上"那一刻。时刻由表现层给出：冲刺时长随两只宠的间距自适应，
+    // 这里写死一个数字的话，宽屏上血条和飘字会在立绘还没冲到时就跳出来。
+    const hitAt = window.UI.animateAttack(attacker) || 320;
+    // 命中之后立绘还要收招回位（后摇），这段时间也算演出 —— 归位才算打完这一下
+    const backMs = window.UI.attackRecoverMs ? (window.UI.attackRecoverMs(attacker) || 0) : 0;
+    freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs);
+    setTimeout(() => {
+      const result = calcDamage(atkData, defData);
+      const bonus = skill && !result.isMiss
+        ? Math.floor(result.damage * (skill.damageMultiplier - 1)) + Math.floor(defData.maxHp * (skill.maxHpDamageRate || 0))
+        : 0;
+      const damage = result.damage + bonus;
       defData.hp -= damage;
-      // 吸血：攻击者按伤害回血（不超上限）
-      if (heal > 0) {
-        atkData.hp = Math.min(atkData.maxHp, atkData.hp + heal);
+      if (result.heal > 0) {
+        atkData.hp = Math.min(atkData.maxHp, atkData.hp + result.heal);
+        window.UI.showDamage(isPet ? 'pet' : 'enemy', result.heal, 'lifesteal');
       }
       const target = isPet ? 'enemy' : 'pet';
-      window.UI.animateHit(target);
-      if (isMiss) {
-        window.UI.showDamage(target, 0, 'miss');
-        window.UI.addLog(`💨 ${defData.name} 闪避了 ${atkData.name} 的攻击！`);
-      } else {
-        window.UI.showDamage(target, damage, isCrit ? 'crit' : 'normal');
-        // 战斗记录精简：普通攻击一行短记录，暴击高亮；掉落/死亡另有展示
-        window.UI.addLog(isCrit
-          ? `⚡ ${defData.name} 暴击 -${damage}`
-          : `⚔️ ${defData.name} -${damage}`, isCrit);
-      }
+      window.UI.animateHit(target, result.isCrit);
+      window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal');
       window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
-    }, 150);
+    }, hitAt);
+    if (isPet && state.skillCooldown > 0 && !skill) {
+      state.skillCooldown--;
+      window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    }
+  }
+  function useActiveSkill() {
+    if (!autoRunning || !state.pet || !state.enemy || state.enemy.hp <= 0) return false;
+    if (!state.activeSkill || state.skillCooldown > 0 || state.skillQueued) return false;
+    state.skillQueued = true;
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    return true;
   }
   // 完整伤害结算：命中判定 → 攻防减法 → 暴击 → 吸血
   // 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
@@ -256,7 +320,8 @@
     setCurHp(state.petRef || getActivePet(), state.pet.hp);
     fightCount++;
     totalFights++; // 累计战斗场数（跨挂机累计）
-    window.UI.addLog(win ? `🏆 第${fightCount}场胜利！` : '💀 战斗失败……', false, true, !win);
+    // 胜利不单独播报：每场的「经验 +N」已经代表打赢了；战败是异常事件，必须让玩家看见。
+    if (!win) window.UI.addLog('💀 战斗失败……');
     window.UI.updateStatus('fighting', fightCount);
     if (win && window.UI.animateVictory) window.UI.animateVictory(); // 胜利演出：敌人淡出（表现层）
 
@@ -279,5 +344,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, state };
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, state };
 })();

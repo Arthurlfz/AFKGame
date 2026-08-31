@@ -1,18 +1,20 @@
 /* ============================================================
  * drop.js —— 掉落系统
  * 职责：
- *  1. 战斗胜利概率掉落：装备 5% / 宠物蛋 5% / 无掉落（用户拍板有意调低，防装备/宠物通胀）
- *  2. 装备掉落的稀有度由「当前怪」的 rarityWeights 决定（野鼠偏白/毒蛇偏蓝/石魔偏金）
+ *  1. 战斗胜利掉落（改法一·单池·一场一抽）：每场只摇 1 次，从合并权重总池抽 1 件
+ *     （无掉落 / 普通材料 / 装备 / 宠物蛋），一场最多 1 件；装备/蛋为低概率惊喜档
+ *  2. 装备掉落的稀有度由「当前图档」决定：读 Config.equipment.rarityWeightsByTier 的平滑梯度（越深金装越常见），
+ *     取代旧版按怪 lootTier 的 3 档枚举（图3~17 全锁 'high'→必出金）。
  *  3. 宠物蛋计数、累计获得装备数（仅本模块持有）
  *  4. 孵化：消耗一颗蛋 → 生成并出战新宠物（调 Pet）
- *  5. 涅磐兽：每场胜利独立概率掉落（config.drop.phoenixChance，调 Materials 累加）
+ *  5. 涅磐兽等全部材料：整合进单池的 material 档（按区域/图子权重选一），调 Materials 累加
  * 依赖：equipment.js（稀有度挑选 + 装备入库）、pet.js（孵化生成宠物）、materials.js（涅磐兽）
  * ============================================================ */
 (function () {
   'use strict';
 
   const Config = window.Config;
-  const { pickRarity, generateEquipment, addToInventory } = window.Equipment;
+  const { pickRarity, generateEquipment, addToInventory, getEquipBonuses } = window.Equipment;
   const { createBaby, addPet, setActive } = window.Pet;
   const Supabase = window.Supabase; // 孵化后写入云端存档
   const Items = window.Items;       // 装备掉落写入云端存档
@@ -28,34 +30,40 @@
     return enemy.eggBaseName || null;
   }
 
+  // 蛋显示名 = 品种名 + '蛋'。品种本身已带'蛋'字（旧数据统一归类的'宠物蛋'）时不再重复拼接，
+  // 否则会显示成"宠物蛋蛋"。
   function makeEggName(baseName) {
-    return baseName ? `${baseName}蛋` : '宠物蛋';
+    if (!baseName) return '宠物蛋';
+    return baseName.endsWith('蛋') ? baseName : `${baseName}蛋`;
   }
 
-  function getEnemyLootTier(enemy) {
-    return (enemy && enemy.lootTier) || 'low';
+  // 稀有度（颜色）随「图档」平滑爬升：读 config.equipment.rarityWeightsByTier[图档] 的
+  // 白/蓝/金 概率表（17 张图各一组，越深金装越常见）。取代旧版按怪 lootTier 的 3 档枚举
+  // （旧版图3~17 全锁 'high'→必出金，15 张图颜色无差异）。返回稀有度对象——
+  // generateEquipment 需要读 rarity.affixMin/affixMax，字符串会让词缀数量算出 NaN。
+  function pickDropRarity(areaTier) {
+    const table = (Config.equipment.rarityWeightsByTier || {})[areaTier]
+      || { white: 80, blue: 18, gold: 2 };
+    const r = Math.random() * 100;
+    let acc = 0;
+    for (const id of ['white', 'blue', 'gold']) {
+      acc += table[id] || 0;
+      if (r < acc) return Config.equipment.rarities.find(x => x.id === id) || Config.equipment.rarities[0];
+    }
+    return Config.equipment.rarities.find(x => x.id === 'gold') || Config.equipment.rarities[0];
   }
 
-  function pickDropRarity(enemy) {
-    const tier = getEnemyLootTier(enemy);
-    if (tier === 'high') return 'gold';
-    if (tier === 'mid') return Math.random() < 0.75 ? 'blue' : 'white';
-    return Math.random() < 0.85 ? 'white' : 'blue';
-  }
-
-  // 底材T阶随机：图越高，越好底材（数字小）概率越高。
-  // 权重 = (1-p)*T + p*(6-T)，p = (areaTier-1)/5 线性插值：
-  //   图1 → 偏向 T5（烂底为主，好底稀有）；图6 → 偏向 T1（优底为主）。
+  // 底材 T 阶随机：直接读 config.equipment.materialTierWeights（每图一套显式权重）。
+  // 以前是这里线性插值算权重（图6 → T1 占 33%，顶级底材太常见）；
+  // 改配置表后策划能一眼调，且 T1 在图6 也只有 20%。
   function rollMaterialTier(areaTier) {
-    const tiers = [1, 2, 3, 4, 5];
-    const a = (areaTier || 1) - 1;
-    const p = Math.max(0, Math.min(1, a / 5));
-    const weights = tiers.map(T => (1 - p) * T + p * (6 - T));
-    const total = weights.reduce((s, w) => s + w, 0);
+    const table = (Config.equipment.materialTierWeights || {})[areaTier] || { 5: 50, 4: 30, 3: 15, 2: 4, 1: 1 };
+    const entries = Object.entries(table);
+    const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
     let r = Math.random() * total;
-    for (let i = 0; i < tiers.length; i++) {
-      r -= weights[i];
-      if (r < 0) return tiers[i];
+    for (const [t, v] of entries) {
+      r -= (Number(v) || 0);
+      if (r < 0) return Number(t);
     }
     return 5;
   }
@@ -66,98 +74,125 @@
 
   const totalEggs = () => Object.values(eggMap).reduce((a, b) => a + b, 0);
 
-  /* ---------- 掉落 ---------- */
-  // rollReward(enemy)：enemy 为当前战斗的怪（含 rarityWeights）
-  // 概率在 config.js；大部分战斗只给经验（无掉落），装备/蛋是偶尔的惊喜
+  /* ---------- 掉落（改法一：单池·一场一抽） ---------- */
+  // rollReward(enemy, area)：每场胜利只做一次加权随机，从合并总池抽 1 件（none/material/equipment/egg）。
+  // 概率/权重在 config.js：drop.pool 总权重 + drop.materialWeightsByTier[图档] 子权重（按图档从低到高，且含出现时机门槛）；一场最多 1 件。
   // 装备掉落时若已登录 → 自动写入 items 表（Items.saveItem），回写 cloudId
   // 宠物蛋掉落时若已登录 → 云端 pet_egg 插一行（刷新不丢）
-  // 涅磐兽在分支之外独立 roll：掉到则 reward.phoenix = true（不改变主掉落）
-  // 返回 { type: 'equipment'|'egg'|'none', eq?, saveError?, phoenix? }，供 UI 播报
-  async function rollReward(enemy, area) {
+  // 全部材料整合进 material 档（按区域/图子权重选一），返回 { type:'material', material, qty }
+  // 返回 type ∈ none/material/equipment/egg，供 UI 播报
+  /* ---------- 单池加权抽取（改法一） ---------- */
+  // 从 [ [key, weight], ... ] 中按权重随机返回一个 key
+  function weightedPick(entries) {
+    let total = 0;
+    for (const [, w] of entries) total += (Number(w) || 0);
+    if (total <= 0) return entries.length ? entries[0][0] : null;
+    let r = Math.random() * total;
+    for (const [k, w] of entries) {
+      r -= (Number(w) || 0);
+      if (r < 0) return k;
+    }
+    return entries[entries.length - 1][0];
+  }
+
+  // 抽到 material 时：按"本图档"的 materialWeightsByTier 选具体材料（缺省键=该图还不出）。
+  // 进化素材用占位键'进化素材'承载权重，具体掉 普通/精粹/传说 由 areaEvolutionTiers + evoMaterialWeights 决定。
+  // 词缀：dropQty≥2 时 qty=2；matDrop 已作用在 pool.material 总权重上。
+  function pickMaterial(enemy, area, res) {
     const D = Config.drop;
-    const r = Math.random();
-    let reward;
-    if (r < D.equipmentChance) { // 装备：稀有度按当前怪的等级段倾向；基底=当前图档 × 随机底材T阶
-      const rarity = pickDropRarity(enemy);
-      // areaTier = 当前图在 config.battle.areas 里的序号+1（图1→1档 ... 图6→6档）
+    const areaList = Config.battle.areas || [];
+    const areaIdx = area && area.id ? areaList.findIndex(a => a.id === area.id) : -1;
+    const maxTier = (D.materialWeightsByTier && Object.keys(D.materialWeightsByTier).length) || 17;
+    const tier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
+    const mw = (D.materialWeightsByTier && D.materialWeightsByTier[tier]) || {};
+    const sub = [];
+    let evoSlot = 0;
+    for (const [name, w] of Object.entries(mw)) {
+      if (!w || w <= 0) continue;
+      if (name === '进化素材') { evoSlot = w; continue; } // 占位，下面按本图档位解析具体名字
+      sub.push([name, w]);
+    }
+    // 进化素材：按本图可用档（areaEvolutionTiers）+ 档位权重（evoMaterialWeights）选具体名字
+    const evoTiers = (area && area.id && D.areaEvolutionTiers && D.areaEvolutionTiers[area.id]) || null;
+    if (evoSlot > 0 && evoTiers && evoTiers.length) {
+      const ew = D.evoMaterialWeights || {};
+      const evoSub = evoTiers.map(t => [t, ew[t] || 10]);
+      sub.push([weightedPick(evoSub), evoSlot]);
+    }
+    // 区域材料：取 areaMaterials[area.id].name（权重已在上面 entries 循环里按'区域材料'加入）
+    const name = weightedPick(sub);
+    if (!name) return null;
+    const qty = (res && res.dropQty && res.dropQty >= 2) ? 2 : 1;
+    return { name, qty };
+  }
+
+  /* ---------- 掉落（改法一：单池·一场一抽） ---------- */
+  // rollReward(enemy, area)：每场胜利只做一次加权随机，从合并总池抽 1 件结果：
+  //   none(无掉落) / material(普通材料·单件) / equipment(装备) / egg(宠物蛋)
+  // 一场最多给 1 件；材料与装备/蛋互斥。装备/蛋为低概率"惊喜档"，不抬高通胀。
+  // 装备掉落时若已登录 → 自动写入 items 表；宠物蛋掉落时若已登录 → 云端 pet_egg 插一行。
+  // 返回 { type: 'equipment'|'egg'|'material'|'none', ... } 供 UI 播报（一场一件，不再有多个 bool 标记）。
+  async function rollReward(enemy, area, opts) {
+    const D = Config.drop;
+    const dry = !!(opts && opts.dry); // 开发者模拟器用：只抽样、不落库、不污染背包/蛋/材料
+    // 出战宠物装备的掉落类词缀加成（掉落数量/掉落稀有度/材料掉率），无装备则默认 1 倍
+    const activePet = window.Pet.getActivePet();
+    const res = (activePet && getEquipBonuses(activePet).resources) || { dropQty: 1, dropRare: 1, matDrop: 1 };
+
+    // 单池一次抽取：总权重归一化；"材料率"词缀拉高 material 档权重
+    const pool = D.pool || {};
+    const entries = [
+      ['none', pool.none || 0],
+      ['material', (pool.material || 0) * (res.matDrop || 1)],
+      ['equipment', pool.equipment || 0],
+      ['egg', pool.egg || 0]
+    ];
+    const tier = weightedPick(entries);
+
+    if (tier === 'equipment') {
       const areaList = Config.battle.areas || [];
       const areaIdx = area && area.id ? areaList.findIndex(a => a.id === area.id) : -1;
-      const areaTier = Math.max(1, Math.min(6, (areaIdx >= 0 ? areaIdx + 1 : 1)));
-      // materialTier = 底材T阶，图越高越好底材概率越高：以 1/T 为权重偏向优底，高图偏移更明显
+      const maxTier = (Config.equipment.baseTierMultipliers || []).length || 17;
+      const areaTier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
+      let rarity = pickDropRarity(areaTier);
+      // 「掉落稀有度」词缀：按 (dropRare-1) 概率把稀有度提升一档（白→蓝→金，金封顶）
+      if (Math.random() < (res.dropRare - 1)) {
+        const upR = rarity.id === 'white' ? 'blue' : (rarity.id === 'blue' ? 'gold' : null);
+        if (upR) rarity = Config.equipment.rarities.find(x => x.id === upR) || rarity;
+      }
       const matTier = rollMaterialTier(areaTier);
       const eq = generateEquipment(rarity, areaTier, matTier);
-      addToInventory(eq);
-      totalEquipDrops++;
-      const { error } = await Items.saveItem(eq); // 未登录时 saveItem 返回"未登录"，静默忽略
-      reward = { type: 'equipment', eq, saveError: error || null };
-    } else if (r < D.equipmentChance + D.eggChance) { // 宠物蛋（所有可捕捉怪都掉，蛋=根源基础宠）
+      eq.identified = false;          // 掉落即未鉴定，背包里灰框，鉴定后揭晓
+      if (!dry) {
+        addToInventory(eq);
+        totalEquipDrops++;
+        // 任务进度上报：所有 type=equipDrop 的任务 +1（捡到装备）
+        if (window.Quest && window.Quest.reportType) window.Quest.reportType('equipDrop', 1);
+        const { error } = await Items.saveItem(eq); // 未登录时 saveItem 返回"未登录"，静默忽略
+        return { type: 'equipment', eq, saveError: error || null };
+      }
+      return { type: 'equipment', eq, dry: true };
+    }
+
+    if (tier === 'egg') {
       const baseName = getEnemyEggBase(enemy);
-      if (baseName) {
+      if (!baseName) return { type: 'none' }; // 没有配 eggBaseName 的怪不掉蛋 → 退化为无掉落
+      if (!dry) {
         eggMap[baseName] = (eggMap[baseName] || 0) + 1;
-        const eggName = makeEggName(baseName);
         await Supabase.addEgg(baseName); // 已登录则云端存一颗该品种的蛋（失败静默，下次登录以云端为准）
-        reward = { type: 'egg', eggName, baseName };
-      } else {
-        reward = { type: 'none' }; // 没有配 eggBaseName 的怪不掉蛋，退化为无掉落
       }
-    } else {
-      reward = { type: 'none' }; // 无掉落
+      const eggName = makeEggName(baseName);
+      return { type: 'egg', eggName, baseName };
     }
-    // 涅磐兽：独立概率，每场胜利都有机会掉（不挤占上述掉率；以后 Boss 可加掉率，现在不分怪）
-    if (Math.random() < D.phoenixChance) {
-      await Materials.gain(D.phoenixName, 1); // 未登录只本地累计
-      reward.phoenix = true;
+
+    if (tier === 'material') {
+      const mat = pickMaterial(enemy, area, res);
+      if (!mat) return { type: 'none' };
+      if (!dry) await Materials.gain(mat.name, mat.qty); // 未登录只本地累计
+      return { type: 'material', material: mat.name, qty: mat.qty };
     }
-    // 合成之石（合成材料）：独立概率掉落，不挤占其他掉率
-    if (Math.random() < (D.synthesizeChance || 0)) {
-      await Materials.gain(D.synthesizeName || '合成之石', 1);
-      reward.synthesize = true;
-    }
-    // 打造材料：重铸石 / 剥离石，各自独立概率（config.drop），不挤占其他掉率
-    if (Math.random() < D.reforgeStoneChance) {
-      await Materials.gain(Config.craft.reforge.name, 1);
-      reward.reforgeStone = true;
-    }
-    if (Math.random() < D.stripStoneChance) {
-      await Materials.gain(Config.craft.strip.name, 1);
-      reward.stripStone = true;
-    }
-    // 神圣石：独立概率（config.drop.holyStoneChance），不挤占其他掉率；
-    // 仅重 Roll 词缀数值用，掉落概率最低（低于强化石/祝福石）
-    if (Math.random() < D.holyStoneChance) {
-      await Materials.gain(Config.craft.holy.name, 1);
-      reward.holyStone = true;
-    }
-    // 增缀石：独立概率（config.drop.augmentStoneChance），不挤占其他掉率；
-    // 用于给装备新增一条词缀，掉落概率与神圣石同为最低
-    if (Math.random() < D.augmentStoneChance) {
-      await Materials.gain(Config.craft.augment.name, 1);
-      reward.augmentStone = true;
-    }
-    // 进化素材分 3 档：按当前图(area.id)的 areaEvolutionTiers 决定能掉哪些档，随机选一档掉（独立概率）。
-    // 图1只掉普通、图2普通+精粹、图3起精粹+传说（防轻易接触）。没有 area/配置时退化为普通进化素材。
-    const evoMats = [];
-    const evoMap = Config.drop.evolutionMaterials || {};
-    const evoMatName = (Config.pet.evolution && Config.pet.evolution.materialName) || '进化素材';
-    let tiers = (area && area.id && D.areaEvolutionTiers && D.areaEvolutionTiers[area.id]);
-    if (!tiers || !tiers.length) tiers = [evoMatName];
-    const dropMat = tiers[Math.floor(Math.random() * tiers.length)];
-    const c = evoMap[dropMat];
-    if (typeof c === 'number' && c > 0 && Math.random() < c) {
-      await Materials.gain(dropMat, 1);
-      evoMats.push(dropMat);
-    }
-    if (evoMats.length) reward.evoMaterials = evoMats;
-    // 每图专属材料：按当前图(area.id)查 Config.drop.areaMaterials，独立概率掉落，不挤占其他掉率。
-    // 驱动"去对应图刷材料"（配合任务收集）。
-    if (area && area.id) {
-      const am = (D.areaMaterials || {})[area.id];
-      if (am && typeof am.chance === 'number' && am.chance > 0 && Math.random() < am.chance) {
-        await Materials.gain(am.name, 1);
-        reward.areaMaterial = am.name;
-      }
-    }
-    return reward;
+
+    return { type: 'none' }; // 无掉落
   }
 
   /* ---------- 孵化 ---------- */
@@ -186,6 +221,8 @@
     }
     // 先存档拿到 cloudId，再设为出战 → is_active 才能同步到云端（刷新后仍为出战）
     setActive(baby.id);
+    // 任务进度上报：所有 type=hatch 的任务 +1（petName = 孵出的品种，供宠物专属任务区分）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('hatch', 1, { petName: baby ? baby.name : null });
     return { baby, saveError: error || null };
   }
 
@@ -194,13 +231,11 @@
   const getEggs = () => ({ ...eggMap });                 // 按品种明细 { '血狐': 2 }
   const getEggCountOf = (baseName) => eggMap[baseName] || 0;
   const getTotalEquipDrops = () => totalEquipDrops;
-  // 登录后以云端 pet_egg 按品种为权威整体替换本地映射
-  function setEggCount(n) {
-    // 兼容旧数值：老数据只有总数时，摊成一个'通用'品种便于向后兼容（不丢失已有蛋）
-    const total = Math.max(0, Math.floor(n || 0));
-    if (total > 0 && !Object.keys(eggMap).length) eggMap = { 宠物蛋: total };
+  // 登出/切号：清空本地蛋映射。云端是唯一权威，登录后由 setEggs 按品种整体重建。
+  function clearEggs() {
+    eggMap = {};
   }
-  // 登录后以云端按品种明细替换（新数据走这个）
+  // 登录后以云端 pet_egg 的按品种明细整体替换本地映射（唯一恢复入口）
   function setEggs(map) {
     eggMap = {};
     for (const [k, v] of Object.entries(map || {})) {
@@ -208,6 +243,17 @@
     }
   }
 
+  /* ---------- 开发者面板：补发蛋（本地计数 + 云端存档，逐颗落库） ---------- */
+  async function grantEgg(baseName, amount) {
+    amount = Math.max(1, Math.floor(amount || 1));
+    if (!baseName) return { ok: false, error: '请选择蛋品种' };
+    for (let i = 0; i < amount; i++) {
+      eggMap[baseName] = (eggMap[baseName] || 0) + 1;
+      await Supabase.addEgg(baseName); // 未登录时 addEgg 静默忽略，仅本地累计
+    }
+    return { ok: true, amount };
+  }
+
   /* ---------- 对外 API ---------- */
-  window.Drop = { rollReward, hatchEgg, getEggCount, getEggs, getEggCountOf, setEggCount, setEggs, getTotalEquipDrops };
+  window.Drop = { rollReward, hatchEgg, grantEgg, getEggCount, getEggs, getEggCountOf, clearEggs, setEggs, makeEggName, getTotalEquipDrops };
 })();

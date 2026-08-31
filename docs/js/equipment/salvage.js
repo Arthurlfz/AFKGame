@@ -14,15 +14,10 @@
   'use strict';
 
   const Config = window.Config;
-  const { getInventory, addToInventory, removeFromInventory, rarityOf, affixCount } = window.Equipment;
-  function rarityForCount(eq) {
-    const count = affixCount({ affixes: eq && eq.affixes });
-    return count >= 4 ? 'gold' : count >= 2 ? 'blue' : 'white';
-  }
-  function syncedRarity(eq) {
-    const id = rarityForCount(eq);
-    return (Config.equipment.rarities || []).find(r => r.id === id) || rarityOf(eq);
-  }
+  const { getInventory, addToInventory, removeFromInventory, rarityOf, scoreOf } = window.Equipment;
+  // 颜色直接读装备存的真实稀有度（rarityOf，由 equipment.syncRarity 按词缀条数维护）；
+  // 旧版"按词缀条数反推"的 syncedRarity 已废——它和掉落阈值(金=3+)对不上(旧代码写成≥4金)，
+  // 会把 3 条词缀的金装当蓝装拆。现在颜色由词缀条数唯一决定，四者统一，不再双标。
   const { gainLocal, spendLocal, cloudGain } = window.Materials;
   const isItemListed = () => window.Market && window.Market.isItemListed ? window.Market.isItemListed.apply(window.Market, arguments) : false;
   const Items = window.Items;
@@ -53,7 +48,7 @@
     const gains = {};
     for (const eq of equips || []) {
       if (!isSalvageable(eq)) { skipped++; continue; }
-      const rarity = syncedRarity(eq);
+      const rarity = rarityOf(eq);
       const r = S[rarity.id] || S.white;
       byRarity[rarity.id] = (byRarity[rarity.id] || 0) + 1;
       for (const k in r) gains[k] = (gains[k] || 0) + r[k];
@@ -74,7 +69,7 @@
     const gains = {};
     const cloudIds = [];
     for (const eq of targets) {
-      const rarity = syncedRarity(eq);
+      const rarity = rarityOf(eq);
       const r = S[rarity.id] || S.white;
       for (const k in r) gains[k] = (gains[k] || 0) + r[k];
       if (eq.cloudId) cloudIds.push(eq.cloudId);
@@ -96,14 +91,32 @@
       for (let i = targets.length - 1; i >= 0; i--) addToInventory(targets[i]); // 倒序放回，保持原顺序
       return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
     }
+    // 任务进度上报：所有 type=salvage 的任务 +件数
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('salvage', targets.length);
+
     return { ok: true, count: targets.length, gains };
   }
 
-  /* ---------- 一键分解（全部可分解） ---------- */
-  async function salvageAll() {
-    const targets = getInventory().filter(isSalvageable);
-    if (!targets.length) return { ok: false, error: '没有可分解的装备（已锁定的跳过）' };
-    return settleSalvage(targets);
+  /* ---------- 按评分清理（一键减负，带三重保护） ----------
+   * 以前的「一键分解」= 清空全部可分解装备，玩家根本不敢点（好东西也一起没了）。
+   * 有了评分之后改成按分数清：低于阈值才分解，并且：
+   *   1) 已锁定 / 在售的跳过（isSalvageable）
+   *   2) 不比身上穿的差就留下（同部位比较，避免把升级品误分解）
+   *   3) 穿着的装备不在背包里，天然不会被扫到
+   */
+  function belowThreshold(threshold) {
+    const pet = (window.Pet && window.Pet.getActivePet) ? window.Pet.getActivePet() : null;
+    return getInventory().filter(eq => {
+      if (!isSalvageable(eq)) return false;
+      if (scoreOf(eq) >= threshold) return false;
+      const worn = pet && pet.equipment ? pet.equipment[eq.slot] : null;
+      return !(worn && scoreOf(eq) >= scoreOf(worn)); // 比身上好 → 留着
+    });
+  }
+  async function salvageBelow(threshold) {
+    const targets = belowThreshold(threshold);
+    if (!targets.length) return { ok: false, error: '没有符合清理条件的装备（好装备/锁定/在售都会保留）' };
+    return { ...(await settleSalvage(targets)), threshold };
   }
 
   /* ---------- 批量分解（指定装备列表） ---------- */
@@ -118,5 +131,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Salvage = { isSalvageable, toggleLock, getSalvagePreview, previewEquips, salvageAll, salvageList };
+  window.Salvage = { isSalvageable, toggleLock, getSalvagePreview, previewEquips, salvageBelow, belowThreshold, salvageList };
 })();

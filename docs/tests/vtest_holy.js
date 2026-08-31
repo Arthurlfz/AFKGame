@@ -3,7 +3,7 @@
 //  - T 阶不变
 //  - 数值在该 T 阶 [min,max] 范围内重新随机（且确实变化）
 //  - 数量正确扣除 1
-// 复用 vtest.js 的 VM 桩（vstub.js，name 化的 RPC 天然支持新石头）
+// 复用 vstub.js 的 VM 桩（vstub.js，name 化的 RPC 天然支持新石头）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{dataset:{},setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
@@ -35,7 +35,11 @@ const r=await C('Craft.reroll(heq)');
 C('Math.random=globalThis.__rand');                          // 还原随机
 A(r.ok===true,'重Roll 成功返回 ok');
 // 词缀类型 / T 阶不变；数值变为该 T 阶最大值（=变化且在区间内）
-const check=C(`(function(){const old=JSON.parse('${oldJson}');const cur=Equipment.flattenAffixes(heq.affixes);for(let i=0;i<cur.length;i++){const a=cur[i],o=old[i];const T=Config.equipment.affixTiers.find(t=>t.tier===a.tier);if(a.type!==o.type)return 'type';if(a.tier!==o.tier)return 'tier';if(a.value<T.min||a.value>T.max)return 'range';if(a.value===o.value)return 'unchanged'}return 'ok'})()`);
+// 注意：固定值类词缀（速度/命中/闪避）的高 T 阶区间可能退化成单点（min===max），
+// 那种词缀重 Roll 数值必然不变，属正常，不算「没重 Roll」。
+const check=C(`(function(){const old=JSON.parse('${oldJson}');const cur=Equipment.flattenAffixes(heq.affixes);for(let i=0;i<cur.length;i++){const a=cur[i],o=old[i];const T=Config.equipment.affixTiers.find(t=>t.tier===a.tier);if(a.type!==o.type)return 'type';if(a.tier!==o.tier)return 'tier';if(a.value<T.min||a.value>T.max)return 'range';if(a.value===o.value&&T.min!==T.max)return 'unchanged'}return 'ok'})()`);
+console.log('  重Roll前 '+oldJson);
+console.log('  重Roll后 '+C('JSON.stringify(Equipment.flattenAffixes(heq.affixes).map(a=>({type:a.type,tier:a.tier,value:a.value})))'));
 A(check==='ok',`类型/T阶不变、数值在区间内且已变化 (got:${check})`);
 const qAfter=C('Materials.getQuantity(Config.craft.holy.name)');
 A(qAfter===qBefore-1,'神圣石正确扣除 1 颗');

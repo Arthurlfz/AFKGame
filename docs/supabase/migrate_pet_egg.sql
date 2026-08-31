@@ -7,10 +7,14 @@
 create table if not exists public.pet_egg (
   id         uuid primary key default gen_random_uuid(),
   owner_id   text not null,
+  egg_type   text,
   status     text not null default '未孵化' check (status in ('未孵化', '已孵化')),
   pet_id     uuid,
   created_at timestamptz not null default now()
 );
+
+-- 兼容已创建过旧表的数据库：补齐品种列，否则掉蛋 insert 会失败且刷新后丢失
+alter table public.pet_egg add column if not exists egg_type text;
 
 create index if not exists pet_egg_owner_idx
   on public.pet_egg (owner_id, status, created_at);

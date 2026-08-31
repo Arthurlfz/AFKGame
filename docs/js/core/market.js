@@ -39,8 +39,8 @@
   function calcNet(qty) {
     return (qty || 0) - calcTax(qty);
   }
-  const LISTING_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋']);
-  const PAYMENT_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋']);
+  const LISTING_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋', '凝魂晶石']);
+  const PAYMENT_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋', '凝魂晶石']);
   const isPaymentMaterial = name => PAYMENT_MATERIALS.has(name);
   // 材料名称 → 配置项（上架下拉 / 市场显示用）
   function findMaterial(name) {
@@ -137,6 +137,8 @@
     // 立即本地标记已上架（不依赖 refresh 异步拉回，避免锁定判定空窗）
     if (data && data.id) myListedPets.push({ listingId: data.id, petId: data.pet_id || pet.cloudId, materialType, materialQty });
     await refresh();
+    // 任务进度上报：所有 type=list 的任务 +1（上架宠物/装备都算）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
     return { ok: true, data };
   }
   // 购买：调 buy_pet RPC（事务内 校验→扣材料→转移归属→标记 sold）。
@@ -148,6 +150,8 @@
     const err = buyResultError(data);
     if (err) return { error: err };
     listings = listings.filter(x => x.id !== listingId); // 本地移除，等轮询兜底
+    // 任务进度上报：所有 type=trade 的任务 +1（买入成交）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('trade', 1);
     return { ok: true, petId: l && l.pet_id };
   }
   async function cancelPet(listingId) {
@@ -165,6 +169,8 @@
     if (error) return { error: error.message };
     if (data && data.id) myListedItems.push({ listingId: data.id, itemId: data.item_id || eq.cloudId, materialType, materialQty });
     await refresh();
+    // 任务进度上报：所有 type=list 的任务 +1（上架宠物/装备都算）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
     return { ok: true, data };
   }
   async function buyItem(listingId) {
@@ -174,6 +180,8 @@
     const err = buyResultError(data);
     if (err) return { error: err };
     itemListings = itemListings.filter(x => x.id !== listingId); // 本地移除，等轮询兜底
+    // 任务进度上报：所有 type=trade 的任务 +1（买入成交）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('trade', 1);
     return { ok: true, itemId: l && l.item_id };
   }
   async function cancelItem(listingId) {

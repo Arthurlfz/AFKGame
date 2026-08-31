@@ -17,17 +17,19 @@ const C=code=>vm.runInContext(code,ctx);
 await S(300);await C('Game.onLogin("ui@test.com","123456")');await S(300);
 
 /* ============ 1. 宠物升级后血量回满 ============ */
-// 用真实配置构造血狐（growth=5, baseHp=85, statCoeff.hp=3），1级满血=85+1×5×3=100
-// 打残血后一次性给大量经验升到 5 级 → 满血上限=85+5×5×3=160，curHp 应回满到 160
+// 用真实配置构造血狐（growth=5, baseHp=85, statCoeff.hp 从 config 取，不写死 → 调数值不用改测试）
+// 打残血后一次性给大量经验升到 5 级 → 满血上限提高，curHp 应回满到新上限
 await C('(async()=>{const p=Pet.createPet("血狐","🦊",5,85,30,8,110);p.curHp=30;Pet.addPet(p);Pet.setActive(p.id);globalThis.__p=p.id})()');
+const FOX_HP=C('(Config.pet.starters.find(s=>s.name==="血狐")||{}).statCoeff.hp');
+const hpMax=n=>Math.round(85+n*5*FOX_HP); // 与 pet.js baseStats 同公式（含取整）
 const beforeMax=C('Pet.getStats(Pet.getPets().find(p=>p.id===globalThis.__p)).hp');
-A(beforeMax===100,'1级满血上限 hp=85+1×5×3=100 计算正确（实际 '+beforeMax+'）');
+A(beforeMax===hpMax(1),`1级满血上限 hp=85+1×5×${FOX_HP}=${hpMax(1)} 计算正确（实际 ${beforeMax}）`);
 const info=C('Pet.grantExp(Pet.getPets().find(p=>p.id===globalThis.__p),5000)');
 A(info.leveled===true&&info.newLevel>=5,'一次性大量经验触发升级（Lv.'+info.newLevel+'）');
 const afterMax=C('Pet.getStats(Pet.getPets().find(p=>p.id===globalThis.__p)).hp');
 const afterCur=C('Pet.getPets().find(p=>p.id===globalThis.__p).curHp');
 A(afterCur===afterMax,'升级后血量回满：curHp('+afterCur+') === 新上限('+afterMax+')');
-const expMax = 85 + info.newLevel*5*3;
+const expMax = hpMax(info.newLevel);
 A(afterMax===expMax&&afterMax>beforeMax,'升级后上限按公式正确（'+beforeMax+' → '+afterMax+'，=85+'+info.newLevel+'×5×3='+expMax+'）');
 // 未升级不强制回满（保持原血量，避免打断回血状态）
 // 先正常 addPet（满血），再手动设残血模拟战斗受伤，给少量经验（不升级）→ curHp 应保持不被动

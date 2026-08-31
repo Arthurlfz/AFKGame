@@ -20,8 +20,11 @@ const C=code=>vm.runInContext(code,ctx);
 const W=C('window.WorldMap');
 A(!!W,'WorldMap 对象已挂载');
 const points=C('window.WorldMap.points');
-A(Array.isArray(points)&&points.length===6,'野图点位有 6 个（实际 '+points.length+'）');
 const areaIds=C('Config.battle.areas.map(a=>a.id)');
+// 2026-08-30 地图扩展：6 图 → 10 图。点位必须与 Config.battle.areas 一一对应
+// （曾经漏改：config 加到 10 图但点位还是 6 个，新图在世界地图上根本不显示）
+A(Array.isArray(points)&&points.length===areaIds.length,
+  `野图点位数量与 Config.battle.areas 一致（点位 ${points.length} / 图 ${areaIds.length}）`);
 let allAreaOk=true;
 for(const p of points){ if(!areaIds.includes(p.areaId)){allAreaOk=false;console.error('  点位 '+p.name+' areaId='+p.areaId+' 找不到');} }
 A(allAreaOk,'每个野图点位的 areaId 都能在 Config.battle.areas 中找到');
@@ -52,5 +55,23 @@ A(!!cap&&cap.type==='capital'&&cap.name,'主城配置存在且类型为 capital�
 // 直接验证 buildPreview 输出的关键字段（专属材料名有值）
 const firstMat=C('window.WorldMap.buildPreview(window.WorldMap.points[0]).mat');
 A(typeof firstMat==='string'&&firstMat.length>0,'首个点位专属材料名非空（'+firstMat+'）');
+
+/* ============ 7. 材料掉落分布（materialWeightsByTier）正确推导 ============ */
+const distOk = C(`(()=>{
+  const dist = window.Config.drop.materialWeightsByTier || {};
+  const areas = window.Config.battle.areas;
+  return window.WorldMap.points.every(p=>{
+    const pv = window.WorldMap.buildPreview(p);
+    const idx = areas.findIndex(a=>a.id===p.areaId);
+    const tier = idx>=0 ? idx+1 : -1;
+    const tbl = tier>0 ? dist[tier] : null;
+    if(!tbl) return false;                          // 每个点位都应有分布
+    if(!Array.isArray(pv.dropDist)) return false;
+    if(pv.dropDist.length!==Object.keys(tbl).length) return false; // 行数=表键数
+    const sum = pv.dropDist.reduce((s,d)=>s+d.pct,0);
+    return Math.abs(sum-100)<=2;                    // 百分比之和≈100
+  });
+})()`);
+A(distOk,'每个点位材料掉落分布由 materialWeightsByTier 正确推导（行数匹配、占比和≈100%）');
 
 console.log('ALL WORLDMAP TESTS PASSED');process.exit(0);

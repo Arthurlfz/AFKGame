@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>主城动效 demo · 暗黑水墨城寨</title>
+<style>
+  /* ====== 基础：等宽居中容器 + 暗黑底 ====== */
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0c0d; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", serif; color: #d4af6a; }
+  .stage {
+    position: relative;
+    width: min(100vw, calc(100vh * 1.81));   /* 与 City.png 比例 1024×565 ≈ 1.81:1 一致 */
+    height: 100vh;
+    margin: 0 auto;
+    overflow: hidden;
+    background: #000;
+  }
+  .stage > .bg {
+    position: absolute; inset: 0;
+    background: url('docs/assets/City/City.png') center/100% 100% no-repeat;
+  }
+
+  /* ====== 顶部雾气：缓慢左右飘移 ====== */
+  .mist {
+    position: absolute; left: -8%; right: -8%; top: 0; height: 32%;
+    background: linear-gradient(180deg, rgba(170,180,200,.22) 0%, rgba(170,180,200,.06) 60%, transparent 100%);
+    pointer-events: none;
+    animation: drift 24s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+  @keyframes drift {
+    from { transform: translateX(-12px); opacity: .85; }
+    to   { transform: translateX(12px);  opacity: 1;   }
+  }
+
+  /* ====== 月光晕（背景层，最弱） ====== */
+  .moon {
+    position: absolute; left: 30%; top: 4%;
+    width: 8%; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle, rgba(210,225,255,.55) 0%, rgba(210,225,255,.18) 40%, transparent 70%);
+    pointer-events: none;
+    animation: breathe 4.5s ease-in-out infinite alternate;
+  }
+  @keyframes breathe {
+    from { opacity: .55; transform: scale(.95); }
+    to   { opacity: .95; transform: scale(1.08); }
+  }
+
+  /* ====== 灯笼/窗户光晕：通用层 ======
+   * 用 mix-blend-mode:screen 叠在原图之上，只加亮、不调色；
+   * 每个光晕独立动画节奏（不同 delay）避免"全场同步"的塑料感。 */
+  .glow {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    background: radial-gradient(circle, rgba(255,170,70,.85) 0%, rgba(255,140,40,.35) 35%, transparent 70%);
+    animation: flicker 1.8s ease-in-out infinite alternate;
+    will-change: opacity, transform;
+  }
+  @keyframes flicker {
+    0%   { opacity: .45; transform: scale(.92); }
+    50%  { opacity: .90; transform: scale(1.08); }
+    100% { opacity: .55; transform: scale(.98); }
+  }
+  /* 炉火 = 灯笼同款但更快更亮、偏红橙 */
+  .furnace {
+    background: radial-gradient(circle, rgba(255,90,30,.95) 0%, rgba(255,140,40,.45) 35%, transparent 70%);
+    animation: forgePulse .9s ease-in-out infinite alternate;
+  }
+  @keyframes forgePulse {
+    0%   { opacity: .65; transform: scale(.9); }
+    50%  { opacity: 1;   transform: scale(1.18); }
+    100% { opacity: .75; transform: scale(1.02); }
+  }
+
+  /* ====== 建筑名字标签：浮在建筑上方 ====== */
+  .building {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px;
+    font-size: clamp(11px, 1.2vw, 14px);
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #e6c890;
+    background: rgba(10,12,13,.6);
+    border: 1px solid rgba(212,168,106,.35);
+    border-radius: 2px;
+    box-shadow: 0 0 12px rgba(0,0,0,.6), 0 0 16px rgba(212,168,106,.08) inset;
+    text-shadow: 0 0 8px rgba(0,0,0,.9);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, color .2s ease;
+    user-select: none;
+  }
+  .building::before {
+    /* 名字下方的小三角（指向建筑） */
+    content: '';
+    position: absolute;
+    left: 50%; bottom: -5px;
+    transform: translateX(-50%);
+    width: 7px; height: 7px;
+    background: rgba(10,12,13,.6);
+    border-right: 1px solid rgba(212,168,106,.35);
+    border-bottom: 1px solid rgba(212,168,106,.35);
+    transform: translateX(-50%) rotate(45deg);
+  }
+  .building:hover {
+    color: #ffeec0;
+    border-color: rgba(255,200,120,.7);
+    transform: translate(-50%, -100%) scale(1.06);
+    box-shadow: 0 0 18px rgba(255,180,80,.45), 0 0 12px rgba(0,0,0,.6) inset;
+  }
+  .building .dot {
+    display: inline-block;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent, #d4af6a);
+    box-shadow: 0 0 6px var(--accent, #d4af6a);
+  }
+
+  /* ====== 调试用坐标网格（开发时打开） ====== */
+  .debug { position: absolute; inset: 0; pointer-events: none; opacity: .15; }
+  .debug-grid {
+    width: 100%; height: 100%;
+    background-image:
+      linear-gradient(to right, #d4af6a 1px, transparent 1px),
+      linear-gradient(to bottom, #d4af6a 1px, transparent 1px);
+    background-size: 10% 10%;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bg"></div>
+
+  <!-- 雾气 -->
+  <div class="mist"></div>
+
+  <!-- 月光 -->
+  <div class="moon"></div>
+
+  <!-- 灯笼/窗户光晕（坐标是估算的，按 City.png 实际建筑位置微调） -->
+  <div class="glow"          style="left:24%; top:62%; width:90px;  height:90px;  animation-delay:.0s"></div>  <!-- 孵化所 -->
+  <div class="glow"          style="left:32%; top:42%; width:70px;  height:70px;  animation-delay:.4s"></div>  <!-- 兽栏 -->
+  <div class="glow"          style="left:55%; top:24%; width:80px;  height:80px;  animation-delay:.8s"></div>  <!-- 商会 -->
+  <div class="glow"          style="left:72%; top:22%; width:70px;  height:70px;  animation-delay:1.2s"></div>  <!-- 冒险者公会 -->
+  <div class="furnace glow"   style="left:78%; top:50%; width:140px; height:140px; animation-delay:.0s"></div>  <!-- 铸造坊炉火 -->
+  <div class="glow"          style="left:85%; top:72%; width:80px;  height:80px;  animation-delay:1.6s"></div>  <!-- 鉴定屋 -->
+  <!-- 副灯笼：多几个点缀 -->
+  <div class="glow"          style="left:50%; top:32%; width:50px;  height:50px;  animation-delay:.6s"></div>  <!-- 广场灯 -->
+  <div class="glow"          style="left:18%; top:55%; width:40px;  height:40px;  animation-delay:1.0s"></div>  <!-- 远景灯 -->
+
+  <!-- 建筑名字（HTML 叠在图上，6 栋） -->
+  <button class="building" style="left:24%; top:64%" data-id="hatchery"><span class="dot"></span>🥚 孵化所</button>
+  <button class="building" style="left:32%; top:44%" data-id="kennel"><span class="dot"></span>🐾 兽栏</button>
+  <button class="building" style="left:55%; top:26%" data-id="market"><span class="dot"></span>💰 商会</button>
+  <button class="building" style="left:72%; top:24%" data-id="guild"><span class="dot"></span>📜 冒险者公会</button>
+  <button class="building" style="left:78%; top:52%" data-id="forge"><span class="dot" style="--accent:#ff8c28;background:#ff8c28;box-shadow:0 0 8px #ff8c28"></span>⚒️ 铸造坊</button>
+  <button class="building" style="left:85%; top:74%" data-id="appraise"><span class="dot"></span>🔍 鉴定屋</button>
+
+  <!-- 调试网格（按 D 切换） -->
+  <div class="debug" id="debug" style="display:none"><div class="debug-grid"></div></div>
+</div>
+
+<script>
+  // 按 D 切换调试网格
+  document.addEventListener('keydown', e => {
+    if (e.key === 'd' || e.key === 'D') {
+      const dbg = document.getElementById('debug');
+      dbg.style.display = dbg.style.display === 'none' ? 'block' : 'none';
+    }
+  });
+  // 点击建筑 → console 输出（demo 用，看落点）
+  document.querySelectorAll('.building').forEach(btn => {
+    btn.addEventListener('click', () => {
+      console.log('点了：', btn.dataset.id, btn.textContent.trim());
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // vtest_bugfix.js —— 三个 bug 的针对性回归测试
 // Bug 2：融合后保留主宠等级、属性立即按新成长值重算、前端刷新可见
 // Bug 3：出战宠物以云端 is_active 为权威还原（刷新后不能变回莱姆）
-// 复用 vtest.js 的 VM 桩（vstub.js）
+// 复用 vstub.js 的 VM 桩（vstub.js）
 const fs=require('fs'),vm=require('vm');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
@@ -30,7 +30,9 @@ A(activeName==='旺财','Bug3：刷新后出战宠物=云端 is_active 的旺财
 A(C('Pet.getActivePet().level')===20,'Bug3：出战宠物等级还原（Lv.20）');
 A(C('Pet.getPets().length')===2,'Bug3：云端宠物列表整体替换（2 只）');
 // 对战区同步：刷新后未开战，对战区应显示真实出战宠物而非写死的莱姆
-A(C('document.getElementById("pet-icon-name").textContent')==='旺财','Bug3：对战区名字=出战宠物（旺财，实际：'+C('document.getElementById("pet-icon-name").textContent')+'）');
+// 名字标签格式是「名字 等级：N级」，按 ' 等级：' 取前缀比对（带等级是有意的：战斗中升级要能看见）
+const iconName=C('document.getElementById("pet-icon-name").textContent');
+A(iconName.split(' 等级：')[0].trim()==='旺财','Bug3：对战区名字=出战宠物（旺财，实际：'+iconName+'）');
 A(C('document.getElementById("pet-icon").textContent')==='🐶','Bug3：对战区图标=出战宠物（🐶，实际：'+C('document.getElementById("pet-icon").textContent')+'）');
 // setActive 写入云端 is_active：莱姆出战 → 云端旺财变 false、莱姆变 true
 const wId=C('Pet.getPets().find(p=>p.name==="旺财").id');
@@ -43,7 +45,7 @@ A(wCloud===false&&lCloud===true,'Bug3：切宠后云端 is_active 同步（旺�
 /* ============ Bug 2：融合后属性立即重算 ============ */
 // 主宠：旺财（成长6，提到 40 级满足融合门槛）；副宠：新宠 成长8 Lv.40
 // 等级同步云端（模拟真实流程：升级会写云端），避免刷新后按旧等级算属性
-await C('(async()=>{const m=Pet.getPets().find(p=>p.name==="旺财");m.level=40;await Supabase.updatePet(m.cloudId,{level:40});const b=Pet.createPet("副宠","🐹",8,100,20,10,8);b.level=40;Pet.addPet(b);const s=await Supabase.savePet(b);b.cloudId=s.data.id})()');
+await C('(async()=>{const m=Pet.getPets().find(p=>p.name==="旺财");m.level=60;await Supabase.updatePet(m.cloudId,{level:60});const b=Pet.createPet("副宠","🐹",8,100,20,10,8);b.level=60;Pet.addPet(b);const s=await Supabase.savePet(b);b.cloudId=s.data.id})()');
 await S(200);
 await C('Materials.gain("涅磐兽",1)');await S(100);
 const before=C('JSON.stringify({growth:Pet.getPets().find(p=>p.name==="旺财").growth,hp:Pet.getStats(Pet.getPets().find(p=>p.name==="旺财")).hp,atk:Pet.getStats(Pet.getPets().find(p=>p.name==="旺财")).atk})');

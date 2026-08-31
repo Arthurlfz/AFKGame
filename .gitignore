@@ -32,3 +32,9 @@ relay-selfcheck.*
 Thumbs.db
 *.swp
 .zcode/
+
+# ===== 临时测试产物（playwright 日志 / 探针页面 / 试算脚本）=====
+docs/.playwright-cli/
+docs/__probe16x9.html
+docs/tests/_tmp_*.js
+docs/tests/tmp_*.js

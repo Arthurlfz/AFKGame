@@ -26,10 +26,67 @@
   };
   const PetSprites = window.PetSprites;
 
-  // 宠物头像 HTML（小尺寸用头像版）：有头像图则 <img>，否则回退 emoji
-  function iconHtml(name, emoji) {
+  // 宠物头像 HTML（小尺寸用头像版）：有头像图则 <img>，否则回退 emoji。
+  // inline=true → 行内小头像（跟文字齐平，用于「路线：<头像> 名字」这类文案里）；
+  // 不传 → 块级，尺寸由所在容器的 CSS 决定（img.pet-avatar-sprite 有兜底尺寸，不会按原图炸开）。
+  function iconHtml(name, emoji, inline) {
     const p = PetSprites && PetSprites.avatarOf(name);
-    return p ? `<img class="pet-avatar-sprite" src="${p}" alt="">` : emoji;
+    return p ? `<img class="pet-avatar-sprite${inline ? ' inline' : ''}" src="${p}" alt="">` : emoji;
+  }
+
+  /* ---------- 宠物 Tooltip（与装备 .bag-tooltip 同款：body 层共享浮层，悬停显示属性） ----------
+   * 环形 = 该属性占"参考上限"的比例：生命/攻击/防御按「同等级但成长练满(10)」的自己算潜力完成度，
+   * 速度/暴击/暴伤按固定参考值（120 / 50% / 300%），纯视觉参考，准确数值看环里的数字。 */
+  function petTipHtml(pet) {
+    const s = getStats(pet);
+    const cap = getStats(Object.assign({}, pet, { growth: 10 }));
+    const rows = [
+      { label: '生命', val: Math.round(s.hp), max: Math.max(1, cap.hp), c: 'var(--hp-hi-rgb)' },
+      { label: '攻击', val: Math.round(s.atk), max: Math.max(1, cap.atk), c: 'var(--action-gold-rgb)' },
+      { label: '防御', val: Math.round(s.def), max: Math.max(1, cap.def), c: 'var(--r-blue-rgb)' },
+      { label: '速度', val: Math.round(s.spd), max: 120, c: 'var(--spd-rgb)' },
+      { label: '暴击', val: Math.round(s.critRate * 100) + '%', num: Math.round(s.critRate * 100), max: 50, c: 'var(--hp-hi-rgb)' },
+      { label: '暴伤', val: Math.round(s.critDamage * 100) + '%', num: Math.round(s.critDamage * 100), max: 300, c: 'var(--action-gold-rgb)' }
+    ];
+    const R = 24, C = 2 * Math.PI * R;
+    const rings = rows.map(r => {
+      const ratio = Math.max(0, Math.min(1, (r.num != null ? r.num : r.val) / r.max));
+      return `<div class="pt-ring" style="--c:${r.c}">
+        <svg viewBox="0 0 58 58">
+          <circle class="pt-bg" cx="29" cy="29" r="${R}"></circle>
+          <circle class="pt-fg" cx="29" cy="29" r="${R}" stroke-dasharray="${(C * ratio).toFixed(1)} ${C.toFixed(1)}"></circle>
+        </svg>
+        <div class="pt-num">${r.val}</div>
+        <div class="pt-label">${r.label}</div>
+      </div>`;
+    }).join('');
+    const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
+    return `<div class="pt-name">${escapeHtml(pet.name)}</div>
+      <div class="pt-sub">Lv.${pet.level} · 成长 ${(pet.growth || 0).toFixed(1)} · ${escapeHtml(profile.role || '均衡型')}</div>
+      <div class="pt-rings">${rings}</div>
+      <div class="pt-foot">${escapeHtml(profile.description || '')}</div>`;
+  }
+  function showPetTip(el, pet) {
+    const tip = $('pet-tooltip');
+    if (!tip || !el || !pet) return;
+    tip.innerHTML = petTipHtml(pet);
+    const r = el.getBoundingClientRect();
+    tip.style.top = Math.max(6, r.top) + 'px';
+    tip.style.left = (r.right + 10) + 'px';
+    tip.classList.add('show');
+    // 右侧放不下 → 翻到左边（与装备 tooltip 同一套视口避让）
+    if (r.right + 10 + tip.offsetWidth > document.documentElement.clientWidth) {
+      tip.style.left = Math.max(6, r.left - tip.offsetWidth - 10) + 'px';
+    }
+  }
+  function hidePetTip() {
+    const tip = $('pet-tooltip');
+    if (tip) tip.classList.remove('show');
+  }
+  function bindPetTip(el, pet) {
+    if (!el) return;
+    el.addEventListener('mouseenter', () => showPetTip(el, pet));
+    el.addEventListener('mouseleave', hidePetTip);
   }
 
   /* ---------- 属性变化闪烁（通用小动画） ---------- */
@@ -46,9 +103,13 @@
     const s = getStats(pet);
     const base = window.Pet.baseStats(pet);
     const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
-    // 资料页大头像用头像版（裁切头部，96x96 contain 到 110px 框更聚焦）
-    if (PetSprites && PetSprites.mountAvatar($('pet-avatar'), pet.name)) {}
-    else $('pet-avatar').textContent = pet.icon;
+    // 资料页大头像：优先逐帧动画立绘，无动画素材回退头像版（裁切头部，96x96 contain 到 110px 框更聚焦）
+    const pa = $('pet-avatar');
+    if (pa) {
+      if (PetSprites && PetSprites.mountAnimated(pa, pet.name)) {}
+      else if (PetSprites && PetSprites.mountAvatar(pa, pet.name)) {}
+      else pa.textContent = pet.icon;
+    }
     $('pet-name').textContent = pet.name;
     $('pet-level').textContent = 'Lv.' + pet.level;
     $('exp-bar').style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
@@ -56,6 +117,21 @@
     $('pet-growth').textContent = pet.growth.toFixed(1);
     const reborn = $('pet-reborn');
     if (reborn) reborn.textContent = `转生 ${pet.rebornCount || 0} 次`;
+    const skillInfo = $('pet-active-skill-info');
+    if (skillInfo) {
+      const skill = Config.pet.evolution.activeSkills[pet.name];
+      const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}%伤害${skill.maxHpDamageRate ? ` + 目标最大生命${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
+      skillInfo.textContent = skill
+        ? `主动技能：${skill.name} · ${pet.level >= skill.minLevel ? `${effect} · ${skill.cooldownTurns} 回合冷却` : `Lv.${skill.minLevel} 解锁`}`
+        : '主动技能：终形态 Lv.60 解锁';
+    }
+    const poolEl = $('pet-exp-pool');
+    if (poolEl) {
+      const EP = Config.pet.expPool;
+      const maxed = pet.level >= Config.pet.maxLevel;
+      poolEl.style.display = (maxed && EP) ? '' : 'none';
+      if (maxed && EP) poolEl.textContent = `经验池 ${Math.round(pet.expPool || 0)}/${EP.perCrystal}（满 ${EP.perCrystal} 凝 1 颗${EP.material}）`;
+    }
     const hpText = `${Math.round(getCurHp(pet))}/${s.hp}`;
     if ($('pet-hp').textContent !== hpText) flashStat('pet-hp');
     $('pet-hp').textContent = hpText;
@@ -122,7 +198,11 @@
     const s = getStats(pet);
     const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
     const av = $id('avatar');
-    if (av) { if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {} else av.textContent = pet.icon; }
+    if (av) {
+      if (PetSprites && PetSprites.mountAnimated(av, pet.name)) {}
+      else if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {}
+      else av.textContent = pet.icon;
+    }
     const nm = $id('name'); if (nm) nm.textContent = pet.name;
     const lv = $id('level'); if (lv) lv.textContent = 'Lv.' + pet.level;
     const eb = $id('exp-bar'); if (eb) eb.style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
@@ -163,12 +243,15 @@
   function renderPetList() {
     const list = $('pet-list');
     list.innerHTML = '';
+    // 出战宠可能为空（刚被卖掉/上架），不能拿它当必然存在的前提，否则整个宠物页渲染会崩
+    const active = getActivePet();
+    const activeId = active ? active.id : null;
     for (const pet of getPets()) {
       const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length; // 已穿装备数
       const card = document.createElement('div');
-      card.className = 'pet-card' + (pet.id === getActivePet().id ? ' active' : '');
-      const active = pet.id === getActivePet().id;
-      card.innerHTML = `${active ? '<div class="pet-card-badge">出战</div>' : ''}
+      const isActive = pet.id === activeId;
+      card.className = 'pet-card' + (isActive ? ' active' : '');
+      card.innerHTML = `${isActive ? '<div class="pet-card-badge">出战</div>' : ''}
         <div class="icon">${iconHtml(pet.name, pet.icon)}</div>
         <div class="pname">${pet.name}</div>
         <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>
@@ -189,6 +272,7 @@
         eqTag.title = '穿着装备的宠物不能融合，请先卸下装备';
         card.appendChild(eqTag);
       }
+      bindPetTip(card, pet);
       list.appendChild(card);
     }
   }
@@ -434,7 +518,13 @@
   }
 
   /* ---------- 进化 tab：三段式（左选主宠 → 右选方向 → 预览确认），去弹窗 ---------- */
-  let evolveMainId = null; // 当前选中主宠（renderAll 高频重建，用 state 保存）
+  // renderAll 高频重建（非战斗回血每秒、挂机每场、市场轮询都会触发），
+  // 所以「玩家当前选到哪一步」必须落在 state 上，不能靠 DOM 记住：
+  //   evolveMainId  = 选中的主宠（renderAll 高频重建，用 state 保存）
+  //   evolvePreview = { petId, routeIndex, boost } 选中的进化方向 + 定死的成长加成
+  // 涅槃 tab 的 mergeSubId 是同一套模式；进化 tab 以前漏了，导致预览/确认被重建冲掉。
+  let evolveMainId = null;
+  let evolvePreview = null;
   function renderEvolveTab() {
     const list = $('evolve-pet-list');
     if (!list) return;
@@ -458,6 +548,7 @@
         <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>`;
       card.onclick = () => {
         evolveMainId = pet.id;
+        evolvePreview = null; // 换主宠 → 旧的方向预览作废
         UI.renderAll();
       };
       list.appendChild(card);
@@ -492,12 +583,12 @@
 
     if (maxed) {
       tb.innerHTML = `<div class="warn">🔒 进化已达上限(${maxTimes}次)，需通过<b>涅槃</b>重置进化次数后才能继续</div>`;
-      pb.innerHTML = ''; cb.innerHTML = '';
+      pb.innerHTML = ''; cb.innerHTML = ''; evolvePreview = null;
       return;
     }
     if (!routes.length) {
       tb.innerHTML = '<div class="hint">该形态无法再进化</div>';
-      pb.innerHTML = ''; cb.innerHTML = '';
+      pb.innerHTML = ''; cb.innerHTML = ''; evolvePreview = null;
       return;
     }
     tb.innerHTML = '<div class="es-tip">选择进化方向（等级不变、成长+、换形态）：</div><div class="es-route-grid">' +
@@ -515,8 +606,14 @@
         renderEvolvePreview(main, Number(btn.dataset.i), matName, have);
       };
     });
-    pb.innerHTML = '<div class="hint">← 选择一个进化方向查看预览</div>';
-    cb.innerHTML = '';
+    // 重建后按 state 恢复预览（否则玩家刚点的方向被 renderAll 冲掉）
+    if (evolvePreview && evolvePreview.petId === main.id && routes[evolvePreview.routeIndex]) {
+      renderEvolvePreview(main, evolvePreview.routeIndex, matName, have);
+    } else {
+      evolvePreview = null;
+      pb.innerHTML = '<div class="hint">← 选择一个进化方向查看预览</div>';
+      cb.innerHTML = '';
+    }
   }
 
   function renderEvolvePreview(pet, i, matName, have) {
@@ -528,7 +625,13 @@
     const route = routes[i];
     if (!route) return;
     const cur = getStats(pet);
-    const boost = window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]);
+    // 成长加成在「预览这一次」定死并记进 state：
+    // 1) renderAll 每秒重建面板，数字不会乱跳；
+    // 2) 确认时把这个 boost 传给 Evolve.evolve，做到预览多少就是多少。
+    if (!evolvePreview || evolvePreview.petId !== pet.id || evolvePreview.routeIndex !== i) {
+      evolvePreview = { petId: pet.id, routeIndex: i, boost: window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]) };
+    }
+    const boost = evolvePreview.boost;
     const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
     const next = getStats({ ...pet, growth: nextGrowth });
     const row = (label, a, b) => {
@@ -543,7 +646,7 @@
     if (!lvOk) warnRow += `<div class="es-preview-row warn">⚠ 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
     if (!matOk) warnRow += `<div class="es-preview-row warn">⚠ 材料不足：需要 1 个 ${matName}，当前持有 ${have}</div>`;
     pb.innerHTML = `
-      <div class="es-preview-row">路线：<b>${iconHtml(route.to, route.icon)} ${route.to}</b>（${route.minLevel ? '需 Lv.' + route.minLevel : '无等级要求'}）</div>
+      <div class="es-preview-row">路线：<b>${iconHtml(route.to, route.icon, true)} ${route.to}</b>（${route.minLevel ? '需 Lv.' + route.minLevel : '无等级要求'}）</div>
       <div class="es-preview-row">消耗：<b>${matName} ×1</b>（当前持有 ${have}）</div>
       <div class="hint">等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
       ${warnRow}
@@ -557,12 +660,13 @@
       }
       const origName = pet.name;
       const origGrowth = pet.growth;
-      const res = await Evolve.evolve(pet.id, i);
+      const res = await Evolve.evolve(pet.id, i, boost); // 用预览定好的 boost，所见即所得
       if (res.error) { showToast('❌ 进化失败', res.error); return; }
       const changed = res.keepForm ? '（形态不变）' : '';
       addLog(`🌟 进化成功！${origName} 成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${changed}`);
       showToast('🌟 进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}</small>`);
       evolveMainId = res.pet ? res.pet.id : pet.id;
+      evolvePreview = null; // 已进化：旧预览（形态/成长都变了）作废
       UI.renderAll();
     };
   }
@@ -598,11 +702,12 @@
         const tip = document.createElement('div');
         tip.className = 'equip-tip';
         const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
-        const detailLine = (list, cls) => (list || []).map(a => `<div class="${cls}">${escapeHtml(a.label || '?')} +${a.value || 0}${['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%'} <span class="tip-tier">T${a.tier || '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
+        const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
         const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
         const base = eq.base || { label: '攻击', value: 0 };
         tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
         item.appendChild(tip);
+        item.onclick = (e) => { e.stopPropagation(); item.classList.toggle('open'); };
         const takeBtn = document.createElement('button');
         takeBtn.className = 'btn-sm ghost slot-unequip';
         takeBtn.textContent = '脱下';
@@ -618,7 +723,11 @@
     });
     wrap.appendChild(orbit);
     const art = orbit.querySelector('#equip-orbit-art');
-    if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {} else art.textContent = pet.icon || '未知';
+    if (art) {
+      if (typeof PetSprites !== 'undefined' && PetSprites.mountAnimated(art, pet.name)) {}
+      else if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {}
+      else art.textContent = pet.icon || '未知';
+    }
   }
 
   /* ---------- 换装背包（装备 tab：给当前出战宠物穿上背包里的装备，悬停看属性面板） ---------- */
@@ -699,7 +808,7 @@
       const tip = document.createElement('div');
       tip.className = 'equip-tip';
       const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
-      const detailLine = (list, cls) => (list || []).map(a => `<div class="${cls}">${escapeHtml(a.label || '?')} +${a.value || 0}${['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%'} <span class="tip-tier">T${a.tier || '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
+      const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
       const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
       const base = eq.base || { label: '攻击', value: 0 };
       tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
@@ -727,6 +836,8 @@
         }
       };
       row.appendChild(btn);
+      row.appendChild(tip);
+      row.onclick = () => row.classList.toggle('open');
       box.appendChild(row);
     }
   }
@@ -782,7 +893,7 @@
       row.className = 'egg-species';
       const name = document.createElement('span');
       name.className = 'egg-species-name';
-      name.textContent = `${baseName}蛋`;
+      name.textContent = Drop.makeEggName(baseName);
       const qty = document.createElement('span');
       qty.className = 'egg-species-qty';
       qty.textContent = `×${n}`;
@@ -855,9 +966,13 @@
       btn.onclick = () => {
         const sub = getPets().find(p => p.id === Number(btn.dataset.id));
         if (!sub) return;
-        // 用 calcNirvanaGrowth 统一计算（与 Merge.nirvana 实际结果一致，含合成限制），避免预览和实际不符
-        const calc = window.Merge && window.Merge.calcNirvanaGrowth ? window.Merge.calcNirvanaGrowth(main, sub) : null;
-        const newGrowth = calc ? calc.growth : Math.round((main.growth + sub.growth * M.absorbRatio) * 10) / 10;
+        // 凝魂晶石加成（可选）：预览与实际共用 calcNirvanaGrowth，勾上就按加成后的成长重算
+        const CB = M.crystalBonus;
+        const haveCrystal = CB ? Materials.getQuantity(CB.material) : 0;
+        const render = (useCrystal) => {
+        const bonusMult = (useCrystal && CB) ? 1 + CB.absorbBonus : 1;
+        const calc = window.Merge && window.Merge.calcNirvanaGrowth ? window.Merge.calcNirvanaGrowth(main, sub, bonusMult) : null;
+        const newGrowth = calc ? calc.growth : Math.round((main.growth + sub.growth * M.absorbRatio * bonusMult) * 10) / 10;
         const cur = getStats(main);
         // 属性对比按「融合后的等级」计算：重置等级时用 1 级，保留等级时用当前等级
         const next = M.resetLevel
@@ -892,13 +1007,16 @@
               : '<div class="hint">等级保留，属性按当前等级 × 新成长值重算</div>'}
             ${limitHtml}
             ${maxed ? `<div class="merge-limit warn">⚠️ 主宠成长已达上限 <b>${M.maxGrowth}</b>，本次涅槃<b>不再涨成长</b>，仅重置等级（可继续练级）</div>` : ''}
+            ${CB ? `<label class="merge-crystal"><input type="checkbox" id="merge-crystal" ${useCrystal ? 'checked' : ''} ${haveCrystal < CB.amount ? 'disabled' : ''}>额外投入 ${CB.material} ×${CB.amount}（持有 ${haveCrystal}），本次吸收 +${Math.round(CB.absorbBonus * 100)}%</label>` : ''}
             <div class="merge-stats">属性变化（按涅槃后等级计算）：</div>
             ${statHtml}
             <div style="margin-top:8px"><button class="btn-mini primary" id="merge-ok">确认涅槃</button></div>
           </div>`;
+        const cb = body.querySelector('#merge-crystal');
+        if (cb) cb.onchange = () => render(cb.checked);
         body.querySelector('#merge-ok').onclick = async () => {
           const origName = main.name; // 涅槃前原名
-          const res = await Merge.nirvana(main.id, sub.id);
+          const res = await Merge.nirvana(main.id, sub.id, !!(cb && cb.checked));
           if (res.error) { showToast('❌ 涅槃失败', res.error); return; }
           addLog(`♻️ 涅槃成功！${res.subName} 消失了，${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}，等级重置为 Lv.${res.main.level}`);
           showToast('♻️ 涅槃成功！', `${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}<br><small>等级重置为 Lv.${res.main.level}，属性已按新成长值重算</small>`);
@@ -908,6 +1026,8 @@
           setActive(res.main.id);
           UI.renderAll();
         };
+        };
+        render(false);
       };
     });
   }
@@ -959,20 +1079,30 @@
             <div>两只素材宠（${main.name}、${sub.name}）都将消失，消耗 ${S.material.amount} 颗${S.material.name}</div>
             <div style="margin-top:8px"><button class="btn-mini primary" id="merge-ok">确认合成</button></div>
           </div>`;
-        body.querySelector('#merge-ok').onclick = async () => {
-          const res = await Merge.synthesize(main.id, sub.id);
-          if (res.error) { showToast('❌ 合成失败', res.error); return; }
-          if (res.mutated) {
-            addLog(`💠🌟 合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
-            showToast('💠🌟 合成变异成功！', `${iconHtml(res.baby.name, res.baby.icon)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)} · 全新稀有宠</small>`);
-            if (UI.showDialog) UI.showDialog({ icon: '💠🌟', speaker: '合成', text: `合成变异成功！<br>${res.mainName}+${res.subName} → <b style="color:#c9a86a">【${res.baby.name}】</b><br>成长值 ${res.newGrowth.toFixed(1)}` });
-          } else {
-            addLog(`💠 合成成功！${res.mainName}+${res.subName} 合成了新宠 ${res.baby.name}（成长 ${res.newGrowth.toFixed(1)}）`);
-            showToast('💠 合成成功！', `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}｜成长值 ${res.newGrowth.toFixed(1)}`);
+        const okBtn = body.querySelector('#merge-ok');
+        okBtn.onclick = async () => {
+          // 连点防护：合成要跑多次云端往返（getUser/扣材料/建档/删素材），期间按钮仍可点，
+          // 一次点击可能跑出两只新宠并扣两份材料 → 先禁用，跑完再放开
+          if (okBtn.disabled) return;
+          okBtn.disabled = true;
+          try {
+            const res = await Merge.synthesize(main.id, sub.id);
+            if (res.error) { showToast('❌ 合成失败', res.error); return; }
+            if (res.cloudWarn) showToast('⚠️ 云端建档失败', res.cloudWarn + '，请刷新页面重试');
+            if (res.mutated) {
+              addLog(`💠🌟 合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
+              showToast('💠🌟 合成变异成功！', `${iconHtml(res.baby.name, res.baby.icon)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)} · 全新稀有宠</small>`);
+              if (UI.showDialog) UI.showDialog({ icon: '💠🌟', speaker: '合成', text: `合成变异成功！<br>${res.mainName}+${res.subName} → <b style="color:#c9a86a">【${res.baby.name}】</b><br>成长值 ${res.newGrowth.toFixed(1)}` });
+            } else {
+              addLog(`💠 合成成功！${res.mainName}+${res.subName} 合成了新宠 ${res.baby.name}（成长 ${res.newGrowth.toFixed(1)}）`);
+              showToast('💠 合成成功！', `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}｜成长值 ${res.newGrowth.toFixed(1)}`);
+            }
+            closeMergePanel();
+            if (res.baby && res.baby.id) { setActive(res.baby.id); }
+            UI.renderAll();
+          } finally {
+            okBtn.disabled = false;
           }
-          closeMergePanel();
-          if (res.baby && res.baby.id) { setActive(res.baby.id); }
-          UI.renderAll();
         };
       };
     });
@@ -990,7 +1120,7 @@
     const rm = (routes.length && Evolve.getRouteMaterial(pet, 0)) || null;
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : Materials.getQuantity(matName);
-    let html = `<div class="merge-main">${iconHtml(pet.name, pet.icon)} ${pet.name}（Lv.${pet.level} · 成长 ${pet.growth.toFixed(1)}）</div>`;
+    let html = `<div class="merge-main">${iconHtml(pet.name, pet.icon, true)} ${pet.name}（Lv.${pet.level} · 成长 ${pet.growth.toFixed(1)}）</div>`;
     html += `<div class="merge-preview">进化次数 <b>${times}/${maxTimes}</b>；转生 <b>${pet.rebornCount || 0} 次</b>；消耗 <b>${matName} ×1</b>（持有 ${have}）</div>`;
     if (maxed) {
       html += `<div class="merge-preview">🔒 进化已达上限(${maxTimes}次)，需通过<b>融合(转生)</b>重置进化次数后才能继续</div>`;
@@ -1002,7 +1132,7 @@
         const ok = pet.level >= (r.minLevel || 1);
         const sub = r.keepForm ? '成长+（形态不变）' : (r.minLevel ? '需 Lv.' + r.minLevel : '可进化');
         return `<button class="merge-cand evolve-route${ok ? '' : ' disabled'}" data-i="${i}"${ok ? '' : ' disabled'}>
-          ${iconHtml(r.to, r.icon)} ${r.to}<br><small>${sub}</small></button>`;
+          ${iconHtml(r.to, r.icon, true)} ${r.to}<br><small>${sub}</small></button>`;
       }).join('') + '</div>';
     }
     body.innerHTML = html;
@@ -1059,6 +1189,9 @@
   /* ---------- 对外 API（宠物页） ---------- */
   UI.renderPetPanel = renderPetPanel;
   UI.renderPetList = renderPetList;
+  UI.showPetTip = showPetTip;
+  UI.hidePetTip = hidePetTip;
+  UI.bindPetTip = bindPetTip;
   UI.updatePetStatsPanel = updatePetStatsPanel;
   UI.renderEquipPetStats = renderEquipPetStats;
   UI.renderEquipSlots = renderEquipSlots;

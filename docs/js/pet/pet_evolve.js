@@ -65,9 +65,12 @@
   }
 
   /* ---------- 执行进化 ---------- */
-  // evolve(petId, routeIndex)：进化一次。有下一形态则换形态；形态到头则形态不变、只涨成长。
+  // evolve(petId, routeIndex, boostOverride)：进化一次。有下一形态则换形态；形态到头则形态不变、只涨成长。
+  // boostOverride = 预览阶段定好的成长加成：预览显示涨多少，确认后就涨多少（所见即所得）。
+  //   不传则现场随机（兼容旧调用）。以前预览随机一次、确认再随机一次，
+  //   导致面板重建后预览数字乱跳、且跟实际结果对不上。
   // 成功返回 { ok, pet, oldGrowth, newGrowth, result, material, keepForm }，失败返回 { error }
-  async function evolve(petId, routeIndex) {
+  async function evolve(petId, routeIndex, boostOverride) {
     const cfg = E();
     const pet = getPets().find(p => p.id === petId);
     if (!pet) return { error: '宠物不存在' };
@@ -105,7 +108,9 @@
 
     // ---- 计算结果；先不改本地，等云端更新成功后再提交 ----
     const oldGrowth = pet.growth;
-    const boost = randFloat(cfg.growthBoost[0], cfg.growthBoost[1]);
+    const boost = Number.isFinite(boostOverride)
+      ? boostOverride
+      : randFloat(cfg.growthBoost[0], cfg.growthBoost[1]);
     const newGrowth = Math.round((oldGrowth + boost) * 10) / 10;
     const keepForm = !!route.keepForm;
     const nextName = keepForm ? pet.name : route.to;
@@ -128,8 +133,8 @@
     pet.evolveTimes = nextEvolveTimes;
     pet.curHp = getStats(pet).hp;
 
-    // 任务进度上报：所有 type=evolve 的任务进度 +1
-    (Config.drop.quests || []).forEach(q => { if (q.type === 'evolve' && window.Quest) window.Quest.report(q.id, 1); });
+    // 任务进度上报：所有 type=evolve 的任务进度 +1（petName 供宠物专属任务区分）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('evolve', 1, { petName: pet ? pet.name : null });
 
     return { ok: true, pet, oldGrowth, newGrowth, result: pet.name, material: materialName, keepForm };
   }

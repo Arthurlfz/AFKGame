@@ -58,7 +58,8 @@ const matQ = uid => name => {
   await C('Supabase.signIn("alice@test.com","123456")');
   await S(30);
   assert(C('session.user.id') === 'user-a', 'A(alice) 登录');
-  await C('Materials.gain("重铸石", 200)');
+  // gain 现在只改本地并入队（不立即上传），测试要查云端表就得先 flush
+  await C('(async()=>{Materials.gain("重铸石", 200);await Materials.flushMaterials()})()');
   await S(50);
   assert(matQ('user-a')('重铸石') === 200, 'A 持有 200 重铸石');
 
@@ -115,7 +116,7 @@ const matQ = uid => name => {
   const afterBuy = C('Market.getBotListings().length');
   assert(afterBuy >= 1, `批量购买后假单剩 ${afterBuy} 件`);
   // 材料清零后买任何在售假单都该拒绝
-  await C('Materials.gain("重铸石", 1000)'); // 先补足，避免干扰下一步补货断言
+  await C('(async()=>{Materials.gain("重铸石", 1000);await Materials.flushMaterials()})()'); // 先补足，避免干扰下一步补货断言
   await S(50);
   const spendId = C('Market.getBotListings()[0].id');
   // 直接清空云端材料

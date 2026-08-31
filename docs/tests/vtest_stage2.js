@@ -11,7 +11,7 @@ const C=code=>vm.runInContext(code,ctx), S=ms=>new Promise(r=>setTimeout(r,ms));
  A(C('(()=>{const p=Pet.petFromRow({id:"old",name:"腐噜兽",icon:"x",growth:5,level:1,hp:100,attack:20,defense:10,speed:55,cur_hp:100});return p.evolveTimes===0&&p.rebornCount===0})()'),'旧宠物缺字段时默认 evolveTimes/rebornCount=0');
  A(C('Config.pet.starters.length===8&&Config.pet.starters.every(x=>x.name)'),'开局选宠配置为8只基宠');
  A(C('Supabase.loadPets&&Pet.petFromRow'),'云端宠物读写接口存在');
- await C('(async()=>{const p=Pet.createPet("腐噜兽","x",5,100,20,10,55);p.level=40;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__p=p.id})()');await S(40);
+ await C('(async()=>{const p=Pet.createPet("腐噜兽","x",5,100,20,10,55);p.level=60;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__p=p.id})()');await S(40);
  const id=C('__p');
  for(let i=0;i<10;i++){const tier=i<3?'进化素材':i<6?'精粹进化素材':'传说进化素材';const before=C(`Pet.getPets().find(p=>p.id===${id}).growth`);await C(`Materials.gain("${tier}",1)`);const r=await C(`Evolve.evolve(${id},0)`);const after=C(`Pet.getPets().find(p=>p.id===${id}).growth`);const delta=Math.round((after-before)*10)/10;A(r.ok===true,`连续进化第${i+1}次成功`);A(delta>=0.1&&delta<=0.2,`第${i+1}次成长增加0.1~0.2`)}
  A(C(`Pet.getPets().find(p=>p.id===${id}).evolveTimes===10`),'连续进化10次后次数为10');

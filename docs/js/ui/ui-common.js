@@ -81,23 +81,20 @@
     }
   }
 
-  /* ---------- 战报日志（通用组件：所有页面共享的日志槽，写入战斗记录面板） ---------- */
-  function addLog(text, isCrit, isResult, isLose) {
-    const log = $('battle-log');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry';
-    if (isCrit) entry.classList.add('crit');
-    if (isResult) { entry.classList.add('result'); if (isLose) entry.classList.add('lose'); }
-    entry.textContent = text;
-    log.appendChild(entry);
-    log.scrollTop = log.scrollHeight;
+  /* ---------- 消息出口（全游戏唯一：底部消息控制台 system 分类） ----------
+   * 历史坑：这里原本写战斗页的 #battle-log，而该面板在 v2 布局里早已 display:none，
+   * 于是全项目 50+ 处播报（升级/进化/打造/登录/读档失败…）全部掉进黑洞，
+   * 隐藏 DOM 还跟着每回合战斗无限增长（挂机一小时 = 几千个废节点）。
+   * 现在只有一条路：控制台。一处可见、上限 100 条、自动滚动。
+   * addLog = 纯文本日志（内部转义，防 XSS）；showToast = 富文本提示（调用方负责 HTML 安全）。
+   */
+  function addLog(text) {
+    if (!UI.consoleLog) return;
+    UI.consoleLog('system', escapeHtml(text == null ? '' : String(text)));
   }
-
-  /* ---------- 系统消息：写入消息控制台（system 分类） ---------- */
   function showToast(title, msg) {
     if (!UI.consoleLog) return;
-    const html = (title ? '<b>' + title + '</b>' : '') + (msg ? ' ' + msg : '');
-    UI.consoleLog('system', html);
+    UI.consoleLog('system', (title ? '<b>' + title + '</b> ' : '') + (msg != null ? String(msg) : ''));
   }
 
 
@@ -144,6 +141,25 @@
     document.addEventListener('DOMContentLoaded', initQuestionTips);
   }
 
+  /* ---------- 按钮 loading 态（打造 / 购买等所有要等云端的操作共用） ----------
+   * 实测一次云端 rpc 340ms，打造/购买要串两三次往返 = 1~2 秒。
+   * 这段时间若按钮只是禁用、没有任何文字变化，玩家的感受就是「点了没反应、卡住了」。
+   * 所以点下立刻换文字 + 禁用，结束（成功或失败）后恢复原文与可用状态。
+   * 注意：禁用必须保留 —— 连点会重复扣材料/重复打造，这个坑踩过两次（见 ui-craft / quest 注释）。
+   * 成功后调用方通常会 render() 重建该按钮，此时对本函数持有的旧节点赋值无害。
+   */
+  async function runWithLoading(btn, loadingText, task) {
+    if (!btn || btn.disabled) return;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = loadingText;
+    try { return await task(); }
+    finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  }
+
   /* ---------- 渲染枢纽（按页面顺序调用各 UI 模块，统一刷新） ---------- */
   function renderAll() {
     UI.renderPetPanel();
@@ -157,9 +173,9 @@
     UI.renderInventory();
     UI.renderInvFilter();
     UI.renderInvToolbar();
-    UI.renderAreaSelector && UI.renderAreaSelector();
     UI.updateBattleArea && UI.updateBattleArea(window.Battle?.getCurrentArea());
-    UI.syncCombatant && UI.syncCombatant(); // 未开战时把对战区同步成当前出战宠物（修复写死的莱姆）
+    UI.renderCombatantData && UI.renderCombatantData();     // 出战宠物区数据（经验/等级）：战斗中也要刷新
+    UI.syncCombatantSnapshot && UI.syncCombatantSnapshot(); // 立绘快照：仅非战斗时同步
     UI.renderRoster && UI.renderRoster();   // 战斗页左侧出战宠物竖列
     UI.renderMarket();
     UI.renderSellArea();
@@ -172,15 +188,19 @@
     $('holy-num').textContent = String(Materials.getQuantity(Config.craft.holy.name));
     $('augment-num').textContent = String(Materials.getQuantity(Config.craft.augment.name));
     UI.renderEggPanel && UI.renderEggPanel(); // 宠物页孵化面板（ui-pet 定义，未定义时跳过）
+    UI.renderQuestTracker && UI.renderQuestTracker(); // 任务追踪栏（ui-quest 定义，未定义时跳过）
+    UI.renderShop && UI.renderShop();                 // 魔石商店页（ui-shop 定义，用缓存数据重绘，不打接口）
   }
 
   /* ---------- 对外 API（通用部分；其余在页面 UI 文件中挂载） ---------- */
   UI.$ = $;
   UI.escapeHtml = escapeHtml;
   UI.setAuthUser = setAuthUser;
+  UI.getAuthUser = function () { return authUser; };
   UI.isLoggedIn = isLoggedIn;
   UI.addLog = addLog;
   UI.showToast = showToast;
   UI.clampTip = clampTip;
+  UI.runWithLoading = runWithLoading;
   UI.renderAll = renderAll;
 })();

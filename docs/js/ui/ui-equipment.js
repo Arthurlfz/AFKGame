@@ -16,7 +16,7 @@
 
   const Config = window.Config;
   const { getActivePet } = window.Pet;
-  const { getInventory, equipItem, describeItem } = window.Equipment;
+  const { getInventory, equipItem, describeItem, scoreOf } = window.Equipment;
   const { getEggCount, hatchEgg } = window.Drop;
   const Materials = window.Materials;
   const Market = window.Market;
@@ -133,17 +133,22 @@
       const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
       const card = document.createElement('div');
       const selected = selectedEqIds.has(eq.id);
-      const craftSelected = UI.getActiveCraftEqId && UI.getActiveCraftEqId() === eq.id;
-      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '') + (craftSelected ? ' craft-selected' : '');
+      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '');
+      // 卡片也显示词缀（含 roll 区间）：POE 式卡片 = 名字 + 词缀行列表
+      const affRows = (window.Equipment.flattenAffixes ? window.Equipment.flattenAffixes(eq.affixes) : [])
+        .filter(a => !a.base)
+        .map(a => window.Equipment.formatAffixHtml(a, 'tip-affix'))
+        .join('');
       card.innerHTML = `
         <div class="ec-name" style="color:${r.color}">
           ${eq.fresh ? '<span class="eq-new">新</span>' : ''}${escapeHtml(eq.name || '未知装备')}${eq.locked ? '<span class="eq-lock">🔒</span>' : ''}
         </div>
         <div class="ec-meta">${r.label}装 · T${eq.tier ?? 4}</div>
-        <div class="ec-slot">${eq.slot || '武器'}｜${b.label}+${b.value}</div>`;
+        <div class="ec-slot">${eq.slot || '武器'}｜${b.label}+${b.value}</div>
+        <div class="ec-affixes">${affRows || '<div class="tip-empty">无词缀</div>'}</div>`;
       const tip = document.createElement('div');
       tip.className = 'equip-tip';
-      tip.innerHTML = buildEquipTip(eq);
+      tip.innerHTML = buildEquipTip(eq, pet); // 传 pet：详情里要算「换上这件」相对身上装备的属性增减
       card.appendChild(tip);
       card.onclick = () => {
         if (eq.locked) {
@@ -166,9 +171,12 @@
       btn.textContent = '穿上';
       btn.onclick = (e) => {
         e.stopPropagation();
+        // 差异必须在换装【之前】算：换完之后候选装备已经上身，再比对就是 0 了
+        const changes = equipDeltas(pet, eq);
         const res = equipItem(pet, eq.id);
         if (res) {
           addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
+          if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
           UI.renderAll();
         }
       };
@@ -220,41 +228,61 @@
     }
   }
 
-  /* ---------- 一键分解（确认框 → 执行） ---------- */
+  /* ---------- 一键清理（按评分阈值，确认框 → 执行） ----------
+   * 以前「一键分解」= 清空全部可分解装备，好东西也一起没了，玩家根本不敢点。
+   * 装备有评分之后改成按分数清理：低于阈值才分解，并且自动保护
+   * 已锁定 / 在售 / 比身上穿得好的，玩家可以放心一键减负。
+   */
   function openSalvagePanel() {
     try {
       const body = $('salvage-body');
-      const preview = Salvage.getSalvagePreview();
-      if (!preview.count) {
-        showToast('🗑 无可分解装备', '背包里没有可分解的装备（已锁定/在售的会被跳过）');
-        return;
-      }
-      const S = Config.salvage;
-      const line = (label, n) => n ? `<div>${label} ×<b>${n}</b></div>` : '';
-      const gainHtml = Object.entries(preview.gains || {}).map(([k, n]) =>
-        line(`${Config.craft[k]?.icon || ''} ${Config.craft[k]?.name || k}`, n)
+      const inv = getInventory();
+      if (!inv.length) { showToast('🗑 背包没有装备', '去战斗页刷点掉落吧'); return; }
+      // 默认阈值 = 背包评分中位数：清理垫底的一半，保守不误杀
+      const sorted = inv.map(scoreOf).sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+
+      const gainLine = (gains) => Object.entries(gains || {}).map(([k, n]) =>
+        `<div>${Config.craft[k]?.icon || ''} ${Config.craft[k]?.name || k} ×<b>${n}</b></div>`
       ).join('') || '<div class="hint">无材料产出（白装分解无产出）</div>';
+
       body.innerHTML = `
-        <div class="salvage-count">将分解 <b>${preview.count}</b> 件装备</div>
+        <div class="salvage-count">按评分清理</div>
         <div class="salvage-detail">
-          <div>白装 ${preview.byRarity.white} 件 ｜ 蓝装 ${preview.byRarity.blue} 件 ｜ 金装 ${preview.byRarity.gold} 件</div>
+          <label class="salvage-th-row">
+            <span>清理低于</span>
+            <input id="salvage-threshold" type="number" min="0" step="1" value="${median}" class="salvage-th-input">
+            <span>分的装备</span>
+          </label>
+          <div class="hint">背包评分范围 ${sorted[0]} ~ ${sorted[sorted.length - 1]}（默认取中位数 ${median} = 清掉垫底一半）</div>
         </div>
-        <div class="salvage-gain">预计获得：</div>
-        <div class="salvage-detail">
-          ${gainHtml}
-        </div>
-        <div class="salvage-warn">⚠️ 已锁定装备不会被分解</div>`;
+        <div id="salvage-preview" class="salvage-detail"></div>
+        <div class="salvage-warn">⚠️ 已锁定 / 在售 / 比身上穿得好的装备会自动保留</div>`;
+
+      const renderPreview = () => {
+        const th = Number($('salvage-threshold').value);
+        const targets = Salvage.belowThreshold(Number.isFinite(th) ? th : 0);
+        const pv = Salvage.previewEquips(targets);
+        const box = $('salvage-preview');
+        if (!box) return;
+        box.innerHTML = pv.count
+          ? `<div>将分解 <b>${pv.count}</b> 件：白 ${pv.byRarity.white} ｜ 蓝 ${pv.byRarity.blue} ｜ 金 ${pv.byRarity.gold}</div>
+             <div class="salvage-gain">预计获得：</div>${gainLine(pv.gains)}`
+          : '<div class="hint">这个阈值下没有可清理的装备（好装备都被保护了）</div>';
+      };
+      $('salvage-threshold').oninput = renderPreview;
+      renderPreview();
+
       $('salvage-modal').style.display = 'flex';
       $('salvage-ok').onclick = async () => {
-        const res = await Salvage.salvageAll();
+        const th = Number($('salvage-threshold').value);
+        const res = await Salvage.salvageBelow(Number.isFinite(th) ? th : 0);
         closeSalvagePanel();
         if (res.error) { showToast('❌ 分解失败', res.error); return; }
-        const parts = [`分解了 ${res.count} 件装备`];
+        const parts = [`清理了 ${res.count} 件装备（低于 ${res.threshold} 分）`];
         for (const [k, n] of Object.entries(res.gains || {})) parts.push(`${Config.craft[k]?.name || k} ×${n}`);
-        addLog(`🗑 一键分解：${parts.join('，')}`);
-        showToast('🗑 分解完成', parts.join('<br>'));
-        if (UI.showDialog) UI.showDialog({ icon: '🗑', speaker: '分解', text: parts.join('<br>') });
-        if (res.cloudError) addLog('⚠️ 部分云端装备删除失败，刷新后可能重新出现');
+        addLog(`🗑 一键清理：${parts.join('，')}`);
+        showToast('🗑 清理完成', parts.join('<br>'));
         UI.renderAll();
       };
     } catch (err) {
@@ -304,15 +332,70 @@
     };
   }
 
-  // 装备详情浮层内容：按“等级 / 基底词缀 / 前缀 / 后缀”分段展示
-  function buildEquipTip(eq) {
+  /* ---------- 换装属性对比 ----------
+   * 玩家痛点：背包里一堆装备，单看一件看不出「换上去人是变强还是变弱」，只能凭感觉穿。
+   * 做法：浅拷贝一只宠物、把候选装备放进对应部位，走 Pet.getStats（与战斗同源，
+   *   含 atk%/hp%/def% 百分比词缀对裸属性的换算），再与当前身上的最终属性逐项比对。
+   *   —— 只读试穿，不改动任何真实装备/宠物状态，也不会触发云端同步。
+   * 明确不展示评分：评分只用于背包排序与批量清理，不参与战斗，混进属性对比只会误导。
+   */
+  const CMP_FIELDS = [
+    { key: 'atk',        label: '攻击',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'hp',         label: '生命',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'def',        label: '防御',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'spd',        label: '速度',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'critRate',   label: '暴击率',   scale: 100, unit: '%', digits: 1 },
+    { key: 'critDamage', label: '暴击伤害', scale: 100, unit: '%', digits: 0 },
+    { key: 'hit',        label: '命中',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'dodge',      label: '闪避',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'lifesteal',  label: '吸血',     scale: 100, unit: '%', digits: 0 }
+  ];
+  // 试穿候选装备后的最终属性（浅拷贝，不碰真实状态）
+  function previewStatsWith(pet, eq) {
+    if (!pet || !eq || !window.Pet || !window.Pet.getStats) return null;
+    try {
+      const clone = Object.assign({}, pet);
+      clone.equipment = Object.assign({}, pet.equipment || {}, { [eq.slot]: eq });
+      return window.Pet.getStats(clone);
+    } catch (e) { return null; } // 脏数据兜底：算不出来就不显示对比，不能让背包渲染挂掉
+  }
+  // 返回有变化的属性项 [{label, delta, unit, digits}]
+  function equipDeltas(pet, eq) {
+    if (!pet || !eq) return [];
+    const before = window.Pet.getStats(pet), after = previewStatsWith(pet, eq);
+    if (!before || !after) return [];
+    const out = [];
+    for (const f of CMP_FIELDS) {
+      const d = ((after[f.key] || 0) - (before[f.key] || 0)) * f.scale;
+      if (Math.abs(d) < 0.05) continue; // 浮点误差当无变化
+      out.push({ label: f.label, delta: d, unit: f.unit || '', digits: f.digits || 0 });
+    }
+    return out;
+  }
+  function fmtDelta(c) {
+    const v = Math.abs(c.delta).toFixed(c.digits).replace(/\.0+$/, '');
+    return `${c.delta > 0 ? '+' : '−'}${v}${c.unit}`;
+  }
+  function buildEquipCompare(pet, eq) {
+    if (!pet || !eq) return '';
+    const rows = equipDeltas(pet, eq);
+    if (!rows.length) return '<div class="tip-section">对比身上装备</div><div class="tip-empty">属性无变化</div>';
+    const html = rows.map(c =>
+      `<div class="tip-line" style="color:${c.delta > 0 ? '#5fd18b' : '#e0726f'}">${c.label} ${fmtDelta(c)}</div>`
+    ).join('');
+    return `<div class="tip-section">对比身上装备</div>${html}`;
+  }
+
+  // 装备详情浮层内容：按“等级 / 基底词缀 / 前缀 / 后缀 / 对比身上装备”分段展示
+  function buildEquipTip(eq, pet) {
     const affixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
     const prefix = affixes.prefix || [];
     const suffix = affixes.suffix || [];
     const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
     const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
     const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
-    const line = (a, cls) => a.map(x => `<div class="${cls}">${escapeHtml((x && x.label) || '?')} +${x ? (x.value || 0) : 0}${['hit', 'dodge', 'spd'].includes(x && x.type) ? '' : '%'} <span class="tip-tier">T${x ? (x.tier || '?') : '?'}</span></div>`).join('') || '<div class="tip-empty">无</div>';
+    // 词缀行统一走 Equipment.formatAffixHtml（POE 式：label +值 (该T阶区间 min~max)，T1/满roll 金色）
+    const line = (a, cls) => a.map(x => window.Equipment.formatAffixHtml(x, cls)).join('') || '<div class="tip-empty">无</div>';
     return `
       <div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}</div>
       <div class="tip-line">等级：<b>${itemLevel}</b></div>
@@ -321,7 +404,8 @@
       <div class="tip-section">前缀</div>
       ${line(prefix, 'tip-prefix')}
       <div class="tip-section">后缀</div>
-      ${line(suffix, 'tip-suffix')}`;
+      ${line(suffix, 'tip-suffix')}
+      ${buildEquipCompare(pet, eq)}`;
   }
 
   /* ---------- 对外 API（装备页） ---------- */

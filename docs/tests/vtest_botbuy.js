@@ -76,9 +76,9 @@ const matQ = uid => name => {
   await S(50);
   const picked = C('MarketBot.pickBuyCandidate(Market.getRealItemListings(), [])');
   assert(picked && picked.item_name === '低价的剑', `优先买低于市场参考价的挂单（选中：${picked && picked.item_name}，qty=${picked && picked.material_qty}）`);
-  // 全都不便宜 → 选最便宜的
+  // 全都不便宜 → 不购买
   const cheapest = C('MarketBot.pickBuyCandidate(Market.getRealItemListings().filter(l => l.item_name !== "低价的剑"), [])');
-  assert(cheapest.item_name === '贵价的盾', '无低价时买最便宜的（选中贵价的盾）');
+  assert(cheapest === null, '无低价挂单时不购买（返回 null）');
 
   // --- 2. tryBuyOnce 集成：买走 1 件 → 卖家收材料 → 挂单移除 → 双写记录 → 装备行删除 ---
   const before = matQ('user-a')('重铸石');
@@ -93,7 +93,18 @@ const matQ = uid => name => {
   assert(botRecs.some(x => x.player_id === 'user-a' && x.role === 'sell' && x.price_qty === 5 && x.tax_qty === 0 && x.net_qty === 5),
     '交易记录：卖家 sell 5（5<8 不满税）');
 
+  // 高于参考价的挂单不能被流浪商人兜底收购
+  await C('itemListTable.length = 0');
+  await mk('高价的甲', 'white', '重铸石', 999);
+  await C('Market.refresh()');
+  await S(50);
+  const highBefore = C('Market.getRealItemListings().length');
+  const highResult = await C('MarketBot.tryBuyOnce()');
+  assert(highResult.bought === false, '高于参考价的挂单 → 流浪商人不购买');
+  assert(C('Market.getRealItemListings().length') === highBefore, '高价挂单仍保留');
+
   // --- 3. 带税的购买（每满8收1）：上架 10 重铸石 → 卖家实收 9 ---
+  await C('itemListTable.length = 0');
   await mk('玄铁剑', 'blue', '重铸石', 10);
   await C('Market.refresh()');
   await S(50);

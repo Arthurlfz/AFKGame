@@ -1,420 +1,177 @@
 /* ============================================================
- * css/design-tokens.css —— Forge of Souls 视觉规范 v2（暗黑挂机版）
- *
- * 定位：暗黑挂机网游 · 地下城冒险感
- * 关键词：黑 / 血 / 暗金 / 旧铁 / 地下城
- * 参考：暗黑破坏神 · 流放之路 · 火炬之光
- *
- * 绝对不要：灰蓝、铜锈、塑料、文档、后台、大圆角、紫色渐变、玻璃拟态
- * 约束：不用外部字体 / 不做粒子特效和大动画 / 不用 emoji / 不新增图标库
- *      信息密度高，游戏感优先，不为好看而好看
- *
- * 接入方式：
- *   - 本文件是视觉规范唯一权威来源，所有新 UI 必须引用。
- *   - 组件示例类统一 fs- 前缀（避免与游戏现有 .btn/.panel 撞名），接入时映射。
- *   - 旧页面迁移：先只替换 CSS 变量，不急着改组件类名。
- *   - 面板/血条颗粒纹理为内联 SVG 噪点（data-URI），无外部图片请求。
+ * Forge of Souls 视觉 Token v3
+ * 全站统一：暗黑国风水墨。战斗页场景是母版，组件像嵌在墨色画面上的牌匾。
+ * 颜色、字体、圆角、阴影、纹理只在这里定义。
  * ============================================================ */
-
 :root {
-  /* ========================================================
-   * Part A —— 设计变量
-   * ======================================================== */
+  /* 墨色底 */
+  --bg: #101516;
+  --bg-deep: #080b0c;
+  --panel: #182021;
+  --panel-2: #222d2d;
+  --inset: #0c1112;
+  --ink: #101516;
+  --ink-soft: #2a3838;
 
-  /* ---------- 底与面（暖黑，去蓝灰） ---------- */
-  --bg: #0c0b0a;            /* 页面底：暖黑（火把地下城的黑，非蓝黑） */
-  --bg-deep: #070707;       /* 更深底：弹层蒙层之下 / 登录页 */
-  --panel: #14110d;         /* 面板底：深褐黑（皮革 / 旧铁） */
-  --panel-2: #1b1712;       /* 次级面板 / hover 提升面 */
-  --inset: #0a0908;         /* 内嵌凹槽：输入框、条槽、凹陷区 */
+  /* 边线与文字 */
+  --line: #354343;
+  --line-hi: #586563;
+  --line-weak: #263232;
+  --text: #d2d3c8;
+  --text-hi: #ece6d2;
+  --text-dim: #9aa49f;
+  --text-faint: #687572;
+  --mist: #899694;
+  --paper: #d8d1bd;
+  --metal: #9ba7a2;
+  --metal-dim: #687571;
+  --steel: #7d8985;
 
-  /* ---------- 边框（暖铁，细边框 + 内阴影，不做大量实线框） ---------- */
-  --line: #2e2820;          /* 常规描边：做旧铁褐 */
-  --line-hi: #4d4233;       /* 高亮描边：暗金调 */
-  --line-weak: #211c16;     /* 弱分隔线：行间 / 列间 */
+  /* 枯金、朱印、灵息 */
+  --accent: #b89b59;
+  --accent-hi: #e0c77d;
+  --accent-dim: #806b3e;
+  --action-gold: #b89b59;
+  /* ⚠️ 这些 rgb 分量必须是【空格分隔】，不是逗号。
+     全站用 `rgb(var(--x-rgb) / 透明度)` 做半透明色：只有空格格式展开后才合法
+     （rgb(184 155 89 / .3) ✓，rgb(184, 155, 89 / .3) ✗ 逗号与斜杠混用会被浏览器整条丢弃）。
+     2026-08-30 修复：此前是逗号格式，导致 118 处半透明边框/发光/渐变从未渲染过。 */
+  --action-gold-rgb: 184 155 89;
+  --danger: #963d3d;
+  --danger-hi: #c76559;
+  --hp: #963d3d;
+  --hp-hi: #c76559;
+  --hp-hi-rgb: 199 101 89;
+  --energy: #5f8585;
+  --spd: #79a3a0;
+  --spd-rgb: 121 163 160;
+  --exp: #788d61;
+  --xp: #788d61;
+  --act: #9b8553;
 
-  /* ---------- 文字（暖白，非冷灰） ---------- */
-  --text: #d6ccbc;          /* 主文字：暖米白 */
-  --text-hi: #f2e8d5;       /* 强调文字：亮暖白 */
-  --text-dim: #978b78;      /* 次文字：暖灰褐 */
-  --text-faint: #5e5547;    /* 弱文字：暗褐（占位 / 禁用） */
+  /* 稀有度：不抢水墨主体 */
+  --r-white: #b8c0bb;
+  --r-blue: #71999b;
+  --r-blue-rgb: 113 153 155;
+  --r-gold: #d0ad61;
+  --r-gold-rgb: 208 173 97;
+  --r-purple: #8c789e;
 
-  /* ---------- 金属（旧铁，低饱和暖灰） ---------- */
-  --metal: #8f867a;         /* 旧铁钢：图标 / 金属元素主色 */
-  --metal-dim: #615a4f;     /* 哑光旧铁 */
-  --steel: #71695e;         /* 锻铁灰：白装本体 / 铁面 */
+  /* 控件 */
+  --btn-bg: #263333;
+  --btn-bg-hover: #344342;
+  --btn-bg-active: #182323;
+  --btn-bg-disabled: #171e1e;
+  --btn-text: #d2d3c8;
+  --btn-text-disabled: #687572;
+  --btn-border: #4a5957;
+  --btn-border-hover: #b89b59;
 
-  /* ---------- 强调：熔岩金 / 灵魂金（要亮，不是铜锈） ---------- */
-  --accent: #f0a92e;        /* 主强调：熔岩金 */
-  --accent-hi: #ffcf66;     /* 亮金：hover / 标题 / 高亮（灵魂金） */
-  --accent-dim: #b87a1c;    /* 深金：按下 / 描边 / 压暗处 */
-
-  /* ---------- 血晶红（血条 / 危险操作，暗红晶亮） ---------- */
-  --hp: #a82323;            /* 血量：暗血晶 */
-  --hp-hi: #e53a2e;         /* 血量告警：低血量（≤25%）亮红 */
-  --hp-hi-rgb: 229, 58, 46; /* 血晶亮红 RGB 三通道（配 / alpha 用） */
-  --danger: #a82323;        /* 危险操作 / 警告 */
-  --danger-hi: #e53a2e;     /* 危险 hover / 告警文字 */
-
-  /* ---------- 幽蓝魔力 / 经验 ---------- */
-  --energy: #3d6a9e;        /* 魔力 / 能量：幽蓝（冷而暗，微光） */
-  --exp: #6b8847;           /* 经验：暗绿（低饱和，不抢金蓝） */
-
-  /* ---------- 行动金 / 速度蓝（战斗条 / 属性徽标专用） ----------
-   * 行动金 = 战斗行动条/技能飘字金（原散落 #d4a843，收为 token）；
-   * 速度蓝 = 属性徽标「速度」色（原散落 #58b1cd，收为 token）。
-   * 用法：实色用 var(--action-gold)/var(--spd)；带透明度用 rgb 三通道：
-   *       border/background/text-shadow: rgb(var(--action-gold-rgb) / .35)
-   *       这样透明度任意写，不用为每种 alpha 建 token。 */
-  --action-gold: #d4a843;              /* 行动金：行动条 / 战斗描边 */
-  --action-gold-rgb: 212, 168, 67;     /* 行动金 RGB 三通道（配 / alpha 用） */
-  --spd: #58b1cd;                      /* 速度蓝：属性徽标「速度」 */
-  --spd-rgb: 88, 177, 205;             /* 速度蓝 RGB 三通道（配 / alpha 用） */
-
-  /* ---------- 稀有度（白铁灰 / 幽蓝 / 熔金炸眼） ---------- */
-  --r-white: #b2aa9c;       /* 白装：铁灰 */
-  --r-blue: #4a6fa8;        /* 蓝装：幽冷蓝 */
-  --r-blue-rgb: 74, 111, 168; /* 幽冷蓝 RGB 三通道（配 / alpha 用） */
-  --r-gold: #f2b632;        /* 金装：熔金（亮，炸眼） */
-  --r-gold-rgb: 242, 182, 50; /* 熔金 RGB 三通道（配 / alpha 用） */
-  --r-purple: #8b5cf6;      /* 紫装/神圣系通货：神圣石 / 重铸（需求指定 #8b5cf6） */
-
-  /* ---------- 按钮三态（锻铁；hover 像被加热） ---------- */
-  --btn-bg: #2b261f;        /* 默认：锻铁本体 */
-  --btn-bg-hover: #6b3f1d;  /* hover：被炉火加热（暗红橙） */
-  --btn-bg-active: #1c1813; /* 按下：锻压凹陷 */
-  --btn-bg-disabled: #17140f;
-  --btn-text: #d6ccbc;
-  --btn-text-disabled: #5e5547;
-  --btn-border: #3d3529;
-  --btn-border-hover: #a05a26; /* 加热后的边框 */
-
-  /* ---------- 字体（力量感标题 / 等宽数值 / 清晰正文） ---------- */
-  --font-title: "Arial Black", "Segoe UI", "Microsoft YaHei", "SimHei", sans-serif;
-                 /* 标题：无衬线超黑体系（Arial Black 英文有力，中文回退黑体加粗）
-                    使用规范：font-weight 900 + letter-spacing 1-2px，
-                    拉丁字符可 text-transform: uppercase */
-  --font-num: "Consolas", "Cascadia Mono", "Courier New", monospace;
-                 /* 数值：等宽，配合 font-variant-numeric: tabular-nums 对齐 */
+  /* 字体与尺寸 */
   --font-body: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-                 /* 正文：无衬线，中文优先 */
+  --font: var(--font-body);
+  --font-title: "STKaiti", "KaiTi", "FZKai-Z03", "Microsoft YaHei", sans-serif;
+  --font-num: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  --font-size: 1rem;
+  --font-small: .889rem;
+  --fs-xs: .722rem;
+  --fs-sm: .833rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.111rem;
+  --fs-xl: 1.333rem;
+  --fs-2xl: 1.556rem;
+  --fs-display: 1.778rem;
 
-  /* ---------- 字号层级（rem，基准 18px；2K 屏 100% 可读性优先） ---------- */
-  --fs-xs: 0.722rem;        /* 徽标 / 角标 / 品质小字（=13px） */
-  --fs-sm: 0.833rem;        /* 辅助说明 / 次要信息（=15px） */
-  --fs-md: 1rem;            /* 正文 / 基础（=18px） */
-  --fs-lg: 1.111rem;        /* 区块标题（=20px） */
-  --fs-xl: 1.222rem;        /* 面板标题（=22px） */
-  --fs-2xl: 1.444rem;       /* 页面大标题（=26px） */
-  --fs-display: 1.667rem;   /* 稀有掉落播报 / 大数值（=30px，克制使用） */
-
-  /* ---------- 间距（4px 基准） ---------- */
+  /* 间距与形状 */
   --gap-2xs: 2px;
   --gap-xs: 4px;
   --gap-sm: 8px;
   --gap-md: 12px;
-  --gap-lg: 16px;           /* 页面与边缘 / 卡片间距基准 */
-  --gap-xl: 24px;           /* 页面区块间距 */
+  --gap-lg: 16px;
+  --gap-xl: 24px;
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius: 2px;
+  --radius-lg: 4px;
 
-  /* ---------- 圆角（硬朗金属系，上限 4px，禁大圆角） ---------- */
-  --radius-xs: 1px;         /* 标签 / 细分隔 */
-  --radius-sm: 2px;         /* 按钮 / 输入 / 面板 / 血条 */
-  --radius-md: 4px;         /* 仅弹窗 / 大浮层 */
+  /* 水墨材质：细纹理，不做玻璃拟态 */
+  --tex-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='.045'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  --ui-paper-texture: linear-gradient(135deg, rgb(216 209 189 / .035), transparent 38%), var(--tex-grain);
+  --shadow-panel: inset 0 1px 0 rgb(236 230 210 / .055), inset 0 0 0 1px rgb(0 0 0 / .28), 0 8px 22px rgb(0 0 0 / .42);
+  --shadow-inset: inset 0 2px 5px rgb(0 0 0 / .55), inset 0 0 0 1px rgb(0 0 0 / .3);
+  --shadow-btn: inset 0 1px 0 rgb(236 230 210 / .1), inset 0 -1px 0 rgb(0 0 0 / .35);
+  --shadow-btn-hover: inset 0 1px 0 rgb(236 230 210 / .16), 0 0 10px rgb(184 155 89 / .2);
+  --shadow-btn-active: inset 0 3px 6px rgb(0 0 0 / .58);
+  --shadow-glow-gold: 0 0 8px rgb(208 173 97 / .34);
+  --shadow-glow-blue: 0 0 7px rgb(113 153 155 / .28);
 
-  /* ---------- 阴影（金属凹凸 + 唯一允许的辉光：熔岩金 / 幽蓝） ---------- */
-  --shadow-panel: inset 0 1px 0 rgba(255,255,255,.05),
-                  inset 0 0 0 1px rgba(0,0,0,.35),
-                  0 8px 22px rgba(0,0,0,.6);          /* 面板：顶微光 + 底部投影 */
-  --shadow-inset: inset 0 2px 4px rgba(0,0,0,.55),
-                  inset 0 0 0 1px rgba(0,0,0,.25);     /* 凹槽：条槽 / 输入框 */
-  --shadow-btn: inset 0 1px 0 rgba(255,255,255,.09),
-                inset 0 -1px 0 rgba(0,0,0,.4);         /* 锻铁凸起 */
-  --shadow-btn-hover: inset 0 1px 0 rgba(255,255,255,.18),
-                      0 0 10px rgba(240,140,50,.28);   /* 加热：暗红橙微光 */
-  --shadow-btn-active: inset 0 3px 6px rgba(0,0,0,.65);/* 按下凹陷 */
-  --shadow-glow-gold: 0 0 8px rgba(242,182,50,.65),
-                      0 0 16px rgba(230,140,30,.35);   /* 金装：双层熔金微光（炸眼） */
-  --shadow-glow-blue: 0 0 7px rgba(74,111,168,.55);    /* 蓝装 / 魔力：幽蓝微光 */
-
-  /* ---------- 纹理：皮革 / 旧铁颗粒（内联 SVG 噪点，无外部资源） ---------- */
-  --tex-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-
-  /* ---------- 层级 ---------- */
+  --sidebar-w: 276px; /* 2026-09-01 用户要求：侧边栏加宽 100px（原 176px） */
+  --topbar-h: 48px;
+  --page-max-w: 1600px;
   --z-drop: 10;
   --z-sticky: 30;
   --z-login: 90;
   --z-dialog: 150;
   --z-toast: 200;
+}
 
-  /* 旧版图片切片已停用，正式界面统一使用下方纯 CSS 暗黑锻铁组件。 */
-/* ========================================================
- * Part B —— 组件规范（示例样式，类名带 fs- 前缀）
- * ======================================================== */
-
-/* ---------- 力量感标题 ---------- */
 .fs-title {
-  font-family: var(--font-title);
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: var(--accent-hi);
-  text-transform: uppercase;
-  text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 0 10px rgba(240,169,46,.3); /* 雕刻 + 熔岩微光 */
+  font-family: var(--font-title); font-weight: 700; letter-spacing: 2px;
+  color: var(--accent-hi); text-shadow: 0 1px 0 rgb(0 0 0 / .65), 0 0 10px rgb(184 155 89 / .2);
 }
-.fs-title--display {
-  font-size: var(--fs-display);
-  letter-spacing: 3px;
-}
-
-/* ---------- 面板：暗纹皮革颗粒 + 做旧锻铁边框 ---------- */
+.fs-title--display { font-size: var(--fs-display); letter-spacing: 3px; }
 .fs-panel {
-  position: relative;
-  background-color: var(--panel);
-  background-image: var(--tex-grain);   /* 皮革颗粒 */
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-panel);
+  position: relative; background-color: var(--panel); background-image: var(--ui-paper-texture);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel);
 }
 .fs-panel__head {
-  display: flex; align-items: center; gap: var(--gap-sm);
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line-weak);
-  font-family: var(--font-title);
-  font-weight: 900;
-  font-size: var(--fs-lg);
-  letter-spacing: 1px;
-  color: var(--accent-hi);
-  text-shadow: 0 1px 0 rgba(0,0,0,.6);
+  display: flex; align-items: center; gap: var(--gap-sm); padding: 10px 14px;
+  border-bottom: 1px solid var(--line-weak); font-family: var(--font-title); font-weight: 700;
+  font-size: var(--fs-lg); letter-spacing: 1px; color: var(--accent-hi);
 }
-/* 标题左侧：熔岩金短装饰条（暗黑 UI 经典） */
-.fs-panel__head::before {
-  content: '';
-  flex: none; width: 3px; height: 1.1em;
-  background: var(--accent);
-  box-shadow: 0 0 6px rgba(240,169,46,.6);
-}
+.fs-panel__head::before { content: ''; width: 3px; height: 1.1em; flex: none; background: var(--accent); }
 .fs-panel__body { padding: 16px; }
-/* 面板内凹陷区：数值面板 / 列表 / 条槽 */
-.fs-panel__inset {
-  background-color: var(--inset);
-  background-image: var(--tex-grain);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-inset);
-  padding: var(--gap-sm) var(--gap-md);
+.fs-panel__inset, .fs-input {
+  background-color: var(--inset); background-image: var(--ui-paper-texture);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-inset);
 }
-
-/* ---------- 按钮：锻铁；hover 像被加热，按下像锻压 ---------- */
+.fs-panel__inset { padding: var(--gap-sm) var(--gap-md); }
 .fs-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--gap-xs);
-  padding: 10px 20px;
-  background: var(--btn-bg);
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-sm);
-  color: var(--btn-text);
-  font-family: var(--font-body);
-  font-size: var(--fs-md); font-weight: 700; letter-spacing: 1px;
-  box-shadow: var(--shadow-btn);
-  cursor: pointer; user-select: none; white-space: nowrap;
-  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+  min-height: 40px; padding: 9px 18px; background: var(--btn-bg); border: 1px solid var(--btn-border);
+  border-radius: var(--radius-sm); color: var(--btn-text); font: 700 var(--fs-md) var(--font-body);
+  letter-spacing: 1px; box-shadow: var(--shadow-btn); cursor: pointer; user-select: none; white-space: nowrap;
+  transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
-.fs-btn:hover:not(:disabled) {
-  background: var(--btn-bg-hover);      /* 被炉火加热：暗红橙 */
-  border-color: var(--btn-border-hover);
-  color: #ffe9d0;
-  box-shadow: var(--shadow-btn-hover);  /* 热辐射微光 */
-}
-.fs-btn:active:not(:disabled) {
-  background: var(--btn-bg-active);     /* 锻压凹陷 */
-  box-shadow: var(--shadow-btn-active);
-  color: var(--text);
-}
-.fs-btn:disabled {
-  background: var(--btn-bg-disabled);
-  color: var(--btn-text-disabled);
-  border-color: var(--line);
-  box-shadow: none;
-  cursor: not-allowed;
-}
-/* 主按钮：熔岩金锻造（亮金底用深字保证对比度） */
-.fs-btn--primary {
-  background: var(--accent);
-  border-color: var(--accent-dim);
-  color: #1a1206;
-  font-weight: 800;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 10px rgba(240,169,46,.25);
-}
-.fs-btn--primary:hover:not(:disabled) {
-  background: var(--accent-hi);
-  border-color: #d99a2b;
-  color: #120c03;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 14px rgba(255,207,102,.4);
-}
-.fs-btn--primary:active:not(:disabled) {
-  background: var(--accent-dim);
-  box-shadow: var(--shadow-btn-active);
-  color: #120c03;
-}
-.fs-btn--primary:disabled {
-  background: var(--btn-bg-disabled);
-  color: var(--btn-text-disabled);
-  border-color: var(--line);
-  box-shadow: none;
-}
-/* 幽灵按钮：次级操作，透明底 */
-.fs-btn--ghost {
-  background: transparent;
-  border-color: var(--line);
-  box-shadow: none;
-  color: var(--text-dim);
-}
-.fs-btn--ghost:hover:not(:disabled) {
-  background: var(--inset);
-  border-color: var(--line-hi);
-  color: var(--text);
-  box-shadow: none;
-}
-.fs-btn--ghost:active:not(:disabled) { background: var(--panel-2); box-shadow: var(--shadow-btn-active); }
-
-/* ============================================================
- * 水墨 UI 主题样式（body.ink-ui 激活时覆盖）
- * 仅改"面板/按钮"两个最常用组件，先验证风格 OK 再推广
- * ============================================================ */
-body.ink-ui .fs-panel {
-  background-color: #1d1914;
-  background-image: var(--ui-paper-texture);
-  background-size: cover;
-  border: 1px solid var(--ui-ink-line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-panel);
-}
-body.ink-ui .fs-btn {
-  background-image: none;
-  background-color: var(--btn-bg);
-  background-size: auto;
-  border: 1px solid var(--btn-border);
-  color: var(--btn-text);
-  box-shadow: var(--shadow-btn);
-}
-body.ink-ui .fs-btn:hover:not(:disabled) {
-  background-image: none;
-  background-color: var(--btn-bg-hover);
-  border-color: var(--btn-border-hover);
-  color: #ffe9d0;
-  box-shadow: var(--shadow-btn-hover);
-}
-body.ink-ui .fs-btn--primary {
-  background-image: none;
-  background-color: var(--accent);
-  border-color: var(--accent-dim);
-  color: #1a1206;
-  font-weight: 800;
-  text-shadow: 0 1px 3px rgba(0,0,0,.45);
-}
-body.ink-ui .fs-btn--primary:hover:not(:disabled) {
-  background-image: none;
-  background-color: var(--accent-hi);
-  color: #120c03;
-}
-
-/* ---------- 血条：金属槽 + 血晶/熔岩填充，低血量变亮红 ---------- */
-.fs-bar {
-  position: relative; height: 12px;
-  background-color: var(--inset);
-  background-image: var(--tex-grain);   /* 槽内旧铁颗粒 */
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  box-shadow: var(--shadow-inset);
-  overflow: hidden;
-}
-.fs-bar__fill {
-  position: absolute; top: 0; left: 0; bottom: 0; width: 100%;
-  background: var(--hp);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.28),   /* 血晶顶面高光 */
-              inset 0 -1px 2px rgba(0,0,0,.45);      /* 底部收暗 */
-  transition: width .25s ease;
-}
-.fs-bar--hp .fs-bar__fill { background: var(--hp); }
-.fs-bar--energy .fs-bar__fill { background: var(--energy); box-shadow: inset 0 1px 0 rgba(160,200,255,.25), inset 0 -1px 2px rgba(0,0,0,.45); }
+.fs-btn:hover:not(:disabled) { background: var(--btn-bg-hover); border-color: var(--btn-border-hover); color: var(--text-hi); box-shadow: var(--shadow-btn-hover); }
+.fs-btn:active:not(:disabled) { background: var(--btn-bg-active); box-shadow: var(--shadow-btn-active); transform: translateY(1px); }
+.fs-btn:disabled { background: var(--btn-bg-disabled); color: var(--btn-text-disabled); border-color: var(--line); cursor: not-allowed; }
+.fs-btn--primary { background: var(--accent); border-color: var(--accent-dim); color: var(--ink); box-shadow: inset 0 1px 0 rgb(255 255 255 / .25), 0 0 8px rgb(184 155 89 / .16); }
+.fs-btn--primary:hover:not(:disabled) { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--ink); }
+.fs-btn--ghost { background: transparent; box-shadow: none; color: var(--text-dim); }
+.fs-btn--ghost:hover:not(:disabled) { background: var(--inset); border-color: var(--line-hi); color: var(--text); }
+.fs-bar { position: relative; height: 12px; overflow: hidden; background: var(--inset); border: 1px solid var(--line); border-radius: var(--radius-xs); box-shadow: var(--shadow-inset); }
+.fs-bar__fill { position: absolute; inset: 0 auto 0 0; width: 100%; background: var(--hp); transition: width .25s ease; }
+.fs-bar--energy .fs-bar__fill { background: var(--energy); }
 .fs-bar--exp .fs-bar__fill { background: var(--exp); }
-/* 低血量（JS 在 ≤25% 时给 .fs-bar 加 .is-low）：变亮红警示 + 慢脉动（可移除） */
-.fs-bar--hp.is-low .fs-bar__fill {
-  background: var(--hp-hi);
-  animation: fs-bar-pulse 1.6s ease-in-out infinite;
-}
-@keyframes fs-bar-pulse {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.45); }
-}
-
-/* ---------- 装备品质：名字色 + 微光（金炸眼 / 蓝幽冷） ---------- */
-.fs-q--white { color: var(--r-white); }                            /* 铁灰：无光，克制 */
-.fs-q--blue {
-  color: var(--r-blue);
-  text-shadow: var(--shadow-glow-blue);                            /* 幽蓝微光 */
-}
-.fs-q--gold {
-  color: var(--r-gold);
-  text-shadow: var(--shadow-glow-gold);                            /* 双层熔金微光：炸眼 */
-}
-/* 品质应用于物品卡：边框 tint + 极淡底色 + 同色微光 */
-.fs-item {
-  padding: var(--gap-sm) var(--gap-md);
-  background-color: var(--panel-2);
-  background-image: var(--tex-grain);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.fs-item--blue { border-color: rgba(74,111,168,.6); box-shadow: inset 0 0 12px rgba(74,111,168,.08); }
-.fs-item--gold { border-color: rgba(242,182,50,.7); box-shadow: inset 0 0 12px rgba(242,182,50,.1), 0 0 8px rgba(242,182,50,.15); }
-
-/* ---------- 分隔线（弱，1px） ---------- */
-.fs-hr { height: 1px; margin: var(--gap-sm) 0; background: var(--line-weak); border: 0; }
-
-/* ---------- 输入框：凹槽感 ---------- */
-.fs-input {
-  background-color: var(--inset);
-  background-image: var(--tex-grain);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 9px 14px;
-  color: var(--text);
-  font-size: var(--fs-md);
-  outline: none;
-  transition: border-color .12s, box-shadow .12s;
-}
+.fs-bar--hp.is-low .fs-bar__fill { background: var(--hp-hi); animation: fs-bar-pulse 1.8s ease-in-out infinite; }
+@keyframes fs-bar-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.22); } }
+.fs-q--white { color: var(--r-white); }
+.fs-q--blue { color: var(--r-blue); text-shadow: var(--shadow-glow-blue); }
+.fs-q--gold { color: var(--r-gold); text-shadow: var(--shadow-glow-gold); }
+.fs-item { padding: var(--gap-sm) var(--gap-md); background: var(--panel-2); background-image: var(--ui-paper-texture); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.fs-item--blue { border-color: rgb(var(--r-blue-rgb) / .6); }
+.fs-item--gold { border-color: rgb(var(--r-gold-rgb) / .7); box-shadow: inset 0 0 12px rgb(var(--r-gold-rgb) / .08); }
+.fs-input { padding: 9px 14px; color: var(--text); font-size: var(--fs-md); outline: none; }
 .fs-input::placeholder { color: var(--text-faint); }
-.fs-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(240,169,46,.25), 0 0 8px rgba(240,169,46,.15);
-}
-
-/* ---------- 标签 / 徽标 ---------- */
-.fs-tag {
-  display: inline-block;
-  padding: 1px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  color: var(--text-dim);
-  font-size: var(--fs-xs);
-  letter-spacing: .5px;
-  white-space: nowrap;
-}
-
-/* ---------- 表格：行间弱分隔 ---------- */
+.fs-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgb(var(--action-gold-rgb) / .3), var(--shadow-inset); }
+.fs-tag { display: inline-block; padding: 1px 6px; border: 1px solid var(--line); border-radius: var(--radius-xs); color: var(--text-dim); font-size: var(--fs-xs); white-space: nowrap; }
 .fs-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
-.fs-table th {
-  padding: 6px 10px;
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
-}
+.fs-table th { padding: 6px 10px; color: var(--text-dim); font-size: var(--fs-sm); text-align: left; border-bottom: 1px solid var(--line); }
 .fs-table td { padding: 6px 10px; border-bottom: 1px solid var(--line-weak); }
 .fs-table tr:last-child td { border-bottom: 0; }
 
-/* ---------- 滚动条：暗色细条 ---------- */
-*::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-track { background: var(--bg-deep); }
-*::-webkit-scrollbar-thumb { background: var(--line-hi); border-radius: var(--radius-xs); }
-*::-webkit-scrollbar-thumb:hover { background: var(--metal-dim); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

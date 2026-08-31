@@ -2,7 +2,7 @@
  * ui/ui-worldmap.js —— 世界地图页（二级菜单：选图 → 进战斗/主城）
  * 职责：
  *  1. 渲染世界地图底图上的点位（主城 + 6 野图印章点）
- *  2. 点位悬停 → 显示信息卡（图名/等级段/专属材料/进化素材/金装概率）
+ *  2. 点位悬停 → 显示信息卡（图名/等级段/材料掉落分布/金装概率）
  *  3. 野图点位点击 → selectArea(图id) 并进入战斗页（三级）
  *  4. 主城点位点击 → 弹出安全区面板（回城休整、恢复满血）
  * 依赖：worldmap.js（点位配置）、battle.js（selectArea）、pet.js（回血）
@@ -20,36 +20,35 @@
     const a = area && area.find(x => x.id === point.areaId);
     const lv = a ? a.levelRange || a.recommended : (point.recommended || '');
     const pv = point._preview || {};
-    // areaEvolutionTiers 的 value 本身是素材名数组（如 ['进化素材','精粹进化素材']），直接展示
-    const tiers = (pv.evoTiers && pv.evoTiers.length) ? pv.evoTiers.join(' / ') : '普通';
     // gold 已是百分比数值（如 3 = 3%），直接展示
     const gold = (typeof pv.gold === 'number') ? pv.gold + '%' : '—';
+    // 进化素材档位 → 短标签（普通/精粹/传说），避免信息卡里出现冗长的素材全名
+    const evoShort = (pv.evoTiers || []).map(n =>
+      n.indexOf('精粹') >= 0 ? '精粹' : n.indexOf('传说') >= 0 ? '传说' : '普通'
+    );
+    // 材料掉落分布块：条形长度=相对权重，数字=占材料分支百分比（双表达，不只靠颜色）
+    let distHtml = '';
+    if (pv.dropDist && pv.dropDist.length) {
+      const rows = pv.dropDist.map(d => {
+        const varNote = d.variants && d.variants.length > 1
+          ? ` <span class="wm-drop-var">(${evoShort.join('/')})</span>` : '';
+        return `<div class="wm-drop-row">`
+          + `<span class="wm-drop-name" title="${UI.escapeHtml ? UI.escapeHtml(d.name) : d.name}">${UI.escapeHtml ? UI.escapeHtml(d.name) : d.name}${varNote}</span>`
+          + `<span class="wm-drop-bar"><span class="wm-drop-fill" style="width:${d.bar}%"></span></span>`
+          + `<span class="wm-drop-pct">${d.pct}%</span>`
+          + `</div>`;
+      }).join('');
+      distHtml = `<div class="wm-tip-sub">材料掉落分布</div>${rows}`;
+    }
     return `
       <div class="wm-tip-name">${UI.escapeHtml ? UI.escapeHtml(point.name) : point.name}</div>
       <div class="wm-tip-line">建议等级：${UI.escapeHtml ? UI.escapeHtml(String(lv)) : lv}</div>
-      <div class="wm-tip-line">专属材料：${pv.mat ? (UI.escapeHtml ? UI.escapeHtml(pv.mat) : pv.mat) : '—'}</div>
-      <div class="wm-tip-line">进化素材：${tiers}</div>
+      ${distHtml}
       <div class="wm-tip-line">金装概率：约 ${gold}</div>
       <div class="wm-tip-cta">点击进入挂机</div>`;
   }
 
-  // 主城安全区面板
-  function openCapitalPanel() {
-    const cap = (window.WorldMap && window.WorldMap.capital) || { name: '主城', desc: '' };
-    if (UI.showDialog) {
-      UI.showDialog({
-        icon: '🏯',
-        speaker: cap.name,
-        text: cap.desc + '\n点击下方按钮回城休整，将出战宠物恢复满血。',
-        buttons: [
-          { label: '🏥 回城休整（回满血）', onClick: () => { healActivePet(); } }
-        ]
-      });
-    } else {
-      healActivePet();
-    }
-  }
-  // 回城休整：出战宠物回满血
+  // 回城休整：出战宠物回满血（提取到 UI 共享层，主城页「旅店」复用）
   function healActivePet() {
     const Pet = window.Pet;
     const active = Pet && Pet.getActivePet && Pet.getActivePet();
@@ -61,6 +60,9 @@
     if (UI.updateStatus) UI.updateStatus();
   }
   function capName() { return (window.WorldMap && window.WorldMap.capital && window.WorldMap.capital.name) || '主城'; }
+  // 共享层导出：主城页旅店直接调 UI.healActivePet()
+  UI.healActivePet = healActivePet;
+  UI.capName = capName;
 
   // 绑定单个点位的事件（悬停信息卡 / 点击进图）
   function bindPoint(marker, point) {
@@ -93,9 +95,37 @@
     });
     marker.addEventListener('mouseleave', () => { if (tip) tip.hidden = true; });
     marker.addEventListener('click', () => {
-      if (point.type === 'capital') { openCapitalPanel(); return; }
+      // 主城标记：跳到主城页（2026-09-01 主城升级为独立页，不再弹 dialog）
+      if (point.type === 'capital') {
+        if (window.UI && window.UI.switchPage) window.UI.switchPage('capital');
+        return;
+      }
       const Battle = window.Battle;
       if (!Battle) return;
+      /* 越级警告（2026-08-30 用户拍板）：怪物等级改成【由地图等级段决定】之后，
+       * 等级不够的玩家进高级图会被压制到几乎必输（怪不再被压到玩家等级）。
+       * 挂机玩家不看战斗细节，不提示就会"一直输、以为游戏卡了"——所以在进图前拦一次。
+       * 仍允许硬闯（玩家可能就想挑战），只是必须明确告知。
+       * 放在停挂机【之前】：玩家取消时不能把正在跑的挂机停掉。
+       * 测试环境没有 confirm（vm 桩）→ 视为同意，不阻断。 */
+      const pet = window.Pet && window.Pet.getActivePet && window.Pet.getActivePet();
+      const areaCfg = ((window.Config && window.Config.battle && window.Config.battle.areas) || [])
+        .find(a => a.id === point.areaId);
+      if (pet && areaCfg && areaCfg.levelRange) {
+        const lo = areaCfg.levelRange[0], hi = areaCfg.levelRange[1], lv = pet.level || 1;
+        if (lv < lo) {
+          const msg = `⚠️ 等级不足\n\n「${areaCfg.name}」的怪物是 ${lo}~${hi} 级，`
+            + `你的宠物只有 Lv.${lv}。\n怪物等级由地图决定，进去会被压制、几乎必输。\n\n仍要进入吗？`;
+          const ok = typeof window.confirm === 'function' ? window.confirm(msg) : true;
+          if (!ok) return;
+        }
+      }
+      // 重复点击当前正在挂机的图：只是「返回观看战斗」，不要停掉挂机（否则一返回战斗画面就没了）
+      const curArea = Battle.getCurrentArea && Battle.getCurrentArea();
+      if (curArea && curArea.id === point.areaId) {
+        UI.switchPage && UI.switchPage('battle');
+        return;
+      }
       // 挂机中直接换图：先停挂机 → 切到新图（不自动重启挂机，避免误操作）
       const wasRunning = Battle.isRunning && Battle.isRunning();
       if (wasRunning) Battle.stopAutoBattle && Battle.stopAutoBattle();
@@ -106,7 +136,6 @@
       }
       // 进入战斗页（三级），刷新战斗页地图条
       UI.switchPage && UI.switchPage('battle');
-      if (UI.renderAreaSelector) UI.renderAreaSelector();
       if (UI.updateBattleArea) UI.updateBattleArea(Battle.getCurrentArea());
       // 切图后给个明确反馈：原挂机已被停，避免玩家以为还在挂
       if (wasRunning) {
@@ -114,6 +143,17 @@
       }
     });
   }
+
+  // 世界地图页内「返回战斗」按钮：纯导航回到战斗页，不碰挂机（避免一返回战斗画面就没了）
+  (function bindReturnBattle() {
+    const btn = $('btn-return-battle');
+    if (btn && !btn.__battleBound) {
+      btn.__battleBound = true;
+      btn.addEventListener('click', () => {
+        if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
+      });
+    }
+  })();
 
   // 渲染世界地图页（幂等：canvas 已有 marker 则不重复）
   let rendered = false;
@@ -137,6 +177,9 @@
   function renderWorldMapPage() {
     const canvas = $('worldmap-canvas');
     if (!canvas || !window.WorldMap) return;
+    // 「返回战斗」只在已选地图（有正在看的战斗）时显示，没选图时隐藏
+    const rb = $('btn-return-battle');
+    if (rb) rb.hidden = !(window.Battle && window.Battle.getCurrentArea && window.Battle.getCurrentArea());
     if (!rendered) {
       // 首次：底图 + 点位（cover 填满 16:9 取景框）
       canvas.style.backgroundImage = 'url("' + window.WorldMap.img + '")';
@@ -160,6 +203,15 @@
     // 每次切到该页都重算 16:9 尺寸（页面 active 后 wrap 才有真实尺寸）
     fitCanvas();
   }
+  // 取野图怪物等级段（来自对应 area 的 levelRange，纯展示）
+  function markerLevelText(point) {
+    if (point.type === 'capital') return null;
+    const areaCfg = ((window.Config && window.Config.battle && window.Config.battle.areas) || [])
+      .find(a => a.id === point.areaId);
+    if (!areaCfg || !areaCfg.levelRange) return null;
+    const [lo, hi] = areaCfg.levelRange;
+    return 'Lv.' + lo + '-' + hi;
+  }
   function makeMarker(point) {
     const el = document.createElement('button');
     el.type = 'button';
@@ -169,13 +221,17 @@
     el.setAttribute('aria-label', point.name);
     el.title = point.name;
     const nameHTML = '<span class="wm-marker-name">' + (UI.escapeHtml ? UI.escapeHtml(point.name) : point.name) + '</span>';
+    // 野图在名字下方显示怪物等级段
+    const lv = markerLevelText(point);
+    const lvHTML = lv ? '<span class="wm-marker-lv">' + lv + '</span>' : '';
     el.innerHTML = point.type === 'capital'
       ? '<span class="wm-marker-icon">' + (point.icon || '🏯') + '</span>' + nameHTML
-      : '<span class="wm-marker-dot"></span>' + nameHTML;
+      : '<span class="wm-marker-dot"></span>' + nameHTML + lvHTML;
     return el;
   }
 
   // 对外 API
   UI.renderWorldMapPage = renderWorldMapPage;
-  UI.openWorldMapCapital = openCapitalPanel;
+  UI.healActivePet = healActivePet;
+  UI.capName = capName;
 })();

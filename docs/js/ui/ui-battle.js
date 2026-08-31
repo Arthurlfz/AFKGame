@@ -24,10 +24,23 @@
     if (!name) return '';
     return String(name).split(' 等级：')[0].trim();
   }
-  // 图标挂载：有立绘图则塞 <img>，否则回退 emoji。返回 true=已用立绘 / false=回退 emoji。
+  // 图标挂载：优先逐帧动画立绘 → 静态立绘 <img> → 回退 emoji。返回 true=已用立绘 / false=回退 emoji。
   function mountIcon(el, name, fallbackEmoji) {
     if (!el) return false;
-    if (PetSprites && PetSprites.mount(el, pureName(name))) return true;
+    const n = pureName(name);
+    el.dataset.pet = n;
+    if (PetSprites && PetSprites.mountAnimated(el, n)) return true;
+    if (PetSprites && PetSprites.mount(el, n)) {
+      const img = el.firstElementChild;
+      if (img) {
+        img.classList.add('pet-breathe'); // 静态立绘走 CSS 待机呼吸
+        // 立绘 URL 存到容器上，受击闪光层用它做遮罩（闪光形状 = 角色轮廓，不是糊一个方框）。
+        // 用 img.src 而不是相对路径：img.src 是浏览器解析后的绝对 URL，
+        // 自定义属性里的相对 url() 会被按样式表目录解析（踩过 /css/assets/... 404 的坑）。
+        el.style.setProperty('--sprite', 'url("' + img.src + '")');
+      }
+      return true;
+    }
     el.textContent = fallbackEmoji != null ? fallbackEmoji : '';
     return false;
   }
@@ -39,10 +52,7 @@
     return false;
   }
 
-  /* 三级菜单：选图已迁移到「世界地图页」（ui-worldmap.js）。
-   * 战斗页只显示当前地图条 + 顶部「返回地图」按钮（回到世界地图页选图）。
-   * v20260828：删除旧的 map-select-overlay 浮层。renderAreaSelector 保留为空实现，
-   * 兼容 ui-common.js / ui-worldmap.js 的调用（选图逻辑已不在战斗页）。 */
+  /* ---------- 当前地图 ---------- */
   function updateBattleArea(area) {
     const box = $('battle-area-info');
     if (!box) return;
@@ -60,8 +70,6 @@
       if (stage.classList && !stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
   }
-  // 空实现：选图已迁移到世界地图页，保留导出兼容旧调用
-  function renderAreaSelector() { /* no-op：选图在世界地图页进行 */ }
   /* 顶部「返回地图」按钮：回到世界地图页（二级菜单）选图（只绑一次） */
   (function bindReturnMap() {
     const openBtn = $('btn-change-map');
@@ -85,41 +93,23 @@
     if (UI.consoleLog) UI.consoleLog('loot', html);
   }
   function showLoot(reward) {
-    // 【去除所有左下角 toast 与屏幕中间弹窗】—— 只保留掉落日志记录。
-    // 说明：showToast / UI.showDialog 为通用组件函数，本体保留（勿删，删了会报错）；
-    //       这里仅注释调用点。掉落仍然写进 #loot-list（掉落日志面板），游戏逻辑零改动。
-    if (reward.phoenix) {
-      addLootEntry(`${Config.drop.phoenixName} ×1（融合材料）`, 'mat');
-      // showToast('掉落材料', `${Config.drop.phoenixName} ×1`);
+    // 改法一·单池：reward.type ∈ none/material/equipment/egg，一场最多一件。
+    // 仍只保留掉落日志记录（不引入 toast / 中间弹窗）；金装/蛋保留全屏光效。
+    if (!reward || reward.type === 'none') return;
+    if (reward.type === 'material') {
+      addLootEntry(`${escapeHtml(reward.material)} ×${reward.qty || 1}`, 'mat');
+      return;
     }
-    if (reward.reforgeStone) {
-      addLootEntry(`${Config.craft.reforge.name} ×1（重铸全部词缀）`, 'mat');
-    }
-    if (reward.stripStone) {
-      addLootEntry(`${Config.craft.strip.name} ×1（移除一条词缀）`, 'mat');
-    }
-    if (reward.holyStone) {
-      addLootEntry(`${Config.craft.holy.name} ×1（重 Roll 词缀数值）`, 'mat');
-      // showToast('掉落神圣石', `${Config.craft.holy.name} ×1`);
-    }
-    if (reward.augmentStone) {
-      addLootEntry(`${Config.craft.augment.name} ×1（新增词缀）`, 'mat');
-      // showToast('掉落增缀石', `${Config.craft.augment.name} ×1`);
-    }
-    if (reward.evoMaterials && reward.evoMaterials.length) {
-      for (const m of reward.evoMaterials) addLootEntry(`${m} ×1（进化素材）`, 'mat');
-    }
-    if (reward.areaMaterial) {
-      addLootEntry(`${reward.areaMaterial} ×1（本图专属材料）`, 'mat');
-    }
-    if (reward.type === 'none') return; // 无主掉落：材料提示已加，直接返回
     if (reward.type === 'equipment') {
       const r = reward.eq.rarity;
       addLootEntry(`<span class="loot-q ${r.id === 'gold' ? 'fs-q--gold' : r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white'}">${r.label}·${escapeHtml(reward.eq.name)}</span>`, r.id);
       if (r.id === 'gold') flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
-    } else if (reward.type === 'egg') {
+      return;
+    }
+    if (reward.type === 'egg') {
       addLootEntry('宠物蛋 ×1（去「宠物」页或「装备」页背包孵化）');
       flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
+      return;
     }
   }
 
@@ -145,7 +135,10 @@
     }
     const type = ENEMY_TYPE[enemy.enemyType] || ENEMY_TYPE.normal;
     const weights = enemy.rarityWeights || {};
-    const experience = Math.round((enemy.level * 5 + enemy.maxHp * 0.1) * enemy._diff);
+    // 经验：显示Pet.expRange 的区间，与实际发放（main.js 调 Pet.expFromBattle）同一个函数算出来
+    // 经验预览与实发同源（Pet.expRange），UI 不许再自己写一套公式
+    const er = window.Pet.expRange(enemy, window.Battle && window.Battle.getCurrentArea());
+    const experience = er.min === er.max ? String(er.min) : `${er.min}~${er.max}`;
     // 战斗属性：显示完整（生命/攻击/防御/速度 + 暴击/暴伤/命中/闪避/吸血）
     const pct = (v) => Math.round((Number(v) || 0) * 100) + '%';
     const num = (v) => enemyStat(v);
@@ -178,7 +171,7 @@
         <div class="enemy-tip-heading">掉落信息</div>
         <div class="enemy-tip-rows">
           <div class="enemy-tip-row">难度<b>×${Number(enemy._diff || 0).toFixed(2)}</b></div>
-          <div class="enemy-tip-row">经验<b>+${num(experience)}</b></div>
+          <div class="enemy-tip-row">经验<b>+${escapeHtml(experience)}</b></div>
           <div class="enemy-tip-row" style="grid-column:1/-1">掉落品质：<span class="rarity-white">白 ${Number(weights.white || 0)}%</span> · <span class="rarity-blue">蓝 ${Number(weights.blue || 0)}%</span> · <span class="rarity-gold">金 ${Number(weights.gold || 0)}%</span></div>
         </div>
       </div>`;
@@ -301,23 +294,104 @@
     stage.classList.add(cls);
     setTimeout(() => stage.classList.remove(cls), ms);
   }
+  /* 冲到对方脸前所需的水平位移：量两个立绘的实际间距，冲掉 78%（留一点间隙，别糊在对方脸上）。
+   * 视觉方向：我方在左向右冲（正值），敌方在右向左冲（负值）。
+   * ⚠️ 位移量必须这么量：舞台是响应式布局，两个立绘的间距随视口宽度变，写死数值必然对不上。 */
+  /* 冲刺速度恒定（px/秒）：舞台越宽、两只宠离得越远，冲刺时间自动变长，
+   * 而不是距离翻倍速度也翻倍——后者在宽屏上等于瞬移，晃眼。
+   * 1700~2000 是"看得出在冲、又不刺眼"的区间，调快调慢改这一个数。 */
+  const DASH_MIN = 0.24, DASH_MAX = 0.6; // 秒：太近别一闪而过，太远也别拖沓
+  /* 出手节奏按角色类型区分。挂机玩家不一定盯着血条，但能感觉到"这只抬手慢、收招沉"= 不好惹，
+   * 类型辨识度就是靠这个建立的，光靠体型大一圈不够。
+   *   charge = 前摇(ms)：抬手蓄力，越长越有威胁感，也给玩家反应时间
+   *   speed  = 冲刺速度(px/s)：见下方"速度恒定"说明
+   *   back   = 后摇(秒)：收招回位，越长显得越笨重
+   * 前摇/后摇以 CSS 变量注入（--dash-charge / --dash-back），CSS 里不再写死时长。 */
+  const PACE = {
+    pet:     { charge: 160, speed: 1800, back: 0.30 },
+    normal:  { charge: 140, speed: 1950, back: 0.26 }, // 路边小怪：快、轻、收招利索
+    evolved: { charge: 200, speed: 1700, back: 0.36 }, // 进化体：沉稳
+    mutant:  { charge: 300, speed: 1450, back: 0.52 }  // 变异体：抬手慢、收招沉
+  };
+  // 敌人的类型从战斗状态里读；我方固定走 pet 档
+  function paceOf(attacker) {
+    if (attacker !== 'enemy') return PACE.pet;
+    const st = window.Battle && window.Battle.state;
+    const type = st && st.enemy && st.enemy.enemyType;
+    return PACE[type] || PACE.normal;
+  }
+  // 返回冲刺时长（毫秒）；量不到距离时返回 0（调用方按 0 处理）
+  function setDashDistance(icon, foe, attacker, speed) {
+    if (!icon || !foe) return 0;
+    const a = icon.getBoundingClientRect(), b = foe.getBoundingClientRect();
+    if (!a.width || !b.width) return 0; // 未开战时敌方不可见（尺寸 0），此时不冲
+    // 冲进对方容器 40%：立绘是透明 PNG，角色本体只占中间约 78%（两边各留 11%），
+    // 只按容器边缘对齐的话，视觉上角色本体离对方还差一截，看着像半路刹车。
+    const OVERLAP = 0.4;
+    const toRight = attacker === 'pet';
+    const gap = toRight
+      ? (b.left + b.width * OVERLAP) - a.right
+      : (b.right - b.width * OVERLAP) - a.left;
+    // 只朝对手方向冲：我方恒为非负，敌方恒为非正，避免布局异常时冲反
+    const dist = toRight ? Math.max(0, gap) : Math.min(0, gap);
+    const dur = Math.min(DASH_MAX, Math.max(DASH_MIN, Math.abs(dist) / speed));
+    icon.style.setProperty('--dash-x', Math.round(dist) + 'px');
+    icon.style.setProperty('--dash-out', dur.toFixed(3) + 's');
+    return Math.round(dur * 1000);
+  }
+  /* 上一次出手演出的「后摇归位」时长（毫秒）。
+   * battle.js 拿它决定行动条冻结多久 —— 命中不等于演完，立绘还得收招回位，
+   * 这段时间行动条继续走的话，会出现"人还在半路、下一次出手已经开始蓄力"的错位。 */
+  let lastBackMs = 0;
+  function attackRecoverMs() { return lastBackMs; }
   function animateAttack(attacker) {
     const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
-    // 舞台上下布局：宠物在上（向下扑）、怪物在下（向上扑）
-    icon.style.setProperty('--lunge-dir', attacker === 'pet' ? '26px' : '-26px');
-    icon.classList.add('attacking');
-    setTimeout(() => icon.classList.remove('attacking'), 300);
+    const foe = attacker === 'pet' ? $('enemy-icon') : $('pet-icon');
+    if (!icon) { lastBackMs = 0; return 0; }
+    const pace = paceOf(attacker);
+    lastBackMs = Math.round(pace.back * 1000);
+    const dashMs = setDashDistance(icon, foe, attacker, pace.speed);
+    icon.style.setProperty('--dash-charge', (pace.charge / 1000).toFixed(3) + 's');
+    icon.style.setProperty('--dash-back', pace.back.toFixed(3) + 's');
+    /* 前摇（蓄力压扁）→ 扑击（冲到对方脸上）→ 后摇（收招回位）。
+     * 连击时必须先摘掉旧 class 并强制重排：同名 class 的 CSS 动画不会自己重播，
+     * 不重排的话第二次出手会丢掉前摇动作，只剩一段位移。 */
+    clearTimeout(icon.__chargeT);
+    clearTimeout(icon.__attackT);
+    icon.classList.remove('charging', 'attacking');
+    void icon.offsetWidth;
+    icon.classList.add('charging');
+    icon.__chargeT = setTimeout(() => {
+      icon.classList.remove('charging');
+      icon.classList.add('attacking');
+      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'), dashMs + pace.back * 1000);
+    }, pace.charge);
+    // 逐帧动画立绘：有攻击帧则切换播一遍（无则维持现有 CSS 突进+刀光）
+    const node = icon && icon.querySelector('.pet-anim');
+    if (node && PetSprites && PetSprites.setAnim) {
+      PetSprites.setAnim(node, 'attack');
+      setTimeout(() => { if (node.isConnected) PetSprites.setAnim(node, 'idle'); }, 850);
+    }
+    // 命中时刻（前摇结束 + 冲到对方脸上）：伤害结算与受击特效都对齐这一刻，
+    // 由调用方决定怎么用，表现层不写死——前摇按类型、冲刺按距离，都是变的。
+    return pace.charge + dashMs;
   }
-  function animateHit(target) {
+  function animateHit(target, isCrit) {
     const icon = target === 'pet' ? $('pet-icon') : $('enemy-icon');
-    icon.classList.add('hit');
-    setTimeout(() => icon.classList.remove('hit'), 300);
+    if (!icon) return;
+    clearTimeout(icon.__hitT);
+    icon.classList.remove('hit', 'crit-hit');
+    // 连续挨打时，同名 class 的 CSS 动画不会自己重播，必须摘掉 → 强制重排 → 再挂上
+    void icon.offsetWidth;
+    const cls = isCrit ? 'crit-hit' : 'hit';
+    icon.classList.add(cls);
+    icon.__hitT = setTimeout(() => icon.classList.remove('hit', 'crit-hit'), isCrit ? 440 : 320);
   }
   // 战斗飘字：在目标头像上方弹带类型标签的数字（攻击：-X / 暴击：-X / 吸血：+X）
   // 普通白 / 暴击亮红大20% / 吸血暗绿侧边；同一目标同时最多 3 个，超出延迟 120ms 排队；
   // 淡入 → 上飘 → 淡出 0.8s 后自动移除。只做表现，不参与任何战斗计算。
   const floatActive = new WeakMap();
-  const FLOAT_LABEL = { normal: '攻击', crit: '暴击', lifesteal: '吸血', miss: '闪避' };
+  const FLOAT_LABEL = { normal: '攻击', skill: '技能', crit: '暴击', lifesteal: '吸血', miss: '闪避' };
   function showFloatingText(target, text, type, opts) {
     const host = target === 'pet' ? $('pet-icon') : $('enemy-icon');
     if (!host) return;
@@ -359,33 +433,57 @@
     btn.textContent = label;
     btn.disabled = !!disabled;
   }
+  function renderActiveSkill(skill, cooldown, queued) {
+    const btn = $('btn-active-skill');
+    if (!btn) return;
+    btn.hidden = !skill;
+    if (!skill) return;
+    btn.disabled = cooldown > 0 || queued;
+    btn.textContent = queued ? `${skill.name} · 待释放` : cooldown > 0 ? `${skill.name} · 冷却 ${cooldown}` : skill.name;
+  }
+  (function bindActiveSkill() {
+    const btn = $('btn-active-skill');
+    if (!btn || btn.__skillBound) return;
+    btn.__skillBound = true;
+    btn.addEventListener('click', () => window.Battle?.useActiveSkill?.());
+  })();
 
-  /* ---------- 对战区同步（登录/刷新后调用，修复"未开战一直显示写死的莱姆"） ----------
-   * 游戏.html 里对战区图标/名字是静态初始值（🟢 莱姆），只在 beginFight→resetBattle 时更新。
-   * 刷新页面后即使出战宠物已还原成别的宠物，未开战前对战区仍显示旧静态值。
-   * 此函数在 renderAll 里调用：未开战时把对战区同步成当前出战宠物；战斗中不覆盖（由 resetBattle 维护本场快照）。
+  /* ---------- 对战区：数据 与 快照 是两个状态，分开管 ----------
+   * 以前这两件事挤在一个 syncCombatant() 里，靠「战斗中早退」区分，
+   * 结果连经验条一起被早退吃掉（挂机时进度条全程不动）。现在拆成两个职责：
+   *   1) 数据（经验条 / 等级）→ renderCombatantData()：无条件刷新，永远跟当前出战宠物走。
+   *      战斗中升级必须立刻跳，这是玩家唯一盯着的成长反馈。
+   *   2) 立绘 / 名字 → syncCombatantSnapshot()：只在非战斗时同步。
+   *      战斗中切宠不能把台上的换掉——本场仍由 beginFight 的快照打完。
+   * renderAll 分别调用，职责互不遮蔽，不需要任何"在早退之前插一行"的技巧。
    */
-  function updateBattleExp(pet) {
+  function renderCombatantData() {
+    const pet = getActivePet();
+    if (!pet) return;
     const text = $('pet-exp-text');
     const percent = $('pet-exp-percent');
     const fill = $('pet-exp-fill');
-    if (!text || !percent || !fill) return;
-    const need = Math.max(1, window.Pet.expNeed(pet.level));
-    const current = Math.min(Math.max(0, pet.exp || 0), need);
-    const progress = Math.round(current / need * 100);
-    text.textContent = `经验 ${current} / ${need}`;
-    percent.textContent = `${progress}%`;
-    fill.style.width = `${progress}%`;
+    if (text && percent && fill) {
+      const need = Math.max(1, window.Pet.expNeed(pet.level));
+      const current = Math.min(Math.max(0, Math.round(pet.exp || 0)), need);
+      const progress = Math.round(current / need * 100);
+      text.textContent = `经验 ${current} / ${need}`;
+      percent.textContent = `${progress}%`;
+      fill.style.width = `${progress}%`;
+    }
+    // 等级标签同步真实等级。只对同名宠物改：战斗中途切宠时台上还是旧宠，名字保持开战快照。
+    const nameEl = $('pet-icon-name');
+    if (nameEl && pureName(nameEl.textContent) === pet.name) {
+      nameEl.textContent = `${pet.name} 等级：${pet.level || 1}级`;
+    }
   }
 
-  function syncCombatant() {
+  function syncCombatantSnapshot() {
     const pet = getActivePet();
     if (!pet) return;
-    const Battle = window.Battle;
-    if (Battle && Battle.isRunning()) return; // 战斗中：本场宠物由 beginFight 快照维护，不覆盖
-    updateBattleExp(pet);
+    if (window.Battle && window.Battle.isRunning()) return; // 战斗中：立绘由 beginFight 快照维护
     mountIcon($('pet-icon'), pet.name, pet.icon);
-    $('pet-icon-name').textContent = pet.name;
+    $('pet-icon-name').textContent = `${pet.name} 等级：${pet.level || 1}级`;
     // 未开战：隐藏敌方（避免显示占位怪）
     const enemyFighter = document.getElementById('enemy-fighter');
     if (enemyFighter) enemyFighter.style.display = 'none';
@@ -416,7 +514,7 @@
         }
         setActive(pet.id);
         if (UI.addLog) UI.addLog(`🐾 ${pet.name} 出战！`);
-        if (!(window.Battle && window.Battle.isRunning())) syncCombatant();
+        if (!(window.Battle && window.Battle.isRunning())) syncCombatantSnapshot();
         renderRoster();
         if (UI.renderAll) UI.renderAll();
       };
@@ -430,20 +528,45 @@
         const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length;
         const bonusText = getBonusText ? getBonusText(pet) : '';
         const active = getActivePet();
-        tipBox.innerHTML = `<div class="rt-name">${pet.icon} ${escapeHtml(pet.name)}</div>
-          <div class="rt-row"><span>等级</span><span>Lv.${pet.level}</span></div>
-          <div class="rt-row"><span>成长</span><span>${pet.growth.toFixed(1)}</span></div>
-          <div class="rt-row"><span>生命</span><span>${s.hp}</span></div>
-          <div class="rt-row"><span>攻击</span><span>${s.atk}</span></div>
-          <div class="rt-row"><span>防御</span><span>${s.def}</span></div>
-          <div class="rt-row"><span>速度</span><span>${s.spd}</span></div>
-          <div class="rt-row"><span>暴击</span><span>${Math.round(s.critRate * 100)}%</span></div>
-          <div class="rt-row"><span>暴伤</span><span>${Math.round(s.critDamage * 100)}%</span></div>
-          <div class="rt-row"><span>命中</span><span>${Math.round(s.hit)}</span></div>
-          <div class="rt-row"><span>闪避</span><span>${Math.round(s.dodge)}</span></div>
-          <div class="rt-row"><span>吸血</span><span>${Math.round(s.lifesteal * 100)}%</span></div>
-          <div class="rt-row"><span>装备</span><span>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + bonusText + '）' : ''}</span></div>
-          ${active && pet.id === active.id ? '<div class="rt-row"><span style="color:var(--accent-hi)">当前出战</span></div>' : ''}`;
+        // 复用怪物悬浮框同款结构（.enemy-tip-*），只保留宠物该有的信息，不照搬怪物"掉落信息"
+        tipBox.className = 'roster-tooltip enemy-tip';
+        tipBox.innerHTML = `<div class="enemy-tip-title">
+            <strong>${escapeHtml(pet.icon)} ${escapeHtml(pet.name)}</strong>
+            <span>Lv.${pet.level}</span>
+            ${active && pet.id === active.id ? '<b class="enemy-type evolved">出战</b>' : ''}
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">成长</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row">成长值<b>${pet.growth.toFixed(1)}</b></div>
+              <div class="enemy-tip-row">经验<b>${pet.exp || 0}</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">基础属性</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row" data-enemy-hp>生命<b>${s.hp}</b></div>
+              <div class="enemy-tip-row">攻击<b>${s.atk}</b></div>
+              <div class="enemy-tip-row">防御<b>${s.def}</b></div>
+              <div class="enemy-tip-row">速度<b>${s.spd}</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">战斗属性</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row">暴击<b>${Math.round(s.critRate * 100)}%</b></div>
+              <div class="enemy-tip-row">暴伤<b>${Math.round(s.critDamage * 100)}%</b></div>
+              <div class="enemy-tip-row">命中<b>${Math.round(s.hit)}</b></div>
+              <div class="enemy-tip-row">闪避<b>${Math.round(s.dodge)}</b></div>
+              <div class="enemy-tip-row">吸血<b>${Math.round(s.lifesteal * 100)}%</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">装备</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row" style="grid-column:1/-1">已装备<b>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + escapeHtml(bonusText) + '）' : ''}</b></div>
+            </div>
+          </div>`;
         const r = anchor.getBoundingClientRect();
         tipBox.style.left = (r.right + 8) + 'px';
         tipBox.style.top = Math.max(6, r.top) + 'px';
@@ -477,14 +600,16 @@
   UI.updateBars = updateBars;
   UI.updateAction = updateAction;
   UI.animateAttack = animateAttack;
+  UI.attackRecoverMs = attackRecoverMs;
   UI.animateHit = animateHit;
   UI.animateVictory = animateVictory;
   UI.showDamage = showDamage;
   UI.showFloatingText = showFloatingText;
   UI.updateStatus = updateStatus;
   UI.renderBattleButton = renderBattleButton;
+  UI.renderActiveSkill = renderActiveSkill;
   UI.updateBattleArea = updateBattleArea;
-  UI.renderAreaSelector = renderAreaSelector;
-  UI.syncCombatant = syncCombatant;
+  UI.renderCombatantData = renderCombatantData;
+  UI.syncCombatantSnapshot = syncCombatantSnapshot;
   UI.renderRoster = renderRoster;
 })();

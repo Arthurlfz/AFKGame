@@ -118,14 +118,14 @@
   /* ============================================================
    * 假买家（流浪商人）购买玩家挂单
    * ============================================================ */
-  // 市场参考价（该档合理价上限）：config.marketBot.prices[材料id][稀有度][1]；查不到视为不设限
+  // 市场参考价（该档合理价上限）：查不到参考价时不允许 NPC 收购
   function refPrice(listing) {
     const mat = Config.trade.materials.find(m => m.name === listing.material_type);
-    if (!mat) return Infinity;
+    if (!mat) return 0;
     const range = (MB.prices && MB.prices[mat.id] && MB.prices[mat.id][listing.item_rarity]) || null;
-    return range ? range[1] : Infinity;
+    return range ? range[1] : 0;
   }
-  // 是否低于市场参考价（规则2：优先购买）
+  // 只收购低于或等于参考价的挂单；没有合适价格时本轮不购买
   const isCheap = l => l.material_qty <= refPrice(l);
   const isGoodPet = p => {
     const threshold = MB.petMinGrowth || 0;
@@ -142,8 +142,8 @@
       return pool.slice().sort((a, b) => b.pet_growth - a.pet_growth || a.material_qty - b.material_qty)[0];
     }
     const cheap = items.filter(isCheap);
-    const pool = cheap.length ? cheap : items;
-    return pool.slice().sort((a, b) => a.material_qty - b.material_qty)[0];
+    if (!cheap.length) return null;
+    return cheap.slice().sort((a, b) => a.material_qty - b.material_qty)[0];
   }
 
   // 选择购买类型：先在装备/宠物中各取一个目标，再按优先级决定买谁

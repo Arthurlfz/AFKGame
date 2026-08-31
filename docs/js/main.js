@@ -13,11 +13,10 @@
   'use strict';
 
   const Config = window.Config;
-  const { randInt } = window.Util;
-  const { createPet, addPet, getActivePet, getPets, getStats, getCurHp, grantExp, regenTick, setActive, setCloudPets, clearPets, petFromRow } = window.Pet;
-  const { rollReward, getTotalEquipDrops, setEggCount } = window.Drop;
+  const { createPet, addPet, getActivePet, getPets, getStats, getCurHp, grantExp, expNeed, expFromBattle, regenTick, setActive, setCloudPets, clearPets, petFromRow } = window.Pet;
+  const { rollReward, getTotalEquipDrops, clearEggs } = window.Drop;
   const { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights } = window.Battle;
-  const { renderAll, renderMarket, renderBattleButton, updateStatus, addLog, showLoot, renderStats, showToast, setAuthUser } = window.UI;
+  const { renderAll, renderMarket, renderBattleButton, updateStatus, addLog, showLoot, renderStats, setAuthUser } = window.UI;
   const Supabase = window.Supabase;
   const Market = window.Market;
   const Items = window.Items;
@@ -60,26 +59,31 @@
   async function handleFightEnd({ win, enemy }) {
     if (win) {
       const pet = getActivePet();
-      const P = Config.exp.perWin;
-      const xp = Math.round(randInt(P.min, P.max) * Config.exp.rate); // 每胜经验 × 全局倍率
+      if (!pet) { renderAll(); refreshStats(); syncButton(); return; } // 出战宠物缺失：不结算，避免写坏经验
+      const area = window.Battle.getCurrentArea();
+      const xp = expFromBattle(enemy, area); // 经验唯一来源（与怪物 tooltip 预览同源）
       const info = grantExp(pet, xp);
       if (info.leveled) {
-        addLog(`✨ ${pet.name} 升级到 Lv.${info.newLevel}！属性大幅提升！`);
-        if (info.maxed) addLog(`👑 ${pet.name} 已达到等级上限 Lv.${Config.pet.maxLevel}！`);
+        addLog(`✨ ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`);
+        if (info.maxed) addLog(`👑 ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`);
         // 升级是大事：等级 + 经验立即写云端，刷新页面都不丢
         syncPetProgress(pet, true);
       } else {
         // 没升级也要存经验，走节流（15 秒一次），避免每场都打一次数据库
         syncPetProgress(pet);
+        if (info.maxed) {
+          const EP = Config.pet.expPool;
+          addLog(info.crystal
+            ? `💠 ${pet.name} 满级经验凝成 ${EP.material} ×${info.crystal}（持有 ${Materials.getQuantity(EP.material)}）`
+            : `✦ ${pet.name} 已满级，经验 +${xp} 转入经验池（${Math.round(pet.expPool || 0)}/${EP.perCrystal}）`);
+        } else {
+          addLog(`✦ ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`);
+        }
       }
-      showLoot(await rollReward(enemy, window.Battle.getCurrentArea())); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料
-      // 任务进度上报：当前图的 type=kill 任务进度 +1（打怪类任务）
-      const curArea = window.Battle.getCurrentArea();
-      if (curArea) {
-        (Config.drop.quests || []).forEach(q => {
-          if (q.type === 'kill' && q.area === curArea.id && window.Quest) window.Quest.report(q.id, 1);
-        });
-      }
+      showLoot(await rollReward(enemy, area)); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料
+      // 任务进度上报：type=kill 的任务 +1（任务配了 area 的只算该图，没配的任意图都算；
+      // petName 供宠物专属任务区分「哪只宠打的」——配了 petName 的任务只认对应宠）
+      if (window.Quest && window.Quest.reportType) window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
     }
     renderAll();
     refreshStats();
@@ -98,22 +102,31 @@
     if (!screen || !list) return;
     if (app) app.style.display = 'none';
     const B = Config.pet.legacyBase || { hp: 100, atk: 20, def: 10, spd: 40 };
-    list.innerHTML = `<div class="starter-tip">这是你冒险的第一只伙伴，挑一只顺眼的就行。<b>成长</b>越高后期越强；<b>速度</b>快能先出手；肉（生命/防御高）更耐打。</div>` +
+    // 立绘优先（与图鉴/战斗同一套 PetSprites），拉不到才退回 emoji
+    const artHtml = (name, icon) => {
+      const p = window.PetSprites && PetSprites.pathOf ? PetSprites.pathOf(name) : null;
+      return p ? `<span class="starter-art"><img src="${p}" alt="${name}" onerror="this.parentNode.innerHTML='&lt;span class=\\'starter-icon\\'&gt;${icon}&lt;/span&gt;'"></span>`
+               : `<span class="starter-icon">${icon}</span>`;
+    };
+    // 开局宠物是"还没建档"的预览对象，属性/定位照样走真实公式与 config，避免展示与实际不符
+    const previewOf = (s) => createPet(s.name, s.icon, s.growth,
+      s.baseHp || B.hp, s.baseAtk || B.atk, s.baseDef || B.def,
+      Config.pet.speeds[s.name] || B.spd || 40, s.name);
+    list.innerHTML = `<div class="starter-tip">这是你冒险的第一只伙伴，挑一只顺眼的就行。<b>成长</b>越高后期越强；<b>速度</b>快能先出手；肉（生命/防御高）更耐打。<span class="hint">鼠标悬停看完整属性</span></div>` +
       (Config.pet.starters || []).map((s, i) => {
-      const spd = Config.pet.speeds[s.name] || B.spd || 40;
-      // 用 Lv.1 真实属性展示（每只基宠差异化 baseHp/baseAtk/baseDef），让新玩家看清定位
-      const st = getStats(createPet(s.name, s.icon, s.growth, s.baseHp || B.hp, s.baseAtk || B.atk, s.baseDef || B.def, spd));
       // 定位标签直接读 config.petProfiles（每只基宠都写了 role/description），
       // 不要用规则现猜——曾导致 8 只里 6 只都显示「先手刺客 · 速度快」，选宠标签毫无信息量
       const profile = (Config.pet.petProfiles && Config.pet.petProfiles[s.name]) || Config.pet.defaultPetProfile;
-      const role = profile.role || '均衡型';
-      const desc = profile.description || '';
-      return `<button class="starter-card" data-index="${i}" title="${desc}"><span class="starter-icon">${s.icon}</span><b>${s.name}</b>
+      return `<button class="starter-card" data-index="${i}">${artHtml(s.name, s.icon)}<b>${s.name}</b>
         <small>成长 ${Number(s.growth).toFixed(1)}</small>
-        <small class="starter-role">${role}</small>
-        <small class="starter-stats">生命 ${Math.round(st.hp)} · 攻击 ${Math.round(st.atk)}<br>防御 ${Math.round(st.def)} · 速度 ${Math.round(st.spd)}</small></button>`;
+        <small class="starter-role">${profile.role || '均衡型'}</small></button>`;
     }).join('');
     screen.style.display = 'flex';
+    list.querySelectorAll('.starter-card').forEach(btn => {
+      // 属性浮窗（与装备 tooltip 同款）：卡片上悬停即显示，不占卡片空间
+      const s = Config.pet.starters[Number(btn.dataset.index)];
+      if (UI.bindPetTip && s) UI.bindPetTip(btn, previewOf(s));
+    });
     list.querySelectorAll('.starter-card').forEach(btn => {
       btn.onclick = async () => {
         if (btn.disabled) return;
@@ -143,15 +156,17 @@
     });
   }
 
-  function clearAccountState() {
+  async function clearAccountState() {
     stopAutoBattle();
     flushPetProgress();                                // 登出/切账号前把经验补写云端
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
     runtimeStarted = false;                            // 允许下次登录重新启动运行时
     clearPets();
     Items.setCloudItems([]);
-    Materials.setCloudMaterials([]);
-    setEggCount(0);
+    // 材料要先补报再清空：gain 现在只入队不上传，直接清会把当前号刚掉的收益丢掉。
+    // clearAll 内部会先 flush（把队列报给当前号），再清空本地与队列，换号不会串。
+    await Materials.clearAll();
+    clearEggs();
     starterPending = false;
     if (window.Quest && window.Quest.reset) window.Quest.reset(); // 清空旧号任务进度
     const starterScreen = document.getElementById('starter-screen');
@@ -170,6 +185,9 @@
     }
     // 已登录：以云端为准，清空本地残留宠物
     clearPets();
+    // 任务进度和宠物一样是登录后必拉的状态，且必须 await 完再往下走：
+    // 进度没到手就允许交任务，等于拿「空历史」整行覆盖云端，把以前交过的任务全抹成未完成。
+    if (window.Quest && window.Quest.loadCloudProgress) await window.Quest.loadCloudProgress();
     const { data, error } = await Supabase.loadPets();
     if (error) {
       addLog('⚠️ 读取云端宠物失败：' + (error.message || '未知错误'));
@@ -181,8 +199,6 @@
       setCloudPets(data);
       const active = getActivePet();
       if (active) addLog(`☁️ 已从云端读取 ${data.length} 只宠物，出战 ${active.name}`);
-      // 登录后拉云端任务进度（evolve/kill 类）
-      if (window.Quest && window.Quest.loadCloudProgress) window.Quest.loadCloudProgress();
     } else {
       // 云端无宠物 = 新号：弹开局选宠（选完建档），不再走"本地残留宠物建档"逻辑
       showStarterPicker();
@@ -250,20 +266,31 @@
     const { data, error } = await Items.loadCloudItems();
     if (error) { addLog('⚠️ 读取云端装备失败：' + (error.message || '未知错误')); return; }
     Items.setCloudItems(data || []);
-    // 背包加载完后，把宠物装备槽的 cloudId 引用还原成背包里的装备对象（F5 后不脱落）
-    // 装备槽引用单独读（loadPetEquipment），兼容旧库无列
-    if (window.Pet && window.Pet.restoreEquipment && window.Equipment && window.Equipment.getInventory && Supabase.loadPetEquipment) {
-      const inv = window.Equipment.getInventory();
-      for (const pet of getPets()) {
-        if (pet.cloudId) {
-          const eqMap = await Supabase.loadPetEquipment(pet.cloudId);
-          pet.equipment = {};
-          for (const [slot, cid] of Object.entries(eqMap || {})) pet.equipment[slot] = cid ? { cloudId: cid } : null;
-          window.Pet.restoreEquipment(pet, inv);
-        }
-      }
-    }
+    await restorePetEquipment(); // 背包就绪后，把各宠物身上的装备按 cloudId 挂回去
     renderAll();
+  }
+
+  /* ---------- 宠物装备槽恢复（背包加载完后调用，F5 后装备不脱落） ----------
+   * 云端只存 { 部位: 装备cloudId } 引用，装备本体在 equip_items（背包）。
+   * 装备槽单独读（loadPetEquipment），兼容旧库缺列时退化为空槽，不影响宠物本体。
+   */
+  async function restorePetEquipment() {
+    if (!window.Pet || !window.Pet.restoreEquipment || !Supabase.loadPetEquipment) return;
+    const inv = window.Equipment.getInventory();
+    const slots = (window.Equipment && window.Equipment.SLOTS) || [];
+    // 并发拉：原来逐个 await，N 只宠物 = N × 340ms 串行等待（10 只宠就是 3.4 秒）。
+    // 各宠物的装备槽互不依赖，并发后只花一次往返的时间。
+    const pets = getPets().filter(p => p.cloudId);
+    const maps = await Promise.all(pets.map(p => Supabase.loadPetEquipment(p.cloudId)));
+    pets.forEach((pet, i) => {
+      const eqMap = maps[i];
+      // 按 12 个部位整体重建（而不是整体替换成云端那份）：云端没存过时也保留完整槽位结构
+      pet.equipment = Object.fromEntries(slots.map(s => [s, null]));
+      for (const [slot, cid] of Object.entries(eqMap || {})) {
+        if (cid && slot in pet.equipment) pet.equipment[slot] = { cloudId: cid };
+      }
+      window.Pet.restoreEquipment(pet, inv);
+    });
   }
 
   /* ---------- 云端材料恢复（登录后：拉取替换本地计数） ---------- */
@@ -276,35 +303,51 @@
     renderAll();
   }
 
-  /* ---------- 云端宠物蛋恢复（登录后：以云端 pet_egg 数量为权威） ---------- */
+  /* ---------- 云端宠物蛋恢复（登录后：以云端 pet_egg 按品种为权威） ---------- */
   async function restoreCloudEggs() {
     const user = await Supabase.getCurrentUser();
     if (!user) return;
-    const { data, error } = await Supabase.loadEggCount();
+    const { error, eggMap } = await Supabase.loadEggCount();
     if (error) { addLog('⚠️ 读取云端宠物蛋失败：' + (error.message || '未知错误')); return; }
-    Drop.setEggCount(data || 0);
+    // 必须按品种整体恢复：只恢复总数的话，所有蛋会被摊成一个通用品种，
+    // 刷新后品种（血狐/骨狼…）丢失，界面会显示成"宠物蛋蛋"。
+    Drop.setEggs(eggMap || {});
   }
   /* ---------- 账号流程（供 UI 按钮回调） ---------- */
-  // 登录/注册成功后的统一收尾：恢复云端宠物 + 云端装备 + 云端材料 + 云端宠物蛋
-  async function onAuthenticated() {
+  // 登录 / 会话恢复的公共收尾：先拉云端宠物，再并发拉装备 / 材料 / 蛋 / 市场。
+  // restoreCloudPets 必须单独先走，两个原因：
+  //   ① 它决定是不是新号（云端无宠 → 弹选宠，不能往下走）
+  //   ② 装备槽恢复要按宠物 cloudId 逐只查，依赖宠物列表已就位
+  // 其余四者互不依赖：串行 = 付 4 次 340ms，并发只付一次。
+  // 四个 restore 内部都是「失败只 addLog 不抛」，所以 Promise.all 安全。
+  // 返回 false = 新号还没宠物，调用方不要启动运行时。
+  async function restoreAllCloudData() {
     await restoreCloudPets();
-    if (!getPets().length) return;
-    await restoreCloudItems();
-    await restoreCloudMaterials();
-    await restoreCloudEggs();
-    await Market.refresh();
+    if (!getPets().length) return false;
+    await Promise.all([
+      restoreCloudItems(), restoreCloudMaterials(), restoreCloudEggs(), Market.refresh()
+    ]);
+    // 魔石钱包 / 商店商品：失败只提示（表没建时界面自己显示"未开通"），不能挡住进游戏
+    if (UI.refreshShop) { try { await UI.refreshShop(); } catch (e) { console.warn('商店数据加载失败：', e && e.message); } }
+    return true;
+  }
+
+  // 登录/注册成功后的统一收尾
+  async function onAuthenticated() {
+    const ready = await restoreAllCloudData();
+    if (!ready) return; // 新号：等 showStarterPicker 选完宠再启动运行时
     startGameRuntime();
     renderAll();
   }
   async function onLogin(email, password) {
     if (!email || !password) {
       const error = { message: '请输入邮箱和密码' };
-      showToast('❌ 登录失败', error.message);
+      addLog('❌ 登录失败：' + error.message);
       return { error };
     }
     const { error } = await Supabase.signIn(email, password);
-    if (error) { showToast('❌ 登录失败', error.message); return { error }; }
-    clearAccountState();
+    if (error) { addLog('❌ 登录失败：' + (error.message || '未知错误')); return { error }; }
+    await clearAccountState();
     addLog('☁️ 登录成功');
     await onAuthenticated();
     return { error: null };
@@ -312,41 +355,41 @@
   async function onSignup(email, password) {
     if (!email || !password) {
       const error = { message: '请输入邮箱和密码' };
-      showToast('❌ 注册失败', error.message);
+      addLog('❌ 注册失败：' + error.message);
       return { error };
     }
     const a = (window.Config && window.Config.auth) || {};
     if (password.length < (a.pwdMinLen || 6)) {
       const error = { message: '密码至少 ' + (a.pwdMinLen || 6) + ' 位' };
-      showToast('❌ 注册失败', error.message);
+      addLog('❌ 注册失败：' + error.message);
       return { error };
     }
     if (a.pwdRequireLetter && !/[A-Za-z]/.test(password)) {
       const error = { message: '密码需包含字母' };
-      showToast('❌ 注册失败', error.message);
+      addLog('❌ 注册失败：' + error.message);
       return { error };
     }
     if (a.pwdRequireDigit && !/[0-9]/.test(password)) {
       const error = { message: '密码需包含数字' };
-      showToast('❌ 注册失败', error.message);
+      addLog('❌ 注册失败：' + error.message);
       return { error };
     }
     const { data, error } = await Supabase.signUp(email, password);
-    if (error) { showToast('❌ 注册失败', error.message); return { error }; }
+    if (error) { addLog('❌ 注册失败：' + (error.message || '未知错误')); return { error }; }
     if (!data.session) { // 项目开了邮箱验证 → 没有自动登录
-      showToast('⚠️ 注册成功', '若需邮箱验证，请先去邮箱确认，再回来登录');
+      addLog('⚠️ 注册成功：若需邮箱验证，请先去邮箱确认，再回来登录');
       return { error: null, needsEmailConfirm: true };
     }
-    clearAccountState();
+    await clearAccountState();
     addLog('☁️ 注册成功并已登录');
     await onAuthenticated();
     return { error: null };
   }
   async function onLogout() {
     const { error } = await Supabase.signOut();
-    clearAccountState();
+    await clearAccountState();
     setAuthUser(null);
-    if (error) showToast('⚠️ 登出失败', error.message);
+    if (error) addLog('⚠️ 登出失败：' + (error.message || '未知错误'));
     else addLog('👋 已登出');
     renderAll();
     syncButton();
@@ -360,6 +403,7 @@
       return;
     }
     const pet = getActivePet();
+    if (!pet) { renderBattleButton('开始自动战斗', true); return; } // 登出/换号后没有出战宠：按钮禁用，别让 getStats(null) 抛错中断登出流程
     const maxHp = getStats(pet).hp, cur = getCurHp(pet);
     if (cur >= maxHp) {
       renderBattleButton('开始自动战斗', false);
@@ -373,7 +417,6 @@
     if (runtimeStarted) return;          // 防重入：会话恢复与 onAuthenticated 都可能会调
     runtimeStarted = true;
     if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
-    if (window.showPetGuide) window.showPetGuide();  // 登录进入游戏后才弹新手引导（离线不弹）
     if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
     const battleBtn = document.getElementById('btn-battle');
@@ -383,7 +426,7 @@
         flushPetProgress();              // 停手时把攒的经验补写云端（否则要等下一次节流）
       } else if (getCurHp(getActivePet()) >= getStats(getActivePet()).hp) {
         if (!window.Battle.getCurrentArea()) {
-          addLog('⚠️ 请先选择挂机地图。', false, true);
+          addLog('⚠️ 请先选择挂机地图。');
           return;
         }
         startAutoBattle(handleFightEnd); // 满血才允许开始
@@ -393,8 +436,12 @@
 
     // 切后台 / 关标签页前补写一次经验
     // （beforeunload 里的异步请求常被浏览器掐掉，visibilitychange 更可靠）
+    // （beforeunload 里的异步请求常被浏览器掐掉，visibilitychange 更可靠）
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flushPetProgress();
+      if (document.visibilityState !== 'hidden') return;
+      flushPetProgress();
+      // 掉落攒着还没上报的材料：切后台/关标签页前补一次，否则这批收益会丢
+      if (Materials.flushMaterials) Materials.flushMaterials();
     });
 
     // 非战斗回血时钟（每秒驱动一次；挂机中「等待回血」状态也回血，回满后 battle 自动继续）
@@ -429,7 +476,11 @@
     // 离线（无有效会话）时除登录页外不运行任何游戏逻辑，避免“离线游玩”。
     Supabase.init();
     try {
-      const user = await Supabase.getCurrentUser();
+      // 会话探测是唯一必须问服务器的路径：页面可能开了很久，本地 JWT 看着还在，
+      // 实际已被服务端判为失效。这里必须走 getUser() 二次确认（force=true），
+      // 否则会拿着过期 token 去读云端宠物 → 读不到 → 退回初始莱姆（历史 bug）。
+      // 其余所有 getCurrentUser() 调用都走本地 session（0ms），不再付这 550ms。
+      const user = await Supabase.getCurrentUser(true);
       setAuthUser(user);
       if (!user) {
         // 未登录：仅展示登录页，不启动任何游戏循环
@@ -437,12 +488,8 @@
         return;
       }
       // 已有会话（刷新/自动恢复）：走正常恢复并启动运行时
-      await restoreCloudPets();
-      if (!getPets().length) return;     // 新号需先选宠，选完在 showStarterPicker 里启动运行时
-      await restoreCloudItems();
-      await restoreCloudMaterials();
-      await restoreCloudEggs();
-      await Market.refresh();
+      const ready = await restoreAllCloudData();
+      if (!ready) return;     // 新号需先选宠，选完在 showStarterPicker 里启动运行时
       startGameRuntime();
     } catch (err) {
       if (window.console && console.warn) console.warn('[初始化] 云端恢复失败，停留在登录页：', err);
@@ -450,6 +497,6 @@
     }
   }
 
-  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, afterBuyPet, afterBuyItem, startGameRuntime };
+  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime };
   init();
 })();

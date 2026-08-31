@@ -51,10 +51,12 @@ A(matDiag&&matDiag.gotArea===true,`枯荣之地掉专属材料「枯荣种荚」
 A(matDiag&&matDiag.gotEvo===true,`掉落进化素材「进化素材」（${matDiag&&matDiag.evoNow}个）`);
 
 // ===== 4) 任务系统 =====
-const questDiag=await C(`(async()=>{const q=Config.drop.quests&&Config.drop.quests.find(x=>x.id==="q1");if(!q)return {err:"no-q1"};await Quest.acceptQuest("q1");const p0=Quest.getQuests().find(x=>x.id==="q1");await Materials.gain(q.matName, q.need);const p1=Quest.getQuests().find(x=>x.id==="q1");const done=p1&&p1.done;const c=await Quest.completeQuest("q1");const p2=Quest.getQuests().find(x=>x.id==="q1");return {accepted:!!p0&&p0.accepted,done,completeOk:!!c&&c.ok,rewards:c&&c.rewards,acceptedAfter:!!p2&&p2.accepted}})()`);
+// 注：这里原本用 id "q1"，但任务表里根本没有 q1（只有 t/m/d/a 前缀），是历史遗留的坏用例。
+// 改用真实的收集类主线任务 m2（收集「枯荣种荚」），复用同一条「接取→达标→领奖→回到未接受」链路。
+const questDiag=await C(`(async()=>{const q=Config.drop.quests&&Config.drop.quests.find(x=>x.id==="m2");if(!q)return {err:"no-m2"};await Quest.acceptQuest("m2");const p0=Quest.getQuests().find(x=>x.id==="m2");await Materials.gain(q.matName, q.need);const p1=Quest.getQuests().find(x=>x.id==="m2");const done=p1&&p1.done;const c=await Quest.completeQuest("m2");const p2=Quest.getQuests().find(x=>x.id==="m2");return {id:q.id,matName:q.matName,need:q.need,accepted:!!p0&&p0.accepted,done,completeOk:!!c&&c.ok,rewards:c&&c.rewards,acceptedAfter:!!p2&&p2.accepted}})()`);
 console.log('  [questDiag] '+JSON.stringify(questDiag));
-A(questDiag&&questDiag.done===true,'任务 q1 收集达标（done）');
-A(questDiag&&questDiag.completeOk===true,'提交任务 q1 成功并领奖（'+JSON.stringify(questDiag.rewards)+'）');
+A(questDiag&&questDiag.done===true,`任务 m2 收集达标（收集「${questDiag.matName}」×${questDiag.need}）`);
+A(questDiag&&questDiag.completeOk===true,'提交任务 m2 成功并领奖（'+JSON.stringify(questDiag.rewards)+'）');
 A(questDiag&&questDiag.acceptedAfter===false,'交完后任务回到未接受状态');
 
 console.log('ALL DEEP2 TESTS PASSED');process.exit(0);

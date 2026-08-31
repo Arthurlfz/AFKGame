@@ -27,30 +27,45 @@
 
   /* ---------- 认证 ---------- */
   async function signIn(email, password) {
-    return client.auth.signInWithPassword({ email, password });
+    const c = getClient();
+    return c.auth.signInWithPassword({ email, password });
   }
   async function signUp(email, password) {
-    const res = await client.auth.signUp({ email, password });
+    const c = getClient();
+    const res = await c.auth.signUp({ email, password });
     // 若项目开着邮箱验证，注册后不会自动建立会话 → 自动再登录一次兜底
     if (!res.error && !res.data.session) {
-      const retry = await client.auth.signInWithPassword({ email, password });
+      const retry = await c.auth.signInWithPassword({ email, password });
       if (!retry.error) return retry;
     }
     return res;
   }
   async function signOut() {
-    return client.auth.signOut();
+    return getClient().auth.signOut();
   }
   async function getSession() {
-    const { data } = await client.auth.getSession();
+    const { data } = await getClient().auth.getSession();
     return data.session;
   }
-  // 当前登录用户：用 getUser() 而非 getSession()——
-  // getUser() 会校验并自动刷新过期的 access token，否则页面打开时 token 过期会导致
-  // 云宠物/材料读不到，界面退回初始莱姆（Bug 修复点）
-  async function getCurrentUser() {
+  // 当前登录用户（2026-08-30 性能优化）
+  //
+  // 实测 auth.getUser() 单次 550ms，而全项目 31 处调用它 —— 每次交互都要先付这半秒，
+  // 打造一个动作串了 3 次，光"问服务器我是谁"就 1.65 秒，比真正干活的 rpc 还贵。
+  //
+  // 绝大多数调用点只是想知道「登没登录、用户 id 是多少」，这个信息本地 JWT 里就有：
+  // 默认走 getSession() —— 本地读，0ms。且 getSession() 在 token 快过期时同样会
+  // 自动用 refresh_token 续期，所以原先靠 getUser() 修的那个
+  // 「页面打开时 token 过期 → 云宠物读不到、退回初始莱姆」的 bug 依然被覆盖。
+  //
+  // 只有需要服务端二次确认的路径（init 会话探测：判断老 token 是不是还有效）
+  // 才传 force=true 走 getUser()。
+  async function getCurrentUser(force) {
+    if (!force) {
+      const s = await getSession();
+      return (s && s.user) || null;
+    }
     const { data, error } = await client.auth.getUser();
-    return error ? null : data.user;
+    return error ? null : ((data && data.user) || null);
   }
 
   /* ---------- 宠物存档（pets 表） ---------- */
@@ -293,53 +308,118 @@
       .order('created_at', { ascending: false });
   }
 
-  /* ---------- 宠物蛋（pet_egg 表：每颗蛋一行，含 egg_type 品种列，掉蛋 insert / 孵化标记已孵化） ---------- */
-  // 掉蛋：云端插一行「未孵化」带品种；未登录仅本地计数
-  // 注意：insert/update 后必须 .select()/.then() 触发请求，否则 PostgrestBuilder 不执行
-  async function addEgg(baseName) {
-    const user = await getCurrentUser();
-    if (!user) return { data: null, error: null };
-    return client.from('pet_egg').insert({ owner_id: user.id, egg_type: baseName || null }).select().single();
-  }
   // 孵化：消耗一颗指定品种的「未孵化」蛋，标记「已孵化」并关联新宠物。
-  // baseName 为空时取最早一颗任意品种的蛋（兼容旧数据/未加品种列的场景）。
   async function consumeEgg(baseName, petId) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: new Error('请先登录') };
-    let q = client.from('pet_egg')
-      .select('id').eq('owner_id', user.id).eq('status', '未孵化');
-    if (baseName) q = q.eq('egg_type', baseName); // 指定品种
-    const { data, error } = await q.order('created_at', { ascending: true });
+    // 旧数据兼容：加 egg_type 列之前掉的蛋，egg_type 是 null。
+    // loadEggCount 把它们归到通用品种「宠物蛋」显示，所以孵「宠物蛋」时
+    // eq(egg_type,'宠物蛋') 必然查不到 → 必须退一步用 is(egg_type, null) 去找，
+    // 否则这颗蛋永远孵不掉：本地扣了、云端没标记 → 刷新后蛋又"复活"。
+    const wantLegacy = (baseName === '宠物蛋');
+    let q = client.from('pet_egg').select('id').eq('owner_id', user.id).eq('status', '未孵化');
+    q = wantLegacy ? q.is('egg_type', null) : q.eq('egg_type', baseName);
+    const { data, error } = await q
+      .order('created_at', { ascending: true }).limit(1).maybeSingle();
     if (error) return { data: null, error };
-    if (!data || !data.length) return { data: null, error: new Error('云端没有可孵化的蛋') };
+    if (!data) return { data: null, error: new Error('云端没有可孵化的该品种宠物蛋') };
     return client.from('pet_egg')
       .update({ status: '已孵化', pet_id: petId })
-      .eq('id', data[0].id)
+      .eq('id', data.id)
       .select().single();
   }
   // 云端未孵化蛋（登录时恢复；云端为权威）。返回 { eggMap, total }
-  // eggMap = { '血狐': 2 }；旧数据 egg_type 为 null 的统一归为 '宠物蛋' 品种。
+  // eggMap = { '血狐': 2 }；无品种的旧数据归入「宠物蛋」（能正常孵化，见 consumeEgg 的回退查找）。
   async function loadEggCount() {
     const user = await getCurrentUser();
     if (!user) return { data: 0, error: null, eggMap: {} };
+    // 这里【不能】加 .not('egg_type','is',null) 过滤掉无品种的蛋：
+    // 加 egg_type 列之前掉的蛋是 null，过滤掉它就既不显示也孵不掉，
+    // 会永远留在云端当垃圾行（本地刷新后反而像"复活"）。
+    // 统一在下面归到通用品种「宠物蛋」（与 Drop.makeEggName(null) 的兜底一致），玩家能正常孵掉。
     const { data, error } = await client.from('pet_egg')
       .select('egg_type').eq('owner_id', user.id).eq('status', '未孵化');
     if (error) return { data: 0, error, eggMap: {} };
     const eggMap = {};
     for (const row of data || []) {
-      const k = row.egg_type || '宠物蛋';
-      eggMap[k] = (eggMap[k] || 0) + 1;
+      const key = row.egg_type || '宠物蛋';
+      eggMap[key] = (eggMap[key] || 0) + 1;
     }
     const total = Object.values(eggMap).reduce((a, b) => a + b, 0);
     return { data: total, error: null, eggMap };
   }
 
-  /* ---------- 装备打造（equip_items 表词缀更新） ---------- */
-  // 更新装备字段（打造后词缀变化；RLS 保证只能改自己的）
-  // patch 示例：{ affixes: [...] }
-  async function updateEquipItem(cloudId, patch) {
-    return client.from('equip_items').update(patch).eq('id', cloudId);
+  // 掉落一颗蛋：写入 pet_egg（未孵化，带品种）。
+  // 掉落不该打断战斗结算：这里【绝不抛异常】，失败静默，下次登录以云端为准。
+  async function addEgg(baseName) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: null };
+    try {
+      return await client.from('pet_egg')
+        .insert({ owner_id: user.id, egg_type: baseName || null, status: '未孵化' })
+        .select().single();
+    } catch (e) {
+      return { data: null, error: e };
+    }
   }
+
+  /* ---------- 魔石钱包 / 商店（migrate_shop.sql） ----------
+   * 余额与商品都是「前端只读」：加钱靠 redeem_code、扣钱靠 spend_gems，两个都是 security definer 函数。
+   * 表还没建（42P01 undefined_table / PGRST205）时不抛异常，返回空结果由界面提示"商店未开通"。 */
+  async function getMyWallet() {
+    try {
+      const { data, error } = await client.rpc('get_my_wallet');
+      if (error) return { gems: 0, totalRecharged: 0, error: error.message, missing: isMissingTable(error) };
+      const row = (data && data[0]) || null;
+      return { gems: (row && row.gems) || 0, totalRecharged: (row && row.total_recharged) || 0, error: null };
+    } catch (e) {
+      return { gems: 0, totalRecharged: 0, error: e && e.message, missing: true };
+    }
+  }
+  // 卡密兑换：返回 'ok:数量' / 'notfound' / 'used' / 'expired' / 'nologin'
+  async function redeemCode(code) {
+    const { data, error } = await client.rpc('redeem_code', { p_code: String(code || '').trim() });
+    if (error) return { ok: false, code: 'error', message: error.message };
+    return { ok: String(data).startsWith('ok'), code: String(data).split(':')[0], gained: Number(String(data).split(':')[1]) || 0, raw: data };
+  }
+  // 用魔石买商品：clientRef 是幂等键（连点两次也只成一单）
+  async function spendGems(sku, clientRef) {
+    const { data, error } = await client.rpc('spend_gems', { p_sku: sku, p_client_ref: clientRef });
+    if (error) return { ok: false, code: 'error', message: error.message };
+    return { ok: data === 'ok', code: String(data) };
+  }
+  // 商店商品（服务端定价，前端只负责展示）
+  async function fetchProducts() {
+    try {
+      const { data, error } = await client.from('products')
+        .select('sku,title,kind,price_cents,price_gems,gems,bonus_gems,payload,icon,sort')
+        .eq('active', true)
+        .order('sort', { ascending: true });
+      if (error) return { data: [], error: error.message, missing: isMissingTable(error) };
+      return { data: data || [], error: null };
+    } catch (e) {
+      return { data: [], error: e && e.message, missing: true };
+    }
+  }
+  // 我的订单（购买记录）
+  async function fetchMyOrders() {
+    try {
+      const { data, error } = await client.from('orders')
+        .select('id,sku,gems,status,provider,created_at')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) return { data: [], error: error.message, missing: isMissingTable(error) };
+      return { data: data || [], error: null };
+    } catch (e) {
+      return { data: [], error: e && e.message, missing: true };
+    }
+  }
+  // 表不存在的错误码：Postgres 42P01 / PostgREST PGRST205
+  function isMissingTable(error) {
+    const c = error && (error.code || '');
+    return c === '42P01' || c === 'PGRST205' || c === '42883'; // 42883 = 函数不存在
+  }
+
   // 单条查询（购买后精准拉取新装备）
   async function fetchItemById(id) {
     return client.from('equip_items').select('*').eq('id', id).maybeSingle();
@@ -398,8 +478,9 @@
     loadPets, fetchPetById, savePet, deletePet, updatePet, petEquipmentToCloud, loadPetEquipment,
     listPet, fetchMarket, fetchMyListedIds, buyPet, cancelPetListing,
     listItem, fetchItemMarket, fetchMyListedItemIds, buyItem, cancelEquipListing, botBuyEquip, botBuyPet,
-    updateEquipItem, fetchItemById, loadTradeRecords,
-    addEgg, consumeEgg, loadEggCount,
+    fetchItemById, loadTradeRecords,
+    consumeEgg, loadEggCount, addEgg,
+    getMyWallet, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     fetchQuestProgress, saveQuestProgress,
     sendChatMessage, fetchRecentMessages, getMyDisplayName
