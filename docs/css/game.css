@@ -238,6 +238,7 @@ body {
 
 /* ---------- 出战宠物 ---------- */
 /* 出战宠物面板：右下角「当前出战」金标 */
+/* ---------- 出战宠物（网游式资料卡） ---------- */
 .pet-hero-panel { position:relative; }
 .pet-active-corner {
   position:absolute; right:0; bottom:0; padding:4px 14px 4px 10px;
@@ -246,88 +247,86 @@ body {
   border-top-left-radius:var(--radius-sm);
   box-shadow:0 0 10px rgb(var(--action-gold-rgb) / .5);
 }
-/* 立绘区：大头像 + 名字/等级/经验条（横向信息卡） */
-.pet-hero { display:flex; gap:16px; align-items:center; margin-bottom:14px; }
+/* 立绘主视觉：居中大立绘 + 金色呼吸光晕 */
+.pet-hero {
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  margin-bottom:14px; padding:6px 0 2px;
+}
 .pet-hero-art { position:relative; flex:none; }
-.pet-avatar {
-  width:110px; height:110px; border-radius:4px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:4.2rem;
+.pet-hero-art::before { /* 金色呼吸光晕 */
+  content:""; position:absolute; inset:-16px; border-radius:18px;
   background:
-    radial-gradient(circle at 50% 30%, rgb(var(--action-gold-rgb) / .2), transparent 62%),
-    linear-gradient(145deg, #252a33, #15181d);
-  border:1px solid rgb(var(--action-gold-rgb) / .55);
+    radial-gradient(circle at 50% 42%, rgb(var(--action-gold-rgb) / .22), transparent 66%),
+    radial-gradient(ellipse at 50% 100%, rgb(var(--action-gold-rgb) / .12), transparent 58%);
+  animation:petGlowPulse 3.4s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes petGlowPulse { 0%,100%{opacity:.5;} 50%{opacity:1;} }
+.pet-avatar {
+  width:158px; height:158px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:5.8rem; overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 30%, rgb(var(--action-gold-rgb) / .3), transparent 62%),
+    linear-gradient(150deg, #2b313c, #15181d);
+  border:2px solid rgb(var(--action-gold-rgb) / .65);
   box-shadow:
-    0 0 0 3px rgba(0,0,0,.6),
-    0 0 0 4px rgb(var(--action-gold-rgb) / .25),
-    inset 0 0 28px rgba(0,0,0,.5),
-    0 6px 22px rgba(0,0,0,.5);
+    0 0 0 4px rgba(0,0,0,.55),
+    0 0 0 5px rgb(var(--action-gold-rgb) / .22),
+    0 0 36px rgb(var(--action-gold-rgb) / .3),
+    inset 0 0 34px rgba(0,0,0,.55),
+    0 10px 28px rgba(0,0,0,.5);
 }
-.pet-hero-art::after { /* 头像底部暗金高光带 */
-  content:""; position:absolute; left:-3px; right:-3px; bottom:-3px; height:3px;
-  background:linear-gradient(90deg, transparent, var(--accent-hi), transparent); opacity:.85;
+.pet-hero-title { text-align:center; width:100%; }
+.pet-name-row { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
+.pet-name {
+  font-size:1.9rem; font-weight:800; color:var(--text-hi); letter-spacing:2px;
+  text-shadow:0 0 12px rgb(var(--action-gold-rgb) / .35);
 }
-.pet-hero-info { flex:1; min-width:0; }
-.pet-name { font-size:1.6rem; font-weight:700; color:var(--text-hi); letter-spacing:1px; text-shadow:0 0 8px rgb(var(--action-gold-rgb) / .2); }
-.pet-name .lv { color:var(--accent-hi); font-size:1.083rem; margin-left:10px; font-weight:600; text-shadow:0 0 6px rgb(var(--action-gold-rgb) / .4); }
-.exp-bar-wrap { height:8px; background:var(--inset); border:1px solid var(--line); margin-top:8px; overflow:hidden; }
+.pet-level-badge {
+  padding:2px 13px; border-radius:20px; font-family:var(--font-num); font-weight:700; font-size:.95rem;
+  color:#14100a; background:linear-gradient(180deg, var(--accent-hi), var(--accent-dim));
+  box-shadow:0 0 10px rgb(var(--action-gold-rgb) / .5), inset 0 0 6px rgba(0,0,0,.2);
+}
+.pet-reborn-badge {
+  padding:2px 13px; border-radius:20px; font-size:.78rem; font-weight:600; letter-spacing:1px;
+  color:var(--energy); border:1px solid rgb(var(--spd-rgb) / .45);
+  background:linear-gradient(180deg, rgb(var(--spd-rgb) / .14), rgba(0,0,0,.2));
+}
+.exp-block { width:100%; margin-top:2px; }
+.exp-bar-wrap { height:10px; background:var(--inset); border:1px solid var(--line); margin-top:8px; overflow:hidden; border-radius:2px; }
 .exp-bar { height:100%; background:linear-gradient(90deg, var(--xp), var(--accent-hi)); transition:width .3s; }
-.pet-hero-reborn { margin-top:6px; font-size:0.833rem; color:var(--text-faint); }
-.pet-active-skill-info { margin-top:6px; color:var(--accent-hi); font-size:0.833rem; line-height:1.35; }
-.pet-exp-pool { margin-top:4px; color:var(--energy); font-size:0.833rem; }
-.merge-crystal { display:block; margin:8px 0 0; font-size:0.917rem; color:var(--accent-hi); cursor:pointer; }
-.merge-crystal input { vertical-align:-2px; margin-right:6px; }
-.merge-crystal input:disabled + *, .merge-crystal:has(input:disabled) { color:var(--text-faint); cursor:not-allowed; }
-/* 魔石商店：页头余额 / 收款码 / 商品网格 / 记录 */
-.gem-chip {
-  padding:4px 10px; margin-right:10px; border:1px solid rgb(var(--action-gold-rgb) / .45);
-  border-radius:2px; background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .12), rgba(0,0,0,.2));
-  color:var(--accent-hi); font-family:var(--font-num); font-weight:700; font-size:0.917rem; white-space:nowrap;
-}
-.shop-page { display:flex; flex-direction:column; gap:12px; }
-.shop-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-.shop-balance { font-size:1.4rem; color:var(--accent-hi); font-family:var(--font-num); text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .35); }
-.shop-pay-note { font-size:0.917rem; color:var(--text-soft); line-height:1.5; }
-.shop-redeem { display:flex; gap:8px; }
-.shop-code-input {
-  flex:1; max-width:280px; padding:6px 10px; background:var(--inset);
-  border:1px solid var(--line); color:var(--text-hi); font-size:0.917rem; letter-spacing:1px;
-}
-.shop-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:10px; }
-.shop-card {
-  display:flex; flex-direction:column; gap:6px; padding:12px;
-  background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .06), rgba(0,0,0,.14));
-  border:1px solid rgb(var(--action-gold-rgb) / .22);
-}
-.shop-card-icon { font-size:1.8rem; }
-.shop-card-title { font-weight:700; color:var(--text-hi); }
-.shop-card-desc { font-size:0.833rem; color:var(--text-faint); line-height:1.4; min-height:2.3em; }
-.shop-card-price { font-family:var(--font-num); color:var(--accent-hi); font-weight:700; }
-.shop-card-rmb { color:var(--text-faint); font-weight:400; font-size:0.833rem; }
-.shop-order { font-size:0.833rem; color:var(--text-soft); padding:3px 0; border-bottom:1px solid var(--line); }
-.shop-missing { padding:20px; text-align:center; color:var(--text-soft); line-height:1.7; }
-.shop-missing-title { font-size:1.2rem; color:var(--accent-hi); margin-bottom:8px; }
-.exp-text { font-size:0.833rem; color:var(--text-faint); margin-top:2px; }
-/* 属性：暗黑金风格竖向列表（每个属性一行金框小格：标签在左、数字在右） */
+.exp-text { font-size:0.833rem; color:var(--text-faint); margin-top:3px; }
+/* 徽章行：技能 / 血统 / 特质 / 觉醒 / 经验池 */
+.pet-badges { display:flex; flex-direction:column; gap:6px; width:100%; padding:0 2px; }
+.pet-active-skill-info { color:var(--accent-hi); font-size:0.833rem; line-height:1.4; text-align:center; }
+.pet-bloodline { margin:2px 0; }
+.pet-bloodline .bloodline-card { margin:0; }
+.pet-exp-pool { color:var(--energy); font-size:0.833rem; text-align:center; }
+/* 属性矩阵：主属性大卡 + 次级属性小卡 */
 .pet-stats {
-  display:flex; flex-direction:column; gap:6px;
+  display:flex; flex-direction:column; gap:8px;
   background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .05), transparent 55%);
-  border-top:1px solid rgb(var(--action-gold-rgb) / .18); padding:10px 4px 8px;
+  border-top:1px solid rgb(var(--action-gold-rgb) / .18); padding:10px 2px 8px;
 }
+.pet-stats-main { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+.pet-stats-sub { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
 .pstat {
-  position:relative; display:flex; align-items:center;
-  gap:26px; padding:8px 14px;
-  background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .05), rgba(0,0,0,.12));
-  border:1px solid rgb(var(--action-gold-rgb) / .22);
+  position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px; padding:9px 4px 10px;
+  background:linear-gradient(180deg, rgb(var(--action-gold-rgb) / .06), rgba(0,0,0,.14));
+  border:1px solid rgb(var(--action-gold-rgb) / .26);
   box-shadow:inset 0 0 10px rgba(0,0,0,.35);
 }
 .pstat::after { /* 格子底部金色细线 */
-  content:""; position:absolute; left:10%; right:10%; bottom:0; height:1px;
-  background:linear-gradient(90deg, transparent, rgb(var(--action-gold-rgb) / .45), transparent);
+  content:""; position:absolute; left:14%; right:14%; bottom:0; height:1px;
+  background:linear-gradient(90deg, transparent, rgb(var(--action-gold-rgb) / .5), transparent);
 }
-.pstat-label { color:var(--accent-hi); font-size:0.833rem; letter-spacing:2px; text-transform:uppercase; text-shadow:0 0 6px rgb(var(--action-gold-rgb) / .35); flex:none; }
-.pstat-value { font-family:var(--font-num); font-weight:700; font-size:1.2rem; font-variant-numeric:tabular-nums; color:var(--text-hi); text-shadow:0 0 8px rgb(var(--action-gold-rgb) / .15); }
-.pstat-growth .pstat-value { color:var(--accent-hi); text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .4); }
+.pstat-label { color:var(--accent-hi); font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; text-shadow:0 0 6px rgb(var(--action-gold-rgb) / .35); }
+.pstat-value { font-family:var(--font-num); font-weight:800; font-variant-numeric:tabular-nums; color:var(--text-hi); text-shadow:0 0 8px rgb(var(--action-gold-rgb) / .2); }
+.pet-stats-main .pstat-value { font-size:1.42rem; }
+.pet-stats-sub .pstat-value { font-size:1.05rem; }
+.pstat-growth .pstat-value { color:var(--accent-hi); text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .45); }
 .pstat-hp .pstat-value { color:var(--hp-hi); text-shadow:0 0 10px rgb(var(--hp-hi-rgb) / .4); }
 .pstat-atk .pstat-value { color:var(--accent-hi); text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .35); }
 .pstat-def .pstat-value { color:var(--r-blue); text-shadow:0 0 10px rgb(var(--r-blue-rgb) / .35); }
@@ -337,12 +336,12 @@ body {
 .pstat-hit .pstat-value { color:var(--r-blue); text-shadow:0 0 10px rgb(var(--r-blue-rgb) / .35); }
 .pstat-dodge .pstat-value { color:var(--energy); text-shadow:0 0 10px rgb(var(--spd-rgb) / .35); }
 .pstat-ls .pstat-value { color:var(--exp); text-shadow:0 0 10px rgb(107,136,71 / .35); }
-.pstat-bonus .pstat-value { color:var(--metal); font-size:1.05rem; }
+.pstat-bonus .pstat-value { color:var(--metal); font-size:.95rem; }
 /* 装备加成 tooltip：悬停 + 点击都显示明细 */
 .pstat.bonus-tip { cursor:help; }
 .bonus-pop {
   display:none; position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%);
-  width:260px; padding:10px 12px; z-index:60;
+  width:250px; padding:10px 12px; z-index:60;
   background-color:var(--panel-2); background-image:var(--tex-grain);
   border:1px solid rgb(var(--action-gold-rgb) / .35); border-radius:var(--radius-sm);
   box-shadow:var(--shadow-panel); font-size:var(--fs-xs); color:var(--text-dim); line-height:1.7; text-align:left;
@@ -1079,12 +1078,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   container-type:size;
 }
 #tab-battle .battle-arena {
-  position:relative; flex:none; margin:0;
-  /* 兜底（老浏览器读不到 cq 单位）：整块 16:9，宽度铺满 */
-  width:100%; height:auto; aspect-ratio:16 / 9;
-  /* 现代浏览器：宽高各自按 16:9 反算，永远塞得下又不变形 */
-  width:min(100cqw, calc(100cqh * 16 / 9));
-  height:min(100cqh, calc(100cqw * 9 / 16));
+  position:relative; flex:1 1 0; min-height:0; margin:0;
+  /* 铺满整个舞台容器：战斗背景（battle-stage）三层分层图 + 立绘都随舞台自适应，
+     消除 16:9 固定比例在超宽/窄视口下左右/上下留出的深色黑边。
+     角色立绘用 cq 容器单位定位，会随舞台尺寸自动缩放；背景 repeat-x 无限平铺不露底。 */
+  width:100%; height:100%;
   background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3);
   border-radius:3px; overflow:hidden;
 }
@@ -2423,3 +2421,63 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   font-weight: 400;
   color: var(--text-dim);
 }
+
+/* ===== 出战宠物资料卡 · 网游徽章化（血统/特质/觉醒胶囊 + 技能条 + 属性层级） ===== */
+.pet-badges { display:flex; flex-direction:column; gap:6px; width:100%; padding:0 2px; }
+.pet-badge-row { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; align-items:center; }
+/* 血统 → 胶囊徽章（描述收进 tooltip） */
+.pet-badges .pet-bloodline { margin:0; }
+.pet-badges .pet-bloodline .bloodline-card {
+  display:inline-flex; align-items:center; gap:6px; padding:2px 10px; margin:0;
+  border-radius:999px; background:rgba(242,182,50,.1); border:1px solid rgba(242,182,50,.4);
+}
+.pet-badges .pet-bloodline .bloodline-icon { font-size:1.05rem; }
+.pet-badges .pet-bloodline .bloodline-info { display:flex; align-items:center; }
+.pet-badges .pet-bloodline .bloodline-name { font-size:.8rem; margin:0; white-space:nowrap; letter-spacing:1px; }
+.pet-badges .pet-bloodline .bloodline-desc { display:none; }
+/* 特质胶囊行居中 */
+.pet-badges .pet-traits { margin:0; }
+.pet-badges .pet-traits .trait-row { justify-content:center; margin-top:0; }
+/* 觉醒徽章 → 胶囊 */
+.pet-badges .pet-awaken { margin:0; }
+.pet-badges .pet-awaken .awaken-badge {
+  border-radius:999px; padding:2px 10px; font-size:.76rem; line-height:1.5;
+  border-color:rgb(var(--action-gold-rgb)/.55);
+  background:linear-gradient(135deg, rgb(var(--action-gold-rgb)/.18), rgb(var(--action-gold-rgb)/.07));
+}
+/* 主动技能 → 浅金条 */
+.pet-badges .pet-active-skill-info {
+  text-align:center; padding:4px 10px; border-radius:4px; font-size:.8rem;
+  background:linear-gradient(180deg, rgb(var(--action-gold-rgb)/.1), rgba(0,0,0,.1));
+  border:1px solid rgb(var(--action-gold-rgb)/.25);
+}
+.pet-badges .pet-exp-pool { text-align:center; }
+/* 名字下方金色分隔线 */
+.pet-hero-title { padding-bottom:10px; border-bottom:1px solid rgb(var(--action-gold-rgb)/.22); }
+/* 主/次级属性层级 */
+.pet-stats-main .pstat { border-color:rgb(var(--action-gold-rgb)/.32); }
+.pet-stats-main .pstat-value { font-size:1.5rem; }
+.pet-stats-sub .pstat {
+  border-color:rgb(var(--action-gold-rgb)/.14);
+  background:linear-gradient(180deg, rgb(var(--action-gold-rgb)/.04), rgba(0,0,0,.12));
+}
+.pet-stats-sub .pstat::after { opacity:.45; }
+.pet-stats-sub .pstat-value { font-size:.95rem; color:var(--text-soft); }
+.pet-stats-sub .pstat-label { font-size:.66rem; opacity:.8; }
+/* 装备加成 tooltip 在次级小卡里不溢出 */
+.pet-stats-sub .pstat.bonus-tip .bonus-pop { left:50%; transform:translateX(-50%); width:220px; }
+/* ===== 属性矩阵排列修正：主属性 3+2 居中大卡 / 次级 3 列紧凑（仅宠物页资料卡） ===== */
+.pet-tab-pane .pet-stats-main {
+  display:flex; flex-wrap:wrap; justify-content:center; gap:6px;
+}
+.pet-tab-pane .pet-stats-main .pstat {
+  flex:1 1 30%; max-width:calc(33.333% - 6px);
+  padding:12px 4px 13px;
+  border-color:rgb(var(--action-gold-rgb)/.4);
+  background:linear-gradient(180deg, rgb(var(--action-gold-rgb)/.11), rgba(0,0,0,.16));
+}
+.pet-tab-pane .pet-stats-main .pstat-value { font-size:1.32rem; }
+.pet-tab-pane .pet-stats-main .pstat-value { white-space:nowrap; }
+.pet-tab-pane .pet-stats-sub { gap:5px; }
+.pet-tab-pane .pet-stats-sub .pstat { padding:7px 3px 8px; }
+.pet-tab-pane .pet-stats-sub .pstat-value { font-size:.82rem; white-space:normal; line-height:1.35; }

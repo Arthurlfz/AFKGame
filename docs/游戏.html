@@ -9,9 +9,9 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=388a08a4">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=cefcdb31">
-<link rel="stylesheet" href="css/game.css?v=bfd1d400">
+<link rel="stylesheet" href="css/game.css?v=d3167980">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=b34c0625">
+<link rel="stylesheet" href="css/ui-polish.css?v=bbafbacc">
 <link rel="stylesheet" href="css/market-refresh.css?v=d3732457">
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
@@ -268,38 +268,52 @@
               <div class="panel pet-hero-panel">
                 <div class="pet-active-corner">当前出战</div>
                 <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
-                <!-- 立绘区：大头像 + 名字/等级/经验条，横向信息卡 -->
+                <!-- 立绘主视觉：居中大立绘 + 金色光晕 + 名字/等级/转生徽章 -->
                 <div class="pet-hero">
                   <div class="pet-hero-art">
                     <div class="pet-avatar" id="pet-avatar">❔</div>
                   </div>
-                  <div class="pet-hero-info">
-                    <div class="pet-name"><span id="pet-name">我的宠物</span><span class="lv" id="pet-level">Lv.1</span></div>
-                    <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
-                    <div class="exp-text" id="exp-text">0/15</div>
-                    <div class="pet-hero-reborn" id="pet-reborn">转生 0 次</div>
-                    <div class="pet-bloodline" id="pet-bloodline"></div>
-                    <div class="pet-active-skill-info" id="pet-active-skill-info">主动技能：终形态 Lv.60 解锁</div>
-                    <div class="pet-traits" id="pet-traits"></div>
-                    <div class="pet-awaken" id="pet-awaken" style="display:none"></div>
-                    <div class="pet-exp-pool" id="pet-exp-pool" style="display:none"></div>
+                  <div class="pet-hero-title">
+                    <div class="pet-name-row">
+                      <span class="pet-name" id="pet-name">我的宠物</span>
+                      <span class="pet-level-badge" id="pet-level">Lv.1</span>
+                      <span class="pet-reborn-badge" id="pet-reborn">转生 0 次</span>
+                    </div>
+                    <div class="exp-block">
+                      <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
+                      <div class="exp-text" id="exp-text">0/15</div>
+                    </div>
                   </div>
                 </div>
-                <!-- 属性数据牌：彩色大数字 -->
+                <!-- 徽章行：血统 / 特质 / 觉醒 胶囊行 + 技能条 + 经验池 -->
+                <div class="pet-badges">
+                  <div class="pet-badge-row">
+                    <div class="pet-bloodline" id="pet-bloodline"></div>
+                    <div class="pet-traits" id="pet-traits"></div>
+                    <div class="pet-awaken" id="pet-awaken" style="display:none"></div>
+                  </div>
+                  <div class="pet-active-skill-info" id="pet-active-skill-info">主动技能：终形态 Lv.60 解锁</div>
+                  <div class="pet-exp-pool" id="pet-exp-pool" style="display:none"></div>
+                </div>
+                <!-- 属性矩阵：主属性大卡（成长/生命/攻击/防御/速度） + 次级属性小卡 -->
                 <div class="pet-stats">
-                  <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="pet-growth">5.0</span></div>
-                  <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="pet-hp">100</span></div>
-                  <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="pet-atk">20</span></div>
-                  <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="pet-def">10</span></div>
-                  <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="pet-spd">8</span></div>
-                  <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
-                  <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
-                  <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
-                  <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
-                  <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
-                  <div class="pstat pstat-bonus bonus-tip">
-                    <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
-                    <div class="bonus-pop" id="pet-bonus-pop"></div>
+                  <div class="pet-stats-main">
+                    <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="pet-growth">5.0</span></div>
+                    <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="pet-hp">100</span></div>
+                    <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="pet-atk">20</span></div>
+                    <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="pet-def">10</span></div>
+                    <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="pet-spd">8</span></div>
+                  </div>
+                  <div class="pet-stats-sub">
+                    <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
+                    <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
+                    <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
+                    <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
+                    <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
+                    <div class="pstat pstat-bonus bonus-tip">
+                      <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
+                      <div class="bonus-pop" id="pet-bonus-pop"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -804,20 +818,20 @@ window.PetSprites = {
 <script src="js/ui/ui-common.js?v=feaff803"></script>
 <script src="js/ui/ui-console.js?v=05a0aa58"></script>
 <script src="js/ui/ui-shell.js?v=d0138c82"></script>
-<script src="js/ui/ui-worldmap.js?v=5186d20c"></script>
-<script src="js/ui/ui-capital.js?v=11fb3349"></script>
+<script src="js/ui/ui-worldmap.js?v=c02315e7"></script>
+<script src="js/ui/ui-capital.js?v=0a5ac952"></script>
 
 <script src="js/ui/ui-login.js?v=99e17f03"></script>
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-quest.js?v=e1cfe143"></script>
 <script src="js/ui/ui-battle.js?v=c0c142e4"></script>
-<script src="js/ui/ui-pet.js?v=0ea3ced5"></script>
+<script src="js/ui/ui-pet.js?v=6777f46b"></script>
 <script src="js/ui/ui-pet-evolve.js?v=196095dd"></script>
 <script src="js/ui/ui-pet-merge.js?v=9249467a"></script>
 <script src="js/ui/ui-pet-synth.js?v=265fbed1"></script>
-<script src="js/ui/ui-bag.js?v=5cf77695"></script>
-<script src="js/ui/ui-equipment.js?v=e53a6742"></script>
+<script src="js/ui/ui-bag.js?v=4686459b"></script>
+<script src="js/ui/ui-equipment.js?v=0fdab0fa"></script>
 <script src="js/ui/ui-craft.js?v=9983d4b9"></script>
 <script src="js/ui/ui-market.js?v=80792912"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>

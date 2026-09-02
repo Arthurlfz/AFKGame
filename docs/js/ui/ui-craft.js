@@ -172,8 +172,10 @@
     const P = window.Pet;
     const pets = (P && P.getPets ? P.getPets() : []) || [];
     return pets.filter(p => {
-      if (!T.level || Number(p.level) < T.level) return false;
-      if (T.growth != null && p.growth < T.growth) return false;
+      const lvl = T.minLevel != null ? T.minLevel : T.level;
+      if (!lvl || Number(p.level) < lvl) return false;
+      const grw = T.minGrowth != null ? T.minGrowth : T.growth;
+      if (grw != null && p.growth < grw) return false;
       if (T.needFinal && !(P.getAwakenState && P.getAwakenState(p))) return false;
       if (T.source === 'awaken') return !!(P.getAwakenState && P.getAwakenState(p));
       return Array.isArray(p.traits) && p.traits.length > 0; // 血脉档需要特质
@@ -221,7 +223,7 @@
         : (T.source === 'awaken' ? '觉醒特质' : '无特质');
       const sel = selPet && selPet.id === p.id ? ' sel' : '';
       return `<div class="craft-soul-pet${sel}" data-pet="${p.id}"><span class="sp-name">${p.name}</span><span class="sp-meta">Lv${p.level} · 成长${p.growth}</span><span class="sp-traits">${traits}</span></div>`;
-    }).join('') : `<div class="craft-soul-empty">当前档位没有可魂铸的宠物（${T.label}：Lv${T.level}+ / 成长≥${T.growth}${T.needFinal ? ' / 终形态' : ''}）</div>`;
+    }).join('') : `<div class="craft-soul-empty">当前档位没有可魂铸的宠物（${T.label}：Lv${T.minLevel != null ? T.minLevel : T.level}+ / 成长≥${T.minGrowth != null ? T.minGrowth : T.growth}${T.needFinal ? ' / 终形态' : ''}）</div>`;
     // 特质自选（血脉档：宠有多条特质时选 1 条）
     let traitSel = '';
     if (selPet && T.source !== 'awaken') {
@@ -261,7 +263,7 @@
     });
     body.querySelectorAll('.craft-soul-pet').forEach(row => {
       row.onclick = () => {
-        soulState.petId = row.dataset.pet;
+        soulState.petId = Number(row.dataset.pet);
         soulState.traitId = null;
         rerender();
       };
@@ -271,7 +273,9 @@
       const btn = btnCast;
       btn.disabled = true;
       btn.textContent = '⚒ 魂铸中…';
-      const res = await Craft.soulCast(eq, soulState.petId, soulState.tier, soulState.traitId || undefined);
+      const petObj = (window.Pet && window.Pet.getPets ? window.Pet.getPets() : []).find(p => p.id === soulState.petId);
+      if (!petObj) { btn.disabled = false; btn.textContent = '⚒ 确认魂铸'; return; }
+      const res = await Craft.soulCast(eq, petObj, soulState.tier, soulState.traitId || undefined);
       const box = body.querySelector('#craft-soul-result');
       if (!box) { if (UI.renderAll) UI.renderAll(); return; }
       if (res && res.ok) {

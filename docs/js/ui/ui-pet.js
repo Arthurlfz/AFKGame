@@ -138,13 +138,15 @@
       const aw = window.Pet.getAwakenState(pet);
       awEl.style.display = aw ? '' : 'none';
       if (aw) {
-        const bonus = Object.keys(aw.bonus || {});
-        const btxt = bonus.length ? ' · ' + bonus.map(function (k) {
-          const bv = aw.bonus[k];
-          const isFlat = ['spd'].indexOf(k) >= 0;
-          return k + '+' + bv + (isFlat ? '' : '%');
-        }).join(' ') : '';
-        awEl.innerHTML = '<span class="awaken-badge">觉醒·' + escapeHtml(aw.skillName || '') +
+        // 觉醒加成：{stat, value} 扁平结构 → 中文属性名 + 百分比（spd 例外，为绝对值）
+        const STAT_CN = { hp: '生命', atk: '攻击', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血' };
+        const ab = aw.bonus;
+        let btxt = '';
+        if (ab && ab.stat != null) {
+          const flat = ['spd'].indexOf(ab.stat) >= 0;
+          btxt = ' · ' + (STAT_CN[ab.stat] || ab.stat) + '+' + ab.value + (flat ? '' : '%');
+        }
+        awEl.innerHTML = '<span class="awaken-badge">觉醒 · ' + escapeHtml(aw.skillName || '') +
           '：主动技能伤害+' + Math.round((aw.damage || 0) * 100) + '%' + btxt + '</span>';
       }
     }
@@ -213,7 +215,14 @@
   
     // 血统被动卡片
     const blEl = $('pet-bloodline');
-    if (blEl) blEl.innerHTML = UI.bloodlineHtml ? UI.bloodlineHtml(pet) : '';
+    if (blEl) {
+      blEl.innerHTML = UI.bloodlineHtml ? UI.bloodlineHtml(pet) : '';
+      const blCard = blEl.querySelector('.bloodline-card');
+      if (blCard) {
+        const blDesc = blCard.querySelector('.bloodline-desc');
+        if (blDesc) blCard.title = blDesc.textContent;
+      }
+    }
   }
 
   /* ---------- 装备 tab 三连屏：左列属性面板（与资料页一致，id 前缀 eqp-） ---------- */
@@ -847,7 +856,7 @@
       const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
       const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
       const base = eq.base || { label: '攻击', value: 0 };
-      tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
+      tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}`;
 
       const name = document.createElement('span');
       name.className = 'qe-name';

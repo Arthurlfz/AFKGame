@@ -405,6 +405,7 @@
       ${line(prefix, 'tip-prefix')}
       <div class="tip-section">后缀</div>
       ${line(suffix, 'tip-suffix')}
+      ${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}
       ${buildEquipCompare(pet, eq)}`;
   }
 

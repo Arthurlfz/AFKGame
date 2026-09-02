@@ -89,6 +89,7 @@
       ${line(aff.prefix, 'tip-prefix')}
       <hr class="tip-divider">
       ${line(aff.suffix, 'tip-suffix')}
+      ${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}
       <div class="tip-line hint" style="border-bottom:none;margin-top:4px">Ctrl/Alt+点击 分解 · 点开看词缀</div>`;
   }
 

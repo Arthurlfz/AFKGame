@@ -156,24 +156,14 @@
   })();
 
   // 渲染世界地图页（幂等：canvas 已有 marker 则不重复）
+  // 第一原则：地图坐标系 = 画布坐标系。
+  //  - canvas 铺满可用舞台（CSS），底图 background-size:100% 100% 拉伸填满 canvas；
+  //  - 点位 x/y 是相对底图的百分比，底图填满 canvas 后即相对 canvas 的百分比；
+  //  - 画布 / 地图 / 点位三个组件共享同一坐标系 → 天然对齐、永不脱锚；
+  //  - 任何视口比例都铺满无黑边（超宽屏地图横向拉伸，窄屏纵向拉伸，均为「铺满」的必然取舍）。
+  //  此前用 16:9 锁宽 / cover / contain 换算，本质是让画布与地图比例互相打架：锁宽留黑边、cover 裁点位、
+  //  contain 留大片空。这套换算在超宽屏下始终无法同时满足「铺满」和「点位全可见」，故整体删除。
   let rendered = false;
-  // 让地图 canvas 保持 16:9 电影取景：按可用空间等比计算宽高（宽=min(容器宽, 容器高×16/9)），居中。
-  // 背景 cover 填满，图会裁剪上下一点点，但画面无黑边、有电影镜头感（用户指定）。
-  function fitCanvas() {
-    const wrap = $('worldmap-canvas-wrap');
-    if (!wrap) return;
-    // 可用空间 = worldmap-page（wrap 的父，flex:1 撑满 tab-worldmap）
-    const page = wrap.parentElement;
-    if (!page) return;
-    const pw = page.clientWidth || 0;
-    const ph = page.clientHeight || 0;
-    if (pw <= 0 || ph <= 0) return;
-    // 16:9 等比：宽=min(可用宽, 可用高×16/9)，高由 aspect-ratio:16/9 自动
-    const RATIO = 16 / 9;
-    let w = pw, h = w / RATIO;
-    if (h > ph) { h = ph; w = h * RATIO; }
-    wrap.style.width = Math.floor(w) + 'px';
-  }
   function renderWorldMapPage() {
     const canvas = $('worldmap-canvas');
     if (!canvas || !window.WorldMap) return;
@@ -181,10 +171,11 @@
     const rb = $('btn-return-battle');
     if (rb) rb.hidden = !(window.Battle && window.Battle.getCurrentArea && window.Battle.getCurrentArea());
     if (!rendered) {
-      // 首次：底图 + 点位（cover 填满 16:9 取景框）
+      // 底图拉伸填满整个 canvas：点位百分比 = 画布百分比，无换算、无黑边、点位永不裁出
       canvas.style.backgroundImage = 'url("' + window.WorldMap.img + '")';
-      canvas.style.backgroundSize = 'cover';
+      canvas.style.backgroundSize = '100% 100%';
       canvas.style.backgroundPosition = 'center';
+      canvas.style.backgroundRepeat = 'no-repeat';
       // 主城
       const cap = window.WorldMap.capital;
       const capEl = makeMarker(cap);
@@ -198,10 +189,7 @@
         canvas.appendChild(m);
       }
       rendered = true;
-      window.addEventListener('resize', fitCanvas);
     }
-    // 每次切到该页都重算 16:9 尺寸（页面 active 后 wrap 才有真实尺寸）
-    fitCanvas();
   }
   // 取野图怪物等级段（来自对应 area 的 levelRange，纯展示）
   function markerLevelText(point) {
@@ -216,6 +204,7 @@
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'wm-marker' + (point.type === 'capital' ? ' wm-marker--capital' : '');
+    // 百分比定位：底图拉伸填满 canvas 后，x/y% 即相对整个画布的坐标
     el.style.left = point.x + '%';
     el.style.top = point.y + '%';
     el.setAttribute('aria-label', point.name);
