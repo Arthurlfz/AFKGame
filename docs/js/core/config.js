@@ -666,25 +666,25 @@ window.Config = {
   craft: {
     // 重铸石：随机重铸装备全部词缀（数量 / 类型 / T 阶 / 数值 全部随机）
     reforge: {
-      name: '重铸石', amount: 1, icon: '🎲',
+      name: '重铸石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_whetstone.png" alt="">',
       effect: '随机重铸全部词缀：数量、类型、T 阶、数值全部重新随机。',
       rule: '会清空并重洗当前词条，组合与数值都不可控，风险远高于收益。'
     },
     // 剥离石：随机移除一条词缀（仅剩 1 条时不可用）
     strip: {
-      name: '剥离石', amount: 1, icon: '✂️',
+      name: '剥离石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_flay_shard.png" alt="">',
       effect: '随机移除装备一条词缀。',
       rule: '装备仅剩 1 条词缀时无法使用。'
     },
     // 神圣石：重 Roll 装备【全部】词缀的数值（类型不变、T 阶不变，数值在该 T 阶范围内重新随机）
     holy: {
-      name: '神圣石', amount: 1, icon: '🔮',
+      name: '神圣石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_sacred_stone.png" alt="">',
       effect: '重随全部词缀的数值，词缀类型与 T 阶不变。',
       rule: '适合在词缀组合已确定后追求更高数值。'
     },
     // 增缀石：给装备【新增】一条随机词缀（类型随机不重复、T 阶随机 1~5；满 3 条不可用）
     augment: {
-      name: '增缀石', amount: 1, icon: '➕',
+      name: '增缀石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_rune_stone.png" alt="">',
       effect: '新增一条随机且不重复的词缀。',
       rule: '装备已有 3 条词缀时无法使用。'
     }

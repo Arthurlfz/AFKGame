@@ -288,61 +288,137 @@
     }
   }
 
-  /* ---------- 装备挂单行 ---------- */
+  /* ---------- 装备卡片 ---------- */
+  function buildItemCard(l, RARITY_LABEL) {
+    const div = document.createElement('div');
+    div.className = 'mk-card';
+    const color = Config.equipment.rarities.find(r => r.id === l.item_rarity)?.color || '#d8d8d8';
+    const affixText = flattenAffixes(l.item_affixes || []).map(a => Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label}+${a.value}%`)
+      .concat(l.item_soul ? [l.item_soul.label] : []).join(' ');
+    const mat = Market.findMaterial(l.material_type);
+    const legacy = !l.material_type;
+    const mine = Market.isItemListed(l.item_id);
+    const priceHtml = legacy
+      ? '<span class="mk-price">旧版挂单</span>'
+      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
+    const btnText = mine ? '取回' : legacy ? '不可购买' : '购买';
+    div.innerHTML = `
+      <div class="mk-card-top">
+        <div class="mk-avatar mk-avatar--item">⚔️</div>
+        <div class="mk-card-info">
+          <div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>
+          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}</div>
+        </div>
+      </div>
+      <div class="mk-affix">${affixText ? escapeHtml(affixText) : '<span style="color:var(--text-faint)">无词缀</span>'}</div>
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${btnText}</button></div>`;
+    // 装备详情 tooltip（hover 显示完整词缀）
+    const marketTip = document.createElement('div');
+    marketTip.className = 'equip-tip';
+    const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
+    const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
+    marketTip.innerHTML = `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}${detailLine(detailAffixes.suffix, 'tip-suffix')}${l.item_soul ? `<div class="tip-section">魂铸</div><div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : ''}`;
+    div.appendChild(marketTip);
+    const btn = div.querySelector('.mk-btn');
+    btn.onclick = async () => {
+      if (mine) {
+        const res = await Market.cancelItem(l.id);
+        if (res.error) { showToast('❌ 取回失败', res.error); return; }
+        showToast('↩️ 已取回', `${l.item_name} 已下架`);
+        UI.renderAll();
+        return;
+      }
+      if (legacy) { showToast('❌ 无法购买', '这是旧版价格挂单，请联系卖家重新上架'); return; }
+      if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买装备'); return; }
+      openBuyConfirm('item', l);
+    };
+    return div;
+  }
+
+  /* ---------- 宠物卡片 ---------- */
+  function buildPetCard(l) {
+    const div = document.createElement('div');
+    div.className = 'mk-card';
+    const avatar = window.PetSprites && window.PetSprites.avatarOf ? window.PetSprites.avatarOf(l.pet_name) : null;
+    const mat = Market.findMaterial(l.material_type);
+    const legacy = !l.material_type;
+    const mine = Market.isListed(l.pet_id);
+    const priceHtml = legacy
+      ? '<span class="mk-price">旧版挂单</span>'
+      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
+    const traitsHtml = (UI.traitsHtml && l.pet_traits && l.pet_traits.length) ? `<div class="mk-traits">${UI.traitsHtml({ traits: l.pet_traits })}</div>` : '';
+    div.innerHTML = `
+      <div class="mk-card-top">
+        ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item">🐾</div>'}
+        <div class="mk-card-info">
+          <div class="mk-name">${escapeHtml(l.pet_name)}</div>
+          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}</div>
+        </div>
+      </div>
+      ${traitsHtml}
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${mine ? '取回' : legacy ? '不可购买' : '购买'}</button></div>`;
+    const btn = div.querySelector('.mk-btn');
+    btn.onclick = async () => {
+      if (mine) {
+        const res = await Market.cancelPet(l.id);
+        if (res.error) { showToast('❌ 取回失败', res.error); return; }
+        showToast('↩️ 已取回', `${l.pet_name} 已下架`);
+        UI.renderAll();
+        return;
+      }
+      if (legacy) { showToast('❌ 无法购买', '这是旧版价格挂单，请联系卖家重新上架'); return; }
+      if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买宠物'); return; }
+      openBuyConfirm('pet', l);
+    };
+    return div;
+  }
+
+  /* ---------- 宠物蛋卡片 ---------- */
+  function buildEggCard(l) {
+    const div = document.createElement('div');
+    div.className = 'mk-card';
+    const mine = Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false;
+    const mat = Market.findMaterial(l.material_type);
+    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
+    div.innerHTML = `
+      <div class="mk-card-top">
+        <div class="mk-egg-icon">🥚</div>
+        <div class="mk-card-info">
+          <div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>
+          <div class="mk-meta">宠物蛋</div>
+        </div>
+      </div>
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
+    const btn = div.querySelector('.mk-btn');
+    btn.onclick = async () => {
+      if (mine) {
+        const res = await Market.cancelEgg(l.id);
+        if (res.error) showToast('❌ 取回失败', res.error);
+        else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
+        return;
+      }
+      const res = await Market.buyEgg(l.id);
+      if (res.error) showToast('❌ 购买失败', res.error);
+      else { showToast('🥚 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
+    };
+    return div;
+  }
+
+  /* ---------- 装备挂单网格（供 UI.renderItemMarket 复用） ---------- */
   function renderItemMarket(container) {
     const box = container || $('market-items');
     if (!box) return;
     box.innerHTML = '';
     const list = sortMarketListings(Market.getItemListings().filter(matchMarketListing));
     if (!list.length) {
-      box.innerHTML = '<div class="inv-empty">没有符合条件的商品</div>';
+      box.innerHTML = '<div class="mk-empty">没有符合条件的装备</div>';
       return;
     }
+    const grid = document.createElement('div');
+    grid.className = 'mk-grid';
     const RARITY_LABEL = { white: '白装', blue: '蓝装', gold: '金装' };
-    for (const l of list) {
-      const div = document.createElement('div');
-      div.className = 'market-item item';
-      const info = document.createElement('div');
-      info.className = 'm-info';
-      const color = Config.equipment.rarities.find(r => r.id === l.item_rarity)?.color || '#d8d8d8';
-      const affixText = flattenAffixes(l.item_affixes || []).map(a => Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label}+${a.value}%`).join(' ');
-      info.innerHTML = `
-        <div class="m-name" style="color:${color}">${escapeHtml(l.item_name)} <span style="font-size:0.833rem">${RARITY_LABEL[l.item_rarity] || l.item_rarity}·T${l.item_tier}</span></div>
-        <div class="m-desc">${escapeHtml(affixText)}</div>`;
-      const marketTip = document.createElement('div');
-      marketTip.className = 'equip-tip';
-      const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
-      const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-      marketTip.innerHTML = `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
-      info.appendChild(marketTip);
-      info.onclick = () => info.classList.toggle('open');
-      const mat = Market.findMaterial(l.material_type);
-      const legacy = !l.material_type;
-      const price = document.createElement('div');
-      price.className = 'm-price';
-      price.textContent = legacy ? '旧版挂单' : `${l.material_qty} ${mat.icon} ${mat.name}`;
-      const mine = Market.isItemListed(l.item_id);
-      const btn = document.createElement('button');
-      btn.className = 'btn-sm' + (mine ? ' alt' : '');
-      btn.textContent = mine ? '取回' : legacy ? '不可购买' : '购买';
-      if (legacy && !mine) btn.disabled = true;
-      btn.onclick = async () => {
-        if (mine) {
-          const res = await Market.cancelItem(l.id);
-          if (res.error) { showToast('❌ 取回失败', res.error); return; }
-          showToast('↩️ 已取回', `${l.item_name} 已下架`);
-          UI.renderAll();
-          return;
-        }
-        if (legacy) { showToast('❌ 无法购买', '这是旧版价格挂单，请联系卖家重新上架'); return; }
-        if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买装备'); return; }
-        openBuyConfirm('item', l);
-      };
-      div.appendChild(info);
-      div.appendChild(price);
-      div.appendChild(btn);
-      box.appendChild(div);
-    }
+    for (const l of list) grid.appendChild(buildItemCard(l, RARITY_LABEL));
+    box.appendChild(grid);
   }
 
   // 可折叠分组面板（宠物/装备左右两列）：标题 + 数量 + 「收起/展开」按钮
@@ -376,537 +452,47 @@
     renderMarketControls(box);
     const list = sortMarketListings(Market.getListings().filter(matchMarketListing));
     const items = sortMarketListings(Market.getItemListings().filter(matchMarketListing));
-
-    const groups = document.createElement('div');
-    groups.className = 'market-groups';
-    box.appendChild(groups);
-
-    // 宠物分组（可折叠，左列）
-    const petList = list.filter(l => l.pet_id);
-    const petGroup = makeMarketGroup('🐾 宠物', petList.length);
-    groups.appendChild(petGroup);
-    const petBody = petGroup.querySelector('.market-group-body');
-    if (!petList.length) {
-      petBody.innerHTML = '<div class="inv-empty">没有符合条件的商品</div>';
-    } else {
-      for (const l of petList) {
-        const div = document.createElement('div');
-        div.className = 'market-item';
-        const info = document.createElement('div');
-        info.className = 'm-info';
-        info.innerHTML = `<span class="m-name">${escapeHtml(l.pet_name)}</span><span class="m-growth">成长${l.pet_growth}</span><span class="m-level">Lv.${l.pet_level}</span>`;
-        const mat = Market.findMaterial(l.material_type);
-        const legacy = !l.material_type;
-        const price = document.createElement('div');
-        price.className = 'm-price';
-        price.textContent = legacy ? '旧版挂单' : `${l.material_qty} ${mat.icon} ${mat.name}`;
-        const mine = Market.isListed(l.pet_id);
-        const btn = document.createElement('button');
-        btn.className = 'btn-sm' + (mine ? ' alt' : '');
-        btn.textContent = mine ? '取回' : legacy ? '不可购买' : '购买';
-        if (legacy && !mine) btn.disabled = true;
-        btn.onclick = async () => {
-          if (mine) {
-            const res = await Market.cancelPet(l.id);
-            if (res.error) { showToast('❌ 取回失败', res.error); return; }
-            showToast('↩️ 已取回', `${l.pet_name} 已下架`);
-            UI.renderAll();
-            return;
-          }
-          if (legacy) { showToast('❌ 无法购买', '这是旧版价格挂单，请联系卖家重新上架'); return; }
-          if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买宠物'); return; }
-          openBuyConfirm('pet', l);
-        };
-        div.appendChild(info);
-        div.appendChild(price);
-        div.appendChild(btn);
-        petBody.appendChild(div);
-      }
-    }
-
-    // 装备分组（可折叠，右列）
-    const itemGroup = makeMarketGroup('⚔️ 装备', items.length, false);
-    groups.appendChild(itemGroup);
-    const itemBody = itemGroup.querySelector('.market-group-body');
-    itemBody.id = 'market-items';
-    renderItemMarket(itemBody);
-
-    // 宠物蛋分组（可折叠）
     const eggList = Market.getEggListings ? Market.getEggListings() : [];
-    const eggGroup = makeMarketGroup('🥚 宠物蛋', eggList.length, false);
-    groups.appendChild(eggGroup);
-    const eggBody = eggGroup.querySelector('.market-group-body');
-    if (!eggList.length) eggBody.innerHTML = '<div class="inv-empty">还没有宠物蛋在售</div>';
-    for (const l of eggList) {
-      const mine = Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false;
-      const row = document.createElement('div');
-      row.className = 'market-item sell-row';
-      row.innerHTML = `
-        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(window.Drop.makeEggName(l.egg_type))}</span>
-        <span class="m-growth">${escapeHtml(l.material_type || '')} ×${l.material_qty}</span></div>
-        ${mine
-          ? '<button class="btn-sm alt sell-recall">取回</button>'
-          : '<button class="btn-sm sell-buy">购买</button>'}`;
-      eggBody.appendChild(row);
-      const buyBtn = row.querySelector('.sell-buy');
-      if (buyBtn) {
-        buyBtn.onclick = async () => {
-          const res = await Market.buyEgg(l.id);
-          if (res.error) showToast('❌ 购买失败', res.error);
-          else { showToast('🥚 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
-        };
-      }
-      const recall = row.querySelector('.sell-recall');
-      if (recall) {
-        recall.onclick = async () => {
-          const res = await Market.cancelEgg(l.id);
-          if (res.error) showToast('❌ 取回失败', res.error);
-          else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
-        };
-      }
-    }
-  }
 
-  /* ---------- 我的上架（市场页：挂单 / 取回的唯一入口） ---------- */
-  // 展开状态：正在填写的上架表单（按 cloudId 记录）。renderAll 高频重建时保持展开，
-  // 避免"刚展开的表单被收起"和"正在打开的材料下拉被销毁弹回"
-  let expandedPetId = null, expandedItemId = null, expandedEggId = null;
+    const pets = list.filter(l => l.pet_id);
+    const RARITY_LABEL = { white: '白装', blue: '蓝装', gold: '金装' };
 
-  function renderSellArea() {
-    const box = $('market-sell');
-    // 聚焦保护：材料下拉打开 / 数量输入框正在编辑时，跳过本次重建。
-    // 每秒回血时钟、市场轮询、每场结算都会触发 renderAll → 整块重建 #market-sell，
-    // 不保护的话正在打开的原生 select 会被销毁，表现为"下拉打开后马上弹回去"
-    const ae = document.activeElement;
-    if (ae && (ae.tagName === 'SELECT' || ae.tagName === 'INPUT') && ae.closest && ae.closest('.sell-form')) return;
-    box.innerHTML = '';
-    if (!UI.isLoggedIn()) {
-      box.innerHTML = '<div class="inv-empty">登录后可在市场挂单出售宠物 / 装备</div>';
-      return;
-    }
-    const evoMatName = (Config.pet.evolution && Config.pet.evolution.materialName) || '进化素材';
-    // 改法一后进化素材不再挂在 Config.drop.evolutionMaterials，统一从交易材料表取（category='evo'）
-    const evolutionItems = Config.trade.materials
-      .filter(m => m.category === 'evo' && m.name === evoMatName)
-      .map(m => ({ id: m.id, name: m.name, icon: m.icon, category: 'evo' }));
-    const paymentGroups = [
-      { key: 'currency', label: '通货', items: Config.trade.materials.filter(m => m.category === 'stone' && Market.isPaymentMaterial(m.name)) },
-      { key: 'evo', label: '进化素材', items: evolutionItems },
-      { key: 'other', label: '其他', items: Config.trade.materials.filter(m => ['egg', 'beast', 'soul'].includes(m.category) && Market.isPaymentMaterial(m.name)) },
-    ];
-    const paymentPanel = () => `
-      <div class="sell-payment">
-        <div class="sell-payment-search"><input type="text" class="sell-input pay-search" placeholder="搜索收款物"></div>
-        <div class="sell-payment-tabs">
-          ${paymentGroups.map((g, gi) => `<button class="btn-mini ${gi === 0 ? 'primary' : 'ghost'} pay-tab" data-pay-tab="${g.key}">${g.label}</button>`).join('')}
-        </div>
-        ${paymentGroups.map((g, gi) => `
-          <div class="sell-payment-group" data-pay-group="${g.key}" style="${gi === 0 ? '' : 'display:none'}">
-            <div class="sell-payment-list">
-              ${g.items.map(m => `<button class="btn-mini pay-item" data-pay-name="${m.name}" data-pay-key="${g.key}">${m.icon} ${m.name}</button>`).join('') || '<div class="hint">暂无</div>'}
-            </div>
-          </div>
-        `).join('')}
-      </div>`;
-    const sellForm = () => `
-      <div class="sell-form">
-        ${paymentPanel()}
-        <input type="hidden" class="sell-input sell-mat">
-        <input type="number" class="sell-input sell-qty" placeholder="数量" min="1">
-        <div class="sell-actions">
-          <button class="btn-mini primary sell-ok">确认</button>
-          <button class="btn-mini ghost sell-cancel">取消</button>
-        </div>
-      </div>`;
-
-    const groups = document.createElement('div');
-    groups.className = 'market-groups';
-    box.appendChild(groups);
-
-    // 宠物区（左列，可折叠）
-    const pets = getPets().filter(p => p.cloudId);
-    const petGroup = makeMarketGroup('🐾 宠物上架', pets.length);
-    groups.appendChild(petGroup);
-    const petBody = petGroup.querySelector('.market-group-body');
-    if (!pets.length) petBody.innerHTML = '<div class="inv-empty">还没有可上架的宠物（需先云端存档）</div>';
-    for (const pet of pets) {
-        const row = document.createElement('div');
-        row.className = 'market-item sell-row';
-        const mine = Market.isListed(pet.cloudId);
-        const expanded = expandedPetId === pet.cloudId;
-        row.innerHTML = `
-          <div class="m-info"><span class="m-name">${escapeHtml(pet.name)}</span><span class="m-growth">成长${pet.growth}</span><span class="m-level">Lv.${pet.level}</span></div>
-          ${expanded
-            ? sellForm()
-            : (mine ? '<button class="btn-sm alt sell-recall">取回</button>' : '<button class="btn-sm sell-open">上架</button>')}`;
-        petBody.appendChild(row);
-        const openBtn = row.querySelector('.sell-open');
-        if (openBtn) {
-          openBtn.onclick = () => {
-            expandedPetId = pet.cloudId; // 记录展开态 → renderAll 后保持展开
-            UI.renderAll();
-          };
-        }
-        const recall = row.querySelector('.sell-recall');
-        if (recall) {
-          recall.onclick = async () => {
-            const listing = Market.getPetListing(pet.cloudId);
-            if (!listing) return;
-            const res = await Market.cancelPet(listing.listingId);
-            if (res.error) showToast('❌ 取回失败', res.error);
-            else { showToast('↩️ 已取回', `${pet.name} 已下架`); UI.renderAll(); }
-          };
-        }
-        const applySearch = () => {
-          const searchEl = row.querySelector('.pay-search');
-          const kw = (searchEl ? searchEl.value : '').trim().toLowerCase();
-          row.querySelectorAll('.pay-item').forEach(btn => {
-            const hit = !kw || (btn.dataset.payName || '').toLowerCase().includes(kw);
-            btn.style.display = hit ? '' : 'none';
-          });
-        };
-        const paySearch = row.querySelector('.pay-search');
-        if (paySearch) paySearch.oninput = applySearch;
-        row.querySelectorAll('.pay-tab').forEach(btn => {
-          btn.onclick = () => {
-            row.querySelectorAll('.pay-tab').forEach(x => x.classList.remove('primary'));
-            row.querySelectorAll('.pay-tab').forEach(x => x.classList.add('ghost'));
-            btn.classList.add('primary');
-            btn.classList.remove('ghost');
-            const key = btn.dataset.payTab;
-            row.querySelectorAll('.sell-payment-group').forEach(g => {
-              const active = g.dataset.payGroup === key;
-              g.classList.toggle('active', active);
-              g.style.display = active ? '' : 'none';
-            });
-            applySearch();
-          };
-        });
-        row.querySelectorAll('.pay-item').forEach(btn => {
-          btn.onclick = () => {
-            row.querySelectorAll('.pay-item').forEach(x => x.classList.remove('primary'));
-            btn.classList.add('primary');
-            row.querySelector('.sell-mat').value = btn.dataset.payName || '';
-          };
-        });
-        applySearch();
-        const okBtn = row.querySelector('.sell-ok');
-        if (okBtn) {
-          okBtn.onclick = async () => {
-            const mat = row.querySelector('.sell-mat').value;
-            const qty = Number(row.querySelector('.sell-qty').value);
-            if (!mat) { showToast('❌ 上架失败', '请选择收款物'); return; }
-            if (!Number.isInteger(qty) || qty < 1) { showToast('❌ 上架失败', '请填正整数数量'); return; }
-            const res = await Market.listPet(pet, mat, qty);
-            expandedPetId = null;
-            if (res.error) showToast('❌ 上架失败', res.error);
-            else showToast('📢 上架成功', `${pet.name} 已挂到市场，收 ${qty} ${mat}`);
-            UI.renderAll();
-          };
-        }
-        const cancelBtn = row.querySelector('.sell-cancel');
-        if (cancelBtn) {
-          cancelBtn.onclick = () => {
-            expandedPetId = null;
-            UI.renderAll();
-          };
-        }
-      }
-
-    // 装备区（右列，可折叠）
-    const equips = getInventory().filter(e => e.cloudId);
-    const eqGroup = makeMarketGroup('⚔️ 装备上架', equips.length);
-    groups.appendChild(eqGroup);
-    const eqBody = eqGroup.querySelector('.market-group-body');
-    if (!equips.length) eqBody.innerHTML = '<div class="inv-empty">还没有可上架的装备（需先云端存档）</div>';
-    for (const eq of equips) {
-        const row = document.createElement('div');
-        row.className = 'market-item item sell-row';
-        // 供装备页「上架」按钮跳转定位；浏览器 dataset 是只读 getter，不能整体赋值（VM 桩无 dataset 则用普通属性）
-        if (row.dataset) row.dataset.cloudId = eq.cloudId;
-        else row._cloudId = eq.cloudId;
-        const mine = Market.isItemListed(eq.cloudId);
-        const expanded = expandedItemId === eq.cloudId;
-        row.innerHTML = `
-          <div class="m-info"><div class="m-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="m-desc">${rarityOf(eq).label}装 · T${eq.tier}｜${eq.slot}</div></div>
-          ${expanded
-            ? sellForm()
-            : (mine ? '<button class="btn-sm alt sell-recall">取回</button>' : '<button class="btn-sm sell-open">上架</button>')}`;
-        eqBody.appendChild(row);
-        const openBtn = row.querySelector('.sell-open');
-        if (openBtn) {
-          openBtn.onclick = () => {
-            expandedItemId = eq.cloudId; // 记录展开态 → renderAll 后保持展开
-            UI.renderAll();
-          };
-        }
-        const recall = row.querySelector('.sell-recall');
-        if (recall) {
-          recall.onclick = async () => {
-            const listing = Market.getItemListing(eq.cloudId);
-            if (!listing) return;
-            const res = await Market.cancelItem(listing.listingId);
-            if (res.error) showToast('❌ 取回失败', res.error);
-            else { showToast('↩️ 已取回', `${eq.name} 已下架`); UI.renderAll(); }
-          };
-        }
-        const applySearch = () => {
-          const searchEl = row.querySelector('.pay-search');
-          const kw = (searchEl ? searchEl.value : '').trim().toLowerCase();
-          row.querySelectorAll('.pay-item').forEach(btn => {
-            const hit = !kw || (btn.dataset.payName || '').toLowerCase().includes(kw);
-            btn.style.display = hit ? '' : 'none';
-          });
-        };
-        const paySearch = row.querySelector('.pay-search');
-        if (paySearch) paySearch.oninput = applySearch;
-        row.querySelectorAll('.pay-tab').forEach(btn => {
-          btn.onclick = () => {
-            row.querySelectorAll('.pay-tab').forEach(x => x.classList.remove('primary'));
-            row.querySelectorAll('.pay-tab').forEach(x => x.classList.add('ghost'));
-            btn.classList.add('primary');
-            btn.classList.remove('ghost');
-            const key = btn.dataset.payTab;
-            row.querySelectorAll('.sell-payment-group').forEach(g => {
-              const active = g.dataset.payGroup === key;
-              g.classList.toggle('active', active);
-              g.style.display = active ? '' : 'none';
-            });
-            applySearch();
-          };
-        });
-        row.querySelectorAll('.pay-item').forEach(btn => {
-          btn.onclick = () => {
-            row.querySelectorAll('.pay-item').forEach(x => x.classList.remove('primary'));
-            btn.classList.add('primary');
-            row.querySelector('.sell-mat').value = btn.dataset.payName || '';
-          };
-        });
-        applySearch();
-        const okBtn = row.querySelector('.sell-ok');
-        if (okBtn) {
-          okBtn.onclick = async () => {
-            const mat = row.querySelector('.sell-mat').value;
-            const qty = Number(row.querySelector('.sell-qty').value);
-            if (!mat) { showToast('❌ 上架失败', '请选择收款物'); return; }
-            if (!Number.isInteger(qty) || qty < 1) { showToast('❌ 上架失败', '请填正整数数量'); return; }
-            const res = await Market.listItem(eq, mat, qty);
-            expandedItemId = null;
-            if (res.error) showToast('❌ 上架失败', res.error);
-            else showToast('📢 上架成功', `${eq.name} 已挂到市场，收 ${qty} ${mat}`);
-            UI.renderAll();
-          };
-        }
-        const cancelBtn = row.querySelector('.sell-cancel');
-        if (cancelBtn) {
-          cancelBtn.onclick = () => {
-            expandedItemId = null;
-            UI.renderAll();
-          };
-        }
-      }
-
-    // 宠物蛋上架（来自宠物页「宠物蛋」tab 的蛋品种）
-    const Drop = window.Drop;
-    const eggMap = (Drop && Drop.getEggs) ? Drop.getEggs() : {};
-    const eggEntries = Object.entries(eggMap).filter(([, n]) => n > 0);
-    const eggGroup = makeMarketGroup('🥚 宠物蛋上架', eggEntries.length);
-    groups.appendChild(eggGroup);
-    const eggBody = eggGroup.querySelector('.market-group-body');
-    if (!eggEntries.length) eggBody.innerHTML = '<div class="inv-empty">还没有可上架的蛋（先去挂机捡蛋）</div>';
-    for (const [baseName, n] of eggEntries) {
-      const mine = Market.isMyEggListed ? Market.isMyEggListed(baseName) : false;
-      const expanded = expandedEggId === baseName;
-      const row = document.createElement('div');
-      row.className = 'market-item sell-row';
-      row.innerHTML = `
-        <div class="m-info"><span class="m-name">🥚 ${escapeHtml(Drop.makeEggName(baseName))}</span><span class="m-growth">×${n}</span></div>
-        ${expanded
-          ? sellForm()
-          : (mine ? '<button class="btn-sm alt sell-recall">取回</button>' : '<button class="btn-sm sell-open">上架</button>')}`;
-      eggBody.appendChild(row);
-      const openBtn = row.querySelector('.sell-open');
-      if (openBtn) {
-        openBtn.onclick = () => {
-          expandedEggId = baseName;
-          UI.renderAll();
-        };
-      }
-      const recall = row.querySelector('.sell-recall');
-      if (recall) {
-        recall.onclick = async () => {
-          const my = Market.getMyListedEggs ? Market.getMyListedEggs().find(x => x.eggType === baseName) : null;
-          if (!my) return;
-          const res = await Market.cancelEgg(my.listingId);
-          if (res.error) showToast('❌ 取回失败', res.error);
-          else { showToast('↩️ 已取回', `${Drop.makeEggName(baseName)} 已下架`); UI.renderAll(); }
-        };
-      }
-      const applySearch = () => {
-        const searchEl = row.querySelector('.pay-search');
-        const kw = (searchEl ? searchEl.value : '').trim().toLowerCase();
-        row.querySelectorAll('.pay-item').forEach(btn => {
-          const hit = !kw || (btn.dataset.payName || '').toLowerCase().includes(kw);
-          btn.style.display = hit ? '' : 'none';
-        });
-      };
-      const paySearch = row.querySelector('.pay-search');
-      if (paySearch) paySearch.oninput = applySearch;
-      row.querySelectorAll('.pay-tab').forEach(btn => {
-        btn.onclick = () => {
-          row.querySelectorAll('.pay-tab').forEach(x => x.classList.remove('primary'));
-          row.querySelectorAll('.pay-tab').forEach(x => x.classList.add('ghost'));
-          btn.classList.add('primary');
-          btn.classList.remove('ghost');
-          const key = btn.dataset.payTab;
-          row.querySelectorAll('.sell-payment-group').forEach(g => {
-            const active = g.dataset.payGroup === key;
-            g.classList.toggle('active', active);
-            g.style.display = active ? '' : 'none';
-          });
-        };
-      });
-      const payItems = row.querySelectorAll('.pay-item');
-      const selMat = row.querySelector('.sell-mat');
-      if (selMat && payItems.length) {
-        const first = payItems[0];
-        selMat.value = first.dataset.payName;
-        payItems.forEach(p => p.classList.toggle('primary', p === first));
-      }
-      if (payItems.length) {
-        payItems.forEach(p => {
-          p.onclick = () => {
-            row.querySelectorAll('.pay-item').forEach(x => x.classList.remove('primary'));
-            p.classList.add('primary');
-            row.querySelector('.sell-mat').value = p.dataset.payName;
-          };
-        });
-      }
-      const okBtn = row.querySelector('.sell-ok');
-      if (okBtn) {
-        okBtn.onclick = async () => {
-          const mat = row.querySelector('.sell-mat').value;
-          const qty = Number(row.querySelector('.sell-qty').value);
-          if (!mat) { showToast('❌ 上架失败', '请选择收款物'); return; }
-          if (!Number.isInteger(qty) || qty < 1) { showToast('❌ 上架失败', '请填正整数数量'); return; }
-          const res = await Market.listEgg(baseName, mat, qty);
-          expandedEggId = null;
-          if (res.error) showToast('❌ 上架失败', res.error);
-          else showToast('📢 上架成功', `${Drop.makeEggName(baseName)} 已挂到市场，收 ${qty} ${mat}`);
-          UI.renderAll();
-        };
-      }
-      const cancelBtn = row.querySelector('.sell-cancel');
-      if (cancelBtn) {
-        cancelBtn.onclick = () => {
-          expandedEggId = null;
-          UI.renderAll();
-        };
-      }
+    if (pets.length) {
+      const sec = document.createElement('div');
+      sec.className = 'mk-section';
+      sec.innerHTML = '🐾 宠物<span class="mk-count">' + pets.length + ' 件</span>';
+      box.appendChild(sec);
+      const grid = document.createElement('div');
+      grid.className = 'mk-grid';
+      for (const l of pets) grid.appendChild(buildPetCard(l));
+      box.appendChild(grid);
     }
 
-    if (!pets.length && !equips.length && !eggEntries.length) {
-      const hint = document.createElement('div');
-      hint.className = 'inv-empty';
-      hint.textContent = '还没有可上架的物品（宠物/装备/蛋）';
-      box.insertBefore(hint, groups);
+    if (items.length) {
+      const sec = document.createElement('div');
+      sec.className = 'mk-section';
+      sec.innerHTML = '⚔️ 装备<span class="mk-count">' + items.length + ' 件</span>';
+      box.appendChild(sec);
+      const grid = document.createElement('div');
+      grid.className = 'mk-grid';
+      for (const l of items) grid.appendChild(buildItemCard(l, RARITY_LABEL));
+      box.appendChild(grid);
     }
-  }
 
-  /* ---------- 交易记录面板（卖出 / 买入 / 汇总） ---------- */
-  function formatTime(iso) {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return String(iso);
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-  // 交易对手显示：只区分「真人」还是「NPC 流浪商人」。
-  // 游戏里市场本就不暴露真实玩家身份（挂单只存 seller_id，不显示名字），
-  // 所以这里也不显示对方 uuid —— 等 profiles 昵称系统做好、且玩家自己公开昵称后，再换成昵称。
-  function counterLabel(v) {
-    if (!v) return '';
-    return v === '流浪商人' ? '流浪商人' : '玩家';
-  }
-  // 对手那一格：老记录没有 counterparty 就不显示这一格（历史数据不回填）
-  function counterCell(r) {
-    if (!r.counterparty) return '';
-    const verb = r.role === 'sell' ? '卖给' : '买自';
-    return `<span class="tr-who">${verb} ${escapeHtml(counterLabel(r.counterparty))}</span>`;
-  }
-  function renderTradeRecords() {
-    const recs = Market.getTradeRecords();
-    const sells = recs.filter(r => r.role === 'sell');
-    const buys = recs.filter(r => r.role === 'buy');
-
-    // 汇总：卖出净收入 - 买入花费，按材料类型分组
-    const netByMat = {};
-    for (const r of recs) {
-      const key = r.material_type;
-      if (r.role === 'sell') netByMat[key] = (netByMat[key] || 0) + r.net_qty;
-      else netByMat[key] = (netByMat[key] || 0) - r.price_qty;
+    if (eggList.length) {
+      const sec = document.createElement('div');
+      sec.className = 'mk-section';
+      sec.innerHTML = '🥚 宠物蛋<span class="mk-count">' + eggList.length + ' 件</span>';
+      box.appendChild(sec);
+      const grid = document.createElement('div');
+      grid.className = 'mk-grid';
+      for (const l of eggList) grid.appendChild(buildEggCard(l));
+      box.appendChild(grid);
     }
-    const summaryHtml = (Config.trade.materials.map(m => {
-      const n = netByMat[m.name] || 0;
-      return `<span class="net-chip ${n >= 0 ? 'pos' : 'neg'}">${m.icon} ${m.name} ${n >= 0 ? '+' : ''}${n}</span>`;
-    }).join('')) || '<span class="hint">暂无交易</span>';
 
-    $('tr-sell-count').textContent = String(sells.length);
-    $('tr-buy-count').textContent = String(buys.length);
-    $('tr-summary-mats').innerHTML = summaryHtml;
-
-    // 卖出记录
-    const sellBox = $('tr-sell-list');
-    sellBox.innerHTML = '';
-    if (!sells.length) {
-      sellBox.innerHTML = '<div class="inv-empty">还没有卖出记录</div>';
-    } else {
-      for (const r of sells) {
-        const mat = Market.findMaterial(r.material_type);
-        const row = document.createElement('div');
-        row.className = 'tr-row';
-        row.innerHTML = `
-          <span class="tr-time">${formatTime(r.created_at)}</span>
-          <span class="tr-name">${escapeHtml(r.item_name)}</span>
-          ${counterCell(r)}
-          <span class="tr-price">${r.price_qty} ${mat.icon} ${mat.name}</span>
-          <span class="tr-tax">税 -${r.tax_qty}</span>`;
-        sellBox.appendChild(row);
-      }
+    if (!pets.length && !items.length && !eggList.length) {
+      box.innerHTML = '<div class="mk-empty">没有符合条件的商品</div>';
     }
-    // 买入记录
-    const buyBox = $('tr-buy-list');
-    buyBox.innerHTML = '';
-    if (!buys.length) {
-      buyBox.innerHTML = '<div class="inv-empty">还没有买入记录</div>';
-    } else {
-      for (const r of buys) {
-        const mat = Market.findMaterial(r.material_type);
-        const row = document.createElement('div');
-        row.className = 'tr-row';
-        row.innerHTML = `
-          <span class="tr-time">${formatTime(r.created_at)}</span>
-          <span class="tr-name">${escapeHtml(r.item_name)}</span>
-          ${counterCell(r)}
-          <span class="tr-price">${r.price_qty} ${mat.icon} ${mat.name}</span>`;
-        buyBox.appendChild(row);
-      }
-    }
-  }
-
-  /* ---------- 装备页「上架」直达：跳我的上架页并自动展开该装备的上架表单 ---------- */
-  function openSellForItem(eq) {
-    if (!eq || !eq.cloudId) { showToast('❌ 无法上架', '该装备需先云端存档'); return; }
-    if (UI.switchPage) UI.switchPage('market-sell'); // 切到我的上架页（display 显隐，不销毁页面）
-    UI.renderAll(); // 重建我的上架页（含上架区）
-    const rows = document.querySelectorAll('#market-sell .sell-row');
-    let row = null;
-    rows.forEach(r => {
-      const cid = r.dataset ? r.dataset.cloudId : r._cloudId;
-      if (cid === eq.cloudId) row = r;
-    });
-    if (!row) { showToast('⚠️ 未找到上架入口', '该装备可能已在售或未存档'); return; }
-    const openBtn = row.querySelector('.sell-open');
-    if (openBtn) openBtn.click(); // 复用现有「上架」展开表单逻辑
   }
 
   /* ---------- 购买确认框（显示商品价格 / 交易税 / 买家需支付 / 卖家将收到） ---------- */
@@ -956,9 +542,8 @@
   /* ---------- 对外 API（市场页） ---------- */
   UI.renderMarket = renderMarket;
   UI.renderItemMarket = renderItemMarket;
-  UI.renderSellArea = renderSellArea;
-  UI.renderTradeRecords = renderTradeRecords;
   UI.openBuyConfirm = openBuyConfirm;
   UI.closeBuyPanel = closeBuyPanel;
-  UI.openSellForItem = openSellForItem;
+  // 注：renderSellArea / renderTradeRecords / openSellForItem 由
+  // ui-market-sell.js 与 ui-market-records.js 各自导出，此处不再重复绑定。
 })();

@@ -1208,4 +1208,49 @@
   UI.openEvolvePanel = openEvolvePanel;
   UI.closeEvolvePanel = closeEvolvePanel;
   UI.initPetTabs = initPetTabs;
+
+  /* ---------- PetUI 共享 API（供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 使用） ----------
+   * 宠物天赋：pet.traits = [{ id, tier }]，T1~T3；
+   * Config.petTraits 为天赋配置表（id -> {name, effect}）。
+   * 注：天赋完整数值表在 git 回滚中丢失，当前以"空态安全 + 记忆概率规则"实现，
+   * 待补 Config.petTraits / Config.traitInherit / Config.traitHatch 配置后自动生效。 */
+  const PetUI = window.PetUI || (window.PetUI = {});
+  function traitsHtml(petLike) {
+    const arr = petLike && petLike.traits;
+    if (!Array.isArray(arr) || !arr.length) return '';
+    const defs = (window.Config && window.Config.petTraits) || {};
+    return '<div class="trait-row">' + arr.map(function (t) {
+      const id = (t && t.id) || '?';
+      const tier = (t && t.tier) || 1;
+      const d = defs[id] || {};
+      const name = d.name || id;
+      const eff = d.effect ? ' <em>' + escapeHtml(d.effect) + '</em>' : '';
+      return '<span class="trait-pill' + (tier >= 2 ? ' t' + tier : '') + '">' + escapeHtml(name) + eff + '</span>';
+    }).join('') + '</div>';
+  }
+  function traitInheritLine(main, sub, type) {
+    const cfg = (window.Config && window.Config.traitInherit) || {};
+    const subTraits = (sub && sub.traits) || [];
+    if (!Array.isArray(subTraits) || !subTraits.length) {
+      return '<div class="es-preview-row"><span class="trait-none">副宠无血脉特质，无可继承</span></div>';
+    }
+    const giveP = type === 'nirvana'
+      ? Math.round((cfg.nirvanaGive != null ? cfg.nirvanaGive : 0.3) * 100)
+      : Math.round((cfg.synthGive != null ? cfg.synthGive : 0.4) * 100);
+    const upP = Math.round(((cfg.up != null ? cfg.up : 0.2)) * 100);
+    const downP = Math.round(((cfg.down != null ? cfg.down : 0.1)) * 100);
+    const label = type === 'nirvana' ? '涅槃植入' : '合成继承';
+    const names = subTraits.map(function (t) { return (t && t.id) || '?'; }).join('、');
+    return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）' + giveP +
+      '% 概率继承（成长≥60 额外 +10%；T 阶 20% 升 / 10% 降，上限 3 条）</div>';
+  }
+  PetUI.iconHtml = iconHtml;
+  PetUI.petTipHtml = petTipHtml;
+  PetUI.showPetTip = showPetTip;
+  PetUI.hidePetTip = hidePetTip;
+  PetUI.bindPetTip = bindPetTip;
+  PetUI.flashStat = flashStat;
+  PetUI.traitsHtml = traitsHtml;
+  PetUI.traitInheritLine = traitInheritLine;
+  UI.traitsHtml = traitsHtml;
 })();
