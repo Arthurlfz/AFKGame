@@ -281,6 +281,14 @@
         else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
         else own[aff.type] = (own[aff.type] || 0) + (stats[aff.type] || 0) * (aff.value || 0) / 100;
       }
+      // 魂铸词缀（独立于 affixes：不会被重铸/剥离/神圣石影响，永久保留；type 走词缀坐标系 critRate→crit）
+      if (eq.soulAffix) {
+        const aff = eq.soulAffix;
+        if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
+        else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        else own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+      }
       for (const [type, value] of Object.entries(own)) flat[type] = (flat[type] || 0) + value;
       contributions.push({ slot, stats: own });
     }
@@ -324,8 +332,9 @@
   }
   function describeItem(eq) {
     const affixes = flattenAffixes(eq.affixes).map(formatAffix).join(' ');
+    const soul = eq.soulAffix ? (' 魂·' + (eq.soulAffix.label || eq.soulAffix.traitId || '?') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '')) : '';
     const b = baseOf(eq);
-    return `${eq.slot}｜${b.label}+${b.value}｜${affixes}`;
+    return `${eq.slot}｜${b.label}+${b.value}｜${affixes}${soul}`;
   }
 
   // 稀有度兜底：旧存档装备的 rarity 可能是空对象/字符串/缺字段，统一返回合法 {id,label,color}（缺省=白装）

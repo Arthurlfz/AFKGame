@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * pet.js —— 宠物系统
  * 职责：
  *  1. 宠物数据模型与列表/出战状态（pets、activePetId 仅本模块持有）
@@ -39,6 +39,10 @@
       baseHp, baseAtk, baseDef, baseSpd,
       curHp: baseHp, // 持久血量：跨场战斗延续，非战斗时自动恢复
       cloudId: null, // 云端 pets.id（存档/市场上架用；本地孵化后由 savePet 回写）
+      // 血脉特质 [{id, tier}]（T1~T3，T1 最强最稀有）；觉醒特质 Lv60 终形态解锁；source 预留氪金来源
+      traits: [],
+      awaken_trait: null,
+      source: 'normal',
       // 12 部位装备槽；旧存档缺失部位会按空槽处理
       equipment: Object.fromEntries((window.Equipment && window.Equipment.SLOTS ||
         ['武器', '戒指', '项链', '头盔', '护甲', '盾牌', '靴子', '腰带', '斗篷', '饰品', '护符', '徽章'])
@@ -157,25 +161,154 @@
   // 装备底材/地图档次只在生成时放大装备基底，不参与宠物成长公式。
   //  - 命中/闪避：固定数值（命中基础90，闪避基础0，裸装命中率≈95%封顶）
   //  - 暴击/暴伤/吸血：小数/倍率，来自宠物 profile 基础 + 装备加成
+
+  // 血统被动：根据宠物根源基宠名查 Config.bloodlinePassive
+  // 支持·异变后缀剥离、进化体通过 lineId 回溯根源基宠
+  function getBloodline(pet) {
+    if (!pet || !Config.bloodlinePassive) return null;
+    const baseName = pet.lineId || resolveLineId(pet.name) || pet.name;
+    return Config.bloodlinePassive[baseName] || null;
+  }
+
+  /* ---------- 血脉特质 + 觉醒（2026-09-01 设计 v1） ---------- */
+  // 觉醒状态：Lv60 终形态（名字在 evolution.activeSkills 表里）→ 觉醒特质 = 对应主动技能伤害 +20% + 血统定位加成
+  function getAwakenState(pet) {
+    if (!pet || Number(pet.level) < 60) return null;
+    const skills = (Config.pet && Config.pet.evolution && Config.pet.evolution.activeSkills) || {};
+    // 变异宠（名字带 ·异变）继承本体主动技能：剥离后缀查找
+    const baseName = String(pet.name || '').replace(/·异变$/, '');
+    const skill = skills[baseName];
+    if (!skill) return null;
+    const line = pet.lineId || pet.name;
+    const raw = (Config.awakenBonus && Config.awakenBonus[line]) || {};
+    const rawKey = Object.keys(raw)[0];
+    return {
+      id: '觉醒·' + pet.name,
+      skillId: skill.id,
+      skillName: skill.name,
+      damage: Config.awakenSkillDamage != null ? Config.awakenSkillDamage : 0.2,
+      skillDamageMult: 1 + (Config.awakenSkillDamage != null ? Config.awakenSkillDamage : 0.2),
+      // 扁平化：{stat, value}（9/1 契约：血狐 → {stat:'critDamage', value:10}）
+      bonus: rawKey ? { stat: rawKey, value: raw[rawKey] } : null,
+    };
+  }
+  // 单条 T 阶 roll：T1 10 / T2 30 / T3 60（变异抬升：T1 10→20、保底不低于 T2）
+  function rollTier(mutant, H) {
+    const tr = (H && H.tierRoll) || [0, 10, 30, 60];
+    const m = (mutant && H && H.mutant) || {};
+    const t1 = m.t1Boost != null ? m.t1Boost : (tr[1] != null ? tr[1] : 10);
+    const t2 = tr[2] != null ? tr[2] : 30;
+    const r = Math.random() * 100;
+    if (r < t1) return 1;
+    if (r < t1 + t2) return 2;
+    return (mutant && m.minTier) ? Math.max(m.minTier, 3) : 3;
+  }
+  // 按孵化概率 roll 宠物特质（条数 + T 阶）；mutant=true 变异宠（保底 1 条、3 条概率抬升、T 阶抬升）
+  function rollPetTraits(pet, opts) {
+    const H = Config.traitHatch || {};
+    const defs = Config.petTraits || {};
+    const keys = Object.keys(defs);
+    if (!keys.length) return pet;
+    const counts = H.counts || [40, 45, 13, 2];
+    const mutant = !!(opts && opts.mutant);
+    // roll 条数（counts 索引 = 条数）
+    let r = Math.random() * 100, acc = 0, count = 0;
+    for (let i = 0; i < counts.length; i++) { acc += counts[i]; if (r < acc) { count = i; break; } }
+    if (mutant) {
+      const m = H.mutant || {};
+      if (count < (m.minCount || 1)) count = m.minCount;
+      if (Math.random() * 100 < (m.count3 || 8)) count = Math.max(count, 3);
+    }
+    const cap = (Config.traitInherit && Config.traitInherit.cap) || 3;
+    count = Math.min(count, cap);
+    const traits = [];
+    const used = {};
+    for (let i = 0; i < count; i++) {
+      let id = pick(keys);
+      let guard = 0;
+      while (used[id] && guard++ < 20) id = pick(keys);
+      used[id] = true;
+      traits.push({ id: id, tier: rollTier(mutant, H) });
+    }
+    pet.traits = traits;
+    return pet;
+  }
+  // 天赋结算：hp/def → pct（÷100）；critRate/critDamage/lifesteal → flat 点数（getStats ÷100）；hit/dodge/spd → flat 点数
+  function addTraitStat(pet, flat, pct) {
+    const defs = Config.petTraits || {};
+    const list = (pet && pet.traits) || [];
+    for (const t of list) {
+      const d = defs[t.id]; if (!d) continue;
+      const v = (d.values && d.values[t.tier]) || 0;
+      if (d.type === 'hp') pct.hp = (pct.hp || 0) + v / 100;
+      else if (d.type === 'def') pct.def = (pct.def || 0) + v / 100;
+      else if (d.type === 'critRate') flat.crit = (flat.crit || 0) + v;
+      else if (d.type === 'critDamage') flat.critDamage = (flat.critDamage || 0) + v;
+      else if (d.type === 'lifesteal') flat.lifesteal = (flat.lifesteal || 0) + v;
+      else if (d.type === 'hit') flat.hit = (flat.hit || 0) + v;
+      else if (d.type === 'dodge') flat.dodge = (flat.dodge || 0) + v;
+      else if (d.type === 'spd') flat.spd = (flat.spd || 0) + v;
+    }
+    // 觉醒特质（Lv60 终形态）：主动技能伤害 +20%（battle.js 施放时乘）+ 血统定位加成
+    const aw = getAwakenState(pet);
+    if (aw && aw.bonus && aw.bonus.stat) {
+      const k = aw.bonus.stat, v = aw.bonus.value;
+      if (k === 'hp') pct.hp = (pct.hp || 0) + v / 100;
+      else if (k === 'def') pct.def = (pct.def || 0) + v / 100;
+      else if (k === 'spd') flat.spd = (flat.spd || 0) + v;
+      else if (k === 'critDamage') flat.critDamage = (flat.critDamage || 0) + v;
+      else if (k === 'lifesteal') flat.lifesteal = (flat.lifesteal || 0) + v;
+    }
+  }
+  // statParts：把裸属性拆成「底座 core（基础值+等级系数）」+「成长增量 growth」两段，
+  // pct（装备/特质百分比）只作用于 core，成长增量不放大（2026-09-01 拍板口径）
+  function statParts(pet) {
+    const g = pet.growth, lv = pet.level, C = getStatCoeff(pet);
+    const coreHp = pet.baseHp + Math.round(lv * C.hp);
+    const coreAtk = pet.baseAtk + Math.round(lv * C.atk);
+    const coreDef = pet.baseDef + Math.round(lv * C.def);
+    const totalHp = pet.baseHp + Math.round(lv * g * C.hp);
+    const totalAtk = pet.baseAtk + Math.round(lv * g * C.atk);
+    const totalDef = pet.baseDef + Math.round(lv * g * C.def);
+    return {
+      core: { hp: coreHp, atk: coreAtk, def: coreDef, spd: getBaseSpeed(pet) },
+      growth: { hp: totalHp - coreHp, atk: totalAtk - coreAtk, def: totalDef - coreDef },
+      total: { hp: totalHp, atk: totalAtk, def: totalDef, spd: getBaseSpeed(pet) }
+    };
+  }
   function getStats(pet) {
     const base = baseStats(pet);
-    const { flat = {}, pct = {} } = getEquipBonuses(pet) || {};
+    const eq = getEquipBonuses(pet) || {};
+    const flat = Object.assign({}, eq.flat);   // 本地拷贝，避免污染装备加成对象
+    const pct = Object.assign({}, eq.pct);
+    addTraitStat(pet, flat, pct);              // 血脉特质 + 觉醒特质结算
     const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
     const baseHit = prof.hit != null ? Number(prof.hit) : 90;     // 基础命中（固定数值）
     const baseDodge = prof.dodge != null ? Number(prof.dodge) : 0; // 基础闪避（固定数值）
     const baseCrit = (prof.critRate != null ? Number(prof.critRate) : 5) / 100;
     const baseCritDmg = (prof.critDamage != null ? Number(prof.critDamage) : 150) / 100; // 145% → 1.45 倍
     const baseLs = (prof.lifesteal != null ? Number(prof.lifesteal) : 0) / 100;
+    // 血统被动：allStatBonus 类型直接加成 critRate/hit/dodge
+    const bl = getBloodline(pet);
+    let blCrit = 0, blHit = 0, blDodge = 0;
+    if (bl && bl.type === 'allStatBonus' && bl.params) {
+      blCrit = bl.params.critRate || 0;
+      blHit = (bl.params.hit || 0) * 100;
+      blDodge = (bl.params.dodge || 0) * 100;
+    }
+    // 装备/特质 % 只作用于"底座"（基础值 + 等级系数），成长增量不放大（2026-09-01 口径）
+    const sp = statParts(pet);
     return {
-      atk: Math.round(base.atk * (1 + (pct.atk || 0)) + (flat.atk || 0)),
-      hp: Math.round(base.hp * (1 + (pct.hp || 0)) + (flat.hp || 0)),
-      def: Math.round(base.def * (1 + (pct.def || 0)) + (flat.def || 0)),
+      atk: Math.round(sp.core.atk * (1 + (pct.atk || 0)) + sp.growth.atk + (flat.atk || 0)),
+      hp: Math.round(sp.core.hp * (1 + (pct.hp || 0)) + sp.growth.hp + (flat.hp || 0)),
+      def: Math.round(sp.core.def * (1 + (pct.def || 0)) + sp.growth.def + (flat.def || 0)),
       spd: base.spd + (flat.spd || 0),
-      critRate: baseCrit + (flat.crit || 0) / 100,
+      critRate: baseCrit + (flat.crit || 0) / 100 + blCrit,
       critDamage: baseCritDmg + (flat.critDamage || 0) / 100,
-      hit: baseHit + (flat.hit || 0),
-      dodge: baseDodge + (flat.dodge || 0),
-      lifesteal: baseLs + (flat.lifesteal || 0) / 100
+      hit: baseHit + (flat.hit || 0) + blHit,
+      dodge: baseDodge + (flat.dodge || 0) + blDodge,
+      lifesteal: baseLs + (flat.lifesteal || 0) / 100,
+      growth: pet.growth || 0
     };
   }
   // 面板"装备加成"文案，如 "攻击+7 生命+20"。
@@ -284,9 +417,11 @@
     const st = (Config.pet.starters || []).find(x => x.name === tmpl.name) || {};
     const baseHp = st.baseHp || base.hp, baseAtk = st.baseAtk || base.atk, baseDef = st.baseDef || base.def;
     const k = g / base.growth;
-    return createPet(tmpl.name, tmpl.icon, g,
+    const baby = createPet(tmpl.name, tmpl.icon, g,
       Math.round(baseHp * k), Math.round(baseAtk * k), Math.round(baseDef * k),
       Config.pet.speeds[tmpl.name] || 40, tmpl.name);
+    rollPetTraits(baby, {});   // 孵化 roll 血脉特质
+    return baby;
   }
 
   /* ---------- 云端宠物（Supabase 行 ↔ 宠物对象） ---------- */
@@ -327,6 +462,10 @@
     pet.rebornCount = Math.max(0, Math.floor(num(row.reborn_count)));
     pet.curHp = num(row.cur_hp);
     pet.isActive = !!row.is_active; // 出战标记（DB 权威，刷新后据此还原出战宠物）
+    // 血脉特质（旧库无列/无数据 → 空数组兜底）；觉醒特质；来源标记
+    pet.traits = Array.isArray(row.traits) ? row.traits : [];
+    pet.awaken_trait = row.awaken_trait || null;
+    pet.source = row.source || 'normal';
     // 装备槽：云端存 {部位: 装备cloudId}，先保存引用，等背包加载后用 restoreEquipment 填回装备对象
     if (row.equipment && typeof row.equipment === 'object') {
       pet.equipment = {};
@@ -355,7 +494,19 @@
   // 没有标记时回退到第一只（兼容旧数据 / 首次建档）
   function setCloudPets(rows) {
     pets.length = 0;
-    for (const r of rows) pets.push(petFromRow(r));
+    for (const r of rows) {
+      const pet = petFromRow(r);
+      // 旧变异宠补特质（一次性修复上线前合成的旧宠）：名字带「·异变」且无特质 → 按变异规则 roll 保底 1 条 + 异步写回云端
+      if (pet.name && String(pet.name).endsWith('·异变') && (!pet.traits || !pet.traits.length)) {
+        rollPetTraits(pet, { mutant: true });
+        if (pet.cloudId && window.Supabase && window.Supabase.updatePet) {
+          window.Supabase.updatePet(pet.cloudId, { traits: pet.traits }).catch(e => {
+            if (window.console) console.warn('[补特质] 写回云端失败：', e && e.message);
+          });
+        }
+      }
+      pets.push(pet);
+    }
     const active = pets.find(p => p.isActive);
     activePetId = active ? active.id : (pets.length ? pets[0].id : null);
     return pets;
@@ -365,6 +516,7 @@
   window.Pet = {
     createPet, addPet, getPets, getActivePet, setActive, removePet, petFromRow, clearPets,
     baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, expFromBattle, expRange, createBaby, setCloudPets,
-    getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment, addExpPool
+    getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment, addExpPool, getBloodline,
+    rollPetTraits, getAwakenState, statParts
   };
 })();

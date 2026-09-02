@@ -22,7 +22,7 @@ A(/PAGES\s*=\s*new Set\(\[[^\]]*'codex'/.test(shell), 'ui-shell.js 的 PAGES 集
 const html = fs.readFileSync('../docs/游戏.html', 'utf8');
 A(/data-page="codex"/.test(html), '侧边栏按钮带 data-page="codex"（否则点击无响应）');
 A(/id="tab-codex"/.test(html), '页面骨架存在 #tab-codex');
-A(/ui-codex\.js\?v=\d/.test(html), '已引入 ui-codex.js 且带版本号');
+A(/ui-codex\.js\?v=[0-9a-f]+/i.test(html), '已引入 ui-codex.js 且带版本号');
 const css = fs.readFileSync('../docs/css/game.css', 'utf8');
 A(/#tab-codex \.codex-body/.test(css), 'game.css 已新增 #tab-codex 样式段');
 

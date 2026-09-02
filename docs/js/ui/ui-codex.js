@@ -102,6 +102,60 @@
       + table(['宠物', '暴击', '暴击伤害', '命中', '闪避', '吸血'], rows2)
       + note('终形态主动技能（终形态达到对应等级后，可在战斗中手动释放）：')
       + table(['终形态', '主动技能', '解锁', '冷却', '效果'], skillRows);
+
+    // ===== 血脉特质图鉴（8 条 × T1~T3） + 孵化概率 + 流动规则 + 觉醒表 =====
+    const TRAITS = Config.petTraits || {};
+    const traitRows = Object.keys(TRAITS).map(id => {
+      const d = TRAITS[id];
+      const isFlat = ['hit', 'dodge', 'spd'].indexOf(d.type) >= 0;
+      const f = v => '+' + v + (isFlat ? '' : '%');
+      return [escapeHtml(d.label || id), f(d.values[1]), f(d.values[2]), f(d.values[3]), escapeHtml(d.desc || '')];
+    });
+    const H = Config.traitHatch || {};
+    const hc = H.counts || [40, 45, 13, 2];
+    const tr = H.tierRoll || [0, 10, 30, 60];
+    const mH = H.mutant || {};
+    const hatchRows = [
+      ['0 条', hc[0] + '%', '白板 = 纯肥料'],
+      ['1 条', hc[1] + '%', ''],
+      ['2 条', hc[2] + '%', ''],
+      ['3 条', hc[3] + '%', '稀有'],
+      ['单条 T 阶', 'T1 ' + tr[1] + '% / T2 ' + tr[2] + '% / T3 ' + tr[3] + '%', 'T1 最强最稀有'],
+      ['变异宠（·异变）', '保底 ' + (mH.minCount || 1) + ' 条 · 3 条 ' + (mH.count3 || 8) + '% · T1 ' + (mH.t1Boost || 20) + '%', '保底不低于 T' + (mH.minTier || 2)]
+    ];
+    const inh = Config.traitInherit || {};
+    const nir = Config.traitNirvana || {};
+    const awBonus = Config.awakenBonus || {};
+    const awRows = Object.keys(awBonus).map(line => {
+      const b = awBonus[line] || {};
+      const bKey = Object.keys(b)[0];
+      const bv = b[bKey];
+      return [escapeHtml(line), bKey + ' +' + bv + (['spd'].indexOf(bKey) >= 0 ? '' : '%')];
+    });
+    return table(['宠物', '定位', '生命', '攻击', '防御', '成长', '速度'], rows1)
+      + note('属性公式（成长系数每只宠不同，进化后沿用来源基宠的系数）：')
+      + rules([
+        `生命 = 基础生命 + 等级 × 成长值 × ${coeff.hp}`,
+        `攻击 = 基础攻击 + 等级 × 成长值 × ${coeff.atk}`,
+        `防御 = 基础防御 + 等级 × 成长值 × ${coeff.def}`,
+        '速度 = 该宠固定基础速度 + 装备加成，等级与成长值不影响速度',
+        `等级上限 ${P.maxLevel} 级`
+      ])
+      + note('每只宠的隐藏底子（上表系数之外的固定值）：')
+      + table(['宠物', '暴击', '暴击伤害', '命中', '闪避', '吸血'], rows2)
+      + note('终形态主动技能（终形态达到对应等级后，可在战斗中手动释放）：')
+      + table(['终形态', '主动技能', '解锁', '冷却', '效果'], skillRows)
+      + note('血脉特质（8 条 × T1~T3，T1 最强最稀有；特质一律不含攻击%，只叠加机制 / 生存属性）：')
+      + table(['特质', 'T1', 'T2', 'T3', '说明'], traitRows)
+      + note('孵化特质概率（变异宠保底 1 条，T 阶整体抬升）：')
+      + table(['条数 / 规则', '概率', '说明'], hatchRows)
+      + note('继承 / 植入（合成与涅槃）：')
+      + rules([
+        `合成：主宠特质每条保留 ${Math.round((inh.synthKeep != null ? inh.synthKeep : 0.7) * 100)}%、副宠每条继承 ${Math.round((inh.synthGive != null ? inh.synthGive : 0.4) * 100)}%；继承时 ${Math.round((inh.up != null ? inh.up : 0.2) * 100)}% 升一阶（封顶 T1）、${Math.round((inh.down != null ? inh.down : 0.1) * 100)}% 降一阶（最低 T3）；变异成功额外追 1 条；总上限 ${inh.cap != null ? inh.cap : 3} 条`,
+        `涅槃：主宠特质全保留；副宠每条 ${Math.round((nir.implantChance != null ? nir.implantChance : 0.3) * 100)}% 概率植入（同类型取高 T，不叠加）`
+      ])
+      + note('觉醒特质（Lv60 终形态解锁 = 对应主动技能伤害 +20% + 血统定位加成）：')
+      + table(['血统线', '觉醒定位加成'], awRows);
   }
 
   /* ---------- 2. 战斗 ---------- */

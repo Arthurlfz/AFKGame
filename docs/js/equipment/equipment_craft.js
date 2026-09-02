@@ -22,6 +22,8 @@
   const tierOf = t => Config.equipment.affixTiers.find(x => x.tier === t);
   // 词缀 T 阶的颜色（T1 最好 → 暗金，T5 最差 → 灰；低饱和金属系）
   const TIER_COLORS = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f', 4: '#7f9fc4', 5: '#6c7684' };
+  // 特质坐标系 → 词缀坐标系（魂铸词缀必须用词缀 type 参与 getEquipBonuses 结算）
+  const SOUL_TYPE_MAP = { critRate: 'crit' };
 
   // 打造通用流程（reforge/strip 共用）：
   //  1. 本地先行：改词缀 + 本地扣材料（界面立即生效）
@@ -198,6 +200,88 @@
     }, onApplied);
   }
 
+  /* ---------- 魂铸：把宠物血脉/觉醒特质铸进装备（独立词缀，永久不可剥离/重铸/神圣石洗） ----------
+   * 档位（config.soulCast.tiers）：普通（Lv40+/成长≥10 铸血脉 T=原阶）｜精锐（Lv40+/成长≥40 铸血脉 T+1 封顶 T1）｜传承（Lv60 终形态/成长≥60 铸觉醒 固定 T1）
+   * 消耗：装备（任意稀有度）+ 1 只宠物（消失）+ 10 凝魂晶石；每件装备最多 1 条；上架后不可打造；随装备走可交易
+   * 流程：本地先行（词缀+扣晶石）→ 云同步（晶石 RPC + equip_items.soul_affix）→ 成功才 removePet+deletePet
+   */
+  async function soulCast(eq, pet, tierKey, traitId) {
+    const S = Config.soulCast || {};
+    const T = (S.tiers && S.tiers[tierKey]) || (S.tiers && S.tiers.normal) || {};
+    const C = S.materialCount || 10;
+    if (!eq || !pet) return { ok: false, error: '缺少装备或宠物' };
+    // 上架中装备不可魂铸（仅在市场模块存在时校验）
+    if (window.Market && typeof window.Market.isItemListed === 'function' && window.Market.isItemListed(eq.cloudId)) {
+      return { ok: false, error: '装备正在市场出售，先取回再魂铸' };
+    }
+    if (eq.soulAffix) return { ok: false, error: '这件装备已铸入魂铸词缀，每件最多 1 条（不可剥离/重铸/神圣石洗）' };
+    if (Number(pet.level) < (T.minLevel != null ? T.minLevel : T.level)) return { ok: false, error: T.label + '魂铸需要宠物达到 ' + (T.minLevel != null ? T.minLevel : T.level) + ' 级（当前 ' + pet.level + ' 级）' };
+    if (pet.growth < (T.minGrowth != null ? T.minGrowth : T.growth)) return { ok: false, error: T.label + '魂铸需要宠物成长 ' + (T.minGrowth != null ? T.minGrowth : T.growth) + ' 以上（当前 ' + pet.growth + '）' };
+    if (T.needFinal) {
+      const aw = window.Pet.getAwakenState(pet);
+      if (!aw) return { ok: false, error: '传承魂铸需要 Lv60 终形态宠物（且已解锁主动技能）' };
+    }
+    if (Materials.getQuantity(S.material) < C) return { ok: false, error: '需要 ' + C + ' 颗' + S.material + '，满级挂机会自动凝聚' };
+
+    // 铸出词缀（soulAffix 驼峰为装备内存字段；DB 列 soul_affix 由序列化映射）
+    const defs = Config.petTraits || {};
+    let aff = null;
+    if (T.source === 'awaken') {
+      const aw = window.Pet.getAwakenState(pet);
+      if (!aw) return { ok: false, error: '该宠物尚未觉醒，无法传承魂铸' };
+      const bonus = aw.bonus || {};
+      const bType = bonus.stat || 'skillDmg';
+      aff = {
+        id: '魂·觉醒·' + pet.name, label: '魂·觉醒·' + pet.name,
+        traitId: aw.id, tier: 1, awaken: true,
+        stat: bType, value: bonus.value != null ? bonus.value : Math.round(aw.damage * 100),
+        type: bType, source: 'soulcast',
+        skillId: aw.skillId, skillName: aw.skillName, skillDamage: aw.damage,
+      };
+    } else {
+      const traits = (pet.traits || []).slice().sort((a, b) => a.tier - b.tier); // T1 在前
+      if (!traits.length) return { ok: false, error: '这只宠物没有血脉特质，无法魂铸' };
+      const best = (traitId && traits.find(t => t.id === traitId)) || traits[0];
+      const d = defs[best.id];
+      if (!d) return { ok: false, error: '未知特质' };
+      const tier = T.tierShift ? Math.max(1, best.tier - (T.tierShift || 1)) : best.tier;
+      const type = SOUL_TYPE_MAP[d.type] || d.type;
+      const value = (d.values && d.values[tier] != null) ? d.values[tier] : (d.values && d.values[best.tier]);
+      aff = { id: '魂·' + d.label, label: '魂·' + d.label, traitId: best.id, tier, type, value, source: 'soulcast' };
+    }
+
+    // 本地先行：词缀 + 本地扣晶石（界面立即生效）
+    const oldAffix = eq.soulAffix || null;
+    eq.soulAffix = aff;
+    const spentLocal = Materials.spendLocal(S.material, C);
+    if (!spentLocal.ok) { eq.soulAffix = oldAffix; return { ok: false, error: spentLocal.error || '材料不足' }; }
+
+    // 云端并行：晶石 RPC + equip_items.soul_affix 更新
+    if (Materials.flushMaterials) await Materials.flushMaterials();
+    const [sp, up] = await Promise.all([
+      Materials.cloudSpend(S.material, C),
+      Items.updateCloudItem(eq, { soul_affix: eq.soulAffix })
+    ]);
+    const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(S.material + ' 余额不足（云端）') : null) || (up && up.error);
+    if (syncErr) {
+      eq.soulAffix = oldAffix;
+      Materials.gainLocal(S.material, C);
+      return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
+    }
+
+    // 成功才消耗宠物（本地 + 云端）
+    const petCloudId = pet.cloudId;
+    window.Pet.removePet(pet.id);
+    if (petCloudId) {
+      const { error: delErr } = await Supabase.deletePet(petCloudId);
+      if (delErr) console.warn('魂铸后云端删除宠物失败（刷新后会复活）：', delErr.message);
+    }
+
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('soulcast', 1);
+
+    return { ok: true, soulAffix: aff, petName: pet.name, tierKey };
+  }
+
   /* ---------- 对外 API ---------- */
-  window.Craft = { reforge, strip, reroll, augment, affixText };
+  window.Craft = { reforge, strip, reroll, augment, affixText, soulCast };
 })();

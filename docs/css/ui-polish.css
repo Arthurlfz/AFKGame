@@ -68,52 +68,52 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 /* ============ 背包页网游风紧凑布局 ============ */
 /* 头部统计条：从五大块卡片改成一行小字 */
-#tab-bag .bag-summary { display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 8px; margin-bottom: 8px;
+#tab-bag .bag-summary, .bag-window .bag-summary { display: flex; gap: 12px; flex-wrap: wrap; padding: 6px 8px; margin-bottom: 8px;
   background: var(--inset); border: 1px solid var(--line); border-radius: 2px; }
-#tab-bag .bag-stat { font-size: var(--fs-sm); color: var(--text-faint); }
-#tab-bag .bag-stat b { color: var(--accent-hi); margin-left: 4px; font-weight: 700; }
+#tab-bag .bag-stat, .bag-window .bag-stat { font-size: var(--fs-sm); color: var(--text-faint); }
+#tab-bag .bag-stat, .bag-window .bag-stat b { color: var(--accent-hi); margin-left: 4px; font-weight: 700; }
 
 /* 搜索/筛选工具条：更紧凑、自动折行 */
-#tab-bag .bag-toolbar { gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-#tab-bag .bag-search { min-width: 120px; flex: 1 1 120px; }
-#tab-bag .bag-filter-sel { min-width: 90px; }
+#tab-bag .bag-toolbar, .bag-window .bag-toolbar { gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+#tab-bag .bag-search, .bag-window .bag-search { min-width: 120px; flex: 1 1 120px; }
+#tab-bag .bag-filter, .bag-window .bag-filter-sel { min-width: 90px; }
 
 /* 背包三连屏（参考宠物资料页 .pet-wrap--tri）：
    左=筛选/统计/鉴定石 | 中=装备流放格子（主区） | 右=素材/消耗品/蛋 */
-#tab-bag .bag-wrap--tri {
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri {
   display: grid;
   grid-template-columns: minmax(200px, 240px) minmax(420px, 1.35fr) minmax(240px, .9fr);
   gap: var(--gap-md);
   align-items: stretch;
 }
-#tab-bag .bag-wrap--tri > .pcol { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-#tab-bag .bag-wrap--tri > .pcol > .panel { min-width: 0; display: flex; flex-direction: column; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol > .panel { min-width: 0; display: flex; flex-direction: column; }
 /* 中列面板撑满高度，装备网格是主区 */
-#tab-bag .bag-wrap--tri > .pcol:nth-child(2) > .panel { flex: 1; }
-#tab-bag .bag-panel-body { padding: 10px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(2) > .panel { flex: 1; }
+#tab-bag .bag-panel, .bag-window .bag-panel-body { padding: 10px; }
 /* 左列窄：筛选控件竖排，统计条竖排（嵌在 panel 内，去掉原独立背景框） */
-#tab-bag .bag-wrap--tri .bag-toolbar { flex-direction: column; align-items: stretch; margin-bottom: 0; }
-#tab-bag .bag-wrap--tri .bag-toolbar .bag-search { width: 100%; min-width: 0; flex: none; }
-#tab-bag .bag-wrap--tri .bag-toolbar .bag-filter-sel { width: 100%; min-width: 0; }
-#tab-bag .bag-wrap--tri .bag-summary {
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri .bag-toolbar { flex-direction: column; align-items: stretch; margin-bottom: 0; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri .bag-toolbar .bag-search { width: 100%; min-width: 0; flex: none; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri .bag-toolbar .bag-filter-sel { width: 100%; min-width: 0; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri .bag-summary {
   flex-direction: column; gap: 4px; margin-bottom: 0; padding: 0;
   background: none; border: none;
 }
 /* 右列窄：素材/消耗品/蛋 用稍小格子，避免一行只排得下三四个 */
-#tab-bag .bag-wrap--tri > .pcol:nth-child(3) .poe-grid { --cell:46px; }
-#tab-bag .bag-wrap--tri > .pcol:nth-child(3) .poe-item .ico { width:36px; height:34px; font-size:24px; }
-#tab-bag .bag-wrap--tri > .pcol:nth-child(3) .poe-item .nm { font-size:9px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-grid { --cell:46px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-item .ico { width:36px; height:34px; font-size:24px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-item .nm { font-size:9px; }
 @media (max-width: 1280px) {
-  #tab-bag .bag-wrap--tri { grid-template-columns: minmax(190px, 240px) minmax(360px, 1fr); }
-  #tab-bag .bag-wrap--tri > .pcol:nth-child(3) { grid-column: 1 / -1; }
+  #tab-bag .bag-wrap, .bag-window .bag-wrap--tri { grid-template-columns: minmax(190px, 240px) minmax(360px, 1fr); }
+  #tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
-  #tab-bag .bag-wrap--tri { grid-template-columns: 1fr; }
-  #tab-bag .bag-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
+  #tab-bag .bag-wrap, .bag-window .bag-wrap--tri { grid-template-columns: 1fr; }
+  #tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
 }
 
 /* 物品网格：小槽位、高信息密度 */
-#tab-bag .bag-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+#tab-bag .bag-grid, .bag-window .bag-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
 #tab-bag .bag-card { padding: 6px 6px 8px; display: flex; flex-direction: column; align-items: center; text-align: center;
   min-height: 118px; justify-content: flex-start; position: relative; }
 #tab-bag .bag-card .bag-icon { font-size: 1.7rem; line-height: 1; margin-bottom: 4px; min-height: 28px;
@@ -147,10 +147,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 /* 流放格子背包（装备分类） */
 /* 单网格自适应列数：混排后物品更杂，固定 10 列会在窄容器溢出，改按可用宽度自动排 */
-#tab-bag .bag-grid.poe-grid { --cell:54px; --gap:2px; display:grid; grid-template-columns:repeat(auto-fill,var(--cell));
+#tab-bag .bag-grid, .bag-window .bag-grid.poe-grid { --cell:54px; --gap:2px; display:grid; grid-template-columns:repeat(auto-fill,var(--cell));
   grid-auto-rows:var(--cell); gap:var(--gap); padding:8px; position:relative; background:#0c0a07;
   border:1px solid #050403; border-radius:6px; box-shadow:inset 0 0 0 1px #000, inset 0 3px 12px rgba(0,0,0,.6); }
-#tab-bag .bag-grid.poe-grid::before { content:''; position:absolute; inset:8px; border-radius:2px; pointer-events:none;
+#tab-bag .bag-grid, .bag-window .bag-grid.poe-grid::before { content:''; position:absolute; inset:8px; border-radius:2px; pointer-events:none;
   background:
     linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px) 0 0/var(--cell) var(--cell),
     linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px) 0 0/var(--cell) var(--cell),
@@ -182,7 +182,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 #tab-bag .poe-item.q-cons { border-color:#3a4a5a; }
 #tab-bag .poe-item.q-egg { border-color:#5a4a2a; }
 #tab-bag .poe-item.q-mat, #tab-bag .poe-item.q-cons, #tab-bag .poe-item.q-egg { cursor:pointer; }
-#tab-bag .bag-grid.poe-grid .inv-empty { grid-column:1 / -1; padding:20px 6px; text-align:center; color:var(--text-faint); }
+#tab-bag .bag-grid, .bag-window .bag-grid.poe-grid .inv-empty { grid-column:1 / -1; padding:20px 6px; text-align:center; color:var(--text-faint); }
 /* 顶部鉴定卷轴 SVG 尺寸 */
 .bag-idstone .bs-ico svg { width:18px; height:21px; display:block; }
 
@@ -325,8 +325,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .cap-tip-desc { font-size: var(--fs-sm); line-height: 1.55; color: var(--text); }
 .cap-tip-cta { margin-top: 6px; color: var(--accent); font-size: var(--fs-sm); font-weight: 700; }
 
-#tab-pet .equip-slots { display: block; min-height: 470px; padding: 12px; overflow: visible; }
-#tab-pet .equip-orbit {
+#tab-pet .equip-slot, .bag-window .equip-slots, .bag-window .equip-slots { display: block; min-height: 470px; padding: 12px; overflow: visible; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit {
   position: relative; display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: repeat(5, minmax(64px, 1fr));
@@ -335,69 +335,69 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   background: radial-gradient(circle at center, rgb(var(--action-gold-rgb) / .1), transparent 52%), linear-gradient(180deg, var(--panel-2), var(--inset));
   border: 1px solid var(--line-hi); box-shadow: var(--shadow-inset), 0 8px 24px rgb(0 0 0 / .3);
 }
-#tab-pet .equip-orbit::before { content: ''; position: absolute; inset: 74px; border: 1px solid rgb(var(--action-gold-rgb) / .2); pointer-events: none; }
-#tab-pet .equip-orbit-center {
+#tab-pet .equip-orbit, .bag-window .equip-orbit::before { content: ''; position: absolute; inset: 74px; border: 1px solid rgb(var(--action-gold-rgb) / .2); pointer-events: none; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit-center {
   grid-column: 2 / 5; grid-row: 2 / 5; z-index: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-width: 0; min-height: 0; padding: 18px;
   background: radial-gradient(circle, rgb(var(--action-gold-rgb) / .12), transparent 68%);
   text-align: center;
 }
-#tab-pet .equip-orbit-art {
+#tab-pet .equip-orbit, .bag-window .equip-orbit-art {
   display: flex; align-items: center; justify-content: center;
   width: min(100%, 220px); aspect-ratio: 1; overflow: hidden;
   border: 1px solid rgb(var(--action-gold-rgb) / .5); border-radius: 50%;
   background: radial-gradient(circle at 50% 35%, rgb(var(--action-gold-rgb) / .2), var(--inset) 68%);
   box-shadow: 0 0 0 4px rgb(0 0 0 / .45), 0 0 22px rgb(var(--action-gold-rgb) / .18), var(--shadow-inset);
 }
-#tab-pet .equip-orbit-art img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
-#tab-pet .equip-orbit-name { margin-top: 12px; color: var(--accent-hi); font: 700 var(--fs-md) var(--font-title); letter-spacing: 2px; }
-#tab-pet .equip-orbit > .equip-slot { min-width: 0; min-height: 0; padding: 7px 6px; position: relative; z-index: 2; background: var(--panel-2); background-image: var(--ui-paper-texture); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-inset); }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(2) { grid-column: 2; grid-row: 1; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(3) { grid-column: 3; grid-row: 1; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(4) { grid-column: 4; grid-row: 1; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(5) { grid-column: 1; grid-row: 2; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(6) { grid-column: 1; grid-row: 3; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(7) { grid-column: 1; grid-row: 4; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(8) { grid-column: 5; grid-row: 2; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(9) { grid-column: 5; grid-row: 3; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(10) { grid-column: 5; grid-row: 4; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(11) { grid-column: 2; grid-row: 5; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(12) { grid-column: 3; grid-row: 5; }
-#tab-pet .equip-orbit > .equip-slot:nth-of-type(13) { grid-column: 4; grid-row: 5; }
-#tab-pet .equip-slot.empty { border-style: dashed; color: var(--text-faint); opacity: .8; }
-#tab-pet .equip-slot.equipped.rarity-blue { border-color: var(--r-blue); box-shadow: var(--shadow-inset), var(--shadow-glow-blue); }
-#tab-pet .equip-slot.equipped.rarity-gold { border-color: var(--r-gold); box-shadow: var(--shadow-inset), var(--shadow-glow-gold); }
-#tab-pet .equip-slot:hover { border-color: var(--accent-hi); }
-#tab-pet .equip-slot .slot-label { color: var(--text-faint); font-size: var(--fs-xs); letter-spacing: 1px; }
-#tab-pet .equip-slot .slot-item { min-height: 38px; margin-top: 4px; display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); line-height: 1.35; overflow: visible; }
-#tab-pet .equip-slot .slot-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--accent-hi); font-size: 1.2rem; }
-#tab-pet .equip-slot .slot-copy { min-width: 0; flex: 1; }
-#tab-pet .equip-slot .slot-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-#tab-pet .equip-slot .slot-item .sub { display: block; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
-#tab-pet .equip-slot .slot-unequip { display: none; }
-#tab-pet .equip-slot:hover .slot-unequip { display: block; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit-art img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit-name { margin-top: 12px; color: var(--accent-hi); font: 700 var(--fs-md) var(--font-title); letter-spacing: 2px; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot { min-width: 0; min-height: 0; padding: 7px 6px; position: relative; z-index: 2; background: var(--panel-2); background-image: var(--ui-paper-texture); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-inset); }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(2) { grid-column: 2; grid-row: 1; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(3) { grid-column: 3; grid-row: 1; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(4) { grid-column: 4; grid-row: 1; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(5) { grid-column: 1; grid-row: 2; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(6) { grid-column: 1; grid-row: 3; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(7) { grid-column: 1; grid-row: 4; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(8) { grid-column: 5; grid-row: 2; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(9) { grid-column: 5; grid-row: 3; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(10) { grid-column: 5; grid-row: 4; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(11) { grid-column: 2; grid-row: 5; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(12) { grid-column: 3; grid-row: 5; }
+#tab-pet .equip-orbit, .bag-window .equip-orbit > .equip-slot:nth-of-type(13) { grid-column: 4; grid-row: 5; }
+#tab-pet .equip-slot, .bag-window .equip-slot.empty { border-style: dashed; color: var(--text-faint); opacity: .8; }
+#tab-pet .equip-slot, .bag-window .equip-slot.equipped.rarity-blue { border-color: var(--r-blue); box-shadow: var(--shadow-inset), var(--shadow-glow-blue); }
+#tab-pet .equip-slot, .bag-window .equip-slot.equipped.rarity-gold { border-color: var(--r-gold); box-shadow: var(--shadow-inset), var(--shadow-glow-gold); }
+#tab-pet .equip-slot, .bag-window .equip-slot:hover { border-color: var(--accent-hi); }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-label { color: var(--text-faint); font-size: var(--fs-xs); letter-spacing: 1px; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-item { min-height: 38px; margin-top: 4px; display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); line-height: 1.35; overflow: visible; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; color: var(--accent-hi); font-size: 1.2rem; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-copy { min-width: 0; flex: 1; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-item .sub { display: block; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
+#tab-pet .equip-slot, .bag-window .equip-slot .slot-unequip { display: none; }
+#tab-pet .equip-slot, .bag-window .equip-slot:hover .slot-unequip { display: block; }
 
 #pet-list:empty::before, #evolve-pet-list:empty::before, #synth-pet-list:empty::before, #merge-pet-list:empty::before, #market-list:empty::before { content: "暂无内容 · 去野外挂机刷一刷吧"; display: block; padding: 30px 10px; text-align: center; color: var(--text-faint); border: 1px dashed var(--line); border-radius: var(--radius-sm); }
 /* 装备资料页：属性 | 当前装备 | 换装背包，三列必须保留 */
-#tab-pet .pet-wrap--tri {
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri {
   display: grid;
   grid-template-columns: minmax(220px, 240px) minmax(520px, 1.35fr) minmax(260px, .9fr);
   gap: var(--gap-md);
   align-items: stretch;
 }
-#tab-pet .pet-wrap--tri > .pcol { min-width: 0; }
-#tab-pet .pet-wrap--tri > .pcol:nth-child(2) .panel,
-#tab-pet .pet-wrap--tri > .pcol:nth-child(3) .panel { min-width: 0; height: 100%; box-sizing: border-box; }
-#tab-pet .pet-wrap--tri .panel-title { min-width: 0; }
-#tab-pet .pet-wrap--tri .equip-inv { min-width: 0; overflow: hidden; }
-#tab-pet .pet-wrap--tri .equip-inv-filter { min-width: 0; }
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol { min-width: 0; }
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(2) .panel,
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(3) .panel { min-width: 0; height: 100%; box-sizing: border-box; }
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri .panel-title { min-width: 0; }
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri .equip-inv { min-width: 0; overflow: hidden; }
+#tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri .equip-inv-filter { min-width: 0; }
 
 @media (max-width: 1280px) {
-  #tab-pet .pet-wrap--tri { grid-template-columns: minmax(200px, 240px) minmax(360px, 1fr); }
-  #tab-pet .pet-wrap--tri > .pcol:nth-child(3) { grid-column: 1 / -1; }
+  #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri { grid-template-columns: minmax(200px, 240px) minmax(360px, 1fr); }
+  #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(3) { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
-  #tab-pet .pet-wrap--tri { grid-template-columns: 1fr; }
-  #tab-pet .pet-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
+  #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri { grid-template-columns: 1fr; }
+  #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
 }

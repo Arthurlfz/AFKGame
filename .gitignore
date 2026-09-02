@@ -42,3 +42,7 @@ docs/.playwright-cli/
 docs/__probe16x9.html
 docs/tests/_tmp_*.js
 docs/tests/tmp_*.js
+
+# ===== 根目录 js Junction（mklink /J → docs/js，不入库，避免重复内容）=====
+js/
+

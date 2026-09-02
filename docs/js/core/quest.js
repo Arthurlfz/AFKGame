@@ -12,7 +12,7 @@
  *   - achieve  成就：长期累计，一次性
  * 12 种目标类型（config.drop.quests 的 type）：
  *   collect 收集材料（进度=背包材料数，实时） / kill 击败怪 / evolve 进化 / nirvana 涅槃
- *   synth 合成 / hatch 孵化 / craft 打造 / salvage 分解 / equipDrop 获得装备
+ *   synth 合成 / soulcast 魂铸 / hatch 孵化 / craft 打造 / salvage 分解 / equipDrop 获得装备
  *   equip 穿装备 / list 上架 / trade 市场成交
  * 加任务 = 在 config.drop.quests 加一行，不用改本文件逻辑。
  * 依赖：materials.js、pet.js(等级)、supabase.js(账号级进度，存 quest_progress 的 JSON，不加表字段)

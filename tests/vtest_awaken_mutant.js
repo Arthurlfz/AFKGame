@@ -23,7 +23,7 @@ C(`(function(){
 const aw = C('Pet.getAwakenState(globalThis.__p)');
 A(aw !== null && aw !== undefined, `「霜魂鬼皇·异变」觉醒状态非空（${aw ? 'form=' + aw.form : 'null'}）`);
 const skill = C(`Config.pet.evolution.skillOf(globalThis.__p.name)`);
-A(!!skill && skill.name === '霜牙连闪', `变异宠继承本体技能 ${skill ? skill.name : 'null'}`);
+A(!!skill && skill.name === '霜魂月刃', `变异宠继承本体技能 ${skill ? skill.name : 'null'}`);
 
 const can = C(`(function(){
   const t=Config.soulCast.tiers.legend;

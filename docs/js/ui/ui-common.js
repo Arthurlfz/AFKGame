@@ -160,6 +160,76 @@
     }
   }
 
+  /* ---------- 血统被动卡片渲染（金色主题：图标+名称+描述） ---------- */
+  function bloodlineHtml(pet) {
+    if (!pet || !window.Pet || !window.Pet.getBloodline) return '';
+    const bl = window.Pet.getBloodline(pet);
+    if (!bl) return '';
+    return '<div class="bloodline-card">' +
+      '<span class="bloodline-icon">' + (bl.icon || '✨') + '</span>' +
+      '<div class="bloodline-info">' +
+        '<div class="bloodline-name">血统 · ' + escapeHtml(bl.name) + '</div>' +
+        '<div class="bloodline-desc">' + escapeHtml(bl.desc || '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+
+  /* ---------- 通用窗口拖动（标题栏按住拖动整个窗口） ---------- */
+  function makeDraggable(winEl, handleEl) {
+    if (!winEl || !handleEl || winEl._dragBound) return;
+    winEl._dragBound = true;  // 防止重复绑定
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let baseX = 0, baseY = 0;
+    let rafId = null;
+    let curX = 0, curY = 0;
+
+    function applyTransform() {
+      rafId = null;
+      winEl.style.transform = 'translate3d(' + curX + 'px,' + curY + 'px,0)';
+    }
+
+    function onMouseDown(e) {
+      // 点击关闭按钮等交互元素时不拖动
+      if (e.target.closest('button, input, select, a, textarea')) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      const rect = winEl.getBoundingClientRect();
+      baseX = rect.left;
+      baseY = rect.top;
+      curX = baseX;
+      curY = baseY;
+      // 拖动时禁用 transition（否则窗口会追着鼠标跑），用 translate3d 走 GPU
+      winEl.classList.add('is-dragging');
+      winEl.style.left = '0';
+      winEl.style.top = '0';
+      winEl.style.transform = 'translate3d(' + baseX + 'px,' + baseY + 'px,0)';
+      e.preventDefault();
+    }
+
+    function onMouseMove(e) {
+      if (!isDragging) return;
+      curX = baseX + (e.clientX - startX);
+      curY = baseY + (e.clientY - startY);
+      // rAF 节流：每帧最多更新一次，避免高频重绘卡顿
+      if (rafId === null) rafId = requestAnimationFrame(applyTransform);
+    }
+
+    function onMouseUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      winEl.classList.remove('is-dragging');
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+    }
+
+    handleEl.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
   /* ---------- 渲染枢纽（按页面顺序调用各 UI 模块，统一刷新） ---------- */
   function renderAll() {
     UI.renderPetPanel();
@@ -203,4 +273,6 @@
   UI.clampTip = clampTip;
   UI.runWithLoading = runWithLoading;
   UI.renderAll = renderAll;
+  UI.makeDraggable = makeDraggable;
+  UI.bloodlineHtml = bloodlineHtml;
 })();

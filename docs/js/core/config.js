@@ -103,22 +103,28 @@ window.Config = {
        * Lv60 = 终形态 + 学主动技能 + 涅槃解锁（三者同点，第一幕毕业仪式），第二幕靠技能+涅槃撑。 */
       // 主动技能：终形态且达到 60 级时解锁；每次施放后按后续我方行动冷却 3 回合。
       activeSkills: {
-        '腐烂之母': { id: 'corrosion-spit', name: '腐蚀喷吐', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.5 },
-        '剧毒魔君': { id: 'toxic-cloud', name: '剧毒云雾', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.3, maxHpDamageRate: 0.03 },
-        '血月魔狐': { id: 'blood-moon-slash', name: '血月斩', minLevel: 60, cooldownTurns: 3, damageMultiplier: 2 },
-        '幽火魔狐': { id: 'hellfire-burn', name: '幽火焚身', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.5 },
-        '瘟疫之主': { id: 'plague-stomp', name: '瘟疫践踏', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.6 },
-        '血瘟暴君': { id: 'blood-feast', name: '血瘟盛宴', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
-        '刺骨魔兽': { id: 'bone-spike', name: '万骨穿刺', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.8 },
-        '幽冥疫君': { id: 'nether-plague', name: '幽冥疫爆', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
-        '骸骨君主': { id: 'bone-cleave', name: '骸骨裂斩', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.9 },
-        '霜寒领主': { id: 'frost-bite', name: '极寒撕咬', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.6 },
-        '剧毒魔神': { id: 'venom-eruption', name: '毒沼爆发', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.4, maxHpDamageRate: 0.03 },
-        '深渊蛙帝': { id: 'abyss-crush', name: '深渊镇压', minLevel: 60, cooldownTurns: 3, damageMultiplier: 2 },
-        '尸界狱主': { id: 'corpse-rend', name: '尸界撕裂', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.7 },
-        '幽魂犬皇': { id: 'ghost-hunt', name: '幽魂猎杀', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.5, maxHpDamageRate: 0.02 },
-        '影蚀魔君': { id: 'shadow-eclipse', name: '影蚀绝杀', minLevel: 60, cooldownTurns: 3, damageMultiplier: 2.1 },
-        '霜魂兔皇': { id: 'frost-moon', name: '霜魂月刃', minLevel: 60, cooldownTurns: 3, damageMultiplier: 1.7 }
+        '腐烂之母': { id: 'corrosion-spit', name: '腐蚀喷吐', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
+        '剧毒魔君': { id: 'toxic-cloud', name: '剧毒云雾', minLevel: 60, cooldownTurns: 3, triggerChance: 0.22, damageMultiplier: 1.3, maxHpDamageRate: 0.03 },
+        '血月魔狐': { id: 'blood-moon-slash', name: '血月斩', minLevel: 60, cooldownTurns: 3, triggerChance: 0.13, damageMultiplier: 2 },
+        '幽火魔狐': { id: 'hellfire-burn', name: '幽火焚身', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
+        '瘟疫之主': { id: 'plague-stomp', name: '瘟疫践踏', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.6 },
+        '血瘟暴君': { id: 'blood-feast', name: '血瘟盛宴', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
+        '刺骨魔兽': { id: 'bone-spike', name: '万骨穿刺', minLevel: 60, cooldownTurns: 3, triggerChance: 0.15, damageMultiplier: 1.8 },
+        '幽冥疫君': { id: 'nether-plague', name: '幽冥疫爆', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
+        '骸骨君主': { id: 'bone-cleave', name: '骸骨裂斩', minLevel: 60, cooldownTurns: 3, triggerChance: 0.14, damageMultiplier: 1.9 },
+        '霜寒领主': { id: 'frost-bite', name: '极寒撕咬', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.6 },
+        '剧毒魔神': { id: 'venom-eruption', name: '毒沼爆发', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.03 },
+        '深渊蛙帝': { id: 'abyss-crush', name: '深渊镇压', minLevel: 60, cooldownTurns: 3, triggerChance: 0.13, damageMultiplier: 2 },
+        '尸界狱主': { id: 'corpse-rend', name: '尸界撕裂', minLevel: 60, cooldownTurns: 3, triggerChance: 0.16, damageMultiplier: 1.7 },
+        '幽魂犬皇': { id: 'ghost-hunt', name: '幽魂猎杀', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.5, maxHpDamageRate: 0.02 },
+        '影蚀魔君': { id: 'shadow-eclipse', name: '影蚀绝杀', minLevel: 60, cooldownTurns: 3, triggerChance: 0.12, damageMultiplier: 2.1 },
+        '霜魂兔皇': { id: 'frost-moon', name: '霜魂月刃', minLevel: 60, cooldownTurns: 3, triggerChance: 0.16, damageMultiplier: 1.7 }
+      },
+      // 变异宠（名字带 ·异变）继承本体主动技能：skillOf 剥离后缀查找
+      skillOf: (name) => {
+        const skills = (window.Config.pet && window.Config.pet.evolution && window.Config.pet.evolution.activeSkills) || {};
+        const baseName = String(name || '').replace(/·异变$/, '');
+        return skills[baseName] || null;
       },
       tree: {
         '腐噜兽': [ { to: '腐沼兽', icon: '🐸', minLevel: 10 }, { to: '毒噜兽', icon: '🐹', minLevel: 10 } ],
@@ -163,6 +169,24 @@ window.Config = {
         '霜影魔兔': [ { to: '霜魂兔皇', icon: '❄', minLevel: 60 } ]
       }
     }
+  },
+
+
+  /* ================= 血统被动 =================
+   * 每只基宠天生绑定一个机制性被动，战斗中可见、不可继承、不可更换 = 职业定位。
+   * 与血脉特质（trait，随机roll/属性加成/可继承）互补：血统定方向，特质做微调。
+   * 类型化设计：战斗代码只认 type 不认宠物名，未来加新宠物90%情况复用已有type配参数。
+   * 8个类型：allStatBonus / onCritExtraHit / onHitReflect / speedAspd / killDamageBuff / corruptionStack / lifestealTrueDamage / onDodgeCounter
+   * ==================================================== */
+  bloodlinePassive: {
+    '腐噜兽': { type: 'allStatBonus', name: '适应力', icon: '🐹', desc: '暴击率/闪避/命中各+8%，全场景稳定发挥。', params: { critRate: 0.08, dodge: 0.08, hit: 0.08 } },
+    '血狐':   { type: 'onCritExtraHit', name: '猎杀本能', icon: '🦊', desc: '暴击时25%概率追加一次普攻（100%伤害）。', params: { chance: 0.25, damageMult: 1.0 } },
+    '瘟熊':   { type: 'onHitReflect', name: '重甲反冲', icon: '🐻', desc: '受击时反弹防御力30%的伤害给敌人。', params: { defRatio: 0.3 } },
+    '疫毛兽': { type: 'speedAspd', name: '疾风步', icon: '🐱', desc: '速度超100后，每10点速度+5%攻速，上限+30%。', params: { threshold: 100, perPoint: 10, bonusPer: 0.05, cap: 0.30 } },
+    '骨狼':   { type: 'killDamageBuff', name: '嗜血追击', icon: '🐺', desc: '击杀敌人后，下次攻击伤害+50%。', params: { damageMult: 1.5 } },
+    '毒沼蛙': { type: 'corruptionStack', name: '腐蚀毒液', icon: '🐸', desc: '攻击叠加腐蚀层数，每层使敌人受伤+5%，最多5层。', params: { perStack: 0.05, maxStacks: 5 } },
+    '尸犬':   { type: 'lifestealTrueDamage', name: '噬魂咬', icon: '🐶', desc: '吸血时附加吸血量100%的真实伤害。', params: { ratio: 1.0 } },
+    '幽影兔': { type: 'onDodgeCounter', name: '影袭', icon: '🐰', desc: '闪避后立即反击，造成80%伤害。', params: { damageMult: 0.8 } }
   },
 
   /* ================= 经验 =================
@@ -408,25 +432,26 @@ window.Config = {
     //       rewardGear 奖励装备件数（新手链专用：送实体装备，不是材料）
     quests: [
       /* ---- 新手成长 12 条：线性引导，做完一条出下一条，全部一次性 ---- */
-      { id: 't1', category: 'tutorial', type: 'kill', need: 1, name: '初醒', guide: { page: 'battle', btn: '去挂机' }, reward: { 重铸石: 1 } },
+      { id: 't1', category: 'tutorial', type: 'kill', need: 1, name: '初醒', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '点击 <b>开始自动战斗</b> 击败 1 只怪物', target: '#btn-battle', reward: { 重铸石: 1 } },
       /* t2 送 1 件蓝装（2026-08-31 用户拍板）：下一条 t3「披上残甲」要求穿 1 件装备，
        * 而装备靠单池 equipment 档掉落（改法一后概率仍低），新手期 10 场大概率捡不到 ——
        * 引导会卡死在「去穿装备」但背包空的死循环。所以前置任务直接发一件，
        * 玩家拿到就能穿，同时也第一次看见「装备」这个东西长什么样。 */
-      { id: 't2', category: 'tutorial', type: 'kill', need: 10, requires: 't1', name: '熟悉腐土', guide: { page: 'battle', btn: '去挂机' }, reward: { 进化素材: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'blue', materialTier: 3 } },
-      { id: 't3', category: 'tutorial', type: 'equip', need: 1, requires: 't2', name: '披上残甲', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, reward: { 重铸石: 1 } },
+      { id: 't2', category: 'tutorial', type: 'kill', need: 10, requires: 't1', name: '熟悉腐土', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '点击 <b>开始自动战斗</b> 累计击败 10 只怪物', target: '#btn-battle', reward: { 进化素材: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'blue', materialTier: 3 } },
+      { id: 't3', category: 'tutorial', type: 'equip', need: 1, requires: 't2', name: '披上残甲', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, isGuide: true, hint: '在宠物资料页打开 <b>装备</b> 栏，穿上一件装备', target: '.pet-tab[data-pet-tab="equip"]', reward: { 重铸石: 1 } },
       // t11/t12 是「升级缓冲」：进化门槛 Lv10（按 exp 公式约需累计 78 场），t3 后直接接进化的话，
       // 玩家要干等 20 分钟且引导条一直卡在 0/1。这两条让进度条持续动，玩家边刷边到 Lv10。
       // 注意：kill 类进度在 reportType 里按 type 全量累加（不分任务），所以 need 是「累计击败数」而非增量。
-      { id: 't11', category: 'tutorial', type: 'kill', need: 30, requires: 't3', name: '腐土巡守', guide: { page: 'battle', btn: '去挂机' }, reward: { 重铸石: 2 } },
-      { id: 't12', category: 'tutorial', type: 'kill', need: 80, requires: 't11', name: '腐土猎手', guide: { page: 'battle', btn: '去挂机' }, reward: { 进化素材: 1 } },
-      { id: 't4', category: 'tutorial', type: 'evolve', need: 1, requires: 't12', name: '第一次进化', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, reward: { 进化素材: 2 } },
-      { id: 't5', category: 'tutorial', type: 'craft', need: 1, requires: 't4', name: '初次淬炼', guide: { page: 'equip', btn: '去打造' }, reward: { 神圣石: 1 } },
-      { id: 't6', category: 'tutorial', type: 'salvage', need: 1, requires: 't5', name: '拆解废品', guide: { page: 'equip', btn: '去分解' }, reward: { 增缀石: 1 } },
-      { id: 't7', category: 'tutorial', type: 'hatch', need: 1, requires: 't6', name: '新的生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, reward: { 宠物蛋: 1 } },
-      { id: 't8', category: 'tutorial', type: 'list', need: 1, requires: 't7', name: '第一次交易', guide: { page: 'market-sell', btn: '去上架' }, reward: { 合成之石: 1 } },
-      { id: 't9', category: 'tutorial', type: 'kill', area: 'plague-swamp', need: 20, requires: 't8', name: '深入腐变', guide: { page: 'battle', btn: '去挂机' }, reward: { 精粹进化素材: 1 } },
-      { id: 't10', category: 'tutorial', type: 'nirvana', need: 1, requires: 't9', name: '脱胎换骨', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, reward: { 涅磐兽: 1, 合成之石: 1 } },
+      { id: 't11', category: 'tutorial', type: 'kill', need: 30, requires: 't3', name: '腐土巡守', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '继续 <b>自动战斗</b>，累计击败 30 只怪物', target: '#btn-battle', reward: { 重铸石: 2 } },
+      { id: 't12', category: 'tutorial', type: 'kill', need: 80, requires: 't11', name: '腐土猎手', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '继续 <b>自动战斗</b>，累计击败 80 只怪物', target: '#btn-battle', reward: { 进化素材: 1 } },
+      { id: 't13', category: 'tutorial', type: 'soulcast', need: 1, requires: 't10', name: '魂铸传承', guide: { page: 'equip', tab: 'soulcast', btn: '去魂铸' } },
+      { id: 't4', category: 'tutorial', type: 'evolve', need: 1, requires: 't12', name: '第一次进化', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物资料页打开 <b>进化</b> 栏，完成第一次进化', target: '.pet-tab[data-pet-tab="evolve"]', reward: { 进化素材: 2 } },
+      { id: 't5', category: 'tutorial', type: 'craft', need: 1, requires: 't4', name: '初次淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页打造 1 件装备', target: '.sb-btn[data-page="equip"]', reward: { 神圣石: 1 } },
+      { id: 't6', category: 'tutorial', type: 'salvage', need: 1, requires: 't5', name: '拆解废品', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点击 <b>一键分解</b> 分解废品', target: '#btn-salvage', reward: { 增缀石: 1 } },
+      { id: 't7', category: 'tutorial', type: 'hatch', need: 1, requires: 't6', name: '新的生命', guide: { page: 'pet', tab: 'profile', btn: '去孵化' }, isGuide: true, hint: '在宠物资料页 <b>资料</b> 栏打开孵化面板，孵化 1 颗蛋', target: '#egg-panel', reward: { 宠物蛋: 1 } },
+      { id: 't8', category: 'tutorial', type: 'list', need: 1, requires: 't7', name: '第一次交易', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备', target: '.sb-btn[data-page="market-sell"]', reward: { 合成之石: 1 } },
+      { id: 't9', category: 'tutorial', type: 'synth', need: 1, requires: 't8', name: '初次融合', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物资料页打开 <b>合成</b> 栏，完成一次合成', target: '.pet-tab[data-pet-tab="synth"]', reward: { 精粹进化素材: 1 } },
+      { id: 't10', category: 'tutorial', type: 'nirvana', need: 1, requires: 't9', name: '脱胎换骨', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, isGuide: true, hint: '在宠物资料页打开 <b>涅槃</b> 栏，完成一次涅槃', target: '.pet-tab[data-pet-tab="merge"]', reward: { 涅磐兽: 1, 合成之石: 1 } },
 
       /* ---- 主线 40 条：10 图 × 4 条（击败 / 收集 / 养成 / 装备），按等级解锁。
        * ⚠️ 2026-08-30 地图重排：腐变之源做最终图（55-60），回响崖/腐沼泽/余烬渊/魂渊依次提前。
@@ -784,6 +809,61 @@ window.Config = {
    *  - 变异成功：出一只名字带「·异变」的全新宠，成长 = 主×mainW + 副×subW + 随机加成
    *  - 变异失败：出一只普通新宠（继承主宠形态，成长 = 加权和，略低于变异）
    *  - 两只素材宠都消失；新宠等级回 1（重新练级）；消耗合成之石 */
+  /* ================= 宠物血脉特质 + 魂铸系统（设计 v1） =================
+   * T 阶口径：T1 最强最稀有（与装备词缀惯例一致）；特质一律不含攻击%。
+   * 结算桶：critRate/critDamage/lifesteal/hit/dodge/spd → flat 点数（getStats 再 ÷100 或点数）；
+   *         hp/def → pct 百分比（÷100）。 */
+  petTraits: {
+    '嗜血': { type: 'lifesteal', label: '吸血', values: { 1: 8, 2: 5, 3: 3 } },    // %（flat 点数）
+    '狂暴': { type: 'critDamage', label: '暴击伤害', values: { 1: 25, 2: 15, 3: 8 } },
+    '战意': { type: 'critRate', label: '暴击率', values: { 1: 6, 2: 4, 3: 2 } },
+    '精准': { type: 'hit', label: '命中', values: { 1: 12, 2: 8, 3: 5 } },
+    '疾风': { type: 'spd', label: '速度', values: { 1: 8, 2: 5, 3: 3 } },
+    '铁壁': { type: 'def', label: '防御', values: { 1: 12, 2: 8, 3: 5 } },        // %（pct）
+    '坚韧': { type: 'hp', label: '生命', values: { 1: 12, 2: 8, 3: 5 } },         // %（pct）
+    '灵巧': { type: 'dodge', label: '闪避', values: { 1: 8, 2: 5, 3: 3 } },
+  },
+  traitHatch: {
+    counts: [40, 45, 13, 2],     // 0/1/2/3 条概率 %（索引 = 条数）
+    tierRoll: [0, 10, 30, 60],   // T1/T2/T3 概率 %（索引 = 阶）
+    mutant: { minCount: 1, count3: 8, t1Boost: 20, minTier: 2 },  // 变异：保底1条、3条 2→8%、T1 10→20%、保底≥T2
+  },
+  awakenBonus: {   // 血统线定位加成（觉醒特质 = 对应主动技能伤害+20% + 此加成）
+    '腐噜兽': { hp: 5 },        // 生命+5%
+    '血狐': { critDamage: 10 }, // 暴伤+10%
+    '瘟熊': { def: 8 },         // 防御+8%
+    '疫毛兽': { spd: 4 },       // 速度+4
+    '骨狼': { lifesteal: 3 },   // 吸血+3%
+    '毒沼蛙': { hp: 5 },        // 生命+5%
+    '尸犬': { lifesteal: 3 },   // 吸血+3%
+    '幽影兔': { spd: 4 },       // 速度+4
+  },
+  awakenSkillDamage: 0.2,  // 终形态 Lv60 觉醒：对应主动技能伤害 +20%
+  traitInherit: {
+    mainKeep: 0.7,     // 合成：主宠每条特质保留概率（9/1 契约字段名）
+    subKeep: 0.4,      // 合成：副宠每条继承概率
+    synthKeep: 0.7,    // 兼容别名
+    synthGive: 0.4,    // 合成：副宠每条特质继承概率
+    up: 0.2,           // 继承时 T 阶 +1 概率（封顶 T1）
+    down: 0.1,         // 继承时 T 阶 -1 概率（最低 T3）
+    growthBonus: 0.1,  // 主宠成长≥60：整体 +10%（一档封顶）
+    growthMin: 60,
+    cap: 3,            // 特质总条数上限
+    mutantExtra: 1,    // 合成变异成功额外追 1 条随机新特质
+  },
+  traitNirvana: {
+    implantChance: 0.3,  // 涅槃：副宠每条特质植入主宠概率
+    takeHigherT: true,   // 同类型取高 T，不叠加
+  },
+  soulCast: {
+    material: '凝魂晶石', materialCount: 10,
+    tiers: {
+      normal: { label: '普通', minLevel: 40, minGrowth: 10, source: 'blood', tierShift: 0 },
+      elite: { label: '精锐', minLevel: 40, minGrowth: 40, source: 'blood', tierShift: 1 },
+      legend: { label: '传承', minLevel: 60, minGrowth: 60, source: 'awaken', tierShift: 0, needFinal: true },
+    },
+    maxSoulAffixes: 1,  // 每件装备最多 1 条魂铸词缀
+  },
   synthesize: {
     minLevel: 40,           // 两只素材必须达到的等级
     material: { name: '合成之石', amount: 1 },  // 合成消耗（新增通货）

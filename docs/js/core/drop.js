@@ -119,8 +119,13 @@
       const evoSub = evoTiers.map(t => [t, ew[t] || 10]);
       sub.push([weightedPick(evoSub), evoSlot]);
     }
-    // 区域材料：取 areaMaterials[area.id].name（权重已在上面 entries 循环里按'区域材料'加入）
-    const name = weightedPick(sub);
+    // 区域材料：权重条目里 '区域材料' 是占位符，实际名字取 areaMaterials[area.id].name
+    // （如 corrupted-forest → 枯荣种荚）；其余材料名直接用
+    let name = weightedPick(sub);
+    if (name === '区域材料') {
+      const am = (D.areaMaterials && D.areaMaterials[area && area.id]) || null;
+      name = (am && am.name) || null;
+    }
     if (!name) return null;
     const qty = (res && res.dropQty && res.dropQty >= 2) ? 2 : 1;
     return { name, qty };

@@ -12,7 +12,7 @@
 
   const UI = window.UI;
   const Config = window.Config;
-  const $ = id => document.getElementById(id);
+  const $ = (id) => document.getElementById(id);
 
   const ADMIN = (Config.dev && Config.dev.adminEmails) || [];
   const isAdmin = () => {
@@ -80,13 +80,27 @@
       { path: 'marketBot.perTick', label: '每次上架', min: 1, max: 20, step: 1 },
       { path: 'marketBot.leakChance', label: '漏价概率', min: 0, max: 0.5, step: 0.01 }
     ] },
+    { group: '特质/魂铸', fields: [
+      { path: 'traitHatch.mutant.t1Boost', label: '变异T1特质概率加成', min: 0, max: 50, step: 1, note: '合成变异时 T1 特质概率 +X%（%为单位）' },
+      { path: 'traitHatch.mutant.count3', label: '变异3条特质概率', min: 0, max: 50, step: 1, note: '合成变异时出 3 条特质的概率（%）' },
+      { path: 'traitInherit.mainKeep', label: '合成主宠特质保留率', min: 0, max: 1, step: 0.05 },
+      { path: 'traitInherit.subKeep', label: '合成副宠特质继承率', min: 0, max: 1, step: 0.05 },
+      { path: 'traitInherit.up', label: '继承升阶概率', min: 0, max: 1, step: 0.01, note: '特质继承时 T 阶 +1 概率（封顶 T1）' },
+      { path: 'traitNirvana.implantChance', label: '涅槃特质植入率', min: 0, max: 1, step: 0.01 },
+      { path: 'soulCast.materialCount', label: '魂铸消耗凝魂晶石', min: 1, max: 50, step: 1 },
+      { path: 'awakenSkillDamage', label: '觉醒技能伤害加成', min: 0, max: 0.5, step: 0.05 }
+    ] },
     { group: '成长系统', fields: [
       { path: 'synthesize.mutation.chance', label: '变异概率', min: 0, max: 1, step: 0.01 },
       { path: 'nirvana.absorbRatio', label: '涅槃吸收比例', min: 0, max: 1, step: 0.01 },
       { path: 'nirvana.minLevel', label: '涅槃门槛等级', min: 1, max: 100, step: 1 }
     ] }
   ];
-  SCHEMA.forEach(g => (g.fields || []).forEach(f => { f._default = getByPath(f.path); }));
+  // 构建默认值；配置里缺字段的项标记 _missing，渲染时兜底显示且不影响其他项
+  SCHEMA.forEach(g => (g.fields || []).forEach(f => {
+    f._default = getByPath(f.path);
+    f._missing = f._default === undefined;
+  }));
 
   function fmt(v) {
     if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
@@ -111,7 +125,9 @@
       mk('tune', '1', '调参', '数值调参') +
       mk('res', '2', '资源', '资源发放') +
       mk('sim', '3', '模拟', '模拟器') +
-      mk('fast', '4', '快进', '养成快进') + '</div>';
+      mk('fast', '4', '快进', '养成快进') +
+      mk('player', '5', '玩家', '玩家管理') +
+      mk('stats', '6', '数据', '运营数据') + '</div>';
   }
 
   /* ============ Tab 1：数值调参 ============ */
@@ -131,7 +147,8 @@
         return;
       }
       const rows = g.fields.map(f => {
-        const val = getByPath(f.path);
+        let val = getByPath(f.path);
+        if (!Number.isFinite(val)) val = Number.isFinite(f._default) ? f._default : (Number.isFinite(f.default) ? f.default : f.min);
         if (f.bool) {
           return '<div class="dev-row" data-path="' + f.path + '">' +
             '<div class="dev-row-head"><span class="dev-label">' + f.label + '</span>' +
@@ -325,7 +342,7 @@
         '</div>' +
       '</div>' +
       '<div class="dev-row">' +
-        '<div class="dev-row-head"><span class="dev-label">加成长（可负，封顶 ' + (Config.pet.maxGrowth || 100) + '）</span></div>' +
+        '<div class="dev-row-head"><span class="dev-label">加成长（可负，封顶 ' + (Config.nirvana.maxGrowth || 100) + '）</span></div>' +
         '<div class="dev-inline">' +
           '<input class="dev-input" id="res-pet-gr" type="number" step="0.1" value="5" style="width:90px">' +
           '<button class="btn-mini primary" id="res-pet-gr-go">加</button>' +
@@ -427,7 +444,7 @@
     const grGo = $('res-pet-gr-go');
     if (grGo) grGo.onclick = async () => {
       const p = needPet(); if (!p) return;
-      const max = Config.pet.maxGrowth || 100;
+      const max = Config.nirvana.maxGrowth || 100;
       const d = parseFloat($('res-pet-gr') && $('res-pet-gr').value) || 0;
       p.growth = Math.max(0, Math.min(max, (p.growth || 0) + d));
       if (window.Pet && window.Pet.getStats) p.curHp = window.Pet.getStats(p).hp;
@@ -513,7 +530,7 @@
     const active = Pet.getActivePet();
     let pet;
     if (active) pet = JSON.parse(JSON.stringify(active));
-    else pet = Pet.createPet('腐噜兽', '🐹', startGr, 50, 20, 15, 55, '腐噜兽');
+    else pet = Pet.createPet('腐噜兽', '', startGr, 50, 20, 15, 55, '腐噜兽');
     pet.level = startLv; pet.exp = 0; pet.expPool = 0;
     // 防满级时 grantExp 顺手凝晶石污染 Materials：临时换成空操作（单线程，循环内无其他调用）
     const origGain = Materials.gain; Materials.gain = () => ({});
@@ -658,7 +675,7 @@
       const p = needPet(); if (!p) return;
       const subId = $('fast-sub') && $('fast-sub').value; if (!subId) { toast('❌ 选副素材宠', ''); return; }
       if (!(await isLoggedIn())) { toast('❌ 请先登录', ''); return; }
-      const S = Config.pet.synthesize;
+      const S = Config.synthesize;
       Materials.gain(S.material.name, S.material.amount);
       const res = await Merge.synthesize(p.id, subId);
       if (res && res.error) { toast('❌ ' + res.error, ''); return; }
@@ -670,7 +687,7 @@
       const p = needPet(); if (!p) return;
       const subId = $('fast-sub2') && $('fast-sub2').value; if (!subId) { toast('❌ 选副宠', ''); return; }
       if (!(await isLoggedIn())) { toast('❌ 请先登录', ''); return; }
-      const M = Config.pet.nirvana;
+      const M = Config.nirvana;
       Materials.gain(M.material.name, M.material.amount);
       const useC = $('fast-crystal') && $('fast-crystal').checked;
       if (useC && M.crystalBonus) Materials.gain(M.crystalBonus.material, M.crystalBonus.amount);
@@ -764,18 +781,132 @@
     } catch (e) { if (UI.showToast) UI.showToast('❌ 导入出错', e && e.message); }
   }
 
+  /* ============ Tab 5：玩家管理（后台） ============ */
+  function renderPlayerPanel() {
+    return groupHtml('玩家管理',
+      '<div class="dev-row">' +
+        '<div class="dev-inline">' +
+          '<input class="dev-input" id="ply-search" type="text" placeholder="按昵称或邮箱搜索" style="flex:1">' +
+          '<button class="btn-mini primary" id="ply-search-go">搜索</button>' +
+          '<button class="btn-mini ghost" id="ply-refresh">刷新</button>' +
+        '</div>' +
+        '<div class="dev-note">数据来自 admin_list_users / admin_search_users / admin_ban_user / grant_gems，仅管理员邮箱可调用</div>' +
+      '</div>' +
+      '<div id="ply-list" class="dev-detail"></div>');
+  }
+  function bindPlayerPanel() {
+    const body = $('dev-body'); if (!body) return;
+    const searchGo = $('ply-search-go');
+    if (searchGo) searchGo.onclick = () => loadPlayers(($('ply-search') && $('ply-search').value) || '');
+    const refresh = $('ply-refresh');
+    if (refresh) refresh.onclick = () => loadPlayers('');
+    loadPlayers('');
+  }
+  async function loadPlayers(q) {
+    const listEl = $('ply-list'); if (!listEl) return;
+    listEl.innerHTML = '<div class="dev-kv">加载中…</div>';
+    const S = window.Supabase;
+    if (!S || !S.getClient) { listEl.innerHTML = '<div class="dev-kv warn">Supabase 未就绪</div>'; return; }
+    try {
+      const client = S.getClient();
+      const { data, error } = q
+        ? await client.rpc('admin_search_users', { q })
+        : await client.rpc('admin_list_users');
+      if (error) { listEl.innerHTML = '<div class="dev-kv warn">RPC 错误：' + (error.message || String(error)) + '</div>'; return; }
+      if (!data || !data.length) { listEl.innerHTML = '<div class="dev-kv">无玩家数据' + (q ? '（未匹配「' + q + '」）' : '') + '</div>'; return; }
+      listEl.innerHTML = data.map(playerRow).join('');
+      listEl.querySelectorAll('[data-act]').forEach(btn => { btn.onclick = () => playerAct(btn, client); });
+    } catch (e) { listEl.innerHTML = '<div class="dev-kv warn">加载失败：' + (e && e.message) + '</div>'; }
+  }
+  function playerRow(u) {
+    const fmt = t => { if (!t) return '—'; try { return new Date(t).toLocaleString('zh-CN', { hour12: false }); } catch (e) { return String(t); } };
+    const safe = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+    const label = safe(u.nickname || u.email || '?');
+    return '<div class="dev-player-row">' +
+      '<div class="dev-player-main"><span class="dev-player-name">' + label + '</span>' +
+        '<span class="dev-player-mail">' + safe(u.email || '') + '</span></div>' +
+      '<div class="dev-player-sub">注册 ' + fmt(u.created_at) + ' · 在线 ' + fmt(u.last_seen_at) + '</div>' +
+      '<div class="dev-player-ops">' +
+        '<span class="dev-val">' + (u.gems != null ? u.gems : 0) + ' 魔石</span>' +
+        (u.banned ? '<span class="dev-banned">已封禁</span>' : '') +
+        '<button class="btn-mini primary" data-act="gem" data-uid="' + u.id + '" data-name="' + label + '">发魔石</button>' +
+        '<button class="btn-mini ghost" data-act="' + (u.banned ? 'unban' : 'ban') + '" data-uid="' + u.id + '" data-name="' + label + '">' + (u.banned ? '解封' : '封禁') + '</button>' +
+      '</div></div>';
+  }
+  async function playerAct(btn, client) {
+    const toast = (t, d) => { if (UI.showToast) UI.showToast(t, d); };
+    const uid = btn.dataset.uid, act = btn.dataset.act, name = btn.dataset.name || '?';
+    if (act === 'gem') {
+      const amt = window.prompt('给 ' + name + ' 发魔石（数量）', '100');
+      if (amt == null) return;
+      const n = Math.floor(Number(amt));
+      if (!Number.isFinite(n) || n <= 0) { toast('数量无效', ''); return; }
+      const { data: rd, error: re } = await client.rpc('grant_gems', { p_user_id: uid, p_amount: n, p_reason: 'admin-panel' });
+      const res = (typeof rd === 'string') ? rd : (re ? 'error' : 'ok');
+      if (res === 'ok') toast('已发放', name + ' +' + n + ' 魔石');
+      else if (res === 'forbidden') toast('无权限', '仅管理员邮箱可发魔石');
+      else if (re) toast('发放失败', re.message || String(re));
+      else toast('发放失败', '未知返回');
+      loadPlayers('');
+    } else {
+      const ban = act === 'ban';
+      if (!window.confirm((ban ? '封禁' : '解封') + ' ' + name + '？')) return;
+      const { data: rd, error: re } = await client.rpc('admin_ban_user', { uid, ban, reason: ban ? '管理员操作' : null });
+      if (rd === 'ok') toast(ban ? '已封禁' : '已解封', name);
+      else if (rd === 'forbidden') toast('无权限', '');
+      else if (re) toast('操作失败', re.message || String(re));
+      else toast('操作失败', String(rd || ''));
+      loadPlayers('');
+    }
+  }
+
+  /* ============ Tab 6：运营数据（后台） ============ */
+  function renderStatsPanel() {
+    return groupHtml('运营数据',
+      '<div class="dev-inline"><button class="btn-mini primary" id="stats-refresh">刷新数据</button>' +
+        '<span class="dev-hint-inline">admin_stats()：总用户 / 今日新增 / 7日活跃 / 1日活跃 / 封禁 / 魔石流通 / 魔石发放 / 订单 / 商品</span></div>' +
+      '<div id="stats-grid" class="dev-stat-grid"></div>');
+  }
+  function bindStatsPanel() {
+    const refresh = $('stats-refresh');
+    if (refresh) refresh.onclick = loadStats;
+    loadStats();
+  }
+  async function loadStats() {
+    const grid = $('stats-grid'); if (!grid) return;
+    grid.innerHTML = '<div class="dev-kv">加载中…</div>';
+    const S = window.Supabase;
+    if (!S || !S.getClient) { grid.innerHTML = '<div class="dev-kv warn">Supabase 未就绪</div>'; return; }
+    try {
+      const { data, error } = await S.getClient().rpc('admin_stats');
+      if (error) { grid.innerHTML = '<div class="dev-kv warn">RPC 错误：' + (error.message || String(error)) + '</div>'; return; }
+      const s = data && data[0];
+      if (!s) { grid.innerHTML = '<div class="dev-kv">无数据（可能未执行 migrate_admin_tools.sql 或权限不足）</div>'; return; }
+      const items = [
+        ['总用户', s.total_users], ['今日新增', s.today_new],
+        ['7日活跃', s.active_7d], ['1日活跃', s.active_1d],
+        ['封禁数', s.banned_count],
+        ['魔石流通', s.total_gems_in_circulation], ['魔石发放', s.total_gems_granted],
+        ['订单数', s.orders_count], ['在售商品', s.products_count]
+      ];
+      grid.innerHTML = items.map(([k, v]) =>
+        '<div class="dev-stat-card"><div class="dev-stat-num">' + (v == null ? '—' : v) + '</div><div class="dev-stat-label">' + k + '</div></div>'
+      ).join('');
+    } catch (e) { grid.innerHTML = '<div class="dev-kv warn">加载失败：' + (e && e.message) + '</div>'; }
+  }
+
   /* ---------- 渲染与 Tab 切换 ---------- */
   function renderBody() {
     const body = $('dev-body');
     if (!body) return;
     let html = tabBarHtml();
-    const panels = { tune: renderTunePanel, res: renderResourcePanel, sim: renderSimPanel, fast: renderFastPanel };
+    const panels = { tune: renderTunePanel, res: renderResourcePanel, sim: renderSimPanel, fast: renderFastPanel, player: renderPlayerPanel, stats: renderStatsPanel };
     html += (panels[activeTab] || renderTunePanel)();
     body.innerHTML = html;
     body.querySelectorAll('.dev-tab').forEach(t => {
       t.onclick = () => { activeTab = t.dataset.tab; renderBody(); };
     });
-    const binders = { tune: bindTunePanel, res: bindResourcePanel, sim: bindSimPanel, fast: bindFastPanel };
+    const binders = { tune: bindTunePanel, res: bindResourcePanel, sim: bindSimPanel, fast: bindFastPanel, player: bindPlayerPanel, stats: bindStatsPanel };
     (binders[activeTab] || bindTunePanel)();
   }
 

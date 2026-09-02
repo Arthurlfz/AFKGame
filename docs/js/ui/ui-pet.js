@@ -64,6 +64,7 @@
     return `<div class="pt-name">${escapeHtml(pet.name)}</div>
       <div class="pt-sub">Lv.${pet.level} · 成长 ${(pet.growth || 0).toFixed(1)} · ${escapeHtml(profile.role || '均衡型')}</div>
       <div class="pt-rings">${rings}</div>
+      ${UI.bloodlineHtml ? UI.bloodlineHtml(pet) : ''}
       <div class="pt-foot">${escapeHtml(profile.description || '')}</div>`;
   }
   function showPetTip(el, pet) {
@@ -124,6 +125,28 @@
       skillInfo.textContent = skill
         ? `主动技能：${skill.name} · ${pet.level >= skill.minLevel ? `${effect} · ${skill.cooldownTurns} 回合冷却` : `Lv.${skill.minLevel} 解锁`}`
         : '主动技能：终形态 Lv.60 解锁';
+    }
+    // 血脉特质胶囊（出战面板常驻；空态显示"无血脉特质"）
+    const traitsEl = $('pet-traits');
+    if (traitsEl) {
+      const th = PetUI.traitsHtml(pet);
+      traitsEl.innerHTML = th || '<span class="trait-none">无血脉特质</span>';
+    }
+    // 觉醒徽标（Lv60 终形态解锁）
+    const awEl = $('pet-awaken');
+    if (awEl) {
+      const aw = window.Pet.getAwakenState(pet);
+      awEl.style.display = aw ? '' : 'none';
+      if (aw) {
+        const bonus = Object.keys(aw.bonus || {});
+        const btxt = bonus.length ? ' · ' + bonus.map(function (k) {
+          const bv = aw.bonus[k];
+          const isFlat = ['spd'].indexOf(k) >= 0;
+          return k + '+' + bv + (isFlat ? '' : '%');
+        }).join(' ') : '';
+        awEl.innerHTML = '<span class="awaken-badge">觉醒·' + escapeHtml(aw.skillName || '') +
+          '：主动技能伤害+' + Math.round((aw.damage || 0) * 100) + '%' + btxt + '</span>';
+      }
     }
     const poolEl = $('pet-exp-pool');
     if (poolEl) {
@@ -187,6 +210,10 @@
           `<span class="hint">攻击决定单次伤害，速度决定出手频率；高攻速宠物会压低攻击和暴击乘区。</span>`;
       }
     }
+  
+    // 血统被动卡片
+    const blEl = $('pet-bloodline');
+    if (blEl) blEl.innerHTML = UI.bloodlineHtml ? UI.bloodlineHtml(pet) : '';
   }
 
   /* ---------- 装备 tab 三连屏：左列属性面板（与资料页一致，id 前缀 eqp-） ---------- */
@@ -254,6 +281,7 @@
       card.innerHTML = `${isActive ? '<div class="pet-card-badge">出战</div>' : ''}
         <div class="icon">${iconHtml(pet.name, pet.icon)}</div>
         <div class="pname">${pet.name}</div>
+        ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">'+bl.icon+' '+bl.name+'</div>':'';})()}
         <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>
         <div class="meta">装备${equipCount}/3</div>`;
       card.onclick = () => {
@@ -385,7 +413,8 @@
       ${M.resetLevel ? '<div class="warn">⚠ 涅槃后等级重置回 1 级，经验清零，属性按 1 级 × 新成长重算</div>' : ''}
       ${!matOk ? `<div class="es-preview-row warn">⚠ 材料不足：需要 ${matAmt} 只${matName}，当前持有 ${haveMat}</div>` : ''}
       <div class="es-stats">属性变化：</div>
-      ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;
+      ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}
+      ${traitInheritLine(main, sub, 'nirvana')}`;
     cb.innerHTML = `<button class="btn-mini primary" id="merge-ok" ${matOk ? '' : 'disabled'}>确认涅槃</button>`;
     cb.querySelector('#merge-ok').onclick = async () => {
       if (!matOk) { showToast('⚠ 无法涅槃', '材料不足'); return; }
@@ -498,7 +527,8 @@
       <div class="es-preview-row">普通成长：<b>${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</b></div>
       ${mutPct ? `<div class="es-preview-row">🧬 有 <b>${mutPct}%</b> 概率变异：成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」</div>` : ''}
       <div class="es-preview-row">两只素材（${main.name}、${sub.name}）都将消失，消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）</div>
-      ${!matOk ? `<div class="es-preview-row warn">⚠ 材料不足：需要 ${matAmt} 颗${matName}，当前持有 ${haveMat}</div>` : ''}`;
+      ${!matOk ? `<div class="es-preview-row warn">⚠ 材料不足：需要 ${matAmt} 颗${matName}，当前持有 ${haveMat}</div>` : ''}
+      ${traitInheritLine(main, sub, 'synth')}`;
     cb.innerHTML = `<button class="btn-mini primary" id="synth-ok" ${matOk ? '' : 'disabled'}>确认合成</button>`;
     cb.querySelector('#synth-ok').onclick = async () => {
       if (!matOk) { showToast('⚠ 无法合成', '材料不足'); return; }
@@ -705,7 +735,13 @@
         const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
         const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
         const base = eq.base || { label: '攻击', value: 0 };
-        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}`;
+        let soulLine = '';
+        if (eq.soulAffix) {
+          const a = eq.soulAffix;
+          const sFlat = ['hit', 'dodge', 'spd'].indexOf(a.type) >= 0;
+          soulLine = `<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">${escapeHtml(a.label || '')}${a.tier ? ' T' + a.tier : ''}${a.value != null ? ' +' + a.value + (sFlat ? '' : '%') : ''}</div>`;
+        }
+        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}${soulLine}`;
         item.appendChild(tip);
         item.onclick = (e) => { e.stopPropagation(); item.classList.toggle('open'); };
         const takeBtn = document.createElement('button');
@@ -908,7 +944,10 @@
         if (res.error) { showToast('❌ 无法孵化', res.error); return; }
         addLog(`🐣 孵化成功！获得新宠物 ${res.baby.name}（成长值 ${res.baby.growth}）！`);
         showToast('🐣 孵化成功！', `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}｜成长值 ${res.baby.growth}｜已出战`);
-        if (UI.showDialog) UI.showDialog({ icon: '🐣', speaker: '孵化', text: `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}<br>成长值 ${res.baby.growth} · 已出战` });
+        const traitBlock = (res.baby && Array.isArray(res.baby.traits) && res.baby.traits.length)
+          ? PetUI.traitsHtml(res.baby)
+          : '<span class="trait-none">无血脉特质</span>';
+        if (UI.showDialog) UI.showDialog({ icon: '🐣', speaker: '孵化', text: `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}<br>成长值 ${res.baby.growth} · 已出战<br>${traitBlock}` });
         if (res.saveError) addLog('⚠️ 云端存档失败，宠物仅保存在本地');
         UI.renderAll();
       };
@@ -1209,12 +1248,13 @@
   UI.closeEvolvePanel = closeEvolvePanel;
   UI.initPetTabs = initPetTabs;
 
-  /* ---------- PetUI 共享 API（供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 使用） ----------
-   * 宠物天赋：pet.traits = [{ id, tier }]，T1~T3；
-   * Config.petTraits 为天赋配置表（id -> {name, effect}）。
-   * 注：天赋完整数值表在 git 回滚中丢失，当前以"空态安全 + 记忆概率规则"实现，
-   * 待补 Config.petTraits / Config.traitInherit / Config.traitHatch 配置后自动生效。 */
+    /* ---------- PetUI 共享 API（供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 使用） ----------
+   * 宠物血脉特质：pet.traits = [{ id, tier }]，T1~T3（T1 最强最稀有）；Config.petTraits 为配置表。
+   * traitsHtml：宠物卡/市场/图鉴共用的特质胶囊渲染（带 T 阶色与数值）。
+   * traitInheritLine：合成/涅槃预览概率说明（读 Config.traitInherit / traitNirvana 真实值）。 */
   const PetUI = window.PetUI || (window.PetUI = {});
+  // 特质 T 阶颜色（与装备词缀惯例一致：T1 最好 → 暗金）
+  const TRAIT_TIER_COLORS = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f' };
   function traitsHtml(petLike) {
     const arr = petLike && petLike.traits;
     if (!Array.isArray(arr) || !arr.length) return '';
@@ -1223,26 +1263,35 @@
       const id = (t && t.id) || '?';
       const tier = (t && t.tier) || 1;
       const d = defs[id] || {};
-      const name = d.name || id;
-      const eff = d.effect ? ' <em>' + escapeHtml(d.effect) + '</em>' : '';
-      return '<span class="trait-pill' + (tier >= 2 ? ' t' + tier : '') + '">' + escapeHtml(name) + eff + '</span>';
+      const name = d.label || id;
+      const v = (d.values && d.values[tier]);
+      const isFlat = ['hit', 'dodge', 'spd'].indexOf(d.type) >= 0;
+      const eff = (v != null) ? '<em>' + escapeHtml(name) + '+' + v + (isFlat ? '' : '%') + '</em>' : '';
+      const color = TRAIT_TIER_COLORS[tier] || '#9a9a9a';
+      // b=特质名(id)，em=属性+值（如 嗜血 → <b>嗜血</b><em>吸血+8%</em>）
+      return '<span class="trait-pill t' + tier + '" style="border-color:' + color + '">' +
+        '<b style="color:' + color + '">' + escapeHtml(id) + '</b><i>T' + tier + '</i>' + eff + '</span>';
     }).join('') + '</div>';
   }
   function traitInheritLine(main, sub, type) {
     const cfg = (window.Config && window.Config.traitInherit) || {};
     const subTraits = (sub && sub.traits) || [];
+    const defs = (window.Config && window.Config.petTraits) || {};
+    const names = subTraits.map(function (t) { return (defs[t.id] ? defs[t.id].label : t.id); }).join('、');
     if (!Array.isArray(subTraits) || !subTraits.length) {
       return '<div class="es-preview-row"><span class="trait-none">副宠无血脉特质，无可继承</span></div>';
     }
     const giveP = type === 'nirvana'
-      ? Math.round((cfg.nirvanaGive != null ? cfg.nirvanaGive : 0.3) * 100)
-      : Math.round((cfg.synthGive != null ? cfg.synthGive : 0.4) * 100);
+      ? Math.round(((window.Config.traitNirvana && window.Config.traitNirvana.implantChance != null ? window.Config.traitNirvana.implantChance : 0.3)) * 100)
+      : Math.round(((cfg.synthGive != null ? cfg.synthGive : 0.4)) * 100);
     const upP = Math.round(((cfg.up != null ? cfg.up : 0.2)) * 100);
     const downP = Math.round(((cfg.down != null ? cfg.down : 0.1)) * 100);
+    const cap = (cfg.cap != null ? cfg.cap : 3);
     const label = type === 'nirvana' ? '涅槃植入' : '合成继承';
-    const names = subTraits.map(function (t) { return (t && t.id) || '?'; }).join('、');
-    return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）' + giveP +
-      '% 概率继承（成长≥60 额外 +10%；T 阶 20% 升 / 10% 降，上限 3 条）</div>';
+    return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）' +
+      giveP + '% 概率继承（主宠成长≥' + (cfg.growthMin != null ? cfg.growthMin : 60) + ' 额外 +' +
+      Math.round((cfg.growthBonus != null ? cfg.growthBonus : 0.1) * 100) + '%；T 阶 ' + upP + '% 升 / ' + downP +
+      '% 降；上限 ' + cap + ' 条）</div>';
   }
   PetUI.iconHtml = iconHtml;
   PetUI.petTipHtml = petTipHtml;

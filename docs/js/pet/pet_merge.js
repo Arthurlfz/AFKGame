@@ -136,6 +136,9 @@
     const oldGrowth = main.growth;
     const { growth: newGrowth } = calcNirvanaGrowth(main, sub, bonusMult);
     main.growth = newGrowth;
+    // 涅槃植入：主宠特质全保留；副宠每条 30% 概率植入（同类型取高 T，不叠加）
+    main.traits = implantNirvanaTraits(main, sub);
+    main.awaken_trait = null;   // 涅槃重置等级 → 觉醒（Lv60）失效，清掉避免残留
 
     // 涅槃 = 突破：重置进化次数 + 累计涅槃/转生次数 + 等级重置
     main.evolveTimes = 0;
@@ -149,7 +152,7 @@
     if (delErr) console.warn('云端删除副宠失败：', delErr.message);
 
     // 主宠成长/等级同步云端
-    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount };
+    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits };
     // 等级重置时必须连 exp 一起清零并同步：否则云端留着旧经验，
     // 刷新后会变成「Lv1 + 几千经验」，打一场直接连升几十级
     if (M.resetLevel) { patch.level = main.level; patch.exp = 0; }
@@ -201,6 +204,7 @@
     const baby = createPet(newName, main.icon, newGrowth, main.baseHp, main.baseAtk, main.baseDef, main.baseSpd, main.lineId || main.name);
     baby.level = 1;
     baby.exp = 0;
+    baby.traits = inheritSynthTraits(main, sub, mutated);   // 血脉特质继承（合成）
     addPet(baby);
     // 新宠云端建档（合成是新增一只，不是改主宠）。失败必须上报调用方：
     // 本地有、云端没有 → 刷新页面这只新宠直接消失（材料已扣、素材宠已删，玩家白亏）
@@ -224,12 +228,72 @@
     return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn };
   }
 
+  /* ---------- 血脉特质继承 / 植入（设计 v1） ---------- */
+  // 继承时 T 阶变化：20% +1 阶（封顶 T1）、10% -1 阶（最低 T3）
+  function shiftTier(tier, upP, downP) {
+    const r = Math.random();
+    if (r < upP) return Math.max(1, tier - 1);
+    if (r < upP + downP) return Math.min(3, tier + 1);
+    return tier;
+  }
+  // 合成继承：主宠每条 70% 保留、副宠每条 40% 继承；主宠成长≥60 整体 +10%（一档封顶）；
+  // 变异成功额外追 1 条随机新特质；总条数上限 cap（默认 3）
+  function inheritSynthTraits(main, sub, mutated) {
+    const cfg = Config.traitInherit || {};
+    const keepP = (cfg.mainKeep != null ? cfg.mainKeep : cfg.synthKeep) != null ? (cfg.mainKeep != null ? cfg.mainKeep : cfg.synthKeep) : 0.7;
+    const giveP = (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) != null ? (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) : 0.4;
+    const upP = cfg.up != null ? cfg.up : 0.2;
+    const downP = cfg.down != null ? cfg.down : 0.1;
+    const growthMin = cfg.growthMin != null ? cfg.growthMin : 60;
+    const growthBonus = cfg.growthBonus != null ? cfg.growthBonus : 0.1;
+    const cap = cfg.cap != null ? cfg.cap : 3;
+    const defs = Config.petTraits || {};
+    const keys = Object.keys(defs);
+    const out = [];
+    const bonus = (main.growth >= growthMin) ? growthBonus : 0;
+    for (const t of (main.traits || [])) {
+      if (Math.random() < keepP + bonus) out.push({ id: t.id, tier: shiftTier(t.tier, upP, downP) });
+    }
+    for (const t of (sub.traits || [])) {
+      if (Math.random() < giveP + bonus) out.push({ id: t.id, tier: shiftTier(t.tier, upP, downP) });
+    }
+    if (mutated && keys.length) {
+      const id = keys[Math.floor(Math.random() * keys.length)];
+      const r = Math.random() * 100, tr = Config.traitHatch && Config.traitHatch.tierRoll || [0, 10, 30, 60];
+      const tier = r < tr[1] ? 1 : r < tr[1] + tr[2] ? 2 : 3;
+      out.push({ id, tier });
+    }
+    const byId = {};
+    for (const t of out) { if (!byId[t.id] || t.tier < byId[t.id].tier) byId[t.id] = t; }
+    return Object.values(byId).slice(0, cap);
+  }
+  // 涅槃植入：副宠每条 30% 概率植入主宠（同类型取高 T，不叠加）；主宠特质全保留
+  function implantNirvanaTraits(main, sub) {
+    const cfg = Config.traitNirvana || {};
+    const chance = cfg.implantChance != null ? cfg.implantChance : 0.3;
+    const cap = (Config.traitInherit && Config.traitInherit.cap) || 3;
+    const subTraits = (sub && sub.traits) || [];
+    if (!subTraits.length || !main) return (main && main.traits) || [];
+    const list = main.traits || (main.traits = []);
+    for (const st of subTraits) {
+      if (Math.random() >= chance) continue;
+      const same = list.find(t => t.id === st.id);
+      if (same) {
+        if (cfg.takeHigherT !== false && st.tier < same.tier) same.tier = st.tier; // 取高 T（数字小=高）
+        continue;
+      }
+      if (list.length < cap) list.push({ id: st.id, tier: st.tier });
+    }
+    return list;
+  }
+
   /* ---------- 对外 API ---------- */
   window.Merge = {
     nirvana,              // 涅槃：主宠涨成长（新）
     synthesize,           // 合成：出全新变异宠（新）
     merge: nirvana,       // 兼容别名：旧调用 Merge.merge = 涅槃
     getMergeCandidates, canMerge,
-    calcNirvanaGrowth, calcSynthesizeGrowth
+    calcNirvanaGrowth, calcSynthesizeGrowth,
+    inheritSynthTraits, implantNirvanaTraits
   };
 })();

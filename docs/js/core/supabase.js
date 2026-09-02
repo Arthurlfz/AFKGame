@@ -69,24 +69,26 @@
   }
 
   /* ---------- 宠物存档（pets 表） ---------- */
-  const PET_COLUMNS = 'id,name,icon,growth,level,exp,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
-  // 兼容旧库：未执行 migrate_pet_exp.sql 时 pets 没有 exp 列，带 exp 查询会 400。
-  // 探测到缺列就自动降级成这份列集，宠物本体照常读取（经验条退化为刷新后清零，其它功能不受影响）。
-  const PET_COLUMNS_LEGACY = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
-  let expColMissing = false; // 旧库缺 exp 列：置 true 后所有 pets 查询/写入自动去掉 exp
-  // 判断错误是否为「exp 列不存在」（Postgres 42703 / PostgREST PGRST204）
-  function isMissingExpColumn(error) {
+  // 基础列（各版本都有）；附加列（旧库可能缺失：缺哪列自动剔除哪列，宠物本体照常读写）
+  const PET_BASE_COLS = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
+  const PET_EXTRA_COLS = ['exp', 'traits', 'awaken_trait', 'source'];
+  const missingPetCols = new Set();
+  const currentPetCols = () => PET_BASE_COLS + ',' + PET_EXTRA_COLS.filter(c => !missingPetCols.has(c)).join(',');
+  // 判断错误是否为「缺列」（Postgres 42703 / PostgREST PGRST204）
+  function isMissingPetColumn(error) {
     if (!error) return false;
     const code = String(error.code || '');
-    const msg = String(error.message || '');
-    return (code === '42703' || code === 'PGRST204') && msg.indexOf('exp') >= 0;
+    return code === '42703' || code === 'PGRST204';
   }
-  // pets 查询统一入口：先按当前列集查，遇到缺列就记下并重试一次（降级对调用方透明）
+  // pets 查询统一入口：按当前列集查，遇缺列记下并重试（降级对调用方透明）
   async function queryPets(build) {
-    const res = await build(expColMissing ? PET_COLUMNS_LEGACY : PET_COLUMNS);
-    if (res && res.error && !expColMissing && isMissingExpColumn(res.error)) {
-      expColMissing = true;
-      return build(PET_COLUMNS_LEGACY);
+    let res = await build(currentPetCols());
+    if (res && res.error && isMissingPetColumn(res.error)) {
+      const msg = String(res.error.message || '');
+      const col = PET_EXTRA_COLS.find(c => msg.indexOf(c) >= 0);
+      if (col) missingPetCols.add(col);
+      else PET_EXTRA_COLS.forEach(c => missingPetCols.add(c)); // 无法定位 → 去掉全部附加列
+      res = await build(currentPetCols());
     }
     return res;
   }
@@ -109,6 +111,10 @@
       cur_hp: Math.round(pet.curHp)
     };
     if (includeExp) row.exp = Math.max(0, Math.round(pet.exp || 0));
+    // 血脉特质 / 觉醒特质 / 来源（缺列时由 savePet 剔除）
+    if (Array.isArray(pet.traits) && pet.traits.length) row.traits = pet.traits;
+    if (pet.awaken_trait) row.awaken_trait = pet.awaken_trait;
+    if (pet.source) row.source = pet.source;
     return row;
   }
   // 装备槽 → 云端 jsonb：{ 部位: 装备cloudId }（只存引用，装备本体在 equip_items）
@@ -128,15 +134,21 @@
   async function savePet(pet) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: new Error('未登录') };
+    let row = petToRow(pet, !missingPetCols.has('exp'));
+    for (const c of PET_EXTRA_COLS) if (missingPetCols.has(c)) delete row[c];
     let res = await client.from('pets')
-      .insert(Object.assign({ user_id: user.id }, petToRow(pet, !expColMissing)))
-      .select(expColMissing ? PET_COLUMNS_LEGACY : PET_COLUMNS).single();
-    // 旧库缺 exp 列：去掉 exp 重试一次，宠物本体必须存成功
-    if (res.error && !expColMissing && isMissingExpColumn(res.error)) {
-      expColMissing = true;
-      res = await client.from('pets')
-        .insert(Object.assign({ user_id: user.id }, petToRow(pet, false)))
-        .select(PET_COLUMNS_LEGACY).single();
+      .insert(Object.assign({ user_id: user.id }, row))
+      .select(currentPetCols()).single();
+    // 旧库缺列：定位缺的列去掉重试一次，宠物本体必须存成功
+    if (res.error && isMissingPetColumn(res.error)) {
+      const msg = String(res.error.message || '');
+      const col = PET_EXTRA_COLS.find(c => msg.indexOf(c) >= 0);
+      if (col) {
+        missingPetCols.add(col); delete row[col];
+        res = await client.from('pets')
+          .insert(Object.assign({ user_id: user.id }, row))
+          .select(currentPetCols()).single();
+      }
     }
     if (!res.error && res.data && res.data.id) {
       try {
@@ -162,13 +174,16 @@
   // patch 示例：{ growth: 10, level: 1 }
   async function updatePet(cloudId, patch) {
     const p = Object.assign({}, patch);
-    if (expColMissing && 'exp' in p) delete p.exp;
+    for (const c of PET_EXTRA_COLS) if (missingPetCols.has(c)) delete p[c];
     let res = await client.from('pets').update(p).eq('id', cloudId);
-    // 旧库缺 exp 列：去掉 exp 重试一次，保证等级等其它字段照常写入
-    if (res.error && !expColMissing && isMissingExpColumn(res.error) && 'exp' in p) {
-      expColMissing = true;
-      delete p.exp;
-      res = await client.from('pets').update(p).eq('id', cloudId);
+    // 旧库缺列：定位缺的列去掉重试一次，保证其它字段照常写入
+    if (res.error && isMissingPetColumn(res.error)) {
+      const msg = String(res.error.message || '');
+      const col = PET_EXTRA_COLS.find(c => msg.indexOf(c) >= 0 && c in p);
+      if (col) {
+        missingPetCols.add(col); delete p[col];
+        res = await client.from('pets').update(p).eq('id', cloudId);
+      }
     }
     return res;
   }
@@ -181,16 +196,24 @@
     if (!user) return { data: null, error: new Error('请先登录') };
     if (!materialType) return { data: null, error: new Error('请选择收什么材料') };
     if (!Number.isInteger(materialQty) || materialQty < 1) return { data: null, error: new Error('材料数量需为正整数') };
-    return client.from('pet_listings').insert({
+    let payload = {
       pet_id: pet.cloudId, seller_id: user.id,
       material_type: materialType, material_qty: materialQty,
-      pet_name: pet.name, pet_growth: pet.growth, pet_level: pet.level
-    }).select().single();
+      pet_name: pet.name, pet_growth: pet.growth, pet_level: pet.level,
+      pet_traits: Array.isArray(pet.traits) ? pet.traits : []
+    };
+    let res = await client.from('pet_listings').insert(payload).select().single();
+    // 旧库缺 pet_traits 列 → 去掉重试（市场展示/筛选退化为无特质，不影响交易）
+    if (res.error && isMissingPetColumn(res.error) && String(res.error.message || '').indexOf('pet_traits') >= 0) {
+      delete payload.pet_traits;
+      res = await client.from('pet_listings').insert(payload).select().single();
+    }
+    return res;
   }
   // 市场在售列表（所有人可见）
   async function fetchMarket() {
     return client.from('pet_listings')
-      .select('id,pet_id,seller_id,price,material_type,material_qty,pet_name,pet_growth,pet_level,created_at')
+      .select('id,pet_id,seller_id,price,material_type,material_qty,pet_name,pet_growth,pet_level,pet_traits,created_at')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
   }
@@ -221,7 +244,7 @@
     const rarityId = typeof eq.rarity === 'string'
       ? eq.rarity
       : ((eq.rarity && eq.rarity.id) || 'white');
-    return client.from('equip_listings').insert({
+    let payload = {
       item_id: eq.cloudId, seller_id: user.id,
       material_type: materialType, material_qty: materialQty,
       item_name: eq.name || '装备', item_slot: eq.slot || '武器',
@@ -231,13 +254,21 @@
       // 市场快照：词缀拍平为扁平数组（展示用，与旧数据形态一致；装备本体仍存嵌套结构）
       item_affixes: Array.isArray(eq.affixes)
         ? eq.affixes
-        : [...(eq.affixes.prefix || []), ...(eq.affixes.suffix || [])]
-    }).select().single();
+        : [...(eq.affixes.prefix || []), ...(eq.affixes.suffix || [])],
+      // 魂铸词缀快照（市场展示；旧库无列则 400 → 兜底重试不带）
+      item_soul: eq.soulAffix || null
+    };
+    let res = await client.from('equip_listings').insert(payload).select().single();
+    if (res.error && isMissingPetColumn(res.error) && String(res.error.message || '').indexOf('item_soul') >= 0) {
+      delete payload.item_soul;
+      res = await client.from('equip_listings').insert(payload).select().single();
+    }
+    return res;
   }
   // 市场在售装备（所有人可见）
   async function fetchItemMarket() {
     return client.from('equip_listings')
-      .select('id,item_id,seller_id,price,material_type,material_qty,item_name,item_slot,item_rarity,item_tier,item_affixes,created_at')
+      .select('id,item_id,seller_id,price,material_type,material_qty,item_name,item_slot,item_rarity,item_tier,item_affixes,item_soul,created_at')
       .eq('status', 'active')
       .order('created_at', { ascending: false });
   }

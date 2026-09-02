@@ -156,3 +156,17 @@
   border-radius: 3px; padding: 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .78rem;
   line-height: 1.5;
 }
+
+/* ===== 后台：玩家管理 / 运营数据 ===== */
+.dev-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding-top: 12px; }
+.dev-stat-card { background: var(--inset); border: 1px solid var(--line); border-radius: 5px; padding: 14px 8px; text-align: center; }
+.dev-stat-num { font-size: 1.5rem; font-weight: 800; color: var(--action-gold, #e8c060); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.dev-stat-label { font-size: .76rem; color: var(--text-dim); margin-top: 5px; }
+.dev-player-row { padding: 9px 11px; background: var(--inset); border: 1px solid var(--line); border-radius: 4px; margin-bottom: 8px; }
+.dev-player-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dev-player-name { font-weight: 700; color: var(--text, #e8e6e1); }
+.dev-player-mail { font-size: .76rem; color: var(--text-faint, #8a867f); }
+.dev-player-sub { font-size: .74rem; color: var(--text-dim); margin: 4px 0 8px; }
+.dev-player-ops { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dev-banned { font-size: .72rem; color: #e07060; border: 1px solid rgba(224,112,96,.4); padding: 1px 7px; border-radius: 9px; }
+.dev-hint-inline { font-size: .76rem; color: var(--text-faint, #8a867f); line-height: 1.5; }

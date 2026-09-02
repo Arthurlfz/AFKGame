@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * ui/ui-bag.js —— 独立背包页 UI
  * 职责：
  *  1. 按分类显示：装备 / 素材 / 消耗品 / 宠物蛋
@@ -40,6 +40,7 @@
   const EQUIP_SLOTS = window.Equipment.SLOTS || [];
   const BAG_TIERS = [1, 2, 3, 4, 5];
   let bagSearch = '';
+  let bagCat = 'all';
   let bagRarity = 'all'; // all / gold / blue / white
   let bagSlot = 'all';   // all / 12部位中文名
   let bagBaseTier = 'all'; // all / '1'~'5'（底材T阶）
@@ -103,167 +104,67 @@
       .map(([name, qty]) => ({ name, qty }));
     const consEntries = CONSUMABLES.map(c => ({ ...c, qty: Materials.getQuantity(c.name) })).filter(x => x.qty > 0);
     const eggCount = getEggCount();
+    const eggEntries = Object.entries(getEggs()).filter(([, c]) => c > 0);
     const totalCount = equipList.length + matEntries.length + consEntries.length + eggCount;
 
-    // 三连屏（参考宠物资料页「属性|装备栏|换装背包」）：左=筛选/统计/鉴定石 | 中=装备流放格子 | 右=素材/消耗品/蛋
-    const wrap = document.createElement('div');
-    wrap.className = 'bag-wrap bag-wrap--tri';
-    root.appendChild(wrap);
-    const mkCol = () => {
-      const c = document.createElement('div');
-      c.className = 'pcol';
-      wrap.appendChild(c);
-      return c;
-    };
-    // panel 外壳（与宠物资料页同款：.panel + .panel-title）
-    const mkPanel = (col, title, hint) => {
-      const p = document.createElement('div');
-      p.className = 'panel';
-      p.innerHTML = `<div class="panel-title">${title}${hint ? `<span class="hint">${hint}</span>` : ''}</div>`;
-      const body = document.createElement('div');
-      body.className = 'bag-panel-body';
-      p.appendChild(body);
-      col.appendChild(p);
-      return body;
-    };
-    const colFilter = mkCol();
-    const colEquip = mkCol();
-    const colMat = mkCol();
+    // 当前分类 tab（全部/装备/素材/消耗品/宠物蛋）
+    if (typeof bagCat === 'undefined') bagCat = 'all';
 
-    // 左列：筛选
-    const filterBody = mkPanel(colFilter, '筛选', '按名称 / 属性过滤');
-    const toolbar = document.createElement('div');
-    toolbar.className = 'bag-toolbar';
+    // ===== 主布局：左侧（筛选+网格+底部） + 右侧详情面板 =====
+    const layout = document.createElement('div');
+    layout.className = 'bag-main-layout';
+    root.appendChild(layout);
+
+    // --- 左侧 ---
+    const left = document.createElement('div');
+    left.className = 'bag-main-left';
+    layout.appendChild(left);
+
+    // 顶部筛选栏：分类 tab + 搜索
+    const filterBar = document.createElement('div');
+    filterBar.className = 'bag-filter-bar';
+    const catTabs = document.createElement('div');
+    catTabs.className = 'bag-cat-tabs';
+    const cats = [
+      ['all', '全部'], ['equip', '装备'], ['material', '素材'],
+      ['consume', '消耗品'], ['egg', '宠物蛋']
+    ];
+    for (const [val, label] of cats) {
+      const btn = document.createElement('button');
+      btn.className = 'bag-cat' + (bagCat === val ? ' active' : '');
+      btn.textContent = label;
+      btn.onclick = () => { bagCat = val; renderBag(); };
+      catTabs.appendChild(btn);
+    }
+    filterBar.appendChild(catTabs);
     const searchInput = document.createElement('input');
-    searchInput.className = 'bag-search';
-    searchInput.placeholder = '搜索名称…';
+    searchInput.className = 'bag-search-input';
+    searchInput.placeholder = '搜索物品名称…';
     searchInput.value = bagSearch;
     searchInput.oninput = () => { bagSearch = searchInput.value.trim().toLowerCase(); renderBag(); };
-    toolbar.appendChild(searchInput);
-    const mkSel = (label, options, cur, onSet) => {
-      const s = document.createElement('select');
-      s.className = 'bag-filter-sel';
-      s.setAttribute('aria-label', label);
-      s.innerHTML = options.map(([v, l]) => `<option value="${v}" ${String(cur) === String(v) ? 'selected' : ''}>${l}</option>`).join('');
-      s.onchange = () => onSet(s.value);
-      return s;
-    };
-    toolbar.appendChild(mkSel('稀有度', [
-      ['all', '品质：全部'], ['gold', '品质：金'], ['blue', '品质：蓝'], ['white', '品质：白']
-    ], bagRarity, v => { bagRarity = v; renderBag(); }));
-    toolbar.appendChild(mkSel('部位', [
-      ['all', '部位：全部'], ...EQUIP_SLOTS.map(s => [s, `部位：${s}`])
-    ], bagSlot, v => { bagSlot = v; renderBag(); }));
-    toolbar.appendChild(mkSel('底材T阶', [
-      ['all', '底材T：全部'], ...BAG_TIERS.map(t => [String(t), `底材 T${t}`])
-    ], bagBaseTier, v => { bagBaseTier = v; renderBag(); }));
-    toolbar.appendChild(mkSel('词缀T阶', [
-      ['all', '词缀T：全部'], ...BAG_TIERS.map(t => [String(t), `含 T${t} 词缀`])
-    ], bagAffixTier, v => { bagAffixTier = v; renderBag(); }));
-    // 词缀类型：打关键字联想词缀池
-    toolbar.appendChild(mkSel('词缀类型', [
-      ['all', '词缀：全部'],
-      ...(window.Equipment.AFFIX_POOL || []).map(a => [a.type, `含「${a.label}」`])
-    ], bagAffixType, v => { bagAffixType = v; renderBag(); }));
-    filterBody.appendChild(toolbar);
+    filterBar.appendChild(searchInput);
+    left.appendChild(filterBar);
 
-    // 左列：统计
-    const statBody = mkPanel(colFilter, '统计', '');
-    const summary = document.createElement('div');
-    summary.className = 'bag-summary';
-    summary.innerHTML = `
-      <span class="bag-stat">总物品 <b>${totalCount}</b></span>
-      <span class="bag-stat">装备 <b>${equipList.length}</b></span>
-      <span class="bag-stat">素材 <b>${matEntries.length}</b></span>
-      <span class="bag-stat">消耗品 <b>${consEntries.length}</b></span>
-      <span class="bag-stat">宠物蛋 <b>${eggCount}</b></span>`;
-    statBody.appendChild(summary);
-
-    // 中列：装备流放格子（主区）
-    const equipBody = mkPanel(colEquip, '装备', '点开看词缀 · Ctrl/Alt+点击分解');
+    // 物品网格区域
+    const gridArea = document.createElement('div');
+    gridArea.className = 'bag-grid-area';
     const grid = document.createElement('div');
-    grid.className = 'bag-grid poe-grid';
-    equipBody.appendChild(grid);
+    grid.className = 'bag-item-grid';
+    gridArea.appendChild(grid);
+    left.appendChild(gridArea);
 
-    // 右列：素材 / 消耗品 / 宠物蛋，各自独立小网格
-    const matBody = mkPanel(colMat, '素材', '合成/涅槃/进化/打造');
-    const matGrid = document.createElement('div');
-    matGrid.className = 'bag-grid poe-grid';
-    matBody.appendChild(matGrid);
-    const consBody = mkPanel(colMat, '消耗品', '装备改造');
-    const consGrid = document.createElement('div');
-    consGrid.className = 'bag-grid poe-grid';
-    consBody.appendChild(consGrid);
-    const eggBody = mkPanel(colMat, '宠物蛋', '点击孵化');
-    const eggGrid = document.createElement('div');
-    eggGrid.className = 'bag-grid poe-grid';
-    eggBody.appendChild(eggGrid);
+    // 底部：统计 + 鉴定石 + 分解台
+    const footer = document.createElement('div');
+    footer.className = 'bag-footer';
+    footer.innerHTML = '<span>物品：<b>' + totalCount + '</b>（装备' + equipList.length + ' · 素材' + matEntries.length + ' · 消耗' + consEntries.length + ' · 蛋' + eggCount + '）</span>';
+    left.appendChild(footer);
 
-    // 装备（搜索 + 品质筛选 + 评分降序 + 悬停 tooltip），统一进大网格
-    const pet = getActivePet();
-    // 搜索 + 品质 + 部位 + 底材T + 词缀T + 词缀类型过滤
-    const highestAffixTier = eq => {
-      let best = Infinity;
-      for (const aff of flattenAffixes(eq.affixes)) best = Math.min(best, aff.tier || 5);
-      return best === Infinity ? 5 : best;
-    };
-    const hasAffixType = (eq, type) => flattenAffixes(eq.affixes).some(a => a.type === type);
-    let eqList = equipList.filter(eq => {
-      if (bagSearch && !eq.name.toLowerCase().includes(bagSearch)) return false;
-      if (bagRarity !== 'all' && (!eq.rarity || eq.rarity.id !== bagRarity)) return false;
-      if (bagSlot !== 'all' && eq.slot !== bagSlot) return false;
-      if (bagBaseTier !== 'all' && Number(eq.materialTier) !== Number(bagBaseTier)) return false;
-      if (bagAffixTier !== 'all' && highestAffixTier(eq) > Number(bagAffixTier)) return false;
-      if (bagAffixType !== 'all' && !hasAffixType(eq, bagAffixType)) return false;
-      return true;
-    });
-    // 按评分降序。评分已把「稀有度 / 图档 / 底材T / 词缀类型×T阶×数值」全算进去，
-    // 比原来的「品质 → 底材T」两级排序更贴近真实强弱，玩家也更好懂：分高的在前面。
-    eqList = eqList.slice().sort((a, b) => scoreOf(b) - scoreOf(a));
-    // 装备图标按部位映射（流放格子卡用 emoji 表示装备类型）
-    const EQUIP_ICON = { 武器:'🗡', 单手剑:'🗡', 双手剑:'⚔️', 长剑:'🗡', 弓:'🏹', 法杖:'🪄', 杖:'🪄', 盾:'🛡', 胸甲:'🦺', 头盔:'⛑️', 帽:'⛑️', 手套:'🧤', 靴:'🥾', 鞋:'🥾', 戒指:'💍', 项链:'📿', 护符:'📿', 腰带:'🔗' };
-    for (const eq of eqList) {
-      const unid = eq.identified === false;
-      const rar = (eq.rarity && eq.rarity.id) || 'white';
-      const card = document.createElement('div');
-      card.className = 'poe-item q-' + rar + (unid ? ' q-unid' : '') + (identifyMode && unid ? ' bc-idtarget' : '');
-      card.draggable = true;
-      // 拖拽鉴定：未鉴定装备卡作为 drop 目标，接收从顶部拖来的鉴定石
-      if (unid) {
-        card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('bc-drop'); });
-        card.addEventListener('dragleave', () => card.classList.remove('bc-drop'));
-        card.addEventListener('drop', e => {
-          e.preventDefault(); card.classList.remove('bc-drop');
-          if (e.dataTransfer.getData('text/plain') === 'identify') identifyEquip(eq, card);
-        });
-      }
-      // 拖到分解台：携带装备 id，drop 区据此调用 Salvage
-      card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: eq.id, act: 'salvage' })); e.dataTransfer.effectAllowed = 'move'; });
-      const ico = unid ? SVG_SEALED : `<span class="emoji">${EQUIP_ICON[eq.slot] || '🛡'}</span>`;
-      card.innerHTML = `
-        <div class="ico">${ico}</div>
-        <div class="nm">${escapeHtml(eq.name)}</div>
-        ${unid ? '' : `<div class="corner">${scoreOf(eq)}</div>`}
-        ${unid ? '<div class="qmark">?</div>' : ''}
-        <div class="unseal-sweep"></div>`;
-      // 手持鉴定：开启鉴定模式时点未鉴定装备即鉴定；Ctrl/Alt 点击=快分解；否则看词缀详情
-      card.onclick = e => {
-        if (identifyMode && unid) { identifyEquip(eq, card); return; }
-        if (e.ctrlKey || e.altKey) { quickSalvage(eq); return; }
-        showEquipDetail(eq);
-      };
-      // 悬停 tooltip：复用打造页 .equip-tip 结构（tip-name/line/section/prefix/suffix/tier）
-      bindTip(card, equipTipHtml(eq, unid));
-      grid.appendChild(card);
-    }
-    // 拖拽源 + 手持鉴定开关：点「鉴定石」进入鉴定模式（拿在手上连续鉴定），再点退出
-    // 拖到「装备」视图里的未鉴定装备卡上同样可鉴定（流放味）；点装备卡的「鉴定」按钮也可
+    // 鉴定石开关
     const haveStoneN = Materials.getQuantity('鉴定石');
     if (haveStoneN > 0) {
       const src = document.createElement('div');
       src.className = 'bag-idstone' + (identifyMode ? ' active' : '');
-      // 用户要求：只显示「鉴定石 ×N」，开关状态靠 .active 明暗表示
-      src.innerHTML = `<span class="bs-ico">${SVG_IDSTONE}</span> 鉴定石 ×${haveStoneN}`;
+      src.innerHTML = '<span class="bs-ico">' + SVG_IDSTONE + '</span> 鉴定石 ×' + haveStoneN;
       src.draggable = true;
       src.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', 'identify'); e.dataTransfer.effectAllowed = 'move'; });
       src.addEventListener('click', () => {
@@ -271,99 +172,120 @@
         renderBag();
         showToast(identifyMode ? '🔍 鉴定模式开启' : '已退出鉴定模式', identifyMode ? '点未鉴定装备即可鉴定' : '');
       });
-      statBody.appendChild(src); // 鉴定石开关放左列统计面板
+      footer.appendChild(src);
     }
 
-    // 回收区（分解台）：拖装备到此碎裂，等价于流放「拖到商店卖出 / 分解」
-    const drop = document.createElement('div');
-    drop.className = 'salvage-drop';
-    drop.innerHTML = `<div class="sd-title">分解台 · 碎裂回收</div>
-      <div class="sd-sub">拖装备到这里碎裂得材料（白装无产出）· 或 Ctrl/Alt+Enter 批量分解</div>`;
-    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('hot'); });
-    drop.addEventListener('dragleave', () => drop.classList.remove('hot'));
-    drop.addEventListener('drop', e => {
-      e.preventDefault(); drop.classList.remove('hot');
-      let data; try { data = JSON.parse(e.dataTransfer.getData('text/plain')); } catch { return; }
-      if (data && data.act === 'salvage') {
-        const eq = getInventory().find(x => x.id === data.id);
-        if (eq) quickSalvage(eq);
+    // --- 右侧详情面板 ---
+    const detail = document.createElement('div');
+    detail.className = 'bag-detail-panel';
+    detail.id = 'bag-detail-panel';
+    detail.innerHTML = '<div class="bag-detail-empty">选择物品<br>查看详情</div>';
+    layout.appendChild(detail);
+
+    // 显示详情到右侧面板
+    function showDetail(html) {
+      detail.innerHTML = html;
+    }
+
+    // ===== 渲染物品卡片（统一进一个网格，按分类过滤） =====
+    const EQUIP_ICON = { 武器:'🗡', 单手剑:'🗡', 双手剑:'⚔️', 长剑:'🗡', 弓:'🏹', 法杖:'🪄', 杖:'🪄', 盾:'🛡', 胸甲:'🦺', 头盔:'⛑️', 帽:'⛑️', 手套:'🧤', 靴:'🥾', 鞋:'🥾', 戒指:'💍', 项链:'📿', 护符:'📿', 腰带:'🔗' };
+    const highestAffixTier = eq => {
+      let best = Infinity;
+      for (const aff of flattenAffixes(eq.affixes)) best = Math.min(best, aff.tier || 5);
+      return best === Infinity ? 5 : best;
+    };
+    const hasAffixType = (eq, type) => flattenAffixes(eq.affixes).some(a => a.type === type);
+
+    // 装备
+    if (bagCat === 'all' || bagCat === 'equip') {
+      let eqList = equipList.filter(eq => {
+        if (bagSearch && !eq.name.toLowerCase().includes(bagSearch)) return false;
+        if (bagRarity !== 'all' && (!eq.rarity || eq.rarity.id !== bagRarity)) return false;
+        if (bagSlot !== 'all' && eq.slot !== bagSlot) return false;
+        if (bagBaseTier !== 'all' && Number(eq.materialTier) !== Number(bagBaseTier)) return false;
+        if (bagAffixTier !== 'all' && highestAffixTier(eq) > Number(bagAffixTier)) return false;
+        if (bagAffixType !== 'all' && !hasAffixType(eq, bagAffixType)) return false;
+        return true;
+      });
+      eqList = eqList.slice().sort((a, b) => scoreOf(b) - scoreOf(a));
+      for (const eq of eqList) {
+        const unid = eq.identified === false;
+        const rar = (eq.rarity && eq.rarity.id) || 'white';
+        const card = document.createElement('div');
+        card.className = 'poe-item q-' + rar + (unid ? ' q-unid' : '') + (identifyMode && unid ? ' bc-idtarget' : '');
+        card.draggable = true;
+        if (unid) {
+          card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('bc-drop'); });
+          card.addEventListener('dragleave', () => card.classList.remove('bc-drop'));
+          card.addEventListener('drop', e => {
+            e.preventDefault(); card.classList.remove('bc-drop');
+            if (e.dataTransfer.getData('text/plain') === 'identify') identifyEquip(eq, card);
+          });
+        }
+        card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: eq.id, act: 'salvage' })); e.dataTransfer.effectAllowed = 'move'; });
+        const ico = unid ? SVG_SEALED : '<span class="emoji">' + (EQUIP_ICON[eq.slot] || '🛡') + '</span>';
+        card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>' + (unid ? '' : '<div class="corner">' + scoreOf(eq) + '</div>') + (unid ? '<div class="qmark">?</div>' : '') + '<div class="unseal-sweep"></div>';
+        card.onclick = e => {
+          if (identifyMode && unid) { identifyEquip(eq, card); return; }
+          if (e.ctrlKey || e.altKey) { quickSalvage(eq); return; }
+          showDetail(equipTipHtml(eq, unid) + '<div style="margin-top:8px"><button class="btn-mini" onclick="document.querySelectorAll(\'.bag-subtab\').forEach(t=>{if(t.dataset.bagSubtab===\'equip\')t.click()})">去装备页穿上</button></div>');
+        };
+        bindTip(card, equipTipHtml(eq, unid));
+        grid.appendChild(card);
       }
-    });
-    equipBody.appendChild(drop); // 分解台放中列装备区下方
-
-    // 素材（字母序，仅按名搜索；不受品质/部位等装备筛选影响）
-    const matList = matEntries.filter(m => !bagSearch || m.name.toLowerCase().includes(bagSearch));
-    for (const m of matList) {
-      const card = document.createElement('div');
-      card.className = 'poe-item q-mat';
-      card.innerHTML = `
-        <div class="ico">${matIcon(m.name)}</div>
-        <div class="nm">${escapeHtml(m.name)}</div>
-        <div class="corner">×${m.qty}</div>`;
-      bindTip(card, `<div class="tip-name">${matIcon(m.name)} ${escapeHtml(m.name)}</div>
-        <div class="tip-line"><span>素材</span><b>×${m.qty}</b></div>
-        <div class="tip-line hint">用于合成/涅槃/进化/打造等消耗</div>`);
-      matGrid.appendChild(card);
-    }
-    if (!matList.length) {
-      const empty = document.createElement('div');
-      empty.className = 'inv-empty';
-      empty.textContent = matEntries.length ? '没有符合条件的素材' : '暂无素材';
-      matGrid.appendChild(empty);
     }
 
-    // 消耗品（原序，仅按名搜索）
-    const consList = consEntries.filter(c => !bagSearch || c.name.toLowerCase().includes(bagSearch));
-    for (const c of consList) {
-      const card = document.createElement('div');
-      card.className = 'poe-item q-cons';
-      card.innerHTML = `
-        <div class="ico">${c.icon}</div>
-        <div class="nm">${escapeHtml(c.name)}</div>
-        <div class="corner">×${c.qty}</div>`;
-      bindTip(card, `<div class="tip-name">${c.icon} ${escapeHtml(c.name)}</div>
-        <div class="tip-line"><span>${c.desc}</span><b>×${c.qty}</b></div>
-        <div class="tip-line hint">用于装备改造</div>`);
-      consGrid.appendChild(card);
-    }
-    if (!consList.length) {
-      const empty = document.createElement('div');
-      empty.className = 'inv-empty';
-      empty.textContent = consEntries.length ? '没有符合条件的消耗品' : '暂无消耗品';
-      consGrid.appendChild(empty);
-    }
-
-    // 宠物蛋（按品种，仅按名搜索；点击弹孵化）
-    const eggEntries = Object.entries(getEggs()).filter(([, c]) => c > 0)
-      .filter(([baseName]) => !bagSearch || baseName.toLowerCase().includes(bagSearch));
-    for (const [baseName, count] of eggEntries) {
-      const eggName = window.Drop.makeEggName ? window.Drop.makeEggName(baseName) : baseName + '蛋';
-      const card = document.createElement('div');
-      card.className = 'poe-item q-egg';
-      card.innerHTML = `
-        <div class="ico">🥚</div>
-        <div class="nm">${escapeHtml(eggName)}</div>
-        <div class="corner">×${count}</div>`;
-      bindTip(card, `<div class="tip-name">🥚 ${escapeHtml(eggName)}</div>
-        <div class="tip-line"><span>宠物蛋</span><b>×${count}</b></div>
-        <div class="tip-line hint">点击查看 / 孵化 ${escapeHtml(baseName)}，也可在市场交易</div>`);
-      card.onclick = () => showEggDetail(baseName, count, eggName);
-      eggGrid.appendChild(card);
+    // 素材
+    if (bagCat === 'all' || bagCat === 'material') {
+      const matList = matEntries.filter(m => !bagSearch || m.name.toLowerCase().includes(bagSearch));
+      for (const m of matList) {
+        const card = document.createElement('div');
+        card.className = 'poe-item q-mat';
+        card.innerHTML = '<div class="ico">' + matIcon(m.name) + '</div><div class="nm">' + escapeHtml(m.name) + '</div><div class="corner">×' + m.qty + '</div>';
+        const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div><div class="tip-line"><span>素材</span><b>×' + m.qty + '</b></div><div class="tip-line hint">用于合成/涅槃/进化/打造等消耗</div>';
+        card.onclick = () => showDetail(tip);
+        bindTip(card, tip);
+        grid.appendChild(card);
       }
-      if (!eggEntries.length) {
-      const empty = document.createElement('div');
-      empty.className = 'inv-empty';
-      empty.textContent = '暂无宠物蛋，去战斗页刷基础怪掉落吧';
-      eggGrid.appendChild(empty);
-      }
+    }
 
-      // 装备区空状态
-      if (!eqList.length) {
+    // 消耗品
+    if (bagCat === 'all' || bagCat === 'consume') {
+      const consList = consEntries.filter(c => !bagSearch || c.name.toLowerCase().includes(bagSearch));
+      for (const c of consList) {
+        const card = document.createElement('div');
+        card.className = 'poe-item q-cons';
+        card.innerHTML = '<div class="ico">' + c.icon + '</div><div class="nm">' + escapeHtml(c.name) + '</div><div class="corner">×' + c.qty + '</div>';
+        const tip = '<div class="tip-name">' + c.icon + ' ' + escapeHtml(c.name) + '</div><div class="tip-line"><span>' + c.desc + '</span><b>×' + c.qty + '</b></div><div class="tip-line hint">用于装备改造</div>';
+        card.onclick = () => showDetail(tip);
+        bindTip(card, tip);
+        grid.appendChild(card);
+      }
+    }
+
+    // 宠物蛋
+    if (bagCat === 'all' || bagCat === 'egg') {
+      const eggList = eggEntries.filter(([baseName]) => !bagSearch || baseName.toLowerCase().includes(bagSearch));
+      for (const [baseName, count] of eggList) {
+        const eggName = window.Drop.makeEggName ? window.Drop.makeEggName(baseName) : baseName + '蛋';
+        const card = document.createElement('div');
+        card.className = 'poe-item q-egg';
+        card.innerHTML = '<div class="ico">🥚</div><div class="nm">' + escapeHtml(eggName) + '</div><div class="corner">×' + count + '</div>';
+        const tip = '<div class="tip-name">🥚 ' + escapeHtml(eggName) + '</div><div class="tip-line"><span>宠物蛋</span><b>×' + count + '</b></div><div class="tip-line hint">点击查看 / 孵化 ' + escapeHtml(baseName) + '，也可在市场交易</div>';
+        card.onclick = () => { showDetail(tip); showEggDetail(baseName, count, eggName); };
+        bindTip(card, tip);
+        grid.appendChild(card);
+      }
+    }
+
+    // 空状态
+    if (!grid.children.length) {
       const empty = document.createElement('div');
       empty.className = 'inv-empty';
-      empty.textContent = equipList.length ? '没有符合条件的装备' : '没有装备，去战斗页刷掉落吧';
+      empty.style.gridColumn = '1 / -1';
+      empty.textContent = totalCount ? '没有符合条件的物品' : '背包空空，去挂机捡装备吧';
       grid.appendChild(empty);
-      }
+    }
   }
 
   // 鉴定：消耗 1 鉴定石 → 揭晓未鉴定装备属性（扫光演出后重渲染）
@@ -497,6 +419,71 @@
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.altKey) && e.key === 'Enter') { e.preventDefault(); bulkSalvage(); }
   });
+
+
+  /* ---------- 背包窗口：打开/关闭/拖动 ---------- */
+  function openBagWindow() {
+    renderBag();
+    // 装备子面板也要刷新（12槽 + 换装背包 + 出战宠物属性）
+    if (UI.renderEquipSlots) UI.renderEquipSlots();
+    if (UI.renderPetEquipInv) UI.renderPetEquipInv();
+    const host = document.getElementById('bag-window');
+    if (!host) return;
+    host.style.display = 'block';
+    requestAnimationFrame(() => host.classList.add('is-open'));
+  }
+  function closeBagWindow() {
+    const host = document.getElementById('bag-window');
+    if (!host) return;
+    host.classList.remove('is-open');
+    window.setTimeout(() => { if (!host.classList.contains('is-open')) host.style.display = 'none'; }, 300);
+  }
+  function initBagWindow() {
+    const cancel = document.getElementById('bag-cancel');
+    if (cancel) cancel.onclick = closeBagWindow;
+    const scrim = document.getElementById('bag-scrim');
+    if (scrim) scrim.onclick = closeBagWindow;
+    // 背包窗口拖动
+    const bagWin = document.querySelector('.bag-window');
+    const bagHeader = document.querySelector('.bag-window-header');
+    if (bagWin && bagHeader && UI.makeDraggable) UI.makeDraggable(bagWin, bagHeader);
+    // 子tab切换（背包 / 装备）
+    const subTabs = document.querySelector('.bag-window-tabs');
+    if (subTabs && !subTabs.__bound) {
+      subTabs.__bound = true;
+      subTabs.addEventListener('click', e => {
+        const btn = e.target.closest && e.target.closest('.bag-subtab');
+        if (!btn) return;
+        const name = btn.dataset.bagSubtab;
+        subTabs.querySelectorAll('.bag-subtab').forEach(t => t.classList.toggle('active', t === btn));
+        document.querySelectorAll('.bag-subpane').forEach(p => {
+          const match = p.dataset.bagSubpane === name;
+          p.classList.toggle('active', match);
+          p.style.display = match ? '' : 'none';
+        });
+        // 切到装备tab时刷新装备面板
+        if (name === 'equip') {
+          if (UI.renderEquipSlots) UI.renderEquipSlots();
+          if (UI.renderPetEquipInv) UI.renderPetEquipInv();
+        }
+      });
+    }
+    // 快捷键 B 打开/关闭背包
+    document.addEventListener('keydown', e => {
+      if (e.key === 'b' || e.key === 'B') {
+        const host = document.getElementById('bag-window');
+        if (host && host.classList.contains('is-open')) closeBagWindow();
+        else openBagWindow();
+      }
+    });
+  }
+
+  UI.openBagWindow = openBagWindow;
+  UI.closeBagWindow = closeBagWindow;
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('DOMContentLoaded', initBagWindow);
+  }
 
   UI.renderBag = renderBag;
   UI.showEquipDetail = showEquipDetail;

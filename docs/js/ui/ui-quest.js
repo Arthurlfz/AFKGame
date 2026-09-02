@@ -14,10 +14,10 @@
   const $ = id => document.getElementById(id);
   const escapeHtml = UI.escapeHtml || (s => String(s == null ? '' : s));
 
-  // 任务类型标签（12 种）
+  // 任务类型标签（13 种）
   const TYPE_LABEL = {
     collect: '收集', kill: '击败', evolve: '进化', nirvana: '涅槃',
-    synth: '合成', hatch: '孵化', craft: '打造', salvage: '分解',
+    synth: '合成', soulcast: '魂铸', hatch: '孵化', craft: '打造', salvage: '分解',
     equipDrop: '获得装备', equip: '穿装备', list: '上架', trade: '成交'
   };
   const TRACK_MAX = 3;          // 追踪栏最多钉几条（与 quest.js 的 TRACK_MAX 一致）
@@ -233,7 +233,7 @@
     const all = Quest.getQuests();
     const inCat = cat => cat === 'done'
       ? all.filter(q => q.finished).length
-      : all.filter(q => q.category === cat && !q.finished).length;
+      : all.filter(q => q.category === cat && !q.finished && q.unlocked).length;
     // 默认分类：第一个有未完成任务的（新手优先），都空则回主线
     if (!activeCat || !CATS.some(c => c.id === activeCat)) {
       const first = CATS.find(c => c.id !== 'done' && inCat(c.id) > 0);
@@ -257,7 +257,7 @@
     // 分类视图：done=所有已完成；其余=该分类未完成（未解锁也显示，灰显，让玩家看到还有什么可解锁）
     const rows = activeCat === 'done'
       ? all.filter(q => q.finished)
-      : all.filter(q => q.category === activeCat && !q.finished);
+      : all.filter(q => q.category === activeCat && !q.finished && q.unlocked);
     // 排序：可提交 > 进行中 > 未接取 > 未解锁
     const rank = q => !q.unlocked ? 3 : q.done ? 0 : q.accepted ? 1 : 2;
     rows.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
@@ -318,6 +318,7 @@
       case 'evolve': return { page: 'pet', tab: 'evolve', btn: '去进化' };
       case 'nirvana': return { page: 'pet', tab: 'merge', btn: '去涅槃' };
       case 'synth': return { page: 'pet', tab: 'synth', btn: '去合成' };
+      case 'soulcast': return { page: 'equip', tab: 'soulcast', btn: '去魂铸' };
       case 'hatch': return { page: 'pet', tab: 'egg', btn: '去孵化' };
       case 'equip': return { page: 'pet', tab: 'equip', btn: '去穿装备' };
       case 'list': return { page: 'market-sell', btn: '去上架' };
@@ -403,6 +404,10 @@
     const taskBtn = document.querySelector('.top-btn[data-dialog="任务"]');
     if (taskBtn) taskBtn.onclick = openQuestPanel;
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeQuestPanel(); });
+    // 任务窗口拖动（标题栏按住拖动）
+    const questWin = document.querySelector('.quest-drawer');
+    const questHeader = document.querySelector('.quest-drawer-header');
+    if (questWin && questHeader && UI.makeDraggable) UI.makeDraggable(questWin, questHeader);
   }
 
   window.UI = window.UI || {};

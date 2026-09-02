@@ -30,6 +30,7 @@
     growth: 'desc',
     sort: 'latest',
     affixFilters: [],     // POE式词缀条件：[{type, min, max}]，可与/或组合（默认与）
+    trait: 'all',         // 宠物血脉特质筛选：'all' / 特质 id / 'none'（无特质捡漏）
   };
 
   let marketFilters = loadMarketFilters();
@@ -73,6 +74,11 @@
         const hay = String(l.item_name || l.pet_name || '').toLowerCase();
         if (!hay.includes(kw)) return false;
       }
+    }
+    if (l.pet_id && marketFilters.trait !== 'all') {
+      const tids = (l.pet_traits || []).map(t => t && t.id);
+      if (marketFilters.trait === 'none') { if (tids.length) return false; }
+      else if (tids.indexOf(marketFilters.trait) < 0) return false;
     }
     if (l.item_id) {
       if (marketFilters.slot !== 'all' && String(l.item_slot || l.slot || '').toLowerCase() !== marketFilters.slot) return false;
@@ -228,6 +234,12 @@
       { key: 'growth', val: 'desc', label: '成长从高到低' },
       { key: 'growth', val: 'asc', label: '成长从低到高' },
     ]);
+    // 宠物血脉特质分组（8 特质 + 无特质捡漏）
+    fillFilterGroup(panel, 'trait', [
+      { key: 'trait', val: 'all', label: '全部' },
+      ...Object.keys(Config.petTraits || {}).map(id => ({ key: 'trait', val: id, label: (Config.petTraits[id].label || id) })),
+      { key: 'trait', val: 'none', label: '无特质（捡漏）' },
+    ]);
     // 属性筛选分组：占位说明（真实属性搜索由顶部搜索框承担）
     const attrBody = panel.querySelector('.filter-group[data-group="attr"] .filter-body');
     if (attrBody && !attrBody.textContent.trim()) attrBody.innerHTML = '<div class="hint">用顶部搜索框按名称 / 词缀搜索</div>';
@@ -239,6 +251,7 @@
       if (el) el.style.display = on ? '' : 'none';
     };
     toggleGroup('growth', kind === 'pet');
+    toggleGroup('trait', kind === 'pet');
     toggleGroup('slot', kind !== 'pet');
     toggleGroup('tier', kind !== 'pet');
     toggleGroup('price', kind !== 'pet');

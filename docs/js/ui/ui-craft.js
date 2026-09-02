@@ -60,7 +60,8 @@
           <button class="btn-mini augment" id="craft-augment" ${(flattenAffixes(eq.affixes).length >= 6) ? 'disabled' : ''}>➕ 增缀石<span>${flattenAffixes(eq.affixes).length >= 6 ? '前后缀已满' : '消耗 1 · 新增词缀'}</span></button>
         </div>
         ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
-        <div class="craft-result" id="craft-result"></div>`;
+        <div class="craft-result" id="craft-result"></div>
+        ${soulCastHtml(eq, inSell)}`;
       // 打造按钮统一防连点：点击后立即禁用（云同步期间再点无效），完成后恢复。
       // 不这么做时快速连点会并发触发多次打造，词缀被连续改多次 + 材料重复扣（曾报"卡顿/突破上限"）
       const btnReforge = body.querySelector('#craft-reforge');
@@ -112,6 +113,7 @@
             if (UI.renderInvToolbar) UI.renderInvToolbar();
           });
       };
+      bindSoulCast(eq, render);
       const btnAug = body.querySelector('#craft-augment');
       if (btnAug) btnAug.onclick = () => {
         if (inSell || (eq.affixes.prefix.length >= 3 && eq.affixes.suffix.length >= 3)) return;
@@ -160,7 +162,134 @@
     }, 300);
   }
 
+  /* ---------- 魂铸（宠物 → 装备）UI ---------- */
+  // 当前魂铸选择状态：{ tier, petId, traitId }（档位按钮 = 筛选器，始终可点；确认按钮控制能否铸）
+  const soulState = { tier: 'normal', petId: null, traitId: null };
+  const soulTier = k => { const T = (Config.soulCast && Config.soulCast.tiers) || {}; return T[k] || {}; };
+  // 该档位下可魂铸的宠物列表（按 level/growth/needFinal 过滤）
+  function soulCandidates(eq) {
+    const T = soulTier(soulState.tier);
+    const P = window.Pet;
+    const pets = (P && P.getPets ? P.getPets() : []) || [];
+    return pets.filter(p => {
+      if (!T.level || Number(p.level) < T.level) return false;
+      if (T.growth != null && p.growth < T.growth) return false;
+      if (T.needFinal && !(P.getAwakenState && P.getAwakenState(p))) return false;
+      if (T.source === 'awaken') return !!(P.getAwakenState && P.getAwakenState(p));
+      return Array.isArray(p.traits) && p.traits.length > 0; // 血脉档需要特质
+    });
+  }
+  // 特质 T 阶颜色
+  const S_TIER_COLOR = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f' };
+  function soulCastHtml(eq, inSell) {
+    const S = Config.soulCast || {};
+    const mat = S.material || '凝魂晶石';
+    const matCount = S.materialCount || 10;
+    // 已有魂铸词缀：只读展示，不可再铸
+    if (eq.soulAffix) {
+      const a = eq.soulAffix;
+      const color = S_TIER_COLOR[a.tier] || '#c9a86a';
+      const val = (a.value != null && !['skillDmg'].includes(a.type))
+        ? '+' + a.value + (['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%') : '';
+      return `<div class="craft-section-label">魂铸（宠物 → 装备）</div>
+        <div class="craft-soul-block">
+          <div class="craft-soul-affix" style="color:${color}">${a.label || '魂·?'} <b>T${a.tier}</b> ${val} <em>（${a.source || ''} · 永久不可剥离）</em></div>
+          <div class="craft-soul-note">每件装备最多 1 条魂铸词缀 · 可随装备交易</div>
+        </div>`;
+    }
+    const T = soulTier(soulState.tier);
+    const cands = soulCandidates(eq);
+    const selPet = cands.find(p => p.id === soulState.petId) || null;
+    // 档位按钮（始终可点 = 筛选器）
+    const tiers = [
+      { k: 'normal', label: '普通', desc: 'Lv40+ / 成长≥10 · 铸血脉 T=原阶' },
+      { k: 'elite', label: '精锐', desc: 'Lv40+ / 成长≥40 · 血脉 T+1' },
+      { k: 'legend', label: '传承', desc: 'Lv60终形态 / 成长≥60 · 铸觉醒 T1' }
+    ];
+    const tierBtns = tiers.map(t => {
+      const cur = Config.soulCast && Config.soulCast.tiers && Config.soulCast.tiers[t.k];
+      const ml = cur && (cur.minLevel != null ? cur.minLevel : cur.level);
+      const mg = cur && (cur.minGrowth != null ? cur.minGrowth : cur.growth);
+      const disable = cur && (ml == null || mg == null);
+      return `<button class="btn-mini soul-tier ${soulState.tier === t.k ? 'on' : ''}" data-tier="${t.k}" ${disable ? 'disabled' : ''}>
+        ${t.label}<span>${cur ? 'Lv' + ml + '·成长≥' + mg : ''}</span></button>`;
+    }).join('');
+    // 宠物列表
+    const petRows = cands.length ? cands.map(p => {
+      const traits = (Array.isArray(p.traits) && p.traits.length)
+        ? p.traits.map(t => { const d = (Config.petTraits || {})[t.id] || {}; return (d.label || t.id) + ' T' + t.tier; }).join('、')
+        : (T.source === 'awaken' ? '觉醒特质' : '无特质');
+      const sel = selPet && selPet.id === p.id ? ' sel' : '';
+      return `<div class="craft-soul-pet${sel}" data-pet="${p.id}"><span class="sp-name">${p.name}</span><span class="sp-meta">Lv${p.level} · 成长${p.growth}</span><span class="sp-traits">${traits}</span></div>`;
+    }).join('') : `<div class="craft-soul-empty">当前档位没有可魂铸的宠物（${T.label}：Lv${T.level}+ / 成长≥${T.growth}${T.needFinal ? ' / 终形态' : ''}）</div>`;
+    // 特质自选（血脉档：宠有多条特质时选 1 条）
+    let traitSel = '';
+    if (selPet && T.source !== 'awaken') {
+      const trs = (Array.isArray(selPet.traits) ? selPet.traits : []).sort((a, b) => a.tier - b.tier);
+      if (trs.length > 1) {
+        traitSel = '<div class="craft-soul-trait">选择要铸的特质：' + trs.map(t => {
+          const d = (Config.petTraits || {})[t.id] || {};
+          const color = S_TIER_COLOR[t.tier] || '#9a9a9a';
+          return `<button class="btn-mini soul-trait ${soulState.traitId === t.id ? 'on' : ''}" data-trait="${t.id}" style="color:${color}">${d.label || t.id} T${t.tier}</button>`;
+        }).join('') + '</div>';
+      }
+    }
+    const canCast = !!selPet && (T.source === 'awaken' || !!(soulState.traitId || (selPet.traits || []).length === 1));
+    return `<div class="craft-section-label">魂铸（宠物 → 装备）</div>
+      <div class="craft-soul-block">
+        <div class="craft-soul-tiers">${tierBtns}</div>
+        <div class="craft-soul-desc">${T.label}：${T.source === 'awaken' ? '铸觉醒特质（固定 T1）' : '铸血脉特质'} · 消耗装备 + 宠物（消失）+ ${matCount} 颗${mat}</div>
+        <div class="craft-soul-pets">${petRows}</div>
+        ${traitSel}
+        <div class="craft-soul-actions">
+          <button class="btn-mini primary" id="craft-soul-cast" ${inSell || !canCast ? 'disabled' : ''}>
+            ${inSell ? '装备在售中' : canCast ? '⚒ 确认魂铸（消耗 1 只宠物 + ' + matCount + ' ' + mat + '）' : '先选宠物'}
+          </button>
+          <div class="craft-soul-result" id="craft-soul-result"></div>
+        </div>
+      </div>`;
+  }
+  // 绑定魂铸事件（档位切换 / 选宠 / 选特质 / 确认）
+  function bindSoulCast(eq, rerender) {
+    const body = $('craft-body');
+    body.querySelectorAll('.craft-soul-tier').forEach(btn => {
+      btn.onclick = () => {
+        soulState.tier = btn.dataset.tier;
+        soulState.petId = null; soulState.traitId = null;
+        rerender();
+      };
+    });
+    body.querySelectorAll('.craft-soul-pet').forEach(row => {
+      row.onclick = () => {
+        soulState.petId = row.dataset.pet;
+        soulState.traitId = null;
+        rerender();
+      };
+    });
+    const btnCast = body.querySelector('#craft-soul-cast');
+    if (btnCast && !btnCast.disabled) btnCast.onclick = async () => {
+      const btn = btnCast;
+      btn.disabled = true;
+      btn.textContent = '⚒ 魂铸中…';
+      const res = await Craft.soulCast(eq, soulState.petId, soulState.tier, soulState.traitId || undefined);
+      const box = body.querySelector('#craft-soul-result');
+      if (!box) { if (UI.renderAll) UI.renderAll(); return; }
+      if (res && res.ok) {
+        box.innerHTML = `<span style="color:#7fae7f">⚒ 魂铸成功：${res.aff.label}（T${res.aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
+        addLog(`⚒ 魂铸成功：${eq.name} 获得 ${res.aff.label}（T${res.aff.tier}），${res.petName} 被消耗`);
+        showToast('⚒ 魂铸成功', `${res.aff.label}（T${res.aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
+        if (UI.renderAll) UI.renderAll();
+      } else {
+        box.innerHTML = `<span class="err">❌ ${(res && res.error) || '魂铸失败'}</span>`;
+        btn.disabled = false;
+        btn.textContent = '⚒ 确认魂铸';
+      }
+    };
+  }
+
   /* ---------- 对外 API（打造页） ---------- */
   UI.openCraftPanel = openCraftPanel;
   UI.closeCraftPanel = closeCraftPanel;
+  UI.soulCastHtml = soulCastHtml;
+  UI.bindSoulCast = bindSoulCast;
 })();

@@ -108,14 +108,19 @@
   /* ---------- 外壳初始化（绑定侧边栏 + 顶栏按钮） ---------- */
   function initShell() {
     // 侧边栏 4 主按钮
-    const sbBtns = document.querySelectorAll('.sb-btn[data-page]');
+    const sbBtns = document.querySelectorAll('.sb-btn[data-page], .topbar-btn[data-page]');
     sbBtns.forEach(btn => {
       btn.onclick = () => switchPage(btn.dataset.page);
     });
     // 顶栏：data-nav 跳页（背包/牧场）
-    const navBtns = document.querySelectorAll('.top-btn[data-nav]');
+    const navBtns = document.querySelectorAll('.top-btn[data-nav], .fs-btn[data-nav]');
     navBtns.forEach(btn => {
-      btn.onclick = () => navTo(btn.dataset.nav);
+      btn.onclick = () => {
+        navTo(btn.dataset.nav);
+        // 从背包窗口点跳页时关闭背包窗口
+        const bw = document.getElementById('bag-window');
+        if (bw) { bw.classList.remove('is-open'); bw.style.display = 'none'; }
+      };
     });
     // data-dialog 占位气泡（顶栏已挪走，这里兼容侧边栏的对话框按钮）
     const dlgBtns = document.querySelectorAll('[data-dialog]');
@@ -126,10 +131,13 @@
     const stBtn = document.getElementById('btn-settings-sidebar');
     if (stBtn) stBtn.onclick = showSettingsDialog;
     // 侧边栏：任务按钮 → 打开真实任务面板（ui-quest.js）
-    const questBtn = document.getElementById('btn-quest-sidebar');
-    if (questBtn) {
-      questBtn.onclick = () => { if (window.UI && window.UI.openQuestPanel) window.UI.openQuestPanel(); };
-    }
+        // 顶部背包按钮 → 打开背包窗口
+    const bagBtn = document.getElementById('topbar-bag');
+    if (bagBtn) bagBtn.onclick = () => { if (window.UI && window.UI.openBagWindow) window.UI.openBagWindow(); };
+
+    document.querySelectorAll('#btn-quest-sidebar, #topbar-quest').forEach(btn => {
+      btn.onclick = () => { if (window.UI && window.UI.openQuestPanel) window.UI.openQuestPanel(); };
+    });
     // 浏览器前进/后退 / 直接带 #hash 打开 → 渲染对应页
     window.addEventListener('hashchange', onHashChange);
     // 刷新（F5 / 直接打开）默认停在主城页（安全区），不记忆上次停的战斗页（第三菜单）。

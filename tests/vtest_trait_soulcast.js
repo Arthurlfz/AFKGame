@@ -125,10 +125,11 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
 }
 {
   // 主宠成长≥60 → 继承概率 +10%（一档封顶），用概率测试难，改为验证 milestone 逻辑不崩
+  // 注意：真随机下"主 70%+bonus / 副 40%+bonus"可能全丢（~10%），故断言允许 0~3
   const main = baby(); main.growth = 60; main.traits = [{ id: '精准', tier: 1 }];
   const sub = baby(); sub.traits = [{ id: '疾风', tier: 1 }];
   const out = ctx.Merge.inheritSynthTraits(main, sub, false);
-  A(out.length >= 1 && out.length <= 3, '主成长≥60 继承条数合法（1~3）');
+  A(Array.isArray(out) && out.length <= 3, '主成长≥60 继承条数合法（0~3）');
 }
 {
   // 变异成功额外追 1 条随机新特质（保底）

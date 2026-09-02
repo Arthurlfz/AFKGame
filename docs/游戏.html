@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -9,12 +9,12 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=388a08a4">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=cefcdb31">
-<link rel="stylesheet" href="css/game.css?v=5e5a9a87">
+<link rel="stylesheet" href="css/game.css?v=84a8d7ed">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=be57c74e">
+<link rel="stylesheet" href="css/ui-polish.css?v=b34c0625">
 <link rel="stylesheet" href="css/market-refresh.css?v=d3732457">
 <!-- 开发者面板（仅管理员账号可见入口） -->
-<link rel="stylesheet" href="css/dev.css?v=ada37786">
+<link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
 </head>
 <body>
 
@@ -49,6 +49,8 @@
   <header class="topbar app-topbar">
     <div class="title">⚒ 宠物养成循环原型</div>
     <div class="spacer"></div>
+    <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）">🎒 背包</button>
+    <button class="topbar-btn" id="topbar-quest" title="任务（快捷键 Q）">📜 任务</button>
     <!-- 魔石余额（ui-shop 渲染；商店 SQL 没跑时自动隐藏） -->
     <div class="gem-chip" id="gem-balance" title="魔石余额">🪙 0 魔石</div>
     <div id="auth-box"></div>
@@ -60,12 +62,10 @@
       <button class="sb-btn active" data-page="capital"><span class="sb-icon">🏯</span><span class="sb-label">主城</span></button>
       <button class="sb-btn" data-page="worldmap"><span class="sb-icon">🗺️</span><span class="sb-label">世界地图</span></button>
       <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
-      <button class="sb-btn" data-page="bag"><span class="sb-icon">🎒</span><span class="sb-label">背包</span></button>
       <button class="sb-btn" data-page="equip"><span class="sb-icon">🛠️</span><span class="sb-label">装备打造</span></button>
       <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">交易市场</span></button>
       <button class="sb-btn" data-page="market-sell"><span class="sb-icon">📦</span><span class="sb-label">我的上架</span></button>
       <button class="sb-btn" data-page="shop"><span class="sb-icon">🪙</span><span class="sb-label">魔石商店</span></button>
-      <button class="sb-btn sb-divider" id="btn-quest-sidebar" title="任务"><span class="sb-icon">📜</span><span class="sb-label">任务</span></button>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon">💬</span><span class="sb-label">聊天</span></button>
       <button class="sb-btn" data-page="codex"><span class="sb-icon">📖</span><span class="sb-label">百科</span></button>
       <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon">⚙️</span><span class="sb-label">设置</span></button>
@@ -256,11 +256,9 @@
         <!-- 顶部水平 tab 导航（金色刻度条）：资料 / 装备 / 进化 / 合成 / 涅槃 / 宠物蛋 -->
         <div class="pet-tabs" id="pet-tabs">
           <button class="pet-tab active" data-pet-tab="profile">资料</button>
-          <button class="pet-tab" data-pet-tab="equip">装备</button>
           <button class="pet-tab" data-pet-tab="evolve">进化</button>
           <button class="pet-tab" data-pet-tab="synth">合成</button>
           <button class="pet-tab" data-pet-tab="merge">涅槃</button>
-          <button class="pet-tab" data-pet-tab="egg">宠物蛋</button>
         </div>
 
         <!-- 资料 tab：出战宠物详情 + 宠物列表 -->
@@ -280,7 +278,10 @@
                     <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
                     <div class="exp-text" id="exp-text">0/15</div>
                     <div class="pet-hero-reborn" id="pet-reborn">转生 0 次</div>
+                    <div class="pet-bloodline" id="pet-bloodline"></div>
                     <div class="pet-active-skill-info" id="pet-active-skill-info">主动技能：终形态 Lv.60 解锁</div>
+                    <div class="pet-traits" id="pet-traits"></div>
+                    <div class="pet-awaken" id="pet-awaken" style="display:none"></div>
                     <div class="pet-exp-pool" id="pet-exp-pool" style="display:none"></div>
                   </div>
                 </div>
@@ -307,59 +308,6 @@
               <div class="panel">
                 <div class="panel-title">宠物列表<span class="hint">点击切换出战 · 悬停看属性</span></div>
                 <div class="pet-list" id="pet-list"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 装备 tab：三连屏（属性 | 装备栏 12槽 | 换装背包 + 去打造） -->
-        <div class="pet-tab-pane" data-pet-pane="equip">
-          <div class="pet-wrap pet-wrap--tri">
-            <div class="pcol">
-              <div class="panel pet-hero-panel">
-                <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
-                <div class="pet-hero">
-                  <div class="pet-hero-art">
-                    <div class="pet-avatar" id="eqp-avatar">❔</div>
-                  </div>
-                  <div class="pet-hero-info">
-                    <div class="pet-name"><span id="eqp-name">我的宠物</span><span class="lv" id="eqp-level">Lv.1</span></div>
-                    <div class="exp-bar-wrap"><div class="exp-bar" id="eqp-exp-bar" style="width:0%"></div></div>
-                    <div class="exp-text" id="eqp-exp-text">0/15</div>
-                    <div class="pet-hero-reborn" id="eqp-reborn">转生 0 次</div>
-                  </div>
-                </div>
-                <div class="pet-stats">
-                  <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="eqp-growth">5.0</span></div>
-                  <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="eqp-hp">100</span></div>
-                  <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="eqp-atk">20</span></div>
-                  <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="eqp-def">10</span></div>
-                  <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="eqp-spd">8</span></div>
-                  <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="eqp-crit">10%</span></div>
-                  <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="eqp-critdmg">150%</span></div>
-                  <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="eqp-hit">90%</span></div>
-                  <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="eqp-dodge">5%</span></div>
-                  <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="eqp-ls">0%</span></div>
-                  <div class="pstat pstat-bonus bonus-tip">
-                    <span class="pstat-label">装备加成</span><span class="pstat-value" id="eqp-bonus">无</span>
-                    <div class="bonus-pop" id="eqp-bonus-pop"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">当前装备<span class="hint">点击槽位脱下 · 悬停看属性</span></div>
-                <div class="equip-slots" id="equip-slots"></div>
-                <div class="equip-go-craft">
-                  <button type="button" class="fs-btn fs-btn--ghost" data-nav="equip">🛠️ 去「装备打造」页做新装备</button>
-                </div>
-              </div>
-            </div>
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">换装背包<span class="hint">给当前出战宠物穿上 · 悬停看属性</span></div>
-                <div class="equip-inv" id="pet-equip-inv"></div>
               </div>
             </div>
           </div>
@@ -456,26 +404,10 @@
           </div>
         </div>
 
-        <!-- 宠物蛋 tab：按品种展示 + 孵化 -->
-        <div class="pet-tab-pane" data-pet-pane="egg">
-          <div class="pet-wrap">
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">宠物蛋<span class="hint">挂机打基础怪掉落 · 按品种孵化 · 可上架交易</span></div>
-                <div id="egg-panel" class="egg-panel"></div>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
-    <!-- ============ 背包页（独立分类查看） ============ -->
-    <section class="tab-page" id="tab-bag">
-      <div class="panel">
-        <div class="panel-title">背包<span class="hint">装备 / 素材 / 消耗品 / 宠物蛋 分类查看</span></div>
-        <div id="bag-root"></div>
-      </div>
-    </section>
+        <!-- 背包已改为可拖动浮窗，见下方 bag-window-host -->
+
 
     <!-- ============ 装备页（装备打造）：背包网格 + 打造 + 分解 + 上架 ============ -->
     <section class="tab-page" id="tab-equip">
@@ -522,6 +454,7 @@
             <div class="filter-group" data-group="baseTier"><button class="filter-head" data-toggle-group="baseTier"><span class="arrow">▸</span><span>词缀T阶</span></button><div class="filter-body"></div></div>
             <div class="filter-group" data-group="affix"><button class="filter-head" data-toggle-group="affix"><span class="arrow">▸</span><span>词缀筛选</span></button><div class="filter-body"></div></div>
             <div class="filter-group" data-group="growth"><button class="filter-head" data-toggle-group="growth"><span class="arrow">▸</span><span>宠物成长值</span></button><div class="filter-body"></div></div>
+            <div class="filter-group" data-group="trait"><button class="filter-head" data-toggle-group="trait"><span class="arrow">▸</span><span>宠物特质</span></button><div class="filter-body"></div></div>
             <div class="filter-group" data-group="price"><button class="filter-head" data-toggle-group="price"><span class="arrow">▸</span><span>价格范围</span></button><div class="filter-body"></div></div>
             <div class="filter-group" data-group="attr"><button class="filter-head" data-toggle-group="attr"><span class="arrow">▸</span><span>属性筛选</span></button><div class="filter-body"></div></div>
           </aside>
@@ -626,6 +559,80 @@
     <div class="quest-drawer-body">
       <div class="quest-tabs" id="quest-tabs"></div>
       <div id="quest-body"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- 背包窗口：可拖动浮窗（点顶栏「背包」打开） -->
+<div class="bag-window-host" id="bag-window" style="display:none">
+  <div class="bag-window-scrim" id="bag-scrim"></div>
+  <aside class="bag-window" aria-label="背包窗口">
+    <header class="bag-window-header">
+      <div class="bag-window-heading">
+        <div class="bag-window-title">🎒 背包</div>
+        <div class="bag-window-subtitle">装备 / 素材 / 消耗品 / 宠物蛋 分类查看</div>
+      </div>
+      <button class="bag-window-close" id="bag-cancel" type="button" aria-label="关闭背包">×</button>
+    </header>
+    <div class="bag-window-tabs">
+      <button class="bag-subtab active" data-bag-subtab="bag">📦 背包</button>
+      <button class="bag-subtab" data-bag-subtab="equip">⚔️ 装备</button>
+    </div>
+    <div class="bag-window-body">
+      <div class="bag-subpane active" data-bag-subpane="bag">
+        <div id="bag-root"></div>
+      </div>
+      <div class="bag-subpane" data-bag-subpane="equip" style="display:none">
+        <div class="equip-layout">
+            <div class="pcol">
+              <div class="panel pet-hero-panel">
+                <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
+                <div class="pet-hero">
+                  <div class="pet-hero-art">
+                    <div class="pet-avatar" id="eqp-avatar">❔</div>
+                  </div>
+                  <div class="pet-hero-info">
+                    <div class="pet-name"><span id="eqp-name">我的宠物</span><span class="lv" id="eqp-level">Lv.1</span></div>
+                    <div class="exp-bar-wrap"><div class="exp-bar" id="eqp-exp-bar" style="width:0%"></div></div>
+                    <div class="exp-text" id="eqp-exp-text">0/15</div>
+                    <div class="pet-hero-reborn" id="eqp-reborn">转生 0 次</div>
+                  </div>
+                </div>
+                <div class="pet-stats">
+                  <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="eqp-growth">5.0</span></div>
+                  <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="eqp-hp">100</span></div>
+                  <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="eqp-atk">20</span></div>
+                  <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="eqp-def">10</span></div>
+                  <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="eqp-spd">8</span></div>
+                  <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="eqp-crit">10%</span></div>
+                  <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="eqp-critdmg">150%</span></div>
+                  <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="eqp-hit">90%</span></div>
+                  <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="eqp-dodge">5%</span></div>
+                  <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="eqp-ls">0%</span></div>
+                  <div class="pstat pstat-bonus bonus-tip">
+                    <span class="pstat-label">装备加成</span><span class="pstat-value" id="eqp-bonus">无</span>
+                    <div class="bonus-pop" id="eqp-bonus-pop"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">当前装备<span class="hint">点击槽位脱下 · 悬停看属性</span></div>
+                <div class="equip-slots" id="equip-slots"></div>
+                <div class="equip-go-craft">
+                  <button type="button" class="fs-btn fs-btn--ghost" data-nav="equip">🛠️ 去「装备打造」页做新装备</button>
+                </div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel">
+                <div class="panel-title">换装背包<span class="hint">给当前出战宠物穿上 · 悬停看属性</span></div>
+                <div class="equip-inv" id="pet-equip-inv"></div>
+              </div>
+            </div>
+          </div>
+      </div>
     </div>
   </aside>
 </div>
@@ -755,7 +762,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=27986ee7"></script>
+<script src="js/core/config.js?v=f9a97702"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -780,44 +787,44 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=2982c4f5"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=302bb613"></script>
-<script src="js/core/supabase.js?v=b39cce3f"></script>
-<script src="js/equipment/equipment.js?v=d25770cc"></script>
-    <script src="js/pet/pet.js?v=de9b4cc4"></script>
-<script src="js/core/items.js?v=5baa83e5"></script>
+<script src="js/core/supabase.js?v=f2b46e6d"></script>
+<script src="js/equipment/equipment.js?v=8f507a6a"></script>
+    <script src="js/pet/pet.js?v=591129e0"></script>
+<script src="js/core/items.js?v=32a26709"></script>
 <script src="js/core/materials.js?v=f128da1a"></script>
-<script src="js/core/drop.js?v=e8d2aacc"></script>
+<script src="js/core/drop.js?v=1b5e2f35"></script>
 <script src="js/core/market.js?v=3d044442"></script>
 <script src="js/core/market_bot.js?v=8361b933"></script>
-<script src="js/equipment/equipment_craft.js?v=0394c9af"></script>
+<script src="js/equipment/equipment_craft.js?v=785fd82c"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
-<script src="js/pet/pet_merge.js?v=ed76acb2"></script>
+<script src="js/pet/pet_merge.js?v=30a44c8f"></script>
 <script src="js/pet/pet_evolve.js?v=78511b8a"></script>
-<script src="js/core/quest.js?v=2defb104"></script>
-<script src="js/core/battle.js?v=393290d2"></script>
-<script src="js/ui/ui-common.js?v=ac51b64f"></script>
+<script src="js/core/quest.js?v=92868060"></script>
+<script src="js/core/battle.js?v=11832020"></script>
+<script src="js/ui/ui-common.js?v=feaff803"></script>
 <script src="js/ui/ui-console.js?v=05a0aa58"></script>
-<script src="js/ui/ui-shell.js?v=27511fa8"></script>
+<script src="js/ui/ui-shell.js?v=d0138c82"></script>
 <script src="js/ui/ui-worldmap.js?v=5186d20c"></script>
 <script src="js/ui/ui-capital.js?v=11fb3349"></script>
 
 <script src="js/ui/ui-login.js?v=99e17f03"></script>
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
-<script src="js/ui/ui-quest.js?v=c7e112e8"></script>
+<script src="js/ui/ui-quest.js?v=e1cfe143"></script>
 <script src="js/ui/ui-battle.js?v=c0c142e4"></script>
-<script src="js/ui/ui-pet.js?v=4576afbe"></script>
+<script src="js/ui/ui-pet.js?v=0ea3ced5"></script>
 <script src="js/ui/ui-pet-evolve.js?v=196095dd"></script>
 <script src="js/ui/ui-pet-merge.js?v=9249467a"></script>
 <script src="js/ui/ui-pet-synth.js?v=265fbed1"></script>
-<script src="js/ui/ui-bag.js?v=76504ea5"></script>
+<script src="js/ui/ui-bag.js?v=5cf77695"></script>
 <script src="js/ui/ui-equipment.js?v=e53a6742"></script>
-<script src="js/ui/ui-craft.js?v=0a31b02f"></script>
-<script src="js/ui/ui-market.js?v=f005a5e0"></script>
+<script src="js/ui/ui-craft.js?v=2ac55b1e"></script>
+<script src="js/ui/ui-market.js?v=80792912"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=b864dea2"></script>
-<script src="js/ui/ui-codex.js?v=bbdc0af4"></script>
+<script src="js/ui/ui-codex.js?v=94ab55e8"></script>
 <script src="js/ui/ui-shop.js?v=b17cd898"></script>
-<script src="js/ui/ui-dev.js?v=1f74b5bc"></script>
+<script src="js/ui/ui-dev.js?v=fa4999e0"></script>
 <script src="js/main.js?v=2c7264fd"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->

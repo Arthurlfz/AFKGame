@@ -36,6 +36,11 @@
   let onFightEnd = null;   // main.js 注入的每场结算回调
   let selectedAreaId = null;
   const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
+  // 血统被动：跨场状态
+  let pendingKillBuff = false;  // 骨狼：击杀后下次攻击+伤害（跨场传递）
+  let bloodline = null;          // 当前出战宠物的血统被动配置
+  let killBuffActive = false;    // 本场是否激活击杀增益
+  let corruptionStacks = 0;      // 毒沼蛙：敌人腐蚀层数
 
   /* ---------- 开始 / 停止 ---------- */
   // startAutoBattle(callback)：callback({win, fightCount}) 每场结束调用
@@ -204,10 +209,18 @@
     if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
     state.petAction = 0;
     state.enemyAction = 0;
-    const skill = Config.pet.evolution.activeSkills?.[pet.name];
+    // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
+    const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
+      ? Config.pet.evolution.skillOf(pet.name)
+      : Config.pet.evolution.activeSkills?.[pet.name];
     state.activeSkill = skill && state.pet.level >= skill.minLevel ? skill : null;
     state.skillCooldown = 0;
     state.skillQueued = false;
+    // 血统被动初始化
+    bloodline = window.Pet && window.Pet.getBloodline ? window.Pet.getBloodline(pet) : null;
+    killBuffActive = pendingKillBuff;
+    pendingKillBuff = false;
+    corruptionStacks = 0;
     clearFreeze('pet'); clearFreeze('enemy');
     fightEnded = false;
     const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
@@ -220,11 +233,20 @@
 
     interval = setInterval(tick, 100);
   }
+  // 血统被动：疫毛兽 疾风步 — 速度超阈值后每N点+攻速，上限cap
+  function getBloodlineAspdMult() {
+    if (!bloodline || bloodline.type !== 'speedAspd' || !bloodline.params) return 1;
+    const p = bloodline.params;
+    const spd = state.pet ? state.pet.spd : 0;
+    if (spd <= p.threshold) return 1;
+    const bonus = Math.min(p.cap, Math.floor((spd - p.threshold) / p.perPoint) * p.bonusPer);
+    return 1 + bonus;
+  }
   function tick() {
     // 进度条满值固定 100，累加 = 速度 / speedScale（config 校正攻速量级，改这一个数即调整体快慢）
     // 谁在演出谁就冻在当前位置（立绘还在对方脸上/收招回位的路上），对手不受牵连
     const scale = Config.battle.speedScale || 1;
-    if (!freeze.pet)   state.petAction += state.pet.spd / scale;
+    if (!freeze.pet)   state.petAction += state.pet.spd * getBloodlineAspdMult() / scale;
     if (!freeze.enemy) state.enemyAction += state.enemy.spd / scale;
     window.UI.updateAction(state.petAction, state.enemyAction);
     if (!freeze.pet && state.petAction >= 100)     { state.petAction = 0;   doTurn('pet'); }
@@ -248,7 +270,14 @@
     const isPet = attacker === 'pet';
     const atkData = isPet ? state.pet : state.enemy;
     const defData = isPet ? state.enemy : state.pet;
+    // 主动技能概率触发：宠物本回合行动时判定（默认 30%），触发后本回合施放技能
+    if (isPet && state.activeSkill && state.skillCooldown <= 0 && !state.skillQueued && Math.random() < (state.activeSkill.triggerChance || 0.30)) {
+      state.skillQueued = true;
+    }
     const skill = isPet && state.skillQueued ? state.activeSkill : null;
+    // 觉醒：Lv60 终形态宠物施放主动技能时伤害 ×(1+awaken.damage)（默认 +20%）
+    const awakenMult = (isPet && skill && window.Pet.getAwakenState)
+      ? ((window.Pet.getAwakenState(state.pet) || {}).damage || 0) : 0;
     if (skill) {
       state.skillQueued = false;
       state.skillCooldown = skill.cooldownTurns;
@@ -262,10 +291,21 @@
     freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs);
     setTimeout(() => {
       const result = calcDamage(atkData, defData);
+      // 血统被动：伤害乘算（骨狼击杀增益 / 毒沼蛙腐蚀易伤）
+      let dmgMult = 1;
+      if (isPet && bloodline) {
+        if (bloodline.type === 'killDamageBuff' && killBuffActive && bloodline.params) {
+          dmgMult *= bloodline.params.damageMult || 1.5;
+          killBuffActive = false;  // 消耗增益
+        }
+        if (bloodline.type === 'corruptionStack' && corruptionStacks > 0 && bloodline.params) {
+          dmgMult *= 1 + (bloodline.params.perStack || 0.05) * corruptionStacks;
+        }
+      }
       const bonus = skill && !result.isMiss
-        ? Math.floor(result.damage * (skill.damageMultiplier - 1)) + Math.floor(defData.maxHp * (skill.maxHpDamageRate || 0))
+        ? Math.floor(result.damage * (skill.damageMultiplier * (1 + awakenMult) - 1)) + Math.floor(defData.maxHp * (skill.maxHpDamageRate || 0))
         : 0;
-      const damage = result.damage + bonus;
+      const damage = Math.floor(result.damage * dmgMult) + bonus;
       defData.hp -= damage;
       if (result.heal > 0) {
         atkData.hp = Math.min(atkData.maxHp, atkData.hp + result.heal);
@@ -275,7 +315,41 @@
       window.UI.animateHit(target, result.isCrit);
       window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal');
       window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
-    }, hitAt);
+
+      // ===== 血统被动触发 =====
+      const bl = bloodline;
+      if (bl && isPet && !result.isMiss) {
+        // 血狐：暴击追加普攻
+        if (bl.type === 'onCritExtraHit' && result.isCrit && bl.params && Math.random() < bl.params.chance) {
+          const extraDmg = Math.max(1, Math.floor((atkData.atk - defData.def) * (bl.params.damageMult || 1)));
+          defData.hp -= extraDmg;
+          window.UI.showDamage('enemy', extraDmg, 'normal');
+        }
+        // 毒沼蛙：腐蚀叠层
+        if (bl.type === 'corruptionStack' && bl.params) {
+          corruptionStacks = Math.min(bl.params.maxStacks || 5, corruptionStacks + 1);
+        }
+        // 尸犬：吸血附加真实伤害
+        if (bl.type === 'lifestealTrueDamage' && result.heal > 0 && bl.params) {
+          const trueDmg = Math.floor(result.heal * (bl.params.ratio || 1));
+          defData.hp -= trueDmg;
+          window.UI.showDamage('enemy', trueDmg, 'normal');
+        }
+      }
+      // 瘟熊：受击反伤（敌人攻击宠物时）
+      if (bl && !isPet && !result.isMiss && bl.type === 'onHitReflect' && bl.params) {
+        const reflectDmg = Math.floor(state.pet.def * (bl.params.defRatio || 0.3));
+        atkData.hp -= reflectDmg;
+        window.UI.showDamage('enemy', reflectDmg, 'normal');
+      }
+      // 幽影兔：闪避反击
+      if (bl && !isPet && result.isMiss && bl.type === 'onDodgeCounter' && bl.params) {
+        const counterDmg = Math.max(1, Math.floor((state.pet.atk - atkData.def) * (bl.params.damageMult || 0.8)));
+        atkData.hp -= counterDmg;
+        window.UI.showDamage('enemy', counterDmg, 'normal');
+      }
+      // 被动造成额外伤害后重新更新血条
+      if (bl) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);    }, hitAt);
     if (isPet && state.skillCooldown > 0 && !skill) {
       state.skillCooldown--;
       window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
@@ -316,6 +390,10 @@
     clearInterval(interval);
     interval = null;
     const win = state.pet.hp > 0;
+    // 血统被动：骨狼击杀增益跨场传递
+    if (win && bloodline && bloodline.type === 'killDamageBuff') {
+      pendingKillBuff = true;
+    }
     // 血量写回「本场」宠物（petRef），避免中途切换出战后把血量写到别的宠物身上
     setCurHp(state.petRef || getActivePet(), state.pet.hp);
     fightCount++;
