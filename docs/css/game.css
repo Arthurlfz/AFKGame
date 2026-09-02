@@ -4,9 +4,12 @@
  * 注：:root 设计变量已迁移至 css/vars.css，此处仅保留组件类样式
  * ============================================================ */
 * { margin:0; padding:0; box-sizing:border-box; }
-/* 全局最小宽度：缩放后空间不足时出横向滚动条，而不是挤压布局 */
-html { min-width:1280px; overflow-x:auto; }
-body { min-width:1280px; overflow-x:auto; }
+/* 全局宽度：页面随视口自适应（不强制 1280px）。
+ * 根因说明：旧写法 min-width:1280px 会让视口不足 1280px 时 body 仍被撑到 1280px 宽，
+ * 右侧露出 body 纯黑背景(--bg-deep)形成左右黑框/黑死区。去掉后 body=视口宽；
+ * 页面本身均为 flex/流式布局会自动收缩，极端窄屏仍由 overflow-x:auto 提供横向滚动兜底。 */
+html { min-width:0; overflow-x:auto; }
+body { min-width:0; overflow-x:auto; }
 body {
   background:var(--bg); color:var(--text);
   font-family:var(--font);
@@ -2368,8 +2371,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   margin-left: 6px;
 }
 .bag-window .pet-hero-panel .exp-bar-wrap {
-  margin: 6px 0 2px;
-  height: 6px;
+  margin: 4px 0 1px;
+  height: 5px;
 }
 .bag-window .pet-hero-panel .exp-text {
   font-size: 0.75rem;
