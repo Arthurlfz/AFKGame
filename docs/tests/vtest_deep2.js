@@ -6,7 +6,7 @@ const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:globa
 ctx.window=ctx;ctx.addEventListener=()=>{};ctx.removeEventListener=()=>{};vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/pet/enemy-data.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/quest.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/pet/enemy-data.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/quest.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
 const A=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('PASS: '+m)};
 const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=async code=>await vm.runInContext(code,ctx);
@@ -45,7 +45,7 @@ console.log('  [salvDiag] '+JSON.stringify(salvDiag));
 A(salvDiag&&(salvDiag.ran===true||salvDiag.ran===false),'分解已执行');
 
 // ===== 3) 地图专属材料 + 进化素材掉落 =====
-const matDiag=await C(`(async()=>{const area={id:"corrupted-forest",name:"枯荣之地"};const e={name:"测试怪",level:1,tier:"common"};let guard=0,gotArea=false,gotEvo=false;while((!gotArea||!gotEvo)&&guard<100){const r=await Drop.rollReward(e,area);if(r&&r.areaMaterial==="枯荣种荚")gotArea=true;if(r&&r.evoMaterials&&r.evoMaterials.length)gotEvo=true;guard++;}return {gotArea,gotEvo,guard,areaNow:Materials.getQuantity("枯荣种荚"),evoNow:Materials.getQuantity("进化素材")}})()`);
+const matDiag=await C(`(async()=>{const area={id:"corrupted-forest",name:"枯荣之地"};const e={name:"测试怪",level:1,tier:"common"};let guard=0,gotArea=false,gotEvo=false;while((!gotArea||!gotEvo)&&guard<100){const r=await Drop.rollReward(e,area);if(r&&r.material==="枯荣种荚")gotArea=true;if(r&&r.material==="进化素材")gotEvo=true;guard++;}return {gotArea,gotEvo,guard,areaNow:Materials.getQuantity("枯荣种荚"),evoNow:Materials.getQuantity("进化素材")}})()`);
 console.log('  [matDiag] '+JSON.stringify(matDiag));
 A(matDiag&&matDiag.gotArea===true,`枯荣之地掉专属材料「枯荣种荚」`+`（${matDiag&&matDiag.areaNow}个）`);
 A(matDiag&&matDiag.gotEvo===true,`掉落进化素材「进化素材」（${matDiag&&matDiag.evoNow}个）`);

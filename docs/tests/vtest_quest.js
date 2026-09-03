@@ -1,4 +1,4 @@
-// 任务系统回归测试（122 条任务 v4：12 新手 + 68 主线 + 12 日常 + 6 成就 + 24 宠物）
+// 任务系统回归测试（120 条任务 v4：10 新手 + 68 主线 + 12 日常 + 6 成就 + 24 宠物）
 // 注：2026-08-30 地图从 6 图扩到 10 图，主线由 24 条（6图×4）扩到 40 条（10图×4）；
 //     2026-08-31 新增宠物专属 24 条（8 宠 × 3 养成链：孵化→带它击杀→它进化），独立 pet 分类
 //     2026-08-31 第二幕 7 图（61-100 级），主线再扩 28 条（m41~m68，17图×4）
@@ -26,41 +26,41 @@ const C = code => vm.runInContext(code, ctx);
 
   /* ---------- 数据完整性 ---------- */
   const total = C('Config.drop.quests.length');
-  A(total === 122, '任务总数 122 条（实际 ' + total + '）');
+  A(total === 120, '任务总数 120 条（实际 ' + total + '）');
   const count = cat => C(`Config.drop.quests.filter(q=>q.category==='${cat}').length`);
-  A(count('tutorial') === 12, '新手成长 12 条');
+  A(count('tutorial') === 10, '新手成长 10 条');
   A(count('main') === 68, '主线 68 条（17 图 × 4）');
   A(count('daily') === 12, '日常 12 条');
   A(count('achieve') === 6, '成就 6 条');
   A(count('pet') === 24, '宠物专属 24 条（8 宠 × 3 养成链）');
   const types = C('JSON.stringify([...new Set(Config.drop.quests.map(q=>q.type))].sort())');
-  A(JSON.parse(types).length === 12, '覆盖 12 种任务类型（实际 ' + JSON.parse(types).length + ' 种）');
+  A(JSON.parse(types).length === 14, '覆盖 14 种任务类型（实际 ' + JSON.parse(types).length + ' 种）');
 
   /* ---------- 新手链前置依赖 ---------- */
-  A(C(`Config.drop.quests.find(q=>q.id==='t1') && !Config.drop.quests.find(q=>q.id==='t1').requires`), '新手第一条 t1 无前置');
-  A(C(`['t2','t3','t11','t12','t4','t5','t6','t7','t8','t9','t10'].every(id=>!!(Config.drop.quests.find(q=>q.id===id)||{}).requires)`), '新手 t2~t12 都配了前置任务');
+  A(C(`Config.drop.quests.find(q=>q.id==='g1') && !Config.drop.quests.find(q=>q.id==='g1').requires`), '新手第一条 g1 无前置');
+  A(C(`['g2','g3','g4','g5','g6','g7','g8','g9','g10'].every(id=>!!(Config.drop.quests.find(q=>q.id===id)||{}).requires)`), '新手 g2~g10 都配了前置任务');
   // 链完整性：有且仅有一个起点，从起点能一路走到底且条数 = 总数（防断链 / 分叉 / 成环）
-  // requires 指向的是「前置」，所以要反向建「后继」索引才能从 t1 一路走到底
+  // requires 指向的是「前置」，所以要反向建「后继」索引才能从 g1 一路走到底
   A(C(`(function(){const T=Config.drop.quests.filter(q=>q.category==='tutorial');
     const roots=T.filter(q=>!q.requires); if(roots.length!==1) return false;
     const next={}; T.forEach(q=>{ if(q.requires) next[q.requires]=q; });
     let cur=roots[0],n=0,seen={};
     while(cur){ if(seen[cur.id]) return false; seen[cur.id]=1; n++; cur=next[cur.id]||null; }
-    return n===T.length})()`), '新手链线性完整：单起点、无断链、无分叉、无环，12 条全串起来');
-  // 进化门槛 Lv10（约需累计 78 场），t4 前必须有足量击杀缓冲，否则引导条会卡在 0/1 干等
-  A(C(`(function(){const t4=Config.drop.quests.find(q=>q.id==='t4');const pre=Config.drop.quests.find(q=>q.id===t4.requires);
-    return !!pre && pre.type==='kill' && pre.need>=60})()`), '进化任务 t4 的前置是足量击杀缓冲（need≥60，保证玩家刷到 Lv10 再接进化）');
+    return n===T.length})`), '新手链线性完整：单起点、无断链、无分叉、无环，10 条全串起来');
+  // 进化门槛 Lv10（g1 升级任务达标 = 宠物到 Lv10），g2（初次蜕变·进化）前必须有升级缓冲，否则引导条会卡在 0/1 干等
+  A(C(`(function(){const g2=Config.drop.quests.find(q=>q.id==='g2');const pre=Config.drop.quests.find(q=>q.id===g2.requires);
+    return !!g2 && g2.type==='evolve' && !!pre && pre.type==='level' && pre.need>=10})`), '进化任务 g2 的前置是升级任务 g1（need≥10，保证玩家刷到 Lv10 再接进化）');
   A(C(`Config.drop.quests.filter(q=>q.category==='tutorial').every(q=>q.guide && q.guide.page)`), '每条新手任务都配了引导跳转目标');
 
   /* ---------- 引导条：取当前该做的那条 ---------- */
   A(C(`window.Quest && typeof Quest.getGuideQuest === 'function'`), 'Quest.getGuideQuest 已导出（引导条用）');
-  A(C(`(Quest.getGuideQuest()||{}).id`) === 't1', '初始引导条指向 t1 初醒');
+  A(C(`(Quest.getGuideQuest()||{}).id`) === 'g1', '初始引导条指向 g1 引路人的馈赠');
 
   /* ---------- 按类型上报 ---------- */
   C(`Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`);
   const after = C(`JSON.stringify(Quest.getQuests().filter(q=>q.type==='kill').map(q=>[q.id,q.progress]))`);
   const killMap = Object.fromEntries(JSON.parse(after));
-  A(killMap['t1'] === 1, '击杀上报：t1 进度 +1');
+  A(!(killMap['g1'] > 0), '击杀上报不影响升级任务 g1（g1 进度=宠物等级）');
   A(killMap['m1'] === 1, '击杀上报：同图主线 m1（枯荣之地）进度 +1');
   A(killMap['m5'] === 0, '限定地图生效：m5（泣腐泥沼）不计入本次击杀');
   A(killMap['a1'] === 1, '成就 a1 累计击败 +1');
@@ -68,39 +68,40 @@ const C = code => vm.runInContext(code, ctx);
   /* ---------- 完成新手任务 → 自动进下一条 ---------- */
   const expBefore0 = C(`Pet.getActivePet().exp`);
   const lvBefore0 = C(`Pet.getActivePet().level`);
-  const r1 = await C(`Quest.completeQuest('t1')`);
-  A(r1 && r1.ok, '提交 t1 成功（' + ((r1.rewards || []).join('、') || '无奖励') + '）');
-  A(r1 && r1.exp > 0, `任务奖励经验为主（t1 给 经验 +${r1.exp || 0}，材料为辅助）`);
-  // 新手档=当前升级所需经验的 100%：Lv1 时给 22 会直接触发升级（升级后经验清零），
-  // 所以判定是「经验累加 或 已升级」，两者都算"经验生效"。
+  // g1 是 level 任务：进度 = 出战宠等级，达标需 Lv10（对应引导经验包的等效等级）
+  C(`(function(){const p=Pet.getActivePet();p.level=10;p.exp=0;return true})()`);
+  const r1 = await C(`Quest.completeQuest('g1')`);
+  A(r1 && r1.ok, '提交 g1 成功（' + ((r1.rewards || []).join('、') || '无奖励') + '）');
+  A(r1 && r1.exp > 0, `任务奖励经验为主（g1 给 经验 +${r1.exp || 0}，材料为辅助）`);
+  // 新手档=固定 300 经验：交 g1 后经验应累加或触发升级，两者都算"经验生效"。
   A(C(`Pet.getActivePet().level`) > lvBefore0 || C(`Pet.getActivePet().exp`) >= expBefore0 + (r1.exp || 0),
     '任务经验已计入当前出战宠物（经验累加或触发升级）');
-  A(C(`(Quest.getGuideQuest()||{}).id`) === 't2', '交完 t1 后引导条自动指向 t2（前置依赖生效）');
-  const r2 = await C(`Quest.completeQuest('t1')`);
+  A(C(`(Quest.getGuideQuest()||{}).id`) === 'g2', '交完 g1 后引导条自动指向 g2（前置依赖生效）');
+  const r2 = await C(`Quest.completeQuest('g1')`);
   A(r2 && r2.error, '一次性任务不能重复交（提示：' + (r2.error || '') + '）');
-  A(C(`Quest.getQuests().find(q=>q.id==='t1').finished`) === true, 't1 标记为已完成');
+  A(C(`Quest.getQuests().find(q=>q.id==='g1').finished`) === true, 'g1 标记为已完成');
 
-  /* ---------- 新手链送装备：t3「披上残甲」的前置必须给一件，否则引导卡死 ----------
-   * 装备只能靠战斗 5% 掉落（drop.js equipmentChance），新手做完前置的 10 场击杀时
-   * 背包很可能还是空的，而 t3 要的正是「穿上 1 件装备」—— 不送就是死循环。 */
-  A(C(`(function(){const t3=Config.drop.quests.find(q=>q.id==='t3');
-    const t2=Config.drop.quests.find(q=>q.id===t3.requires);
-    return !!t3 && t3.type==='equip' && !!t2 && (Number(t2.rewardGear&&t2.rewardGear.count)||Number(t2.rewardGear)||0)>=1})()`),
-    't3（穿装备）的前置任务送至少 1 件装备（不送会卡死引导）');
-  C(`for(let i=0;i<9;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`); // t2 需累计 10 只
+  /* ---------- 新手链送装备：g3「披甲上阵」的前置 g2 必须给一件，否则引导卡死 ----------
+   * 装备只能靠战斗 5% 掉落（drop.js），新手做完 g1（升级）时背包很可能还是空的，
+   * 而 g3 要的正是「穿上 1 件装备」—— g2 不送就是死循环。 */
+  A(C(`(function(){const g3=Config.drop.quests.find(q=>q.id==='g3');
+    const g2=Config.drop.quests.find(q=>q.id===g3.requires);
+    return !!g3 && g3.type==='equip' && !!g2 && (Number(g2.rewardGear&&g2.rewardGear.count)||Number(g2.rewardGear)||0)>=1})`),
+    'g3（穿装备）的前置任务送至少 1 件装备（不送会卡死引导）');
+  C(`Quest.reportType('evolve', 1)`); // g2 进化任务上报 1 次即达标
   const bagBefore = C(`Equipment.getInventory().length`);
-  const rT2 = await C(`Quest.completeQuest('t2')`);
-  A(rT2 && rT2.ok, '提交 t2 成功（' + ((rT2.rewards || []).join('、') || '无奖励') + '）');
+  const rT2 = await C(`Quest.completeQuest('g2')`);
+  A(rT2 && rT2.ok, '提交 g2 成功（' + ((rT2.rewards || []).join('、') || '无奖励') + '）');
   const bagAfter = C(`Equipment.getInventory().length`);
-  A(bagAfter === bagBefore + 1, `交 t2 后背包 +1 件装备（${bagBefore} → ${bagAfter}）`);
+  A(bagAfter === bagBefore + 1, `交 g2 后背包 +1 件装备（${bagBefore} → ${bagAfter}）`);
   const gift = JSON.parse(C(`JSON.stringify(Equipment.getInventory()[0]||{})`));
   A(!!(gift.slot && gift.rarity && gift.rarity.id), `送的是一件完整装备（部位 ${gift.slot} / ${gift.rarity && gift.rarity.label}）`);
   A((rT2.rewards || []).join('').indexOf('装备') >= 0, '奖励列表写明了送的装备（玩家看得见领到什么）');
-  // 送的装备必须能立刻穿上 —— t3 就是靠它完成的
+  // 送的装备必须能立刻穿上 —— g3 就是靠它完成的
   A(C(`(function(){const eq=Equipment.getInventory()[0];return !!Equipment.equipItem(Pet.getActivePet(), eq.id)})()`),
-    '送的装备能直接穿上（t3 有解，引导链不断）');
-  A(C(`(Quest.getQuests().find(q=>q.id==='t3')||{}).progress`) >= 1, '穿装备上报到 t3 进度（引导链能继续走）');
-  A(C(`(Quest.getQuests().find(q=>q.id==='t3')||{}).unlocked`) === true, '交完 t2 后 t3 解锁（前置依赖生效）');
+    '送的装备能直接穿上（g3 有解，引导链不断）');
+  A(C(`(Quest.getQuests().find(q=>q.id==='g3')||{}).progress`) >= 1, '穿装备上报到 g3 进度（引导链能继续走）');
+  A(C(`(Quest.getQuests().find(q=>q.id==='g3')||{}).unlocked`) === true, '交完 g2 后 g3 解锁（前置依赖生效）');
 
   /* ---------- 日常：当天只能交一次 ---------- */
   C(`for(let i=0;i<200;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`);
@@ -139,7 +140,7 @@ const C = code => vm.runInContext(code, ctx);
   const qtCount = () => C(`(document.getElementById('quest-tracker').innerHTML.match(/qt-item/g)||[]).length`);
   const qtHtml = () => C(`document.getElementById('quest-tracker').innerHTML`);
   A(qtCount() === 1, '追踪栏当前 1 条（新手链当前任务）');
-  A(qtHtml().indexOf('初醒') !== -1, '追踪栏显示任务名「初醒」');
+  A(qtHtml().indexOf('引路人的馈赠') !== -1, '追踪栏显示任务名「引路人的馈赠」');
 
   // 钉住两个普通任务
   C(`Quest.toggleTrack('m1'); Quest.toggleTrack('d1'); UI.renderQuestTracker()`);
@@ -180,7 +181,7 @@ const C = code => vm.runInContext(code, ctx);
   A(C(`Quest.getQuests().find(q=>q.id==='m1').accepted`) === false, '放弃后回到未接取状态');
   A(C(`Quest.getTracked().indexOf('m1')`) === -1, '放弃的任务自动从追踪栏撤下');
   // 新手任务不能放弃（只能跳过引导）
-  const abT = C(`Quest.abandonQuest('t1')`);
+  const abT = C(`Quest.abandonQuest('g1')`);
   A(abT && abT.error, '新手任务不能放弃（提示：' + (abT.error || '') + '）');
 
   /* ---------- 提交幂等（经济系统底线）：连点 / 刷新都不能重复领奖 ----------
@@ -212,7 +213,7 @@ const C = code => vm.runInContext(code, ctx);
   A(gained2 === 2, '刷新后也没有多发出材料（实际 +' + gained2 + '）');
 
   /* ---------- 宠物专属任务（2026-08-31：pe 分类，8 宠 × 3 养成链） ---------- */
-  // 固定等级/经验，保证解锁断言可控（前面交 t1 给固定经验 300 会升级）
+  // 固定等级/经验，保证解锁断言可控（前面交 g1 给固定经验 300 会升级）
   C(`(function(){const p=Pet.getActivePet();p.level=1;p.exp=0;return true})()`);
   // 固定经验档位：questExpOf 按分类给固定值，不再按等级比例
   const expTab = C('JSON.stringify({t:Quest.questExpOf({category:"tutorial"}),m:Quest.questExpOf({category:"main"}),d:Quest.questExpOf({category:"daily"}),a:Quest.questExpOf({category:"achieve"}),p:Quest.questExpOf({category:"pet"})})');

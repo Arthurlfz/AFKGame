@@ -55,7 +55,7 @@ vm.runInContext(`
 })();
 `, ctx);
 
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/pet/enemy-data.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/pet/enemy-data.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
 const A=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('PASS: '+m)};
 const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
@@ -126,7 +126,7 @@ A(buyHtml.indexOf('b7c1')<0,'买入记录不泄漏对方 uuid');
 // —— 源码静态项：查询列带新字段 + 主流程确实会同步经验 ——
 const src=fs.readFileSync('../js/core/supabase.js','utf8');
 A(src.indexOf('listing_id,counterparty')>=0,'交易记录查询已带 listing_id / counterparty');
-A(src.indexOf('PET_COLUMNS_LEGACY')>=0,'pets 查询保留缺列降级（PET_COLUMNS_LEGACY）');
+A(src.indexOf('isMissingPetColumn')>=0,'pets 查询保留缺列降级（isMissingPetColumn/missingPetCols）');
 const mainSrc=fs.readFileSync('../js/main.js','utf8');
 A(mainSrc.indexOf('syncPetProgress(pet, true)')>=0,'升级时立即同步经验（main.js 升级分支）');
 A(mainSrc.indexOf('syncPetProgress(pet)')>=0,'未升级走节流同步（main.js 每场结算）');
@@ -135,4 +135,5 @@ const mergeSrc=fs.readFileSync('../js/pet/pet_merge.js','utf8');
 A(mergeSrc.indexOf('patch.exp = 0')>=0,'涅槃重置等级时连经验一起清零同步（否则刷新后 Lv1 配旧经验会连升几十级）');
 
 console.log('\nALL EXP + TRADE-REF TESTS PASSED');
+process.exit(0);
 })();

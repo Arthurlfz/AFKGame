@@ -79,11 +79,11 @@ const S = ms => new Promise(r => setTimeout(r, ms));
 
   A(same.indexOf('属性无变化') >= 0, '与身上完全相同的装备提示「属性无变化」');
 
-  // 百分比词缀：+10% 生命，应按宠物裸生命换算（不是 +10 点）
+  // 百分比词缀：+10% 生命，应按宠物"底座"（core = 基础值+等级系数）换算；成长增量不放大（2026-09-01 口径）
   const pctHpDelta = Number(grab(pctItem, '生命') || 0);
-  const petBaseHp = C('Pet.baseStats(Pet.getPets().find(p=>p.id===globalThis.__p)).hp');
-  const expectHp = Math.round(petBaseHp * 1.1) - petBaseHp;
-  A(pctHpDelta === expectHp, `百分比词缀按裸属性换算：生命 +${pctHpDelta}（期望 +${expectHp} = 裸生命 ${petBaseHp} × 10%，而非固定 +10）`);
+  const coreHp = C(`Pet.statParts(Pet.getPets().find(p=>p.id===globalThis.__p)).core.hp`);
+  const expectHp = Math.round(coreHp * 1.1) - coreHp;
+  A(pctHpDelta === expectHp, `百分比词缀按底座换算：生命 +${pctHpDelta}（期望 +${expectHp} = 底座 ${coreHp} × 10%，成长增量不放大，而非固定 +10）`);
 
   A(tips.every(h => h.indexOf('评分') < 0), '对比里不展示评分（评分只用于排序/清理）');
 

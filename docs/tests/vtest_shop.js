@@ -8,7 +8,7 @@ const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:globa
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-shell.js','../js/ui/ui-login.js','../js/ui/ui-dialog.js','../js/ui/ui-popover.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-bag.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-shop.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-shell.js','../js/ui/ui-login.js','../js/ui/ui-dialog.js','../js/ui/ui-popover.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-bag.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js','../js/ui/ui-shop.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
 let failures=0;const A=(ok,msg)=>{if(ok)console.log('PASS: '+msg);else{console.error('FAIL: '+msg);failures++}};const C=code=>vm.runInContext(code,ctx);const S=ms=>new Promise(r=>setTimeout(r,ms));
 
 // 商品与卡密按 migrate_shop.sql 的初始数据摆一份
@@ -19,6 +19,10 @@ C(`productsTable.push(
   {sku:'mat_limit',title:'限购测试品',kind:'convenience',price_cents:null,price_gems:5,gems:0,bonus_gems:0,payload:{materials:{'重铸石':1}},icon:'🎲',active:true,sort:12,limit_per_user:1}
 )`);
 C(`redeemTable.push({code:'SOUL-TEST-01',sku:'gems_60',max_uses:1,used_count:0,expires_at:null})`);
+
+// 魔石商店当前在 config 里 enabled=false（2026-08-31 用户拍板：正式收款前整条魔石线下线）。
+// 本测试验证的是「商店系统开启时」的充值/卡密/购买行为，故显式开启后断言。
+C('Config.shop.enabled=true');
 
 (async()=>{await S(300);await C('Game.onLogin("shop@test.com","123456")');await S(400);
 // 建一只宠物，否则 onAuthenticated 提前返回，走不到商店数据加载
