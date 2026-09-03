@@ -19,8 +19,24 @@
    * 现在：本地立即加（界面 0ms 生效）+ 入队，后台攒 4 秒合并上报。
    */
   const FLUSH_MS = 4000;
-  let pending = {};      // { 材料名: 待上报数量 }
+  // 云端 add_material 有 60 秒窗口限流（migrate_security_hardening.sql / Config.security），
+  // 触发后不能按 4 秒猛刷重试（会一直撞锁定），退避到窗口结束再试一次。
+  const rateWindowMs = () => {
+    const cfg = (window.Config && window.Config.security && window.Config.security.addMaterial) || {};
+    return ((cfg.windowSec || 60) * 1000);
+  };
+  let lastRateWarnAt = 0;  // 限流提示节流（不刷屏）
+  let pending = {};        // { 材料名: 待上报数量 }
   let flushTimer = null;
+
+  function warnRateLimited() {
+    const now = Date.now();
+    if (now - lastRateWarnAt < 30000) return; // 同一条提示最多 30 秒一次
+    lastRateWarnAt = now;
+    const msg = '材料同步太频繁，已自动降速稍后补传（本地不会丢）';
+    if (window.console && console.warn) console.warn('[材料]', msg);
+    if (window.UI && window.UI.showToast) { try { window.UI.showToast('⏳ 同步降速', msg); } catch (e) { /* 提示失败不挡流程 */ } }
+  }
 
   /* ---------- 获得材料（掉落 / 发奖时调用） ---------- */
   // 本地立即生效；云端走队列（不 await 网络）。
@@ -50,14 +66,21 @@
     if (!names.length) return;
     pending = {};
     const failed = {};
+    let hitRateLimit = false;
     await Promise.all(names.map(async (name) => {
       const r = await cloudGain(name, batch[name]);
-      if (r && r.error) failed[name] = batch[name];
+      if (r && r.error) {
+        failed[name] = batch[name];
+        if (r.rateLimited) hitRateLimit = true; // 服务端限流：放慢重试节奏，别继续撞锁
+      }
     }));
     const failedNames = Object.keys(failed);
     if (!failedNames.length) return;
     for (const n of failedNames) pending[n] = (pending[n] || 0) + failed[n];
-    if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushMaterials(); }, FLUSH_MS);
+    // 失败必须重试（本地已加、云端还没记，不补上去刷新就丢这批收益）；限流时退避到窗口结束
+    const delay = hitRateLimit ? rateWindowMs() : FLUSH_MS;
+    if (hitRateLimit) warnRateLimited();
+    if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushMaterials(); }, delay);
   }
 
   /* ---------- 消耗材料（融合等用途调用） ---------- */
@@ -100,7 +123,11 @@
     const user = await Supabase.getCurrentUser();
     if (!user) return { ok: true, cloud: false }; // 未登录：本地累计即可
     const { error } = await Supabase.getClient().rpc('add_material', { p_name: name, p_amount: amount });
-    if (error) return { ok: true, cloud: false, error };
+    if (error) {
+      // 本地已加过（gainLocal），云没记上；带 rateLimited 标记让 flush 退避重试而不是静默丢
+      const msg = String((error && (error.message || error.details)) || error || '');
+      return { ok: true, cloud: false, error, rateLimited: msg.indexOf('ERR_RATE_LIMIT') >= 0 };
+    }
     return { ok: true, cloud: true };
   }
   // 仅云端扣减（RPC spend_material；本地已由 spendLocal 扣过）

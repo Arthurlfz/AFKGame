@@ -807,7 +807,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260903y"></script>
+<script src="js/core/config.js?v=20260903sec"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -832,14 +832,14 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=2982c4f5"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=302bb613"></script>
-<script src="js/core/supabase.js?v=4d4133e3"></script>
+<script src="js/core/supabase.js?v=20260903sec"></script>
 <script src="js/equipment/equipment.js?v=8f507a6a"></script>
     <script src="js/pet/pet.js?v=591129e0"></script>
 <script src="js/core/items.js?v=32a26709"></script>
-<script src="js/core/materials.js?v=f128da1a"></script>
+<script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=1b5e2f35"></script>
 <script src="js/core/market.js?v=3d044442"></script>
-<script src="js/core/market_bot.js?v=8361b933"></script>
+<script src="js/core/market_bot.js?v=20260903sec"></script>
 <script src="js/equipment/equipment_craft.js?v=785fd82c"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260903x"></script>
@@ -872,7 +872,7 @@ window.PetSprites = {
 <script src="js/ui/ui-codex.js?v=94ab55e8"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
 <script src="js/ui/ui-dev.js?v=20260903u"></script>
-<script src="js/main.js?v=20260903t"></script>
+<script src="js/main.js?v=20260903sec"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->
 <div class="bag-tooltip equip-tip" id="bag-tooltip"></div>

@@ -875,6 +875,32 @@ window.Config = {
     }
   },
 
+  /* ================= 云端安全护栏（2026-09-03 收口） =================
+   * 仅作前端提示/节流的参照值；真正的强制逻辑在服务端 RPC 内
+   * （supabase/migrate_security_hardening.sql，改 SQL 必须同步改这里）：
+   *  - add_material：60 秒窗口内总量上限，超限锁 5 分钟（防脚本无限刷材料）
+   *  - bot_buy：身份/封禁/新号(<10分钟)/每日上限 四道守卫（防小号刷材料）
+   *  - 业务 RPC 一律只授权 authenticated（anon 全收回）
+   *  - 假买家 MarketBot 只买「别人」的挂单（不买自己，杜绝自挂自买刷材料） */
+  security: {
+    addMaterial: {
+      windowSec: 60,            // 统计窗口（秒）
+      maxPerWindow: 1000,       // 窗口内允许上报的材料总量
+      maxPerCall: 5000,         // 单次上报上限（防止单发灌爆）
+      lockSec: 300              // 超限后锁定秒数
+    },
+    botBuy: {
+      minAccountAgeSec: 600,    // 新号保护：创建不足该时长禁止召唤流浪商人
+      dailyCap: 30,             // 每账号每天 bot_buy 次数上限
+      pauseSec: {               // 前端收到对应错误码后暂停自动收购的秒数
+        ERR_BOT_BUY_ANON: 300,
+        ERR_BOT_BUY_BANNED: 6 * 3600,
+        ERR_BOT_BUY_TOO_NEW: 600,
+        ERR_BOT_BUY_DAILY_CAP: 6 * 3600
+      }
+    }
+  },
+
   /* ================= 合成（出全新变异宠） =================
    * 两只宠物 → 概率合成出一只全新的「·异变」稀有宠（复用变异宠规则）。
    *  - 变异成功：出一只名字带「·异变」的全新宠，成长 = 主×mainW + 副×subW + 随机加成

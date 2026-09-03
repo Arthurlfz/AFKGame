@@ -398,10 +398,26 @@
     return true;
   }
 
+  // 封禁拦截（profiles.banned，见 migrate_security_hardening.sql）：封禁号不启动游戏运行时，
+  // 登出并留在登录页。返回 true = 已拦截，调用方应立即 return。
+  async function blockBannedAccount() {
+    const profile = (Supabase.getMyProfile && Supabase.getMyProfile()) || null;
+    if (!profile || !profile.banned) return false;
+    const reason = profile.ban_reason ? `（${profile.ban_reason}）` : '';
+    addLog(`⛔ 账号已被封禁${reason}，如有疑问请联系管理员`);
+    setAuthUser(null);
+    await Supabase.signOut().catch(() => {});
+    await clearAccountState();
+    if (UI.onAuthChange) UI.onAuthChange(false);
+    return true;
+  }
+
   // 登录/注册成功后的统一收尾
   async function onAuthenticated() {
-    // 昵称：登录/注册成功后拉一次存内存（后面聊天显示全部读缓存，不再打接口）
+    // 昵称+封禁态：登录/注册成功后拉一次存内存（后面聊天显示全部读缓存，不再打接口）
     if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 昵称失败不挡进游戏 */ } }
+    // 封禁号在恢复云端数据前就拦下（不读数据、不启动运行时）
+    if (await blockBannedAccount()) return;
     // 落地注册时填的昵称：开了邮箱验证的号，注册后没 session 写不进库，登录成功后再补
     if (Supabase.setMyNickname) {
       try {
@@ -569,7 +585,9 @@
         if (UI.onAuthChange) UI.onAuthChange(false);
         return;
       }
-      // 已有会话（刷新/自动恢复）：走正常恢复并启动运行时
+      // 已有会话（刷新/自动恢复）：先拉档案确认没被封禁，再走正常恢复并启动运行时
+      if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 忽略 */ } }
+      if (await blockBannedAccount()) return;
       const ready = await restoreAllCloudData();
       if (!ready) return;     // 新号需先选宠，选完在 showStarterPicker 里启动运行时
       startGameRuntime();

@@ -34,6 +34,43 @@
   let buyTimer = null;
   let botUid = 0;
 
+  /* ---------- 云端 bot_buy 守卫错误 → 前端暂停自动收购（见 migrate_security_hardening.sql / Config.security.botBuy）
+   * 服务端会拒：未登录(ERR_BOT_BUY_ANON) / 封禁(ERR_BOT_BUY_BANNED) / 新号不满10分钟(ERR_BOT_BUY_TOO_NEW) /
+   * 每日上限(ERR_BOT_BUY_DAILY_CAP)。收到错误码后按冷却暂停，不再反复撞守卫。 */
+  const GUARD_PAUSE_MS = {
+    ERR_BOT_BUY_ANON: 5 * 60 * 1000,
+    ERR_BOT_BUY_TOO_NEW: 10 * 60 * 1000,
+    ERR_BOT_BUY_DAILY_CAP: 6 * 60 * 60 * 1000,
+    ERR_BOT_BUY_BANNED: 6 * 60 * 60 * 1000
+  };
+  const GUARD_PAUSE_TEXT = {
+    ERR_BOT_BUY_ANON: '请先登录后再召唤流浪商人',
+    ERR_BOT_BUY_BANNED: '账号已被封禁，无法召唤流浪商人',
+    ERR_BOT_BUY_TOO_NEW: '账号创建未满10分钟，暂时无法召唤流浪商人',
+    ERR_BOT_BUY_DAILY_CAP: '今日召唤流浪商人次数已达上限'
+  };
+  let buyPausedUntil = 0; // 时间戳：> now 时暂停自动收购（守卫错误后的冷却，stop/start 可重置）
+
+  // 从 RPC 错误消息里识别守卫错误码
+  function guardKeyOf(message) {
+    const msg = String(message || '');
+    for (const code of Object.keys(GUARD_PAUSE_MS)) {
+      if (msg.indexOf(code) >= 0) return code;
+    }
+    return null;
+  }
+  // 记录暂停冷却并给一条系统提示（带节流，避免每次 5 分钟轮询都刷一条）
+  function pauseBuyer(code, message) {
+    buyPausedUntil = Date.now() + (GUARD_PAUSE_MS[code] || 60 * 1000);
+    const text = GUARD_PAUSE_TEXT[code] || code;
+    const hint = '[市场] 自动收购暂停：' + text + (message ? '（' + message + '）' : '');
+    if (window.console && console.warn) console.warn(hint);
+    if (window.UI && window.UI.consoleLog) {
+      try { window.UI.consoleLog('system', '⚠️ ' + text + '，流浪商人暂停收购'); } catch (e) { /* 提示失败不挡流程 */ }
+    }
+    return { paused: true, until: buyPausedUntil };
+  }
+
   /* ============================================================
    * A. AI 玩家 persona 生成（20 个）
    * ============================================================ */
@@ -330,7 +367,11 @@
   // 执行一次 persona 购买：随机出手一个 AI，按流派口味 + 合理价挑目标，买入后 80% 离场 / 20% 降价再挂
   async function tryBuyOnce() {
     if (!MB.enabled || B.enabled === false) return { bought: false };
-    const realItems = Market.getRealItemListings ? Market.getRealItemListings() : [];
+    const user = await Supabase.getCurrentUser();
+    if (!user) return { bought: false };
+    // 防刷材料洞：AI 只买「别人」的挂单——自己的单永远轮不到（云端 bot_buy 对自挂同样返回 self/拒收）
+    const realItems = (Market.getRealItemListings ? Market.getRealItemListings() : [])
+      .filter(l => !(l.seller_id && String(l.seller_id) === String(user.id)));
     if (!realItems.length) return { bought: false };
     const ps = randomPersona();
     if (!ps) return { bought: false };
@@ -352,11 +393,14 @@
         : pickBuyTarget(cheap, ps);
     }
     if (!target) return { bought: false };
-    if (!target) return { bought: false };
     const res = await Market.buyAsBotAny(target);
-    if (!res.ok) return { bought: false, error: res.error };
+    if (!res.ok) {
+      // 云端守卫错误（未登录/封禁/新号/日限）：按错误码暂停自动收购，别死循环撞守卫
+      const code = guardKeyOf(res.error);
+      if (code) pauseBuyer(code, String(res.error));
+      return { bought: false, error: res.error };
+    }
     await Market.refresh();
-    const user = await Supabase.getCurrentUser();
     if (user) {
       const { data } = await Materials.loadCloudMaterials();
       if (data) Materials.setCloudMaterials(data);
@@ -388,11 +432,14 @@
   function scheduleNextBuy() {
     if (buyTimer || !MB.enabled || B.enabled === false) return;
     const min = B.intervalMin || 40000, max = B.intervalMax || 90000;
+    // 守卫冷却中：等到暂停点再试（+5 秒余量），避免每次轮询都撞一次云守卫
+    const pausedLeft = buyPausedUntil - Date.now();
+    const delay = pausedLeft > 0 ? pausedLeft + 5000 : randInt(min, max);
     buyTimer = setTimeout(async () => {
       buyTimer = null;
       await tryBuyOnce();
       scheduleNextBuy();
-    }, randInt(min, max));
+    }, delay);
   }
 
   /* ---------- 启停（main.js 初始化后调用） ---------- */
@@ -414,9 +461,14 @@
     getBotListings: () => (window.Market && window.Market.getBotListings ? window.Market.getBotListings() : []),
     getPersonas: () => personas,
     tryBuyOnce, pickBuyTarget, pickBuyCandidate,
+    guardKeyOf, pauseBuyer,
+    isBuyPaused: () => buyPausedUntil > Date.now(),
     __test: {
       rollPrice, aiDrop, makeListing, pickArea, makeMaterialListing, makeEggListing,
-      generatePersonas, gearAffinity, nextPersona, randomPersona, getPersonas: () => personas
+      generatePersonas, gearAffinity, nextPersona, randomPersona, getPersonas: () => personas,
+      guardKeyOf, pauseBuyer,
+      resetBuyPause: () => { buyPausedUntil = 0; },
+      isBuyPaused: () => buyPausedUntil > Date.now()
     }
   };
 })();

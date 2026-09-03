@@ -494,10 +494,11 @@
       .order('created_at', { ascending: false })
       .limit(Math.min(limit, 100));
   }
-  /* ---------- 玩家资料 / 昵称（profiles 表） ----------
+  /* ---------- 玩家资料 / 昵称 / 封禁（profiles 表） ----------
    * 昵称只在登录时拉一次存内存：auth.getUser() 实测 550ms，绝不能放在发言这种高频路径上。
-   * 显示优先级：profiles.nickname > 邮箱前缀（老代码兜底）> '玩家'。 */
-  let profileCache = null; // { id, nickname }
+   * 显示优先级：profiles.nickname > 邮箱前缀（老代码兜底）> '玩家'。
+   * 封禁字段（banned / ban_reason）顺带读进缓存：main.js 登录后在进游戏前拦截（见 migrate_security_hardening.sql）。 */
+  let profileCache = null; // { id, nickname, banned?, ban_reason? }
 
   function randomNickname() {
     const n = (window.Config && window.Config.auth && window.Config.auth.nickname) || {};
@@ -507,17 +508,17 @@
       String(Math.floor(1000 + Math.random() * 9000));
   }
 
-  // 读自己的昵称；没有资料就自动建一个（老账号 / 邮箱验证后首次登录 / 注册时没填）
+  // 读自己的昵称与封禁态；没有资料就自动建一个（老账号 / 邮箱验证后首次登录 / 注册时没填）
   async function loadMyProfile() {
     const user = await getCurrentUser();
     if (!user) { profileCache = null; return null; }
-    const { data, error } = await client.from('profiles').select('id,nickname').eq('id', user.id).maybeSingle();
+    const { data, error } = await client.from('profiles').select('id,nickname,banned,ban_reason').eq('id', user.id).maybeSingle();
     if (!error && data && data.nickname) { profileCache = data; return profileCache; }
     const nick = randomNickname();
     const { data: made, error: e2 } = await client.from('profiles')
       .upsert({ id: user.id, nickname: nick }, { onConflict: 'id' })
-      .select('id,nickname').maybeSingle();
-    profileCache = (!e2 && made) ? made : { id: user.id, nickname: nick };
+      .select('id,nickname,banned,ban_reason').maybeSingle();
+    profileCache = (!e2 && made) ? made : { id: user.id, nickname: nick, banned: false, ban_reason: null };
     return profileCache;
   }
 
@@ -541,6 +542,11 @@
     return (profileCache && profileCache.nickname) || null;
   }
 
+  // 同步读缓存档案（含封禁态）；未 loadMyProfile 过返回 null（main.js 登录拦截用）
+  function getMyProfile() {
+    return profileCache;
+  }
+
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
@@ -553,6 +559,6 @@
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     fetchQuestProgress, saveQuestProgress,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
-    loadMyProfile, setMyNickname
+    loadMyProfile, setMyNickname, getMyProfile
   };
 })();
