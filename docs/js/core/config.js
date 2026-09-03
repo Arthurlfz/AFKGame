@@ -449,7 +449,7 @@ window.Config = {
       { id: 't5', category: 'tutorial', type: 'craft', need: 1, requires: 't4', name: '初次淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页打造 1 件装备', target: '.sb-btn[data-page="equip"]', reward: { 神圣石: 1 } },
       { id: 't6', category: 'tutorial', type: 'salvage', need: 1, requires: 't5', name: '拆解废品', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点击 <b>一键分解</b> 分解废品', target: '#btn-salvage', reward: { 增缀石: 1 } },
       { id: 't7', category: 'tutorial', type: 'hatch', need: 1, requires: 't6', name: '新的生命', guide: { page: 'pet', tab: 'profile', btn: '去孵化' }, isGuide: true, hint: '在宠物资料页 <b>资料</b> 栏打开孵化面板，孵化 1 颗蛋', target: '#egg-panel', reward: { 宠物蛋: 1 } },
-      { id: 't8', category: 'tutorial', type: 'list', need: 1, requires: 't7', name: '第一次交易', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备', target: '.sb-btn[data-page="market-sell"]', reward: { 合成之石: 1 } },
+      { id: 't8', category: 'tutorial', type: 'list', need: 1, requires: 't7', name: '第一次交易', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备', target: '.sb-btn[data-page="market"]', reward: { 合成之石: 1 } },
       { id: 't9', category: 'tutorial', type: 'synth', need: 1, requires: 't8', name: '初次融合', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物资料页打开 <b>合成</b> 栏，完成一次合成', target: '.pet-tab[data-pet-tab="synth"]', reward: { 精粹进化素材: 1 } },
       { id: 't10', category: 'tutorial', type: 'nirvana', need: 1, requires: 't9', name: '脱胎换骨', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, isGuide: true, hint: '在宠物资料页打开 <b>涅槃</b> 栏，完成一次涅槃', target: '.pet-tab[data-pet-tab="merge"]', reward: { 涅磐兽: 1, 合成之石: 1 } },
 
@@ -906,8 +906,11 @@ window.Config = {
    *    没有合规收款渠道之前，魔石一律由管理员用 grant_gems 发放，界面不得出现任何引导转账的内容。
    * ⚠️ 价格与商品以数据库 products 表为准（服务端定价，前端改不动）；
    *    改价格去 supabase/migrate_shop.sql 的 products 初始数据（price_cents ÷ 10 = gems）。
-   * 依赖：先跑 migrate_shop.sql，否则钱包/商品接口会报「表不存在」，界面给出提示而不是崩。 */
+   * 依赖：先跑 migrate_shop.sql，否则钱包/商品接口会报「表不存在」，界面给出提示而不是崩。
+   * ⚠️ enabled：魔石系统总开关。false = 顶栏余额、侧边栏「魔石商店」入口、商店页全部隐藏，
+   *    且不再请求钱包/商品/订单接口。正式上线（支付 SDK + 资质齐了）改回 true 即可，其余代码不用动。 */
   shop: {
+    enabled: false,
     currency: '魔石',
     rmbPerGem: 0.1,            // 1 元 = 10 魔石（仅用于界面换算展示）
     selfTestNote: '自测阶段：魔石由管理员直接发放（grant_gems），不开放任何收款渠道。正式收款需接入官方支付 SDK，并具备企业主体与版号等资质。',

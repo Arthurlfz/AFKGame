@@ -13,6 +13,7 @@
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=bbafbacc">
 <link rel="stylesheet" href="css/market-refresh.css?v=d3732457">
+<link rel="stylesheet" href="css/market-cascade.css?v=20260903c">
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
 </head>
@@ -63,8 +64,7 @@
       <button class="sb-btn" data-page="worldmap"><span class="sb-icon">🗺️</span><span class="sb-label">世界地图</span></button>
       <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
       <button class="sb-btn" data-page="equip"><span class="sb-icon">🛠️</span><span class="sb-label">装备打造</span></button>
-      <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">交易市场</span></button>
-      <button class="sb-btn" data-page="market-sell"><span class="sb-icon">📦</span><span class="sb-label">我的上架</span></button>
+      <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">市集</span></button>
       <button class="sb-btn" data-page="shop"><span class="sb-icon">🪙</span><span class="sb-label">魔石商店</span></button>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon">💬</span><span class="sb-label">聊天</span></button>
       <button class="sb-btn" data-page="codex"><span class="sb-icon">📖</span><span class="sb-label">百科</span></button>
@@ -442,73 +442,70 @@
       </div>
     </section>
 
-      <!-- ============ 市场页（交易市场）：在售 + 上架 + 购买 + 交易记录 ============ -->
+      <!-- ============ 市集页（交易市场 + 我的上架 合并：顶部级联筛选 + 视图切换） ============ -->
       <section class="tab-page" id="tab-market">
         <div class="guide-bar" style="margin:0 0 10px">💰 <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
         <div class="market-page">
-          <aside class="market-filters" id="market-filters">
-            <div class="market-searchbar">
-              <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 属性" />
-              <div class="market-quick-types">
-                <button class="btn-mini primary" data-kind-quick="all">全部</button>
-                <button class="btn-mini" data-kind-quick="pet">宠物</button>
-                <button class="btn-mini" data-kind-quick="item">装备</button>
-                <button class="btn-mini" data-kind-quick="material">材料</button>
+          <!-- 顶部级联筛选条 -->
+          <aside class="market-filters cascade-filters" id="market-filters">
+            <div class="cf-toprow">
+              <div class="cf-search">
+                <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 属性" aria-label="搜索商品名或词缀" />
               </div>
-              <select id="market-sort" class="market-sort">
-                <option value="latest">最新上架优先</option>
-                <option value="price-asc">价格从低到高</option>
-                <option value="price-desc">价格从高到低</option>
-              </select>
+              <div class="cf-path-wrap">
+                <div class="cf-path-title">当前筛选路径</div>
+                <div class="cf-path" id="cfPath"></div>
+              </div>
+              <button type="button" class="cf-reset" id="cfReset">清空全部筛选</button>
             </div>
-            <div class="filter-group is-open" data-group="type"><button class="filter-head" data-toggle-group="type"><span class="arrow">▾</span><span>类型筛选</span></button><div class="filter-body"></div></div>
-            <div class="filter-group is-open" data-group="slot"><button class="filter-head" data-toggle-group="slot"><span class="arrow">▾</span><span>装备部位</span></button><div class="filter-body"></div></div>
-            <div class="filter-group is-open" data-group="rarity"><button class="filter-head" data-toggle-group="rarity"><span class="arrow">▾</span><span>稀有度</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="tier"><button class="filter-head" data-toggle-group="tier"><span class="arrow">▸</span><span>底材T阶</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="baseTier"><button class="filter-head" data-toggle-group="baseTier"><span class="arrow">▸</span><span>词缀T阶</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="affix"><button class="filter-head" data-toggle-group="affix"><span class="arrow">▸</span><span>词缀筛选</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="growth"><button class="filter-head" data-toggle-group="growth"><span class="arrow">▸</span><span>宠物成长值</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="trait"><button class="filter-head" data-toggle-group="trait"><span class="arrow">▸</span><span>宠物特质</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="price"><button class="filter-head" data-toggle-group="price"><span class="arrow">▸</span><span>价格范围</span></button><div class="filter-body"></div></div>
-            <div class="filter-group" data-group="attr"><button class="filter-head" data-toggle-group="attr"><span class="arrow">▸</span><span>属性筛选</span></button><div class="filter-body"></div></div>
+            <div class="cf-steps" id="cfSteps"></div>
+            <div class="cf-hint">级联规则：选择类型后，下级筛选逐级展开（宠物 → 特质 / 成长；装备 → 部位 → 稀有度 → T阶 → 词缀）。更改上级会自动重置下级。</div>
           </aside>
+          <!-- 结果区 -->
           <section class="market-results">
-            <div class="panel"><div class="panel-title">交易市场<span class="hint">宠物 + 装备 · 材料标价</span></div><div id="market-list"></div></div>
+            <div class="panel">
+              <div class="rp-head">
+                <span class="rp-title">市集</span>
+                <div class="view-toggle" id="viewToggle" role="tablist" aria-label="市集视图切换">
+                  <button type="button" class="vt active" role="tab" aria-selected="true" data-view="all">全部在售</button>
+                  <button type="button" class="vt" role="tab" aria-selected="false" data-view="mine">我的上架</button>
+                </div>
+                <span class="rp-count" id="rpCount"></span>
+              </div>
+              <div id="market-list"></div>
+            </div>
           </section>
-        </div>
-      </section>
-
-      <!-- ============ 我的上架（独立页：上架 / 取回 + 税收 + 买卖记录） ============ -->
-      <section class="tab-page" id="tab-market-sell">
-        <div class="market-page">
-          <aside class="market-filters">
-            <div class="panel market-materials">
-              <div class="panel-title">材料<span class="hint">交易货币</span></div>
-              <div class="materials-row">
-                <span class="mat-chip stone">🎲 重铸石 <b id="reforge-num">0</b></span>
-                <span class="mat-chip stone strip">✂️ 剥离石 <b id="strip-num">0</b></span>
-                <span class="mat-chip material holy">🔮 神圣石 <b id="holy-num">0</b></span>
-                <span class="mat-chip material augment">➕ 增缀石 <b id="augment-num">0</b></span>
-                <span class="mat-chip material">🐉 涅磐兽 <b id="phoenix-num">0</b></span>
+          <!-- 交易信息（材料 / 税收 / 交易记录）：可折叠 -->
+          <div class="panel market-info" id="market-info">
+            <div class="panel-title market-info-head" id="infoToggle">📦 交易信息<span class="hint">材料 / 税收 / 交易记录</span><span class="info-arrow" id="infoArrow">▸</span></div>
+            <div class="market-info-body" id="infoBody">
+              <div class="info-inner">
+                <div class="panel">
+                  <div class="panel-title">材料<span class="hint">交易货币</span></div>
+                  <div class="materials-row">
+                    <span class="mat-chip stone">🎲 重铸石 <b id="reforge-num">0</b></span>
+                    <span class="mat-chip stone strip">✂️ 剥离石 <b id="strip-num">0</b></span>
+                    <span class="mat-chip material holy">🔮 神圣石 <b id="holy-num">0</b></span>
+                    <span class="mat-chip material augment">➕ 增缀石 <b id="augment-num">0</b></span>
+                    <span class="mat-chip material">🐉 涅磐兽 <b id="phoenix-num">0</b></span>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panel-title">税收规则<span class="hint">卖家承担</span></div>
+                  <div class="hint" style="line-height:1.7">每满 <b>8</b> 个材料收 <b>1</b> 个税（不满不收）<br>买家按标价支付，卖家实收 = 标价 − 税</div>
+                </div>
+                <div class="panel">
+                  <div class="panel-title">交易记录<span class="hint">自动记录每笔成交</span></div>
+                  <div class="tr-summary"><span class="tr-stat">累计卖出 <b id="tr-sell-count">0</b> 笔</span><span class="tr-stat">累计买入 <b id="tr-buy-count">0</b> 笔</span></div>
+                  <div class="tr-summary-mats" id="tr-summary-mats"></div>
+                  <div class="market-sub-title">卖出记录</div>
+                  <div id="tr-sell-list"></div>
+                  <div class="market-sub-title">买入记录</div>
+                  <div id="tr-buy-list"></div>
+                </div>
               </div>
             </div>
-            <div class="panel">
-              <div class="panel-title">税收规则<span class="hint">卖家承担</span></div>
-              <div class="hint" style="line-height:1.7">每满 <b>8</b> 个材料收 <b>1</b> 个税（不满不收）<br>买家按标价支付，卖家实收 = 标价 − 税</div>
-            </div>
-            <div class="panel">
-              <div class="panel-title">交易记录<span class="hint">自动记录每笔成交</span></div>
-              <div class="tr-summary"><span class="tr-stat">累计卖出 <b id="tr-sell-count">0</b> 笔</span><span class="tr-stat">累计买入 <b id="tr-buy-count">0</b> 笔</span></div>
-              <div class="tr-summary-mats" id="tr-summary-mats"></div>
-              <div class="market-sub-title">卖出记录</div>
-              <div id="tr-sell-list"></div>
-              <div class="market-sub-title">买入记录</div>
-              <div id="tr-buy-list"></div>
-            </div>
-          </aside>
-          <section class="market-results">
-            <div class="panel"><div class="panel-title">📦 我的上架<span class="hint">挂单 / 取回</span></div><div id="market-sell"></div></div>
-          </section>
+          </div>
         </div>
       </section>
 
@@ -776,7 +773,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=f9a97702"></script>
+<script src="js/core/config.js?v=20260903g"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -817,7 +814,7 @@ window.PetSprites = {
 <script src="js/core/battle.js?v=11832020"></script>
 <script src="js/ui/ui-common.js?v=feaff803"></script>
 <script src="js/ui/ui-console.js?v=05a0aa58"></script>
-<script src="js/ui/ui-shell.js?v=d0138c82"></script>
+<script src="js/ui/ui-shell.js?v=20260903c"></script>
 <script src="js/ui/ui-worldmap.js?v=c02315e7"></script>
 <script src="js/ui/ui-capital.js?v=0a5ac952"></script>
 
@@ -831,13 +828,13 @@ window.PetSprites = {
 <script src="js/ui/ui-pet-merge.js?v=9249467a"></script>
 <script src="js/ui/ui-pet-synth.js?v=265fbed1"></script>
 <script src="js/ui/ui-bag.js?v=4686459b"></script>
-<script src="js/ui/ui-equipment.js?v=0fdab0fa"></script>
+<script src="js/ui/ui-equipment.js?v=20260903f"></script>
 <script src="js/ui/ui-craft.js?v=9983d4b9"></script>
-<script src="js/ui/ui-market.js?v=80792912"></script>
+<script src="js/ui/ui-market.js?v=20260903c"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
-<script src="js/ui/ui-market-sell.js?v=b864dea2"></script>
+<script src="js/ui/ui-market-sell.js?v=20260903c"></script>
 <script src="js/ui/ui-codex.js?v=94ab55e8"></script>
-<script src="js/ui/ui-shop.js?v=b17cd898"></script>
+<script src="js/ui/ui-shop.js?v=20260903g"></script>
 <script src="js/ui/ui-dev.js?v=fa4999e0"></script>
 <script src="js/main.js?v=2c7264fd"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->

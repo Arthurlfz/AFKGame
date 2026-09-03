@@ -1,0 +1,174 @@
+/* ============================================================
+ * market-cascade.css - 市集页「级联筛选 + 上下结构 + 视图合并」样式
+ * 覆盖 app.css / market-refresh.css 的左右分栏，改为顶部筛选条 + 下方结果
+ * 在 market-refresh.css 之后引入；独立文件便于回滚
+ * ============================================================ */
+
+/* ---------- 布局：市集页改为上下结构 ---------- */
+.market-page{
+  display:flex;flex-direction:column;gap:14px;align-items:stretch;
+}
+
+/* ---------- 顶部级联筛选条 ---------- */
+.market-filters{
+  position:static;width:100%;
+  display:flex;flex-direction:column;gap:10px;
+  padding:12px 14px;
+  background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;
+}
+
+/* 顶行：搜索 + 当前路径 + 清空 */
+.cf-toprow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.cf-search{flex:0 0 236px;min-width:180px;}
+.cf-search .market-search{width:100%;}
+.cf-path-wrap{flex:1 1 220px;min-width:180px;}
+.cf-path-title{font-size:.72rem;letter-spacing:.12em;color:var(--text-faint);margin:0 2px 4px;}
+.cf-path{display:flex;flex-wrap:wrap;gap:5px;min-height:4px;}
+.cf-path-empty{color:var(--text-faint);font-size:.75rem;padding:1px 2px;}
+.cf-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;font-size:.75rem;border-radius:6px;cursor:pointer;
+  color:#d7a64a;background:rgba(215,166,74,.13);
+  border:1px solid rgba(215,166,74,.4);transition:background .15s ease,border-color .15s ease;
+  font-family:inherit;
+}
+.cf-chip:hover{background:rgba(215,166,74,.24);border-color:#d7a64a;}
+.cf-chip .cf-chip-x{font-size:.68rem;opacity:.8;}
+.cf-reset{
+  flex:none;margin-left:auto;padding:7px 14px;font-size:.82rem;border-radius:8px;
+  color:var(--text-dim);background:transparent;border:1px solid var(--line);cursor:pointer;
+  transition:color .15s ease,border-color .15s ease,background .15s ease;font-family:inherit;
+}
+.cf-reset:hover{color:var(--danger-hi);border-color:var(--danger);background:rgba(150,61,61,.08);}
+
+/* 级联步骤：横向排列的漏斗，每级一列 */
+.cf-steps{
+  display:flex;flex-wrap:wrap;gap:12px 0;
+  border-top:1px solid var(--line);padding-top:12px;
+}
+.cf-step{
+  display:flex;flex-direction:column;gap:7px;
+  flex:0 1 auto;min-width:158px;max-width:100%;
+  padding:1px 14px 4px;
+  border-left:1px solid var(--line);
+}
+.cf-step:first-child{border-left:0;padding-left:2px;}
+.cf-step[data-step="kind"]{min-width:200px;}
+.cf-step[data-step="sort"]{min-width:190px;}
+.cf-step[data-step="affix"]{min-width:280px;max-width:340px;}
+
+/* 每级头部：节点 + 名称 + 当前值 + 清除 */
+.cf-head{display:flex;align-items:center;gap:6px;min-height:22px;}
+.cf-node{
+  width:9px;height:9px;border-radius:50%;flex:none;
+  background:var(--bg);border:1px solid var(--line);
+  transition:background .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.cf-node.is-set{background:#d7a64a;border-color:#d7a64a;box-shadow:0 0 7px rgba(215,166,74,.5);}
+.cf-label-name{font-weight:700;letter-spacing:1px;font-size:.85rem;color:var(--text);white-space:nowrap;}
+.cf-label-val{font-size:.75rem;color:#d7a64a;white-space:nowrap;min-height:1em;}
+.cf-label-val.is-empty{color:var(--text-faint);}
+.cf-clear{
+  margin-left:auto;border:0;background:none;color:var(--text-faint);
+  font-size:.75rem;cursor:pointer;padding:1px 4px;border-radius:4px;line-height:1;
+}
+.cf-clear:hover{color:var(--danger-hi);background:rgba(150,61,61,.14);}
+
+/* 选项按钮组 */
+.cf-opts{display:flex;flex-wrap:wrap;gap:6px;}
+.cf-opt{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:1 1 60px;max-width:100%;
+  padding:5px 7px;font-size:.78rem;border-radius:7px;cursor:pointer;
+  color:var(--text);background:var(--bg);border:1px solid var(--line);
+  font-family:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:border-color .15s ease,color .15s ease,background .15s ease,transform .12s ease;
+}
+.cf-opt:hover:not(.active){border-color:#d7a64a;color:var(--text-hi);}
+.cf-opt:active:not(.active){transform:translateY(1px);}
+.cf-opt.active{background:#d7a64a;border-color:#d7a64a;color:#1a1206;font-weight:700;}
+.cf-step[data-step="kind"] .cf-opt{flex:1 1 0;padding:8px 6px;font-size:.85rem;}
+.cf-step[data-step="sort"] .cf-opt{flex:1 1 86px;}
+
+/* 全部类型时的展开提示 */
+.cf-branch-hint{
+  font-size:.75rem;color:var(--text-faint);line-height:1.6;
+  border:1px dashed var(--line);border-radius:8px;padding:7px 9px;
+  background:rgba(0,0,0,.12);max-width:300px;
+}
+
+/* 词缀条件（特殊步骤）：保留原有 min/max 行样式 */
+.cf-affix-body{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.affix-filter-wrap{display:flex;flex-direction:column;gap:6px;}
+.affix-filter-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.affix-filter-row select,.affix-filter-row input{
+  background:var(--bg);border:1px solid var(--line);color:var(--text);
+  border-radius:6px;padding:4px 6px;font-size:.75rem;
+}
+.affix-filter-row .affix-type-sel{flex:1 1 96px;}
+.affix-filter-row .affix-min,.affix-filter-row .affix-max{width:52px;}
+.affix-filter-row .affix-del{flex:none;}
+.affix-add{flex:1 1 100%;margin-top:2px;}
+.affix-empty{font-size:.72rem;color:var(--text-faint);}
+
+.cf-hint{font-size:.72rem;color:var(--text-faint);line-height:1.55;}
+
+/* ---------- 结果区头部：标题 + 视图切换 + 计数 ---------- */
+.rp-head{display:flex;align-items:center;gap:12px;padding:2px 2px 10px;border-bottom:1px solid var(--line);}
+.rp-title{font-weight:700;letter-spacing:2px;color:#d7a64a;font-size:1.02rem;white-space:nowrap;}
+.rp-count{margin-left:auto;color:var(--text-dim);font-size:.82rem;white-space:nowrap;}
+
+.view-toggle{display:inline-flex;gap:4px;padding:3px;background:var(--bg);border:1px solid var(--line);border-radius:8px;}
+.vt{
+  padding:5px 14px;font-size:.82rem;border-radius:6px;cursor:pointer;
+  color:var(--text-dim);background:transparent;border:1px solid transparent;font-family:inherit;
+  transition:background .15s ease,color .15s ease,border-color .15s ease;
+}
+.vt:hover{color:var(--text-hi);}
+.vt.active{color:#fff;background:#d7a64a;font-weight:700;border-color:#d7a64a;}
+
+/* 我的上架视图的区块标题沿用 mk-section */
+
+/* ---------- 卡片「我的」标记 ---------- */
+.mk-name-row{display:flex;align-items:center;gap:6px;min-width:0;}
+.mk-tag-mine{
+  flex:none;font-size:.62rem;line-height:1;padding:2px 5px;border-radius:4px;
+  color:#d7a64a;background:rgba(215,166,74,.16);border:1px solid rgba(215,166,74,.4);
+}
+.mk-name-row .mk-name{flex:0 1 auto;}
+
+/* ---------- 交易信息面板（材料 / 税收 / 记录） ---------- */
+.market-info{border-radius:12px;}
+.market-info-head{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;}
+.market-info-head:hover{color:var(--accent-hi);}
+.info-arrow{color:#d7a64a;flex:none;display:inline-block;transition:transform .18s ease;}
+.market-info.is-open .info-arrow{transform:rotate(90deg);}
+.market-info-body{display:none;padding-top:10px;}
+.market-info.is-open .market-info-body{display:block;}
+.info-inner{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;}
+.info-inner .panel{height:100%;}
+#infoBody .market-sub-title{margin-top:10px;}
+
+/* ---------- 进入动画：级联展开（仅状态变化；尊重 reduced-motion） ---------- */
+@keyframes cascadeIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:translateX(0);}}
+.cf-step[data-anim="1"]{animation:cascadeIn .26s ease both;animation-delay:calc(var(--i,0) * 40ms);}
+@keyframes chipIn{from{opacity:0;transform:scale(.92);}to{opacity:1;transform:scale(1);}}
+.cf-chip[data-anim="1"]{animation:chipIn .18s ease both;}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:980px){
+  .cf-search{flex:1 1 100%;}
+  .market-info-body{display:block;} /* 窄屏信息面板默认展开，避免信息被折叠藏起 */
+  .market-info:not(.is-open) .market-info-body{display:block;}
+  .market-info .info-arrow{display:none;}
+}
+@media (max-width:640px){
+  .rp-head{flex-wrap:wrap;gap:8px;}
+  .view-toggle{order:3;width:100%;}
+}
+
+/* reduced-motion：级联动画降级为瞬时 */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
+}

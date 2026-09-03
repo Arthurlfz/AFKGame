@@ -122,33 +122,46 @@
     mask.style.display = 'flex';
   }
 
-  function renderSellArea() {
-    const box = $('market-sell');
+  function renderSellArea(box) {
+    // 支持注入容器（市集页「我的上架」视图传结果区容器）；
+    // 兼容旧调用：renderAll 无参调用时回退到 #market-sell（页面已并入市集，不再存在 → 直接跳过）
+    const target = box || $('market-sell');
+    if (!target) return;
     // 聚焦保护：定价弹窗打开时跳过重建（每秒回血/市场轮询会触发 renderAll）
     const ae = document.activeElement;
     if (ae && ae.closest && ae.closest('.mk-sell-modal-body')) return;
-    box.innerHTML = '';
+    target.innerHTML = '';
     if (!UI.isLoggedIn()) {
-      box.innerHTML = '<div class="mk-empty">登录后可在市场挂单出售宠物 / 装备</div>';
+      target.innerHTML = '<div class="mk-empty">登录后可在市场挂单出售宠物 / 装备</div>';
       return;
     }
 
-    const pets = getPets().filter(p => p.cloudId);
-    const equips = getInventory().filter(e => e.cloudId);
+    // 与级联筛选联动：按当前市集「类型」过滤上架分区（全部/宠物/装备；筛装备时隐藏宠物蛋）
+    const mf = (UI.getMarketFilters ? UI.getMarketFilters() : null) || {};
+    const showPet = !mf.kind || mf.kind === 'all' || mf.kind === 'pet';
+    const showItem = !mf.kind || mf.kind === 'all' || mf.kind === 'item';
+    const showEgg = mf.kind !== 'item';
+
+    const pets = getPets().filter(p => p.cloudId && showPet);
+    const equips = getInventory().filter(e => e.cloudId && showItem);
     const Drop = window.Drop;
     const eggMap = (Drop && Drop.getEggs) ? Drop.getEggs() : {};
-    const eggEntries = Object.entries(eggMap).filter(([, n]) => n > 0);
+    const eggEntries = Object.entries(eggMap).filter(([, n]) => n > 0 && showEgg);
+
+    const total = pets.length + equips.length + eggEntries.length;
+    const cnt = $('rpCount');
+    if (cnt) cnt.textContent = '我的 ' + total + ' 件';
 
     // ---- 宠物上架（卡片） ----
     if (pets.length) {
       const sec = document.createElement('div');
       sec.className = 'mk-section';
       sec.innerHTML = '宠物上架<span class="mk-count">'+ pets.length + '件</span>';
-      box.appendChild(sec);
+      target.appendChild(sec);
       const grid = document.createElement('div');
       grid.className = 'mk-grid';
       for (const pet of pets) grid.appendChild(buildSellPetCard(pet));
-      box.appendChild(grid);
+      target.appendChild(grid);
     }
 
     // ---- 装备上架（卡片 + hover 属性） ----
@@ -156,11 +169,11 @@
       const sec = document.createElement('div');
       sec.className = 'mk-section';
       sec.innerHTML = '装备上架<span class="mk-count">'+ equips.length + '件</span>';
-      box.appendChild(sec);
+      target.appendChild(sec);
       const grid = document.createElement('div');
       grid.className = 'mk-grid';
       for (const eq of equips) grid.appendChild(buildSellItemCard(eq));
-      box.appendChild(grid);
+      target.appendChild(grid);
     }
 
     // ---- 宠物蛋上架 ----
@@ -168,15 +181,15 @@
       const sec = document.createElement('div');
       sec.className = 'mk-section';
       sec.innerHTML = '宠物蛋上架<span class="mk-count">'+ eggEntries.length + '件</span>';
-      box.appendChild(sec);
+      target.appendChild(sec);
       const grid = document.createElement('div');
       grid.className = 'mk-grid';
       for (const [baseName, n] of eggEntries) grid.appendChild(buildSellEggCard(baseName, n));
-      box.appendChild(grid);
+      target.appendChild(grid);
     }
 
     if (!pets.length && !equips.length && !eggEntries.length) {
-      box.innerHTML = '<div class="mk-empty">还没有可上架的物品（宠物/装备/蛋）</div>';
+      target.innerHTML = '<div class="mk-empty">还没有可上架的物品（宠物/装备/蛋）</div>';
     }
   }
 

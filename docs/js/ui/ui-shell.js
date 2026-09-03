@@ -16,6 +16,16 @@
    * 地址栏随切换同步为 #page（#battle/#pet/#equip/#market/#market-sell），
    * 支持浏览器前进/后退、可收藏/分享到具体页。改 hash 不重载页面，状态不丢。 */
   const PAGES = new Set(['worldmap', 'capital', 'battle', 'pet', 'bag', 'equip', 'market', 'market-sell', 'shop', 'codex']);
+  // 我的上架已并入市集页：保留 'market-sell' 路由兼容（教程 t8 / 任务 / 装备页直达上架），
+  // 统一落到市集页并切到「我的上架」视图；'market' 则复位到「全部在售」视图
+  function resolveMarketPage(page) {
+    if (page === 'market-sell') {
+      if (window.UI && window.UI.setMarketView) window.UI.setMarketView('mine');
+      return 'market';
+    }
+    if (page === 'market' && window.UI && window.UI.setMarketView) window.UI.setMarketView('all');
+    return page;
+  }
   function switchPage(page) {
     if (PAGES.has(page) && location.hash !== '#' + page) {
       location.hash = '#' + page; // 同步地址栏（触发 hashchange，由它统一渲染，避免重复）
@@ -25,6 +35,7 @@
   }
   // 真正渲染目标页（只做 display 显隐，DOM 常驻，数据不丢）
   function renderPage(page) {
+    page = resolveMarketPage(page); // market-sell → 市集页 + 我的上架视图
     const pages = document.querySelectorAll('.tab-page');
     pages.forEach(p => p.classList.remove('active'));
     const target = document.getElementById('tab-' + page);

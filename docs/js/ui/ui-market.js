@@ -1,10 +1,11 @@
 /* ============================================================
- * ui/ui-market.js —— 市场页 UI（宠物 + 装备交易 / 我的上架 / 交易记录）
+ * ui/ui-market.js —— 市集页 UI（宠物 + 装备交易 / 我的上架 / 交易记录）
  * 职责：
- *  1. 在售市场（宠物区 + 装备区，购买 / 取回）
- *  2. 我的上架（挂单 / 取回的唯一入口）
- *  3. 交易记录面板（卖出 / 买入 / 汇总）
- *  4. 购买确认框（商品价格 / 交易税 / 买家需支付 / 卖家将收到）
+ *  1. 市集页 = 交易市场 + 我的上架 合并（顶部级联筛选条 + 视图切换）
+ *  2. 在售列表（宠物区 + 装备区 + 蛋，购买 / 取回）
+ *  3. 我的上架视图（挂单 / 取回的唯一入口，复用 ui-market-sell.js）
+ *  4. 交易记录面板（卖出 / 买入 / 汇总）
+ *  5. 购买确认框（商品价格 / 交易税 / 买家需支付 / 卖家将收到）
  * 依赖：market / pet / equipment（只读查询与流程接口）；通用组件来自 ui-common
  * ============================================================ */
 (function () {
@@ -26,7 +27,7 @@
     slot: 'all',
     rarity: 'all',
     tier: 'all',
-    baseTier: 'all',      // 底材T阶 all/'1'~'5'
+    baseTier: 'all',      // 底材T阶 all/'1'~'5'（词缀T阶筛选：最高词缀T ≤ 目标）
     growth: 'desc',
     sort: 'latest',
     affixFilters: [],     // POE式词缀条件：[{type, min, max}]，可与/或组合（默认与）
@@ -34,6 +35,7 @@
   };
 
   let marketFilters = loadMarketFilters();
+  let marketView = 'all'; // 'all' 全部在售 | 'mine' 我的上架（并入市集）
 
   function loadMarketFilters() {
     try {
@@ -47,8 +49,18 @@
     try { localStorage.setItem(MARKET_FILTER_KEY, JSON.stringify(marketFilters)); } catch {}
   }
 
+  // 级联语义：改更高级别时，自动重置其下级，避免互相矛盾的过滤条件
   function setMarketFilter(key, value) {
-    marketFilters = Object.assign({}, marketFilters, { [key]: value });
+    const next = Object.assign({}, marketFilters, { [key]: value });
+    if (key === 'kind') {
+      next.slot = 'all';
+      next.rarity = 'all';
+      next.tier = 'all';
+      next.baseTier = 'all';
+      next.trait = 'all';
+      next.affixFilters = [];
+    }
+    marketFilters = next;
     saveMarketFilters();
     UI.renderAll();
   }
@@ -58,6 +70,14 @@
     saveMarketFilters();
     UI.renderAll();
   }
+
+  function setMarketView(v) {
+    marketView = (v === 'mine') ? 'mine' : 'all';
+    UI.renderMarket();
+  }
+  UI.setMarketView = setMarketView;
+  UI.getMarketView = function () { return marketView; };
+  UI.getMarketFilters = function () { return marketFilters; };
 
   function normalizeTier(v) { return Number(String(v || '').replace(/^T/i, '')) || 0; }
 
@@ -108,44 +128,71 @@
 
   function sortMarketListings(list) {
     const arr = list.slice();
-    if (marketFilters.kind === 'pet' || marketFilters.kind === 'all') {
+    if (marketFilters.kind === 'pet') {
+      // 宠物只按成长排序（成长是宠物核心价值）
       if (marketFilters.growth === 'asc') arr.sort((a, b) => Number(a.pet_growth || 0) - Number(b.pet_growth || 0));
       else if (marketFilters.growth === 'desc') arr.sort((a, b) => Number(b.pet_growth || 0) - Number(a.pet_growth || 0));
       return arr;
     }
+    // 装备 / 混合视图：价格或最新
     if (marketFilters.sort === 'price-asc') arr.sort((a, b) => Number(a.material_qty || 0) - Number(b.material_qty || 0));
     else if (marketFilters.sort === 'price-desc') arr.sort((a, b) => Number(b.material_qty || 0) - Number(a.material_qty || 0));
     else arr.sort((a, b) => new Date(getListingTime(b)).getTime() - new Date(getListingTime(a)).getTime());
     return arr;
   }
 
-  function renderMarketControls(box) {
-    // 顶部筛选条已移除：筛选统一放左侧 #market-filters 面板，这里保持为空
+  /* ============================================================
+   * 顶部级联筛选条
+   * ============================================================ */
+  function stepVal(st, v) {
+    if (v === 'all' || v == null) return '';
+    if (st.key === 'sort' || st.key === 'growth') {
+      const o = (st.opts || []).find(x => x.id === v);
+      return o ? o.label : v;
+    }
+    if (st.key === 'trait' && v === 'none') return '无特质';
+    if (st.key === 'kind') return v === 'pet' ? '宠物' : v === 'item' ? '装备' : v;
+    return v;
   }
 
-  /* ---------- 左侧筛选面板（POE 式折叠分组，纯前端交互，不改交易逻辑） ---------- */
-  function fillFilterGroup(panel, group, items) {
-    const body = panel.querySelector('.filter-group[data-group="' + group + '"] .filter-body');
-    if (!body) return;
-    body.innerHTML = '';
-    items.forEach(({ key, val, label, title }) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'btn-mini filter-btn' + (marketFilters[key] === val ? ' primary' : '');
-      btn.textContent = label;
-      btn.title = title || label;
-      btn.dataset.key = key;
-      btn.dataset.val = val;
-      btn.onclick = () => setMarketFilter(key, val);
-      body.appendChild(btn);
+  function renderFilterPath(box) {
+    const chips = [];
+    const push = (key, label) => chips.push({ key, label });
+    if (marketFilters.kind !== 'all') push('kind', marketFilters.kind === 'pet' ? '宠物' : '装备');
+    if (marketFilters.kind === 'pet') {
+      if (marketFilters.trait !== 'all') {
+        const t = marketFilters.trait === 'none' ? '无特质' : ((Config.petTraits || {})[marketFilters.trait]?.label || marketFilters.trait);
+        push('trait', t);
+      }
+    } else if (marketFilters.kind === 'item') {
+      if (marketFilters.slot !== 'all') push('slot', marketFilters.slot);
+      if (marketFilters.rarity !== 'all') push('rarity', { white: '白装', blue: '蓝装', gold: '金装' }[marketFilters.rarity] || marketFilters.rarity);
+      if (marketFilters.tier !== 'all') push('tier', marketFilters.tier);
+      if (marketFilters.baseTier !== 'all') push('baseTier', '词缀含T' + marketFilters.baseTier);
+    }
+    if ((marketFilters.affixFilters || []).length) push('affixFilters', '词缀条件 ' + marketFilters.affixFilters.length + ' 条');
+
+    box.innerHTML = '';
+    if (!chips.length) {
+      box.innerHTML = '<span class="cf-path-empty">未设置筛选，展示全部</span>';
+      return;
+    }
+    chips.forEach(c => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'cf-chip';
+      el.dataset.anim = '1';
+      el.setAttribute('aria-label', '移除筛选 ' + c.label);
+      el.innerHTML = c.label + '<span class="cf-chip-x">✕</span>';
+      el.onclick = () => setMarketFilter(c.key, 'all');
+      box.appendChild(el);
     });
   }
 
   // POE式词缀条件行：typeahead 选词缀 + min/max 数值范围，可加多条（默认"与"=全部满足）
-  function renderAffixFilterRows(panel) {
-    const body = panel.querySelector('.filter-group[data-group="affix"] .filter-body');
-    if (!body) return;
-    body.innerHTML = '';
+  function renderAffixFilterRows(container) {
+    if (!container) return;
+    container.innerHTML = '';
     const AFFIX_POOL = window.Equipment.AFFIX_POOL || [];
     const filters = marketFilters.affixFilters || [];
     const wrap = document.createElement('div');
@@ -192,81 +239,174 @@
       saveMarketFilters(); UI.renderAll();
     };
     wrap.appendChild(add);
-    body.appendChild(wrap);
+    container.appendChild(wrap);
   }
 
   function renderMarketFilterPanel() {
     const panel = $('market-filters');
-    if (!panel) return;
-    fillFilterGroup(panel, 'type', [
-      { key: 'kind', val: 'all', label: '全部' },
-      { key: 'kind', val: 'pet', label: '宠物' },
-      { key: 'kind', val: 'item', label: '装备' },
-    ]);
-    fillFilterGroup(panel, 'slot', [
-      { key: 'slot', val: 'all', label: '全部' },
-      ...EQUIP_SLOTS.map(s => ({ key: 'slot', val: s, label: s })),
-    ]);
-    fillFilterGroup(panel, 'rarity', [
-      { key: 'rarity', val: 'all', label: '全部' },
-      { key: 'rarity', val: 'white', label: '白' },
-      { key: 'rarity', val: 'blue', label: '蓝' },
-      { key: 'rarity', val: 'gold', label: '金' },
-    ]);
-    fillFilterGroup(panel, 'tier', [
-      { key: 'tier', val: 'all', label: '全部' },
-      ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ key: 'tier', val: t, label: t })),
-    ]);
-    fillFilterGroup(panel, 'baseTier', [
-      { key: 'baseTier', val: 'all', label: '全部' },
-      ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ key: 'baseTier', val: t, label: `含 T${t}` })),
-    ]);
-    // POE式词缀条件行（typeahead 选词缀 + 数值范围，可加多条）
-    renderAffixFilterRows(panel);
-    // 价格范围分组：复用现有排序（价格低→高 / 高→低 / 最新）
-    fillFilterGroup(panel, 'price', [
-      { key: 'sort', val: 'price-asc', label: '价格低→高' },
-      { key: 'sort', val: 'price-desc', label: '价格高→低' },
-      { key: 'sort', val: 'latest', label: '最新上架' },
-    ]);
-    // 宠物成长值分组（选择宠物时联动显示）
-    fillFilterGroup(panel, 'growth', [
-      { key: 'growth', val: 'desc', label: '成长从高到低' },
-      { key: 'growth', val: 'asc', label: '成长从低到高' },
-    ]);
-    // 宠物血脉特质分组（8 特质 + 无特质捡漏）
-    fillFilterGroup(panel, 'trait', [
-      { key: 'trait', val: 'all', label: '全部' },
-      ...Object.keys(Config.petTraits || {}).map(id => ({ key: 'trait', val: id, label: (Config.petTraits[id].label || id) })),
-      { key: 'trait', val: 'none', label: '无特质（捡漏）' },
-    ]);
-    // 属性筛选分组：占位说明（真实属性搜索由顶部搜索框承担）
-    const attrBody = panel.querySelector('.filter-group[data-group="attr"] .filter-body');
-    if (attrBody && !attrBody.textContent.trim()) attrBody.innerHTML = '<div class="hint">用顶部搜索框按名称 / 词缀搜索</div>';
+    const stepsWrap = $('cfSteps');
+    const pathBox = $('cfPath');
+    if (!panel || !stepsWrap || !pathBox) return;
 
-    // 条件联动：宠物 → 显示成长，隐藏部位/T阶/价格；装备 → 反之
     const kind = marketFilters.kind;
-    const toggleGroup = (g, on) => {
-      const el = panel.querySelector('.filter-group[data-group="' + g + '"]');
-      if (el) el.style.display = on ? '' : 'none';
-    };
-    toggleGroup('growth', kind === 'pet');
-    toggleGroup('trait', kind === 'pet');
-    toggleGroup('slot', kind !== 'pet');
-    toggleGroup('tier', kind !== 'pet');
-    toggleGroup('price', kind !== 'pet');
-    toggleGroup('attr', kind !== 'pet');
+    const steps = [];
 
-    // 排序下拉
-    const sortSel = $('market-sort');
-    if (sortSel) {
-      sortSel.value = marketFilters.sort || 'latest';
-      sortSel.onchange = () => setMarketFilter('sort', sortSel.value);
+    steps.push({
+      key: 'kind', label: '类型',
+      get: () => marketFilters.kind, set: v => setMarketFilter('kind', v),
+      opts: [
+        { id: 'all', label: '全部' },
+        { id: 'pet', label: '宠物' },
+        { id: 'item', label: '装备' },
+      ],
+    });
+
+    if (kind === 'pet') {
+      steps.push({
+        key: 'trait', label: '特质',
+        get: () => marketFilters.trait, set: v => setMarketFilter('trait', v),
+        opts: [
+          { id: 'all', label: '全部' },
+          ...Object.keys(Config.petTraits || {}).map(id => ({ id, label: (Config.petTraits[id].label || id) })),
+          { id: 'none', label: '无特质（捡漏）' },
+        ],
+      });
+      steps.push({
+        key: 'growth', label: '成长排序',
+        get: () => marketFilters.growth, set: v => setMarketFilter('growth', v),
+        opts: [
+          { id: 'desc', label: '成长高→低' },
+          { id: 'asc', label: '成长低→高' },
+        ],
+      });
+    } else if (kind === 'item') {
+      steps.push({
+        key: 'slot', label: '部位',
+        get: () => marketFilters.slot, set: v => setMarketFilter('slot', v),
+        opts: [{ id: 'all', label: '全部' }, ...EQUIP_SLOTS.map(s => ({ id: s, label: s }))],
+      });
+      steps.push({
+        key: 'rarity', label: '稀有度',
+        get: () => marketFilters.rarity, set: v => setMarketFilter('rarity', v),
+        opts: [
+          { id: 'all', label: '全部' },
+          { id: 'white', label: '白装' },
+          { id: 'blue', label: '蓝装' },
+          { id: 'gold', label: '金装' },
+        ],
+      });
+      steps.push({
+        key: 'tier', label: '底材T阶',
+        get: () => marketFilters.tier, set: v => setMarketFilter('tier', v),
+        opts: [{ id: 'all', label: '全部' }, ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ id: t, label: t }))],
+      });
+      steps.push({
+        key: 'baseTier', label: '词缀T阶',
+        get: () => marketFilters.baseTier, set: v => setMarketFilter('baseTier', v),
+        opts: [{ id: 'all', label: '全部' }, ...['T1', 'T2', 'T3', 'T4', 'T5'].map(t => ({ id: t, label: '含T' + t }))],
+      });
+      steps.push({
+        key: 'sort', label: '排序',
+        get: () => marketFilters.sort, set: v => setMarketFilter('sort', v),
+        opts: [
+          { id: 'latest', label: '最新上架' },
+          { id: 'price-asc', label: '价格低→高' },
+          { id: 'price-desc', label: '价格高→低' },
+        ],
+      });
+    } else {
+      steps.push({
+        key: 'sort', label: '排序',
+        get: () => marketFilters.sort, set: v => setMarketFilter('sort', v),
+        opts: [
+          { id: 'latest', label: '最新上架' },
+          { id: 'price-asc', label: '价格低→高' },
+          { id: 'price-desc', label: '价格高→低' },
+        ],
+      });
     }
-    // 搜索框
+
+    stepsWrap.innerHTML = '';
+    steps.forEach((st, i) => {
+      const el = document.createElement('div');
+      el.className = 'cf-step';
+      el.dataset.step = st.key;
+      el.style.setProperty('--i', i);
+      el.dataset.anim = '1';
+
+      const v = st.get();
+      const val = stepVal(st, v);
+      const isSet = v !== 'all' && v != null;
+      // 排序/成长这类"总有值"的步骤不算级联节点激活
+      const nodeSet = isSet && st.key !== 'sort' && st.key !== 'growth';
+
+      let optsHtml = '';
+      st.opts.forEach(o => {
+        const active = v === o.id ? ' active' : '';
+        optsHtml += '<button type="button" class="cf-opt' + active + '" data-key="' + st.key + '" data-val="' + o.id + '" aria-pressed="' + (v === o.id) + '">' + o.label + '</button>';
+      });
+
+      let bodyHtml = '';
+      if (st.key === 'kind' && kind === 'all') {
+        bodyHtml += '<div class="cf-branch-hint">选择 宠物 或 装备 后，下级筛选（特质 / 部位 / 稀有度 / T阶 / 词缀）逐级展开</div>';
+      }
+      bodyHtml += '<div class="cf-opts">' + optsHtml + '</div>';
+
+      el.innerHTML =
+        '<div class="cf-head">' +
+          '<span class="cf-node' + (nodeSet ? ' is-set' : '') + '"></span>' +
+          '<span class="cf-label-name">' + st.label + '</span>' +
+          '<span class="cf-label-val' + (val ? '' : ' is-empty') + '">' + (val || (st.key === 'sort' || st.key === 'growth' ? '默认' : '')) + '</span>' +
+          (nodeSet ? '<button type="button" class="cf-clear" data-clear="' + st.key + '" aria-label="清除' + st.label + '筛选">✕</button>' : '') +
+        '</div>' +
+        bodyHtml;
+
+      stepsWrap.appendChild(el);
+    });
+
+    // 词缀条件特殊步骤（item 分支末尾）
+    if (kind === 'item') {
+      const el = document.createElement('div');
+      el.className = 'cf-step';
+      el.dataset.step = 'affix';
+      el.style.setProperty('--i', steps.length);
+      el.dataset.anim = '1';
+      const hasAffix = (marketFilters.affixFilters || []).length > 0;
+      el.innerHTML =
+        '<div class="cf-head">' +
+          '<span class="cf-node' + (hasAffix ? ' is-set' : '') + '"></span>' +
+          '<span class="cf-label-name">词缀条件</span>' +
+          '<span class="cf-label-val' + (hasAffix ? '' : ' is-empty') + '">' + (hasAffix ? (marketFilters.affixFilters.length + ' 条') : '') + '</span>' +
+          (hasAffix ? '<button type="button" class="cf-clear" data-clear-affix="1" aria-label="清除词缀条件">✕</button>' : '') +
+        '</div>' +
+        '<div class="cf-affix-body"></div>';
+      stepsWrap.appendChild(el);
+      renderAffixFilterRows(el.querySelector('.cf-affix-body'));
+    }
+
+    // 绑定：选项
+    stepsWrap.querySelectorAll('.cf-opt').forEach(btn => {
+      btn.onclick = () => setMarketFilter(btn.dataset.key, btn.dataset.val);
+    });
+    // 绑定：单级清除
+    stepsWrap.querySelectorAll('.cf-clear').forEach(btn => {
+      btn.onclick = () => {
+        const k = btn.dataset.clear;
+        if (k) setMarketFilter(k, 'all');
+      };
+    });
+    const affixClear = stepsWrap.querySelector('[data-clear-affix]');
+    if (affixClear) affixClear.onclick = () => setMarketFilter('affixFilters', []);
+
+    renderFilterPath(pathBox);
+    bindMarketControls();
+  }
+
+  // 搜索框 / 清空 / 视图切换 / 交易信息折叠（每次渲染都会刷新绑定，幂等）
+  function bindMarketControls() {
     const kwInput = $('market-keyword');
     if (kwInput) {
-      kwInput.value = marketFilters.keyword || '';
+      if (document.activeElement !== kwInput) kwInput.value = marketFilters.keyword || '';
       kwInput.oninput = () => {
         marketFilters = Object.assign({}, marketFilters, { keyword: kwInput.value });
         saveMarketFilters();
@@ -274,31 +414,39 @@
         UI.renderTradeRecords();
       };
     }
-    // 快捷类型按钮
-    panel.querySelectorAll('[data-kind-quick]').forEach(b => {
-      const active = marketFilters.kind === b.dataset.kindQuick;
-      b.classList.toggle('primary', active);
-      b.onclick = () => setMarketFilter('kind', b.dataset.kindQuick);
-    });
-    // 折叠交互（只绑定一次）
-    if (!panel.dataset.filterInit) {
-      panel.dataset.filterInit = '1';
-      panel.querySelectorAll('.filter-head').forEach(head => {
-        head.onclick = () => {
-          const g = head.closest('.filter-group');
-          if (!g) return;
-          const open = g.classList.toggle('is-open');
-          const arrow = head.querySelector('.arrow');
-          if (arrow) arrow.textContent = open ? '▾' : '▸';
-        };
+    const resetBtn = $('cfReset');
+    if (resetBtn) resetBtn.onclick = () => resetMarketFilters();
+
+    const vtBox = $('viewToggle');
+    if (vtBox) {
+      Array.prototype.forEach.call(vtBox.querySelectorAll('.vt'), b => {
+        b.onclick = () => setMarketView(b.dataset.view);
       });
-      const resetBtn = document.createElement('div');
-      resetBtn.className = 'market-control-actions';
-      resetBtn.innerHTML = '<button class="btn-mini ghost" id="market-filter-reset">重置筛选</button>';
-      panel.appendChild(resetBtn);
-      const rb = $('market-filter-reset');
-      if (rb) rb.onclick = () => resetMarketFilters();
     }
+
+    const infoPanel = $('market-info');
+    const infoToggle = $('infoToggle');
+    if (infoPanel && infoToggle && !infoPanel.dataset.infoInit) {
+      infoPanel.dataset.infoInit = '1';
+      infoToggle.onclick = () => {
+        const open = infoPanel.classList.toggle('is-open');
+        const arrow = $('infoArrow');
+        if (arrow) arrow.textContent = open ? '▾' : '▸';
+      };
+    }
+  }
+
+  /* ============================================================
+   * 视图切换 + 结果渲染
+   * ============================================================ */
+  function renderViewToggle() {
+    const box = $('viewToggle');
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('.vt'), b => {
+      const on = marketView === b.dataset.view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
   }
 
   /* ---------- 装备卡片 ---------- */
@@ -306,11 +454,12 @@
     const div = document.createElement('div');
     div.className = 'mk-card';
     const color = Config.equipment.rarities.find(r => r.id === l.item_rarity)?.color || '#d8d8d8';
-    const affixText = flattenAffixes(l.item_affixes || []).map(a => Equipment.formatAffix ? Equipment.formatAffix(a) : `${a.label}+${a.value}%`)
+    const affixText = flattenAffixes(l.item_affixes || []).map(a => window.Equipment.formatAffix ? window.Equipment.formatAffix(a) : `${a.label}+${a.value}%`)
       .concat(l.item_soul ? [l.item_soul.label] : []).join(' ');
     const mat = Market.findMaterial(l.material_type);
     const legacy = !l.material_type;
     const mine = Market.isItemListed(l.item_id);
+    const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
     const priceHtml = legacy
       ? '<span class="mk-price">旧版挂单</span>'
       : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
@@ -319,7 +468,7 @@
       <div class="mk-card-top">
         <div class="mk-avatar mk-avatar--item">⚔️</div>
         <div class="mk-card-info">
-          <div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>
+          <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
           <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}</div>
         </div>
       </div>
@@ -356,6 +505,7 @@
     const mat = Market.findMaterial(l.material_type);
     const legacy = !l.material_type;
     const mine = Market.isListed(l.pet_id);
+    const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
     const priceHtml = legacy
       ? '<span class="mk-price">旧版挂单</span>'
       : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
@@ -364,7 +514,7 @@
       <div class="mk-card-top">
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item">🐾</div>'}
         <div class="mk-card-info">
-          <div class="mk-name">${escapeHtml(l.pet_name)}</div>
+          <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
           <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}</div>
         </div>
       </div>
@@ -391,13 +541,14 @@
     const div = document.createElement('div');
     div.className = 'mk-card';
     const mine = Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false;
+    const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
     const mat = Market.findMaterial(l.material_type);
     const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
     div.innerHTML = `
       <div class="mk-card-top">
         <div class="mk-egg-icon">🥚</div>
         <div class="mk-card-info">
-          <div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>
+          <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
           <div class="mk-meta">宠物蛋</div>
         </div>
       </div>
@@ -462,13 +613,26 @@
     const box = $('market-list');
     if (!box) return;
     box.innerHTML = '';
-    renderMarketControls(box);
+    renderViewToggle();
+
+    // 我的上架视图：渲染上架/取回区（复用 ui-market-sell.js 的 renderSellArea）
+    if (marketView === 'mine') {
+      const cnt = $('rpCount');
+      if (cnt) cnt.textContent = '';
+      if (UI.renderSellArea) UI.renderSellArea(box);
+      else box.innerHTML = '<div class="mk-empty">上架功能未加载</div>';
+      return;
+    }
+
+    // 全部在售：宠物 + 装备 + 蛋
     const list = sortMarketListings(Market.getListings().filter(matchMarketListing));
     const items = sortMarketListings(Market.getItemListings().filter(matchMarketListing));
     const eggList = Market.getEggListings ? Market.getEggListings() : [];
-
     const pets = list.filter(l => l.pet_id);
     const RARITY_LABEL = { white: '白装', blue: '蓝装', gold: '金装' };
+
+    const cnt = $('rpCount');
+    if (cnt) cnt.textContent = '共 ' + (pets.length + items.length + eggList.length) + ' 件';
 
     if (pets.length) {
       const sec = document.createElement('div');
