@@ -102,7 +102,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* 右列窄：素材/消耗品/蛋 用稍小格子，避免一行只排得下三四个 */
 #tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-grid { --cell:46px; }
 #tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-item .ico { width:36px; height:34px; font-size:24px; }
-#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-item .nm { font-size:9px; }
+#tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) .poe-item .nm { font-size:var(--fs-2xs); }
 @media (max-width: 1280px) {
   #tab-bag .bag-wrap, .bag-window .bag-wrap--tri { grid-template-columns: minmax(190px, 240px) minmax(360px, 1fr); }
   #tab-bag .bag-wrap, .bag-window .bag-wrap--tri > .pcol:nth-child(3) { grid-column: 1 / -1; }
@@ -168,8 +168,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 #tab-bag .poe-item.bc-drop { outline:2px solid var(--good); outline-offset:-1px; box-shadow:0 0 12px rgba(127,174,90,.4) inset; }
 #tab-bag .poe-item .ico { width:42px; height:40px; display:flex; align-items:center; justify-content:center; font-size:28px; line-height:1; }
 #tab-bag .poe-item .ico svg { width:100%; height:100%; }
-#tab-bag .poe-item .nm { font-size:10px; margin-top:1px; text-align:center; line-height:1.1; padding:0 1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-#tab-bag .poe-item .corner { position:absolute; right:1px; top:1px; font-size:8px; color:var(--gold); background:rgba(0,0,0,.6); padding:0 2px; border-radius:2px; }
+#tab-bag .poe-item .nm { font-size:var(--fs-2xs); margin-top:1px; text-align:center; line-height:1.1; padding:0 1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#tab-bag .poe-item .corner { position:absolute; right:1px; top:1px; font-size:var(--fs-2xs); color:var(--gold); background:rgba(0,0,0,.6); padding:0 2px; border-radius:2px; }
 #tab-bag .poe-item .qmark { position:absolute; font-size:17px; color:#c8a45b; font-family:Georgia,serif; opacity:.92; text-shadow:0 0 6px rgba(200,164,91,.5); }
 #tab-bag .poe-item.q-normal { border-color:#4a443b; } #tab-bag .poe-item.q-normal .nm { color:var(--normal); }
 #tab-bag .poe-item.q-magic { border-color:#33406a; box-shadow:0 0 8px rgba(106,140,255,.25) inset; } #tab-bag .poe-item.q-magic .nm { color:var(--magic); }
@@ -190,7 +190,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .salvage-drop { margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:6px;
   background:rgba(127,174,90,.04); text-align:center; transition:.15s; }
 .salvage-drop.hot { border-color:var(--good); background:rgba(127,174,90,.12); box-shadow:0 0 12px rgba(127,174,90,.25) inset; }
-.salvage-drop .sd-title { font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--good); }
+.salvage-drop .sd-title { font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.1em; color:var(--good); }
 .salvage-drop .sd-sub { font-size:10.5px; color:var(--faint); margin-top:3px; line-height:1.4; }
 
 /* 装备详情 modal：词缀区复用全局 .craft-affix-group（前缀绿 / 后缀蓝） */
@@ -280,7 +280,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   transform: translate(-50%, -100%);
   display: inline-flex; align-items: center;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: var(--fs-xs);
   font-weight: 600; letter-spacing: 3px;
   font-family: "PingFang SC", "Microsoft YaHei", "STSong", serif;
   color: rgba(200,194,168,.95);                 /* 墨青/灰金 — 不抢眼 */

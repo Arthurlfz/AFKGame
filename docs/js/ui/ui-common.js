@@ -26,6 +26,11 @@
   let authUser = null;
   function setAuthUser(user) {
     authUser = user || null;
+    // 新手引导：状态按账号隔离（引导开始/跳过/毕业礼包标记都跟账号走，换号各自独立）
+    if (window.TutorialMode && window.TutorialMode.bindUser) {
+      try { window.TutorialMode.bindUser((authUser && (authUser.email || authUser.id)) || ''); }
+      catch (e) { console.warn('[ui] TutorialMode.bindUser 失败', e); }
+    }
     renderAuth();
     // 外壳登录钩子（ui-shell 定义）：未登录 → 全屏登录页；登录 → 主界面（默认战斗页）
     if (UI.onAuthChange) UI.onAuthChange(!!authUser);

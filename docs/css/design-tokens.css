@@ -74,7 +74,8 @@
   --font-num: "Consolas", "Cascadia Mono", "Courier New", monospace;
   --font-size: 1rem;
   --font-small: .889rem;
-  --fs-xs: .722rem;
+  --fs-2xs: .667rem; /* 12px 角标/标签最小档（2026-09-03 UI 体检新增） */
+  --fs-xs: .778rem; /* 14px 正文下限（2026-09-03 UI 体检从 13px 提档） */
   --fs-sm: .833rem;
   --fs-md: 1rem;
   --fs-lg: 1.111rem;

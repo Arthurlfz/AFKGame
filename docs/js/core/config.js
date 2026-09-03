@@ -79,11 +79,12 @@ window.Config = {
       '尸牙犬': 84, '幽灵犬': 84, '影刃兔': 100, '霜影兔': 100
     },
     // 等级上限（到顶后经验条保持满，不再升级）。
-    // 2026-08-31 拍板：上限提到 100，野外图扩到 17 张（图 1-17 覆盖 1-100，节点挂现有世界地图），
-    // 等级到哪、图就到哪，不出现"满级后没图可挂、越级碾压"。
-    // maxLevel 与图的等级段必须同步（改这里必须确认图 17 的上限是 100）。
-    // 注意：涅槃要求 ≥ nirvana.minLevel（60），上限必须 ≥ 涅槃门槛。
-    maxLevel: 100,
+    // 2026-09-03 拍板：上限定为 60（60 级毕业）。图 1-10 覆盖 1-60 级 = 教学/成长主流程
+    //   （前 10 图让玩家快速上手）；图 11-17 为预留毕业图（保留不删）——等级段 61-100 与第二幕
+    //   主线 m41~m68 因上限 60 自然锁死，等毕业设计时整体重做等级段/内容/解锁。
+    // maxLevel 与图的等级段必须同步（改这里必须确认图 10 的上限是 60）。
+    // 注意：涅槃要求 ≥ nirvana.minLevel（60），上限 = 门槛，60 级即可涅槃。
+    maxLevel: 60,
     /* 满级经验池：满级后溢出经验不再蒸发，先攒进池子，每满 perCrystal 自动凝 1 颗「凝魂晶石」。
      * 定位：满级挂机 = 凝魂晶石农场，晶石是账号级材料（涅槃加成 / 市场交易），
      * 让"练满之后继续挂"有产出，而不是纯浪费。
@@ -280,7 +281,9 @@ window.Config = {
       'blight-heart':     { hp: 2641, atk: 510, def: 226 },
       /* ---- 2026-08-31 第二幕 7 图（61-100 级）：按既有等差外推（每图 hp+267/atk+51/def+23）----
        * 与图 6-10 同一套规则：怪数值=图中点基准 × 等级缩放（clamp 0.25~1.6）× typeMult。
-       * 覆盖 61-100 级（maxLevel 100），怪物池复用变异怪，不新增美术。 */
+       * 2026-09-03 拍板 60 级封顶后：本 7 图为【预留毕业图】（保留不删）——等级段 61-100 超上限、
+       * 第二幕主线 m41~m68（unlockLevel 61+）自然锁死；世界地图点位仍在，进图会被"等级不足"拦下。
+       * 待毕业设计时整体重做：等级段压进 60 / 毕业掉落特色 / 解锁方式。当前数值仅作占位，玩家碰不到。 */
       'rift-fissure':     { hp: 2908, atk: 561, def: 249 },
       'black-blood-moor': { hp: 3175, atk: 612, def: 272 },
       'bone-abyss':       { hp: 3442, atk: 663, def: 295 },
@@ -431,27 +434,26 @@ window.Config = {
     //       repeat 每日刷新 / name 任务名 / guide 引导条跳转目标 / reward 奖励材料
     //       rewardGear 奖励装备件数（新手链专用：送实体装备，不是材料）
     quests: [
-      /* ---- 新手成长 12 条：线性引导，做完一条出下一条，全部一次性 ---- */
-      { id: 't1', category: 'tutorial', type: 'kill', need: 1, name: '初醒', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '点击 <b>开始自动战斗</b> 击败 1 只怪物', target: '#btn-battle', reward: { 重铸石: 1 } },
-      /* t2 送 1 件蓝装（2026-08-31 用户拍板）：下一条 t3「披上残甲」要求穿 1 件装备，
-       * 而装备靠单池 equipment 档掉落（改法一后概率仍低），新手期 10 场大概率捡不到 ——
-       * 引导会卡死在「去穿装备」但背包空的死循环。所以前置任务直接发一件，
-       * 玩家拿到就能穿，同时也第一次看见「装备」这个东西长什么样。 */
-      { id: 't2', category: 'tutorial', type: 'kill', need: 10, requires: 't1', name: '熟悉腐土', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '点击 <b>开始自动战斗</b> 累计击败 10 只怪物', target: '#btn-battle', reward: { 进化素材: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'blue', materialTier: 3 } },
-      { id: 't3', category: 'tutorial', type: 'equip', need: 1, requires: 't2', name: '披上残甲', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, isGuide: true, hint: '在宠物资料页打开 <b>装备</b> 栏，穿上一件装备', target: '.pet-tab[data-pet-tab="equip"]', reward: { 重铸石: 1 } },
-      // t11/t12 是「升级缓冲」：进化门槛 Lv10（按 exp 公式约需累计 78 场），t3 后直接接进化的话，
-      // 玩家要干等 20 分钟且引导条一直卡在 0/1。这两条让进度条持续动，玩家边刷边到 Lv10。
-      // 注意：kill 类进度在 reportType 里按 type 全量累加（不分任务），所以 need 是「累计击败数」而非增量。
-      { id: 't11', category: 'tutorial', type: 'kill', need: 30, requires: 't3', name: '腐土巡守', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '继续 <b>自动战斗</b>，累计击败 30 只怪物', target: '#btn-battle', reward: { 重铸石: 2 } },
-      { id: 't12', category: 'tutorial', type: 'kill', need: 80, requires: 't11', name: '腐土猎手', guide: { page: 'battle', btn: '去挂机' }, isGuide: true, hint: '继续 <b>自动战斗</b>，累计击败 80 只怪物', target: '#btn-battle', reward: { 进化素材: 1 } },
-      { id: 't13', category: 'tutorial', type: 'soulcast', need: 1, requires: 't10', name: '魂铸传承', guide: { page: 'equip', tab: 'soulcast', btn: '去魂铸' } },
-      { id: 't4', category: 'tutorial', type: 'evolve', need: 1, requires: 't12', name: '第一次进化', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物资料页打开 <b>进化</b> 栏，完成第一次进化', target: '.pet-tab[data-pet-tab="evolve"]', reward: { 进化素材: 2 } },
-      { id: 't5', category: 'tutorial', type: 'craft', need: 1, requires: 't4', name: '初次淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页打造 1 件装备', target: '.sb-btn[data-page="equip"]', reward: { 神圣石: 1 } },
-      { id: 't6', category: 'tutorial', type: 'salvage', need: 1, requires: 't5', name: '拆解废品', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点击 <b>一键分解</b> 分解废品', target: '#btn-salvage', reward: { 增缀石: 1 } },
-      { id: 't7', category: 'tutorial', type: 'hatch', need: 1, requires: 't6', name: '新的生命', guide: { page: 'pet', tab: 'profile', btn: '去孵化' }, isGuide: true, hint: '在宠物资料页 <b>资料</b> 栏打开孵化面板，孵化 1 颗蛋', target: '#egg-panel', reward: { 宠物蛋: 1 } },
-      { id: 't8', category: 'tutorial', type: 'list', need: 1, requires: 't7', name: '第一次交易', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备', target: '.sb-btn[data-page="market"]', reward: { 合成之石: 1 } },
-      { id: 't9', category: 'tutorial', type: 'synth', need: 1, requires: 't8', name: '初次融合', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物资料页打开 <b>合成</b> 栏，完成一次合成', target: '.pet-tab[data-pet-tab="synth"]', reward: { 精粹进化素材: 1 } },
-      { id: 't10', category: 'tutorial', type: 'nirvana', need: 1, requires: 't9', name: '脱胎换骨', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, isGuide: true, hint: '在宠物资料页打开 <b>涅槃</b> 栏，完成一次涅槃', target: '.pet-tab[data-pet-tab="merge"]', reward: { 涅磐兽: 1, 合成之石: 1 } },
+      /* ---- 新手引导 G1~G10（2026-09-03 目标驱动主线重写，替代原 t1~t13）----
+       * 内核仍是任务链：G1~G9 = 引导段（isGuide:true，带 NPC 台词 / hint 怎么做 / target 指引锚点 / boostLevel 等级资粮）；
+       * G10 魂铸 = 毕业后普通任务（isGuide:false：不进引导条、不进加速）。
+       * 顺序即「变强主线」：领资粮升 Lv10 → 进化 → 武装 → 打造 → 分解 → 孵化副宠 → 融合 → 市集 → 涅槃毕业 → 魂铸。
+       * 等级门槛全部由「引导经验包」顶上去（boostLevel，见 tutorial_mode.boostGuidePetToLevel），玩家不刷级：
+       *   进 G2 前 →Lv10（进化）/ 进 G7 前 →Lv40（合成）/ 进 G9 前 →Lv60（涅槃）。
+       * 奖励纯 B 明给闭环（每一步给下一步要用的东西，不给玩家卡手的机会）：
+       *   G1 蓝装→G3 穿 / G1 进化素材→G2 进化 / G5 宠物蛋→G6 孵化 / G6 合成之石→G7 合成 /
+       *   G7 涅磐兽 + 副宠（grants 发）→G9 涅槃 / G9 毕业礼包（账号仅一次）。
+       * npc 字段 = 引路人台词草稿，文案可直接在这里改。target = 单步指引 hotspot 的锚点选择器。 */
+      { id: 'g1', category: 'tutorial', type: 'level', need: 10, name: '引路人的馈赠', guide: { page: 'pet', btn: '去领取' }, isGuide: true, hint: '引导经验包已就位：出战魂兽直升 Lv10', target: '.qt-go', npc: '腐土虽是你的战场，但蜕变不该靠苦熬。这份资粮，助你直抵进化之境。', boostLevel: 10, reward: { 进化素材: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'blue', materialTier: 3 } },
+      { id: 'g2', category: 'tutorial', type: 'evolve', need: 1, requires: 'g1', name: '初次蜕变', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏完成第一次进化（Lv10＋进化素材都已备好）', target: '.pet-tab[data-pet-tab="evolve"]', npc: '形态蜕变、属性跃升——这是养成的第一个跳变。越过此境，你的魂兽才真正属于你。', boostLevel: 10, reward: { 神圣石: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'white', materialTier: 1 } },
+      { id: 'g3', category: 'tutorial', type: 'equip', need: 1, requires: 'g2', name: '披甲上阵', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, isGuide: true, hint: '在宠物页打开 <b>装备</b> 栏，把刚领到的蓝装穿到出战魂兽身上', target: '.pet-tab[data-pet-tab="equip"]', npc: '蜕变之后仍需甲胄护身，战力才扎实。披上残甲，别让它静静躺在背包蒙尘。', reward: { 重铸石: 1 } },
+      { id: 'g4', category: 'tutorial', type: 'craft', need: 1, requires: 'g3', name: '亲手淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页用重铸石强化背包里的装备 1 次', target: '.sb-btn[data-page="equip"]', npc: '掉落终有尽时。学会亲手锻造，你的战力便不再仰仗天命。', reward: { 增缀石: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'white', materialTier: 1 } },
+      { id: 'g5', category: 'tutorial', type: 'salvage', need: 1, requires: 'g4', name: '化废为宝', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点 <b>一键分解</b>，把「亲手淬炼」送的那件白装拆掉（它就是给你分解用的废品）', target: '#btn-salvage', npc: '废品并非无用。拆了回炉成打造石，养成的循环才真正闭合。', reward: { 剥离石: 1 } },
+      { id: 'g6', category: 'tutorial', type: 'hatch', need: 1, requires: 'g5', name: '孵化新生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, isGuide: true, hint: '在宠物页 <b>宠物蛋</b> 栏孵化 1 颗蛋，得到第二只魂兽', target: '.pet-tab[data-pet-tab="egg"]', npc: '战场不该只容一只孤魂。孵化这颗蛋，让副宠为你并肩而战。', reward: { 合成之石: 1 } },
+      { id: 'g7', category: 'tutorial', type: 'synth', need: 1, requires: 'g6', name: '融合之力', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物页 <b>合成</b> 栏：主宠融合副宠（Lv40 已由经验包顶入）', target: '.pet-tab[data-pet-tab="synth"]', npc: '魂兽之间亦有高下。主宠融副宠、继承其特质，向更上一层蜕变。', boostLevel: 40, reward: { 涅磐兽: 1 } },
+      { id: 'g8', category: 'tutorial', type: 'list', need: 1, requires: 'g7', name: '初入市集', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备（进任务时已自动在背包放 1 件可上架白装，直接去市集上架它）', target: '.sb-btn[data-page="market"]', npc: '你亲手锻造之物，可换他人之资。市集之上，强者互通有无。', reward: { 重铸石: 2, 增缀石: 2 } },
+      { id: 'g9', category: 'tutorial', type: 'nirvana', need: 1, requires: 'g8', name: '浴火涅槃', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, isGuide: true, hint: '在宠物页 <b>涅槃</b> 栏完成涅槃（Lv60 已由经验包顶入，涅磐兽已备）', target: '.pet-tab[data-pet-tab="merge"]', npc: 'Lv60 —— 燃尽旧躯，于灰烬中重塑真形。这是魂兽的毕业之礼，仅此一次。', boostLevel: 60, reward: { 凝魂晶石: 2 } },
+      { id: 'g10', category: 'tutorial', type: 'soulcast', need: 1, requires: 'g9', name: '魂铸传承', guide: { page: 'equip', tab: 'soulcast', btn: '去魂铸' }, hint: '毕业后普通任务：去 <b>打造</b> 页把魂兽特质铸入装备', target: '.sb-btn[data-page="equip"]', npc: '特质可铸入装备，世代相传。毕业之后，仍有可走的更深之路。', reward: { 神圣石: 2 } },
 
       /* ---- 主线 40 条：10 图 × 4 条（击败 / 收集 / 养成 / 装备），按等级解锁。
        * ⚠️ 2026-08-30 地图重排：腐变之源做最终图（55-60），回响崖/腐沼泽/余烬渊/魂渊依次提前。
@@ -779,6 +781,75 @@ window.Config = {
     rarityWeights: { white: 45, blue: 35, gold: 20 },
     // 材料类型随机权重（key 对应 trade.materials 的 id）
     materialWeights: { reforge: 30, strip: 20, holy: 15, augment: 15, phoenix: 15 },
+    /* 新增 2026-09-03：AI 上架覆盖全面化（修复"市场全是图1档白板"）
+     * areaWeight：AI 挂机图档分布（key=图1~17 档位序号）。让市场从低级到高级货全覆盖，
+     *   替代旧逻辑 generateEquipment 默认 areaTier=1 → 所有装备都是图1档。
+     * priceGradient：定价梯度 = 图档基数(每高1档×1.5) × 稀有度乘数 × 材料系数，
+     *   让"图17金装"明显贵于"图1白装"，市场有价差、能识货。 */
+    areaWeight: { 1: 2, 3: 3, 5: 4, 7: 5, 9: 5, 11: 5, 13: 4, 15: 3, 17: 2 },
+    priceGradient: {
+      basePerTier: 1.5,
+      rarityMult: { white: 1, blue: 2, gold: 4 },
+      materialMult: { reforge: 1, strip: 0.6, holy: 0.8, augment: 0.8, synthesize: 0.7, phoenix: 0.5, evolution: 0.5, 'evolution-precise': 0.4, 'evolution-legend': 0.3, egg: 0.6, soulcrystal: 0.9, identify: 0.5 }
+    },
+    /* 2026-09-03 二阶段：AI 上架材料 + 宠物蛋（修复 AI 只上装备和宠物）
+     * botGoods.materials：AI 卖材料商品（以物易物）。key=sold 材料 id → { pay: 收款物 id, qty:[min,max] 收款数量 }，买入 1 单位
+     * botGoods.materialSellWeights：AI 常卖哪些材料（权重）
+     * botGoods.eggPrice：AI 卖宠物蛋（收款物 + 价格范围），蛋品种从 Config.pet.starters 随机
+     * minMaterial / minEgg：各类 AI 商品的最低在售量 */
+    botGoods: {
+      materials: {
+        reforge: { pay: 'strip', qty: [1, 3] },
+        strip: { pay: 'reforge', qty: [1, 2] },
+        holy: { pay: 'reforge', qty: [2, 4] },
+        augment: { pay: 'reforge', qty: [2, 4] },
+        synthesize: { pay: 'reforge', qty: [1, 3] },
+        phoenix: { pay: 'soulcrystal', qty: [1, 2] },
+        evolution: { pay: 'reforge', qty: [2, 4] },
+        'evolution-precise': { pay: 'reforge', qty: [3, 6] },
+        'evolution-legend': { pay: 'holy', qty: [2, 4] },
+        identify: { pay: 'reforge', qty: [1, 2] },
+        soulcrystal: { pay: 'reforge', qty: [1, 3] }
+      },
+      materialSellWeights: { reforge: 5, strip: 5, holy: 5, augment: 5, synthesize: 5, phoenix: 6, evolution: 8, 'evolution-precise': 5, 'evolution-legend': 3, identify: 5, soulcrystal: 5 },
+      eggPrice: { pay: 'reforge', qty: [1, 4] }
+    },
+    minMaterial: 8,
+    /* 2026-09-03 三阶段：20 个 AI 玩家 persona（替代单一"流浪商人"）
+     * personas.count：AI 玩家总数（原型 20，正式 20~80）。
+     * levelTiers：等级档分布 = 进度结构（40% 新手图1-4 / 45% 中坚图5-10 / 15% 毕业图11-17）。
+     *   决定每个 AI 产出/挂单的图档范围 → 市场自然形成"图1白板 → 图17金装"全谱系。
+     * playstyles：流派偏好分布 = 需求结构发动机（55% 输出 / 25% 坦克 / 20% 速度）。
+     *   想捧某玩法 → 调大对应 pct → 该流派 AI 变多 → 对应词缀/血统需求上来 → 价格上来。
+     *   statPriorities 决定它定价时给什么词缀溢价、买玩家挂单时优先挑什么。
+     * wallet：AI 钱包（材料=钱，走现有 Materials 体系）；init 起始、incomePerTick 每 tick 收入。
+     * behavior：像真人的关键——自用率/消耗率(sink)/挂漏/买贵/定价波动/耐心/挂单上限/购买间隔。 */
+    personas: {
+      count: 20,
+      levelTiers: [
+        { tier: '新手', pct: 40, areaMin: 1, areaMax: 4 },
+        { tier: '中坚', pct: 45, areaMin: 5, areaMax: 10 },
+        { tier: '毕业', pct: 15, areaMin: 11, areaMax: 17 }
+      ],
+      playstyles: [
+        { id: 'dps', label: '输出', pct: 55, bloodlineBias: ['血狐', '疫毛兽', '骨狼', '幽影兔'], statPriorities: ['atk', 'crit', 'critDamage'] },
+        { id: 'tank', label: '坦克', pct: 25, bloodlineBias: ['瘟熊', '毒沼蛙', '尸犬'], statPriorities: ['hp', 'def', 'lifesteal'] },
+        { id: 'speed', label: '速度', pct: 20, bloodlineBias: ['幽影兔', '疫毛兽'], statPriorities: ['spd', 'dodge', 'atk'] }
+      ],
+      wallet: { init: { 重铸石: 5, 增缀石: 3, 神圣石: 1 }, incomePerTick: { 重铸石: 0.15, 增缀石: 0.1 } },
+      behavior: {
+        selfUseRate: 0.8,            // 产出 80% 自用（穿/进化），20% 挂市场
+        consumeRate: 0.8,            // 买入 80% 直接消耗离场（sink），20% 降价再挂
+        relistDiscount: [0.1, 0.2],  // 再挂降价 10~20%
+        leakChance: 0.05,            // 挂漏概率
+        overpayChance: 0.03,         // 买贵概率
+        priceJitter: 0.15,           // 个人定价波动 ±15%
+        patienceRate: 0.2,           // 20% 的 AI 选择"等不追高"
+        listSlots: 3,                // 每人挂单上限（< 玩家的 5，显得更"普通"）
+        buyInterval: [60, 180]       // 每人买玩家单的间隔（秒）
+      }
+    },
+    minEgg: 5,
     // 定价表：按稀有度 × 材料类型给数量范围 [最小, 最大]（低价漏取 range[0] 再打折）
     prices: {
       reforge: { white: [2, 6],   blue: [4, 10],  gold: [8, 20] },
@@ -937,12 +1008,84 @@ window.Config = {
     // 注册密码强度：minLen 最少位数；requireLetter 必须含字母；requireDigit 必须含数字
     pwdMinLen: 6,
     pwdRequireLetter: true,
-    pwdRequireDigit: true
+    pwdRequireDigit: true,
+    // 昵称：注册时玩家自己填（注册成功后写 profiles.nickname，聊天与市场展示都读它）；
+    // 玩家没填 / 老账号没资料 → 用下面词库自动生成一个，避免把邮箱前缀（如 776492620）当名字显示。
+    nickname: {
+      minLen: 2,
+      maxLen: 12,
+      // 自动生成的暗黑风词库：前段 + 后段随机拼接，末尾补 4 位编号防重名
+      prefixes: ['灰烬', '腐叶', '白骨', '暗影', '血月', '荒冢', '锈铁', '寒鸦', '幽冥', '枯荣', '泣腐', '幽影', '血潮', '腐变'],
+      suffixes: ['行者', '术士', '游侠', '猎手', '守夜人', '拾荒者', '铸魂者', '引路人', '掘墓人', '游荡者']
+    }
   },
 
   /* ================= 开发者模式（仅管理员账号可见入口） =================
    * adminEmails：登录邮箱在这个名单里，左侧边栏才显示「开发者」按钮。
    * 开发者面板只改内存中的 Config（刷新复原），不写库、不改文件。 */
+  /* ================= 新手引导模式（tutorial_mode.js 驱动） =================
+   * 2026-09-03 目标驱动主线重写配套：
+   *   · 等级门槛不再靠刷怪 —— 进入含 boostLevel 的任务时，tutorial_mode 把名下所有宠顶到该等级
+   *     （等价于一份引导经验包，全宠生效）：G2→Lv10 / G7→Lv40 / G9→Lv60。
+   *   · 加速祝福降级为「可选提速」：开局送 1 个，玩家用掉才生效 durationMin 分钟（刷材料更快）。
+   *   · 引导段（G1~G9）走完 → 发毕业礼包（绑定账号，仅一次；跳过引导的账号不发）。
+   *   · grants = 每关「钥匙表」：任务激活时按库存差量补齐本关要用的材料/装备/蛋/副宠
+   *     （幂等自愈，不依赖上一关奖励是否还在，见下方 grants 注释）。
+   */
+  tutorialMode: {
+    enabled: true,
+    expRate: 6,             // 引导期经验倍率（祝福生效时覆盖 Config.exp.rate）
+    fightSpeedMult: 3,      // 引导期战斗提速（祝福生效时缩短战斗间隔）
+    dropPool: null,         // 引导期掉率池覆盖（null = 不改掉率）
+    levelGate: null,        // 不降门槛：等级全靠经验包顶（null = 不覆盖 synthesize/nirvana.minLevel）
+    blessing: { name: '引导祝福', icon: '', durationMin: 30 },
+    // 毕业礼包（G9 涅槃完成后自动发，全部绑定、不可交易）
+    starterPack: {
+      gear: [{ rarity: 'gold', areaTier: 8, materialTier: 3, count: 1 }],
+      mats: [
+        { name: '凝魂晶石', qty: 5 },
+        { name: '神圣石', qty: 3 },
+        { name: '重铸石', qty: 3 },
+        { name: '增缀石', qty: 3 }
+      ],
+      expItems: [],
+      pet: null
+    },
+    // 开场总览 tour（选宠完成后播一次，spotlight 压暗聚光走一遍核心系统；台词可直接改）
+    openingTour: [
+      { target: '.sb-btn[data-page="worldmap"]', title: '第一站 · 战场', npc: '怪物横行的腐土，是你魂兽变强的资粮。厮杀可得经验与残甲——可蜕变，不该靠苦熬。' },
+      { target: '.sb-btn[data-page="pet"]', title: '第二站 · 魂兽', npc: '资料页藏着它的一切：血统、特质，以及那扇通往更强形态的进化之门。' },
+      { target: '.sb-btn[data-page="equip"]', title: '第三站 · 魂铸工坊', npc: '神兵不只出自掉落。这座铁砧，能把废品炼成护身之甲、把特质铸成传承。' },
+      { target: '.sb-btn[data-page="market"]', title: '第四站 · 市集', npc: '当你足够强大，多余的造物可挂上市集，与天下魂师交换所需之物。' }
+    ],
+    // 「钥匙表」：每个消耗型引导关声明它自己激活时需要的资源。
+    // 引擎（tutorial_mode.applyGrantsFor）在任务激活时按【当前库存差量】补齐，幂等自愈：
+    //   材料/蛋/装备/副宠 缺多少补到多少，库存够就什么都不发。
+    // 任务奖励只是锦上添花的正向反馈，不再承担"喂下一关"的职责——奖励被花掉也卡不了链。
+    grants: [
+      // G2 进化：进化素材 ×1（g1 奖励可能已被消耗，这里兜底）
+      { taskId: 'g2', type: 'mat', name: '进化素材', qty: 1 },
+      // G3 穿装备：一件未穿戴的装备（g1 蓝装可能已被提前穿上，兜底一件）
+      { taskId: 'g3', type: 'gear', spec: { rarity: 'blue', areaTier: 1, materialTier: 3, count: 1, identified: true } },
+      // G4 打造：需要"背包装备 + 石头"，各兜底一件/一颗
+      { taskId: 'g4', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
+      { taskId: 'g4', type: 'mat', name: '重铸石', qty: 1 },
+      // G5 化废为宝：分解需要一件背包装备当"废品"
+      { taskId: 'g5', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
+      // G6 孵化：孵化吃"按品种的蛋"（Drop.hatchEgg），不是材料 → 直接发真蛋
+      { taskId: 'g6', type: 'egg', baseName: '腐噜兽', qty: 1 },
+      // G7 融合：合成之石 + 保证素材池 ≥3 只（合成要吃掉 2 只，剩下 1 只 + 合成产物 = G9 涅槃的两只）。
+      // 血泪：曾用自命名「泥沼从者」当副宠 —— 那是凭空造物种，玩家完全没见过。现在只补已有基础宠，
+      // 不发明任何新名字。补的数量 = 缺口（幂等），宠物等级由经验包统一顶到门槛。
+      { taskId: 'g7', type: 'mat', name: '合成之石', qty: 1 },
+      { taskId: 'g7', type: 'petCount', baseName: '腐噜兽', min: 3 },
+      // G8 上架：一件未穿戴装备
+      { taskId: 'g8', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
+      // G9 涅槃：涅磐兽（主副宠等级由经验包顶入 Lv60）
+      { taskId: 'g9', type: 'mat', name: '涅磐兽', qty: 1 }
+    ]
+  },
+
   dev: {
     adminEmails: ['776492620@qq.com']
   }

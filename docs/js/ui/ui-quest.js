@@ -58,6 +58,7 @@
       case 'equip': return `穿装备 ${q.need} 件`;
       case 'list': return `上架 ${q.need} 次`;
       case 'trade': return `市场成交 ${q.need} 次`;
+      case 'level': return `出战宠物达到 Lv${q.need}`;
       default: return `进度 ${q.need}`;
     }
   }
@@ -344,6 +345,36 @@
     return items;
   }
 
+  /* ---------- 引导单步指引：点「去XX」时先讲清"这一步干嘛、为什么" ----------
+   * 目标通常在「还没切过去」的页面里（如宠物页 synth tab），此刻 getBoundingClientRect
+   * 量到 0×0 → hotspot 引擎会当"缺失"隐藏，控制台刷警告。
+   * 这里轮询等目标真正可见（≤1.5s）再弹；goGuide 紧随其后同步切页，下一帧就量到了。 */
+  function guideHint(it) {
+    try {
+      if (!it || !it.isTutorial || !it.target) return;
+      if (!window.Onboarding || !window.Onboarding.hotspot) return;
+      let tries = 0;
+      const attempt = function () {
+        let rc = null;
+        try {
+          const el = document.querySelector(it.target);
+          if (el && typeof el.getBoundingClientRect === 'function') rc = el.getBoundingClientRect();
+        } catch (e) { rc = null; }
+        if ((rc && rc.width > 1 && rc.height > 1) || ++tries >= 15) {
+          window.Onboarding.hotspot(it.target, {
+            title: it.name || '下一步',
+            npc: it.npc || '',
+            npcName: '引路人',
+            npcTitle: '魂兽向导'
+          });
+          return;
+        }
+        window.setTimeout(attempt, 100);
+      };
+      attempt();
+    } catch (e) { console.warn('[quest] 引导指引失败', e); }
+  }
+
   function renderQuestTracker() {
     const bar = $('quest-tracker');
     if (!bar || !Quest) return;
@@ -355,8 +386,12 @@
       const pct = it.need ? Math.min(100, Math.round(it.progress / it.need * 100)) : 0;
       const g = guideOf(it);
       const acts = it.isTutorial
-        ? `<button class="btn-mini primary qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
-           <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`
+        // 引导任务已达标 → 主按钮变「领取奖励」（G1 领资粮这类"等级即目标"的任务靠它交）
+        ? (it.done
+            ? `<button class="btn-mini primary qt-submit" data-id="${it.id}">领取奖励</button>
+               <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`
+            : `<button class="btn-mini primary qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
+               <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
         : `<button class="btn-mini ghost qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
            <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`;
       return `<div class="qt-item${it.done ? ' qt-done' : ''}" data-id="${it.id}">
@@ -371,7 +406,24 @@
     bar.querySelectorAll('.qt-go').forEach(b => {
       b.onclick = () => {
         const it = items.find(x => x.id === b.dataset.id);
-        if (it) goGuide(guideOf(it), it.area);
+        if (!it) return;
+        guideHint(it);                  // 先弹引路人的"为什么"，再跳到该去的页
+        goGuide(guideOf(it), it.area);
+      };
+    });
+    // 引导任务达标后：直接在引导条领奖（G1 领资粮这类任务没有"去某页"的操作）
+    bar.querySelectorAll('.qt-submit').forEach(b => {
+      b.onclick = async () => {
+        const label = b.textContent;
+        b.disabled = true;
+        b.textContent = '领取中…';
+        let r;
+        try { r = await Quest.completeQuest(b.dataset.id); }
+        finally { b.disabled = false; b.textContent = label; }
+        if (r && r.error) { if (UI.showToast) UI.showToast('领取失败', r.error); return; }
+        if (UI.showToast && r) UI.showToast('任务完成', '奖励：' + (r.rewards || []).join('、'));
+        if (UI.renderAll) UI.renderAll();
+        renderQuestTracker();
       };
     });
     const skip = bar.querySelector('.qt-skip');

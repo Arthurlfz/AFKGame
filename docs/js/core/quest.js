@@ -29,6 +29,9 @@
   let completed = {};           // 一次性任务完成记录 { questId: true }
   let dailyDone = {};           // 当天已交的日常 { questId: true }
   let dailyDate = '';           // 日常上次重置日期（YYYY-M-D）
+  // 账号级一次性标记（云端随 progress 一起存）：新手礼包已领 / 引导补给已发 / 引导祝福已送等。
+  // 规则：云端是唯一真相，本地 localStorage 只做读加速与降级兜底（详见 tutorial_mode 的读写封装）。
+  let extra = {};
 
   // 提交闸门：completeQuest 内部有多次 await（扣材料、逐个发奖），两帧之间的空隙里
   // 连点会重入同一段逻辑。奖励是云端 RPC 累加（add_material），重入一次就多给一份材料。
@@ -51,6 +54,7 @@
         dailyDone = data.dailyDone || {};
         dailyDate = data.dailyDate || '';
         tracked = Array.isArray(data.tracked) ? data.tracked.slice(0, TRACK_MAX) : [];
+        extra = (data.extra && typeof data.extra === 'object') ? data.extra : {};
       } else {
         progress = data;
       }
@@ -84,7 +88,8 @@
       completed: Object.assign({}, completed),
       dailyDone: Object.assign({}, dailyDone),
       dailyDate: dailyDate,
-      tracked: tracked.slice()
+      tracked: tracked.slice(),
+      extra: Object.assign({}, extra)
     };
   }
   function saveProgress() {
@@ -143,6 +148,12 @@
   }
 
   function currentProgress(q) {
+    // level：进度 = 出战宠等级（引导经验包顶上去即达标，玩家不靠刷怪升级。
+    // 2026-09-03 新增，供 G1「引路人的馈赠」这类"等级即目标"的引导任务用）
+    if (q.type === 'level') {
+      const p = (window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null);
+      return p ? Math.max(1, Number(p.level) || 1) : 0;
+    }
     if (q.type === 'collect') return Materials.getQuantity(q.matName);
     // 宠物养成链的「孵化」任务：玩家已经拥有该宠（含开局选择）→ 视为 1/1 已完成，
     // 否则开局选的那只宠的孵化任务永远做不了（开局选择不算 hatch）。
@@ -178,7 +189,8 @@
   // 引导条用：新手链里第一条「已解锁但未交」的任务（线性，走完返回 null）
   function getGuideQuest() {
     ensureDailyReset();
-    const list = (Config.drop.quests || []).filter(q => q.category === 'tutorial');
+    // 只认引导段（isGuide）：毕业后任务（G10 魂铸）不进引导条，走普通任务面板
+    const list = (Config.drop.quests || []).filter(q => q.category === 'tutorial' && q.isGuide);
     for (const q of list) {
       if (completed[q.id] || !isUnlocked(q)) continue;
       const have = currentProgress(q);
@@ -186,10 +198,13 @@
         id: q.id, name: q.name, type: q.type, need: q.need,
         area: q.area || null,   // 目标地图：引导条跳转时用来自动选图
         have, progress: Math.min(have, q.need), done: have >= q.need,
-        guide: q.guide || null, reward: q.reward
+        guide: q.guide || null, reward: q.reward, rewardGear: q.rewardGear || null,
+        // 叙事层：引路人台词（为什么做）/ hotspot 锚点 / 引导经验包等级（透给 tutorial_mode 顶等级）
+        npc: q.npc || '', hint: q.hint || '', target: q.target || '', boostLevel: q.boostLevel || 0,
+        isGuide: true
       };
     }
-    return null; // 新手链已走完
+    return null; // 引导段已走完（毕业）
   }
 
   function acceptQuest(id) { accepted.add(id); return true; }
@@ -328,6 +343,14 @@
       // 奖励必须真正落盘：Materials.gain 现在只改本地并入队（不上传），
       // 不 flush 的话玩家一刷新，刚领的奖励就没了。
       await Materials.flushMaterials();
+      // 引导推进：交完一条引导任务 → 驱动 tutorial_mode（顶下一条的等级门槛 / 走完则发毕业礼包）。
+      // 不 await：它是发礼包/改等级这种附加动作，失败不该拖住玩家的提交反馈。
+      if (q.category === 'tutorial' && window.TutorialMode && window.TutorialMode.checkGuide) {
+        Promise.resolve().then(function () {
+          try { window.TutorialMode.checkGuide(); }
+          catch (e) { console.warn('[quest] tutorial checkGuide 失败', e); }
+        });
+      }
       const rewards = pairs.map(([name, amt]) => `${name} ×${amt}`);
       // 装备名放进奖励列表：玩家领到的是哪一件必须看得见，否则"送了装备"等于没送
       const gear = (await gearTask) || [];
@@ -361,6 +384,24 @@
   // 跳过新手引导：把整条新手链标记为已完成（引导条消失，任务面板显示已完成）
   function skipGuide() {
     (Config.drop.quests || []).forEach(q => { if (q.category === 'tutorial') completed[q.id] = true; });
+    // 打「跳过」账号标记：毕业礼包只发给真正走过引导的账号（tutorial_mode.readSkipped）
+    if (window.TutorialMode && window.TutorialMode.markSkipped) {
+      try { window.TutorialMode.markSkipped(); } catch (e) { console.warn('[quest] markSkipped 失败', e); }
+    }
+    saveProgress();
+    return true;
+  }
+
+  // 重置引导链（开发者「清除引导标记」配套）：把 tutorial 段全部标回未完成/零进度，
+  // 云端一并落盘 —— 否则只清本地标记，云端 completed 还在，引导永远走不回 G1。
+  // ⚠️ 只该在开发者面板/测试用：已发的任务奖励不会回收，等于可以重复体验引导但不重复给奖励。
+  function resetGuideChain() {
+    (Config.drop.quests || []).forEach(q => {
+      if (q.category !== 'tutorial') return;
+      delete completed[q.id];
+      delete progress[q.id];
+      delete dailyDone[q.id];
+    });
     saveProgress();
     return true;
   }
@@ -369,6 +410,7 @@
   function reset() {
     progress = {}; completed = {}; dailyDone = {}; dailyDate = '';
     tracked = [];
+    extra = {};
     accepted.clear();
     submitting.clear();
     clearPendingSave();
@@ -376,10 +418,19 @@
     cloudLoaded = false;   // 换号必须重拉：新号的历史不能拿上一个号的内存当真相
   }
 
+  /* ---------- 账号级一次性标记（云端是唯一真相，随 progress 落盘） ---------- */
+  function getExtra(key) { return key in extra ? extra[key] : undefined; }
+  function setExtra(key, val) {
+    extra[key] = val;
+    return saveProgress(); // 走同一串行队列，不并发覆盖
+  }
+
   /* ---------- 对外 API ---------- */
   window.Quest = {
     getQuests, getGuideQuest, acceptQuest, completeQuest,
     reportType, skipGuide, abandonQuest, toggleTrack, getTracked, loadCloudProgress, reset,
+    getExtra, setExtra, resetGuideChain,
+    isFinished, isUnlocked,
     questExpOf, QUEST_EXP_FIXED
   };
 })();

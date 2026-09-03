@@ -436,8 +436,12 @@
   function renderActiveSkill(skill, cooldown, queued) {
     const btn = $('btn-active-skill');
     if (!btn) return;
-    btn.hidden = !skill;
-    if (!skill) return;
+    btn.hidden = false; // 主动技能按钮始终显示；未解锁置灰占位（2026-09-03）
+    if (!skill) {
+      btn.disabled = true;
+      btn.textContent = '主动技能 · 未解锁';
+      return;
+    }
     btn.disabled = cooldown > 0 || queued;
     btn.textContent = queued ? `${skill.name} · 待释放` : cooldown > 0 ? `${skill.name} · 冷却 ${cooldown}` : skill.name;
   }

@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge of Souls · 战斗演示（真实战斗引擎）</title>
+<!-- 直接复用游戏本体样式，保证视觉 1:1 一致 -->
+<link rel="stylesheet" href="css/game.css">
+<style>
+  /* ===== 演示专用：布局骨架 + 演出动画类（与游戏本体一致的行为） ===== */
+  :root{
+    --ink-900:#0e0d0b; --ink-800:#16140f; --ink-700:#221e16; --ink-600:#332c20;
+    --paper:#e9e2d0; --paper-dim:#b8ad93;
+    --crimson:#8c2b22; --crimson-bright:#c0392b;
+    --plague:#7d8a3a; --gold:#c9a227;
+    --fs-line:rgba(233,226,208,.14);
+    --fs-radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #1c1812 0%, var(--ink-900) 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 2px, transparent 2px 4px);
+    color:var(--paper);
+    font-family:"Noto Serif SC","Songti SC",STSong,serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .demo-head{
+    display:flex;align-items:center;gap:14px;padding:10px 18px;
+    border-bottom:1px solid var(--fs-line);
+    background:linear-gradient(180deg,rgba(40,34,24,.6),transparent);
+  }
+  .demo-head h1{font-size:16px;margin:0;letter-spacing:.08em;color:var(--paper)}
+  .demo-head .sub{font-size:12px;color:var(--paper-dim)}
+  .demo-head .badge{margin-left:auto;font-size:12px;color:var(--plague)}
+
+  #tab-battle{display:flex;flex-direction:column;height:calc(100vh - 46px)}
+
+  /* 顶部状态条 */
+  .battle-topbar{
+    display:flex;align-items:center;gap:18px;padding:8px 16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--fs-line);font-size:13px;
+  }
+  .status-badge{padding:3px 12px;border-radius:999px;border:1px solid var(--fs-line);font-size:12px}
+  .status-badge.fighting{color:var(--plague);border-color:rgba(125,138,58,.5)}
+  .status-badge.stopped{color:var(--paper-dim)}
+  .status-badge.recovering{color:var(--crimson-bright);border-color:rgba(192,57,43,.5)}
+  #battle-area-info{color:var(--paper-dim)}
+  .stat{color:var(--paper-dim)} .stat b{color:var(--paper)}
+
+  /* 战斗舞台 */
+  .battle-stage{
+    position:relative;flex:1;min-height:300px;overflow:hidden;
+    background:
+      radial-gradient(80% 60% at 50% 120%, rgba(140,43,34,.18), transparent 70%),
+      linear-gradient(180deg,#15120d 0%, #0e0c09 100%);
+    border-bottom:1px solid var(--fs-line);
+  }
+  .fighter{position:absolute;bottom:14%;display:flex;flex-direction:column;align-items:center;width:200px}
+  .fighter-pet{left:8%}
+  .fighter-enemy{right:8%}
+  .stage-avatar{
+    position:relative;
+    width:140px;height:140px;display:flex;align-items:flex-end;justify-content:center;
+    transition:transform var(--dash-back,.3s) ease-out;
+    will-change:transform;
+  }
+  .stage-avatar img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.55))}
+  .stage-avatar.pet-breathe{animation:breathe 3.2s ease-in-out infinite}
+  .fighter-name{margin-top:6px;font-size:14px;color:var(--paper);text-shadow:0 1px 2px #000}
+  .fighter-enemy.is-mutant .fighter-name{color:var(--crimson-bright);font-size:16px}
+  .stage-avatar.defeated{opacity:0;transform:translateY(40px) scale(.8);transition:all .6s ease}
+  .hp-bar{width:170px;height:14px;margin-top:6px;background:#000;border:1px solid var(--fs-line);border-radius:8px;overflow:hidden;position:relative}
+  .hp-fill{height:100%;width:100%;background:linear-gradient(90deg,#6b1f1a,#c0392b);transition:width .25s ease}
+  .hp-bar.is-low .hp-fill{background:linear-gradient(90deg,#7a0f0f,#ff2e2e)}
+  .hp-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+  .atk-track{width:170px;height:5px;margin-top:4px;background:#000;border:1px solid var(--fs-line);border-radius:6px;overflow:hidden}
+  .atk-fill{height:100%;width:0;background:linear-gradient(90deg,#b5862a,#f0c64a)}
+
+  /* 行动条竞速（阴阳师式竖条） */
+  .at-lane{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:60px;height:62vh;
+    border:1px solid var(--fs-line);border-radius:30px;background:rgba(0,0,0,.35);overflow:hidden}
+  #at-fill{position:absolute;bottom:0;left:0;right:0;height:0;background:linear-gradient(180deg,#c0392b,#6b1f1a)}
+  .racer{position:absolute;left:50%;width:34px;height:34px;margin-left:-17px;top:var(--pct,0%);border-radius:50%;
+    background:rgba(233,226,208,.1);border:1px solid var(--fs-line);display:flex;align-items:center;justify-content:center;
+    font-size:10px;transition:top .1s linear, transform .15s ease;}
+  .racer.leading{transform:scale(1.2);box-shadow:0 0 10px rgba(240,198,74,.7);border-color:var(--gold)}
+
+  /* 受击 / 蓄力 / 冲刺 */
+  @keyframes charge{0%{transform:scaleY(1) scaleX(1)}40%{transform:scaleY(.82) scaleX(1.1)}100%{transform:scaleY(1.05) scaleX(.97)}}
+  .stage-avatar.charging{animation:charge var(--dash-charge,.16s) ease-out}
+  .stage-avatar.attacking{transform:translateX(var(--dash-x,0));transition:transform var(--dash-out,.3s) ease-in}
+  .stage-avatar.hit{animation:flashHit .32s ease}
+  .stage-avatar.crit-hit{animation:flashCrit .44s ease}
+  @keyframes flashHit{0%{filter:brightness(2.2) drop-shadow(0 0 8px #fff)}100%{filter:none}}
+  @keyframes flashCrit{0%{filter:brightness(2.6) drop-shadow(0 0 14px var(--crimson-bright))}40%{transform:translateX(6px)}100%{filter:none}}
+  @keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+
+  /* 震屏 / 掉落扫光 */
+  .battle-stage.stage-shake{animation:shake .3s ease}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-3px)}60%{transform:translate(-4px,2px)}80%{transform:translate(3px,-2px)}}
+  .loot-flash{position:absolute;inset:0;pointer-events:none;opacity:0}
+  .battle-stage.loot-flash-gold .loot-flash{background:linear-gradient(115deg,transparent 35%,rgba(240,198,74,.55) 50%,transparent 65%);animation:sweep .9s ease}
+  .battle-stage.loot-flash-blue .loot-flash{background:linear-gradient(115deg,transparent 35%,rgba(90,150,220,.5) 50%,transparent 65%);animation:sweep .9s ease}
+  @keyframes sweep{0%{opacity:0;transform:translateX(-60%)}20%{opacity:1}100%{opacity:0;transform:translateX(60%)}}
+
+  /* 飘字 */
+  .fs-float{position:absolute;left:50%;top:0;transform:translateX(-50%);white-space:nowrap;
+    font-size:15px;font-weight:700;pointer-events:none;animation:floatUp .85s ease-out forwards;text-shadow:0 1px 3px #000}
+  .fs-float.normal{color:#fff}
+  .fs-float.skill{color:var(--gold);font-size:16px}
+  .fs-float.crit{color:var(--crimson-bright);font-size:19px}
+  .fs-float.lifesteal{color:#6fbf6f}
+  .fs-float.miss{color:var(--paper-dim);font-size:13px}
+  @keyframes floatUp{0%{opacity:0;transform:translate(-50%,8px)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-46px)}}
+
+  /* 控制台 */
+  .battle-console{height:140px;overflow-y:auto;padding:8px 16px;font-size:12.5px;line-height:1.7;
+    background:rgba(0,0,0,.25);border-top:1px solid var(--fs-line)}
+  .console-line{color:var(--paper-dim)}
+  .console-line.loot{color:var(--paper)}
+  .console-line.sys{color:var(--plague)}
+  .fs-q--gold{color:var(--gold);font-weight:700}
+  .fs-q--blue{color:#6fa8e0;font-weight:700}
+  .fs-q--white{color:var(--paper)}
+
+  /* 控制区 */
+  .battle-controls{display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--fs-line)}
+  .fs-btn{padding:8px 18px;border-radius:var(--fs-radius);border:1px solid var(--fs-line);
+    background:linear-gradient(180deg,var(--ink-700),var(--ink-800));color:var(--paper);
+    font-family:inherit;font-size:13px;cursor:pointer;transition:.15s}
+  .fs-btn:hover{border-color:var(--crimson);color:#fff}
+  .fs-btn:disabled{opacity:.45;cursor:default}
+  #btn-active-skill{color:var(--gold);border-color:rgba(201,162,39,.5)}
+
+  /* 出战竖列 */
+  .pet-roster{display:flex;gap:8px;padding:8px 16px;border-top:1px solid var(--fs-line);flex-wrap:wrap}
+  .roster-pet{width:46px;height:46px;border-radius:8px;border:1px solid var(--fs-line);
+    background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+  .roster-pet.active{border-color:var(--gold);box-shadow:0 0 8px rgba(201,162,39,.4)}
+  .roster-pet img{width:38px;height:38px;object-fit:contain}
+  .rp-lv{position:absolute;right:2px;bottom:0;font-size:10px;color:var(--paper-dim)}
+  .roster-tooltip{position:fixed;z-index:50;display:none;min-width:220px;padding:10px 12px;
+    background:var(--ink-800);border:1px solid var(--fs-line);border-radius:8px;font-size:12px}
+  .roster-tooltip.show{display:block}
+  .enemy-tip{position:fixed;z-index:60;display:none;min-width:230px;padding:10px 12px;
+    background:var(--ink-800);border:1px solid var(--fs-line);border-radius:8px;font-size:12px}
+  .enemy-tip[hidden]{display:none}
+  .enemy-tip-title{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .enemy-tip-title strong{color:var(--paper)}
+  .enemy-type{font-size:11px;padding:1px 7px;border-radius:6px}
+  .enemy-type.normal{color:var(--paper-dim)}
+  .enemy-type.evolved{color:#6fa8e0}
+  .enemy-type.mutant{color:var(--crimson-bright)}
+  .enemy-tip-heading{color:var(--plague);margin:6px 0 3px;font-size:11px}
+  .enemy-tip-row{display:flex;justify-content:space-between;gap:12px;padding:1px 0}
+  .enemy-tip-rows{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .rarity-white{color:var(--paper)} .rarity-blue{color:#6fa8e0} .rarity-gold{color:var(--gold)}
+</style>
+</head>
+<body>
+  <div class="demo-head">
+    <h1>Forge of Souls</h1>
+    <span class="sub">战斗演示 · 单文件内联版（真实战斗引擎 + 真实演出）</span>
+    <span class="badge">暗黑水墨 · 挂机养宠</span>
+  </div>
+
+  <div class="tab-page active" id="tab-battle">
+    <div class="battle-topbar">
+      <span class="status-badge idle" id="status-badge">空闲</span>
+      <span>场数：<b id="fight-count">0</b></span>
+      <span class="stat">累计战斗：<b id="stat-fights">0</b></span>
+      <span class="stat">获得装备：<b id="stat-equips">0</b></span>
+      <span id="battle-area-info"></span>
+    </div>
+
+    <div class="battle-stage" data-area-id="">
+      <div class="loot-flash"></div>
+      <div class="at-lane"><div id="at-fill"></div><div class="racer" id="at-racer-pet"></div><div class="racer" id="at-racer-enemy"></div></div>
+
+      <div class="fighter fighter-pet">
+        <div class="stage-avatar pet-breathe" id="pet-icon"></div>
+        <div class="fighter-name" id="pet-icon-name"></div>
+        <div class="hp-bar" id="pet-hp-bar-wrap"><div class="hp-fill" id="pet-hp-bar"></div><span class="hp-text" id="pet-hp-text"></span></div>
+        <div class="atk-track"><div class="atk-fill" id="atk-bar-pet"></div></div>
+      </div>
+
+      <div class="fighter fighter-enemy" id="enemy-fighter">
+        <div class="stage-avatar" id="enemy-icon"></div>
+        <div class="fighter-name" id="enemy-icon-name"></div>
+        <div class="hp-bar"><div class="hp-fill" id="enemy-hp-bar"></div><span class="hp-text" id="enemy-hp-text"></span></div>
+        <div class="atk-track"><div class="atk-fill" id="atk-bar-enemy"></div></div>
+      </div>
+    </div>
+
+    <div id="enemy-tip" hidden></div>
+
+    <div class="battle-console" id="console"></div>
+
+    <div class="battle-controls">
+      <button class="fs-btn" id="btn-battle">开始挂机</button>
+      <button class="fs-btn" id="btn-active-skill" hidden></button>
+      <button class="fs-btn" id="btn-change-map">返回地图</button>
+    </div>
+
+    <div class="pet-roster" id="pet-roster"></div>
+    <div class="roster-tooltip" id="roster-tooltip"></div>
+  </div>
+
+<!-- ===== 1) PetSprites：从 游戏.html 内联整份 ===== -->
+<script>
+window.PetSprites = {
+  V: "20260830e",
+  pathOf: function (n) { if (!n) return null; var p = this.map[n] || (n.indexOf("·异变") > 0 ? this.map[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
+  avatarOf: function (n) { if (!n) return null; var p = this.avatarMap[n] || (n.indexOf("·异变") > 0 ? this.avatarMap[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
+  elm: function (n) { var p = this.pathOf(n); if (!p) return null; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-sprite"; return img; },
+  mount: function (el, n) { if (!el) return false; var img = this.elm(n); if (!img) return false; el.textContent = ""; el.appendChild(img); return true; },
+  mountAvatar: function (el, n) { if (!el) return false; var p = this.avatarOf(n); if (!p) return false; el.textContent = ""; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-avatar-sprite"; el.appendChild(img); return true; },
+  animOf: function (n) { if (!n) return null; return this.animMap[n] || (n.indexOf("·异变") > 0 ? this.animMap[n.replace("·异变", "")] : null); },
+  paintAnim: function (d, x) { d.style.backgroundImage = "url('" + x.sheet + "?v=" + this.V + "')"; d.style.setProperty("--af", x.frames); d.style.setProperty("--steps", x.frames); d.style.setProperty("--dur", x.dur || "1.6s"); },
+  restartAnim: function (d) { d.style.animation = "none"; void d.offsetWidth; d.style.animation = ""; },
+  makeAnimNode: function (a, act) { var x = a[act] || a.idle; if (!x || !x.sheet) return null; var d = document.createElement("div"); d.className = "pet-anim"; d.dataset.anim = act; this.paintAnim(d, x); return d; },
+  ANIM_ENABLED: false,
+  mountAnimated: function (el, n) { if (!el || !this.ANIM_ENABLED) return false; var a = this.animOf(n); if (!a || !a.idle) return false; var node = this.makeAnimNode(a, "idle"); if (!node) return false; node.dataset.petName = n; el.textContent = ""; el.appendChild(node); return true; },
+  setAnim: function (node, act) { if (!node || !act || node.dataset.anim === act) return; var a = node.dataset.petName && this.animOf(node.dataset.petName); if (!a || !a[act]) return; node.dataset.anim = act; this.paintAnim(node, a[act]); this.restartAnim(node); },
+  map: {"腐噜兽":"assets/pets/pack0-base/monster-00.png","血狐":"assets/pets/pack0-base/monster-01.png","瘟熊":"assets/pets/pack0-base/monster-02.png","疫毛兽":"assets/pets/pack0-base/monster-03.png","骨狼":"assets/pets/pack0-base/monster-04.png","毒沼蛙":"assets/pets/pack0-base/monster-05.png","尸犬":"assets/pets/pack0-base/monster-06.png","幽影兔":"assets/pets/pack0-base/monster-07.png","血牙狐":"assets/pets/pack1-bloodfox/monster-00.png","幽火狐":"assets/pets/pack1-bloodfox/monster-01.png","血灾领主":"assets/pets/pack1-bloodfox/monster-02.png","幽火王":"assets/pets/pack1-bloodfox/monster-03.png","血月魔狐":"assets/pets/pack1-bloodfox/monster-04.png","幽火魔狐":"assets/pets/pack1-bloodfox/monster-05.png","血狐·异变":"assets/pets/pack1-bloodfox/monster-06.png","骨刃狼":"assets/pets/pack2-bonewolf/monster-00.png","冥霜狼":"assets/pets/pack2-bonewolf/monster-01.png","骨刃王":"assets/pets/pack2-bonewolf/monster-02.png","霜狼祭司":"assets/pets/pack2-bonewolf/monster-03.png","骸骨君主":"assets/pets/pack2-bonewolf/monster-04.png","霜寒领主":"assets/pets/pack2-bonewolf/monster-05.png","骨狼·异变":"assets/pets/pack2-bonewolf/monster-06.png","影刃兔":"assets/pets/pack3-shadowrabbit/monster-00.png","霜影兔":"assets/pets/pack3-shadowrabbit/monster-01.png","影舞者":"assets/pets/pack3-shadowrabbit/monster-02.png","霜影魔兔":"assets/pets/pack3-shadowrabbit/monster-03.png","影蚀魔君":"assets/pets/pack3-shadowrabbit/monster-04.png","霜魂兔皇":"assets/pets/pack3-shadowrabbit/monster-05.png","幽影兔·异变":"assets/pets/pack3-shadowrabbit/monster-06.png","瘟甲熊":"assets/pets/pack4-plaguebear/monster-00.png","血瘟熊":"assets/pets/pack4-plaguebear/monster-01.png","瘟神巨熊":"assets/pets/pack4-plaguebear/monster-02.png","血疫暴君":"assets/pets/pack4-plaguebear/monster-03.png","瘟疫之主":"assets/pets/pack4-plaguebear/monster-04.png","血瘟暴君":"assets/pets/pack4-plaguebear/monster-05.png","瘟熊·异变":"assets/pets/pack4-plaguebear/monster-06.png","腐沼兽":"assets/pets/pack5-rotten/monster-00.png","毒噜兽":"assets/pets/pack5-rotten/monster-01.png","腐沼王":"assets/pets/pack5-rotten/monster-02.png","毒沼霸主":"assets/pets/pack5-rotten/monster-03.png","腐烂之母":"assets/pets/pack5-rotten/monster-04.png","剧毒魔君":"assets/pets/pack5-rotten/monster-05.png","疫刺兽":"assets/pets/pack6-plaguecat/monster-00.png","冥毛兽":"assets/pets/pack6-plaguecat/monster-01.png","疫魔刺龙":"assets/pets/pack6-plaguecat/monster-02.png","冥幽兽":"assets/pets/pack6-plaguecat/monster-03.png","刺骨魔兽":"assets/pets/pack6-plaguecat/monster-04.png","幽冥疫君":"assets/pets/pack6-plaguecat/monster-05.png","毒沼王":"assets/pets/pack7-bogfrog/monster-00.png","咒沼蛙":"assets/pets/pack7-bogfrog/monster-01.png","毒沼魔君":"assets/pets/pack7-bogfrog/monster-02.png","咒毒蛙王":"assets/pets/pack7-bogfrog/monster-03.png","剧毒魔神":"assets/pets/pack7-bogfrog/monster-04.png","深渊蛙帝":"assets/pets/pack7-bogfrog/monster-05.png","尸牙犬":"assets/pets/pack8-corpsehound/monster-00.png","幽灵犬":"assets/pets/pack8-corpsehound/monster-01.png","尸魔犬王":"assets/pets/pack8-corpsehound/monster-02.png","幽冥猎犬":"assets/pets/pack8-corpsehound/monster-03.png","尸界狱主":"assets/pets/pack8-corpsehound/monster-04.png","幽魂犬皇":"assets/pets/pack8-corpsehound/monster-05.png"},
+  animMap: {"影刃兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-attack.png",frames:6,dur:"0.7s"}},"霜影兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-attack.png",frames:6,dur:"0.7s"}}},
+  avatarMap: {"腐噜兽":"assets/pets/avatars/pack0-base/腐噜兽.png","血狐":"assets/pets/avatars/pack0-base/血狐.png","瘟熊":"assets/pets/avatars/pack0-base/瘟熊.png","疫毛兽":"assets/pets/avatars/pack0-base/疫毛兽.png","骨狼":"assets/pets/avatars/pack0-base/骨狼.png","毒沼蛙":"assets/pets/avatars/pack0-base/毒沼蛙.png","尸犬":"assets/pets/avatars/pack0-base/尸犬.png","幽影兔":"assets/pets/avatars/pack0-base/幽影兔.png","血牙狐":"assets/pets/avatars/pack1-bloodfox/血牙狐.png","幽火狐":"assets/pets/avatars/pack1-bloodfox/幽火狐.png","血灾领主":"assets/pets/avatars/pack1-bloodfox/血灾领主.png","幽火王":"assets/pets/avatars/pack1-bloodfox/幽火王.png","血月魔狐":"assets/pets/avatars/pack1-bloodfox/血月魔狐.png","幽火魔狐":"assets/pets/avatars/pack1-bloodfox/幽火魔狐.png","血狐·异变":"assets/pets/avatars/pack1-bloodfox/血狐·异变.png","骨刃狼":"assets/pets/avatars/pack2-bonewolf/骨刃狼.png","冥霜狼":"assets/pets/avatars/pack2-bonewolf/冥霜狼.png","骨刃王":"assets/pets/avatars/pack2-bonewolf/骨刃王.png","霜狼祭司":"assets/pets/avatars/pack2-bonewolf/霜狼祭司.png","骸骨君主":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","霜寒领主":"assets/pets/avatars/pack2-bonewolf/霜寒领主.png","骨狼·异变":"assets/pets/pack2-bonewolf/骨狼·异变.png","影刃兔":"assets/pets/avatars/pack3-shadowrabbit/影刃兔.png","霜影兔":"assets/pets/avatars/pack3-shadowrabbit/霜影兔.png","影舞者":"assets/pets/avatars/pack3-shadowrabbit/影舞者.png","霜影魔兔":"assets/pets/avatars/pack3-shadowrabbit/霜影魔兔.png","影蚀魔君":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png","霜魂兔皇":"assets/pets/avatars/pack3-shadowrabbit/霜魂兔皇.png","幽影兔·异变":"assets/pets/avatars/pack3-shadowrabbit/幽影兔·异变.png","瘟甲熊":"assets/pets/avatars/pack4-plaguebear/瘟甲熊.png","血瘟熊":"assets/pets/avatars/pack4-plaguebear/血瘟熊.png","瘟神巨熊":"assets/pets/avatars/pack4-plaguebear/瘟神巨熊.png","血疫暴君":"assets/pets/avatars/pack4-plaguebear/血疫暴君.png","瘟疫之主":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","血瘟暴君":"assets/pets/avatars/pack4-plaguebear/血瘟暴君.png","瘟熊·异变":"assets/pets/avatars/pack4-plaguebear/瘟熊·异变.png","腐沼兽":"assets/pets/avatars/pack5-rotten/腐沼兽.png","毒噜兽":"assets/pets/avatars/pack5-rotten/毒噜兽.png","腐沼王":"assets/pets/avatars/pack5-rotten/腐沼王.png","毒沼霸主":"assets/pets/avatars/pack5-rotten/毒沼霸主.png","腐烂之母":"assets/pets/avatars/pack5-rotten/腐烂之母.png","剧毒魔君":"assets/pets/avatars/pack5-rotten/剧毒魔君.png","疫刺兽":"assets/pets/avatars/pack6-plaguecat/疫刺兽.png","冥毛兽":"assets/pets/avatars/pack6-plaguecat/冥毛兽.png","疫魔刺龙":"assets/pets/avatars/pack6-plaguecat/疫魔刺龙.png","冥幽兽":"assets/pets/avatars/pack6-plaguecat/冥幽兽.png","刺骨魔兽":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","幽冥疫君":"assets/pets/avatars/pack6-plaguecat/幽冥疫君.png","毒沼王":"assets/pets/avatars/pack7-bogfrog/毒沼王.png","咒沼蛙":"assets/pets/avatars/pack7-bogfrog/咒沼蛙.png","毒沼魔君":"assets/pets/avatars/pack7-bogfrog/毒沼魔君.png","咒毒蛙王":"assets/pets/avatars/pack7-bogfrog/咒毒蛙王.png","剧毒魔神":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","深渊蛙帝":"assets/pets/avatars/pack7-bogfrog/深渊蛙帝.png","尸牙犬":"assets/pets/avatars/pack8-corpsehound/尸牙犬.png","幽灵犬":"assets/pets/avatars/pack8-corpsehound/幽灵犬.png","尸魔犬王":"assets/pets/avatars/pack8-corpsehound/尸魔犬王.png","幽冥猎犬":"assets/pets/avatars/pack8-corpsehound/幽冥猎犬.png","尸界狱主":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","幽魂犬皇":"assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png"}
+};
+</script>
+
+<!-- ===== 2) Util ===== -->
+<script>
+window.Util = {
+  pickWeighted: (arr, wf) => {
+    const ws = arr.map(x => Math.max(0, (wf ? wf(x) : (x.weight||1)) || 0));
+    const total = ws.reduce((a,b)=>a+b,0);
+    if(total<=0) return arr[0];
+    let r = Math.random()*total;
+    for(let i=0;i<arr.length;i++){ r -= ws[i]; if(r<=0) return arr[i]; }
+    return arr[arr.length-1];
+  }
+};
+</script>
+
+<!-- ===== 3) 最小 Config（战斗所需数值） ===== -->
+<script>
+window.Config = {
+  pet: {
+    evolution: {
+      activeSkills: {
+        '腐烂之母': { id: 'corrosion-spit', name: '腐蚀喷吐', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
+        '剧毒魔君': { id: 'toxic-cloud', name: '剧毒云雾', minLevel: 60, cooldownTurns: 3, triggerChance: 0.22, damageMultiplier: 1.3, maxHpDamageRate: 0.03 },
+        '血月魔狐': { id: 'blood-moon-slash', name: '血月斩', minLevel: 60, cooldownTurns: 3, triggerChance: 0.13, damageMultiplier: 2 },
+        '幽火魔狐': { id: 'hellfire-burn', name: '幽火焚身', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
+        '瘟疫之主': { id: 'plague-stomp', name: '瘟疫践踏', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.6 },
+        '血瘟暴君': { id: 'blood-feast', name: '血瘟盛宴', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
+        '刺骨魔兽': { id: 'bone-spike', name: '万骨穿刺', minLevel: 60, cooldownTurns: 3, triggerChance: 0.15, damageMultiplier: 1.8 },
+        '幽冥疫君': { id: 'nether-plague', name: '幽冥疫爆', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.02 },
+        '骸骨君主': { id: 'bone-cleave', name: '骸骨裂斩', minLevel: 60, cooldownTurns: 3, triggerChance: 0.14, damageMultiplier: 1.9 },
+        '霜寒领主': { id: 'frost-bite', name: '极寒撕咬', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.6 },
+        '剧毒魔神': { id: 'venom-eruption', name: '毒沼爆发', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.4, maxHpDamageRate: 0.03 },
+        '深渊蛙帝': { id: 'abyss-crush', name: '深渊镇压', minLevel: 60, cooldownTurns: 3, triggerChance: 0.13, damageMultiplier: 2 },
+        '尸界狱主': { id: 'corpse-rend', name: '尸界撕裂', minLevel: 60, cooldownTurns: 3, triggerChance: 0.16, damageMultiplier: 1.7 },
+        '幽魂犬皇': { id: 'ghost-hunt', name: '幽魂猎杀', minLevel: 60, cooldownTurns: 3, triggerChance: 0.18, damageMultiplier: 1.5, maxHpDamageRate: 0.02 },
+        '影蚀魔君': { id: 'shadow-eclipse', name: '影蚀绝杀', minLevel: 60, cooldownTurns: 3, triggerChance: 0.12, damageMultiplier: 2.1 },
+        '霜魂兔皇': { id: 'frost-moon', name: '霜魂月刃', minLevel: 60, cooldownTurns: 3, triggerChance: 0.16, damageMultiplier: 1.7 }
+      },
+      skillOf: (name) => {
+        const skills = (window.Config.pet && window.Config.pet.evolution && window.Config.pet.evolution.activeSkills) || {};
+        const baseName = String(name || '').replace(/·异变$/, '');
+        return skills[baseName] || null;
+      }
+    }
+  },
+  battle: {
+    speedScale: 12,
+    levelScaleClamp: [0.25, 1.1],
+    areaEnemyStats: {
+      'corrupted-forest': { hp: 225, atk: 38, def: 16 },
+      'plague-swamp':     { hp: 460, atk: 80, def: 38 },
+      'shadow-mountains': { hp: 820, atk: 135, def: 68 },
+      'bone-wastes':      { hp: 1350, atk: 210, def: 110 },
+      'blood-rift':       { hp: 2100, atk: 315, def: 170 },
+      'echo-cliffs':      { hp: 3200, atk: 470, def: 260 },
+      'rotfen-bog':       { hp: 4600, atk: 660, def: 370 },
+      'ember-hollow':     { hp: 6400, atk: 900, def: 510 },
+      'soul-abyss':       { hp: 8700, atk: 1190, def: 680 },
+      'blight-heart':     { hp: 11500, atk: 1550, def: 890 }
+    },
+    typeMult: { normal: 1.0, evolved: 1.1, mutant: 1.2 },
+    areas: [
+      { id: 'corrupted-forest', name: '枯荣之地', levelRange: [1, 6], recommended: '成长 3', recGrowth: 3, background: '枯荣之地', difficulty: 1.0, enemyIds: ['wild-rotten', 'wild-bloodfox'] },
+      { id: 'plague-swamp', name: '泣腐泥沼', levelRange: [7, 12], recommended: '成长 5', recGrowth: 5, background: '泣腐泥沼', difficulty: 1.0, enemyIds: ['wild-rotten', 'wild-bloodfox', 'wild-plaguebear', 'wild-bogfrog'] },
+      { id: 'shadow-mountains', name: '白骨旷野', levelRange: [13, 18], recommended: '成长 7', recGrowth: 7, background: '白骨旷野', difficulty: 1.0, enemyIds: ['wild-bonewolf', 'wild-shadowrabbit', 'wild-plaguebear', 'wild-bogfrog', 'wild-corpsehound', 'wild-plaguecat'] },
+      { id: 'bone-wastes', name: '幽影迷境', levelRange: [19, 24], recommended: '成长 9', recGrowth: 9, background: '幽影迷境', difficulty: 1.0, enemyIds: ['wild-bloodfang-fox', 'wild-netherfrost-wolf', 'wild-withermaw', 'wild-blightspine', 'wild-umbra-rabbit', 'wild-bog-king'] },
+      { id: 'blood-rift', name: '血潮裂谷', levelRange: [25, 30], recommended: '成长 11', recGrowth: 11, background: '血潮裂谷', difficulty: 1.0, enemyIds: ['wild-bloodfang-fox', 'wild-netherfrost-wolf', 'wild-withermaw', 'wild-blightspine', 'wild-umbra-rabbit', 'wild-bog-king'] },
+      { id: 'echo-cliffs', name: '回响崖', levelRange: [31, 36], recommended: '成长 13', recGrowth: 13, background: '回响崖', difficulty: 1.0, enemyIds: ['wild-bog-king', 'wild-umbra-rabbit', 'wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-bloodfox-mutant', 'wild-plaguebear-mutant'] },
+      { id: 'rotfen-bog', name: '腐沼泽', levelRange: [37, 42], recommended: '成长 15', recGrowth: 15, background: '腐沼泽', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
+      { id: 'ember-hollow', name: '余烬渊', levelRange: [43, 48], recommended: '成长 17', recGrowth: 17, background: '余烬渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
+      { id: 'soul-abyss', name: '魂渊', levelRange: [49, 54], recommended: '成长 19', recGrowth: 19, background: '魂渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
+      { id: 'blight-heart', name: '腐变之源', levelRange: [55, 60], recommended: '成长 21', recGrowth: 21, background: '腐变之源', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] }
+    ],
+    critRate: 0.1,
+    critMultiplier: 1.5,
+    stopHpRatio: 0.3,
+    nextFightDelay: 600
+  },
+  drop: {
+    pool: { none: 760, material: 210, equipment: 15, egg: 15 }
+  }
+};
+</script>
+
+<!-- ===== 4) EnemyData ===== -->
+<script>
+window.EnemyData = {
+  list: [
+    { id: 'wild-rotten', name: '腐噜兽', icon: '🐹', level: 6, spd: 55, rarityWeights: { white: 80, blue: 18, gold: 2 }, levelRange: [1, 10], weight: 9, eggBaseName: '腐噜兽', enemyType: 'normal' },
+    { id: 'wild-bloodfox', name: '血狐', icon: '🦊', level: 9, spd: 95, rarityWeights: { white: 75, blue: 22, gold: 3 }, levelRange: [1, 10], weight: 8, eggBaseName: '血狐', enemyType: 'normal' },
+    { id: 'wild-bonewolf', name: '骨狼', icon: '🐺', level: 14, spd: 75, rarityWeights: { white: 60, blue: 35, gold: 5 }, levelRange: [11, 20], weight: 8, eggBaseName: '骨狼', enemyType: 'normal' },
+    { id: 'wild-shadowrabbit', name: '幽影兔', icon: '🐰', level: 16, spd: 110, rarityWeights: { white: 55, blue: 38, gold: 7 }, levelRange: [11, 20], weight: 7, eggBaseName: '幽影兔', enemyType: 'normal' },
+    { id: 'wild-plaguebear', name: '瘟熊', icon: '🐻', level: 18, spd: 30, rarityWeights: { white: 50, blue: 42, gold: 8 }, levelRange: [11, 20], weight: 6, eggBaseName: '瘟熊', enemyType: 'normal' },
+    { id: 'wild-bogfrog', name: '毒沼蛙', icon: '🐸', level: 15, spd: 45, rarityWeights: { white: 52, blue: 40, gold: 8 }, levelRange: [11, 20], weight: 6, eggBaseName: '毒沼蛙', enemyType: 'normal' },
+    { id: 'wild-corpsehound', name: '尸犬', icon: '🐶', level: 17, spd: 65, rarityWeights: { white: 55, blue: 38, gold: 7 }, levelRange: [11, 20], weight: 7, eggBaseName: '尸犬', enemyType: 'normal' },
+    { id: 'wild-plaguecat', name: '疫毛兽', icon: '🐱', level: 13, spd: 85, rarityWeights: { white: 58, blue: 36, gold: 6 }, levelRange: [11, 20], weight: 7, eggBaseName: '疫毛兽', enemyType: 'normal' },
+    { id: 'wild-bloodfang-fox', name: '血牙狐', icon: '🦷', level: 24, spd: 95, rarityWeights: { white: 25, blue: 50, gold: 25 }, levelRange: [21, 35], weight: 4, eggBaseName: '血狐', enemyType: 'evolved' },
+    { id: 'wild-netherfrost-wolf', name: '冥霜狼', icon: '❄', level: 28, spd: 75, rarityWeights: { white: 20, blue: 45, gold: 35 }, levelRange: [21, 35], weight: 4, eggBaseName: '骨狼', enemyType: 'evolved' },
+    { id: 'wild-withermaw', name: '尸牙犬', icon: '🦷', level: 26, spd: 65, rarityWeights: { white: 22, blue: 48, gold: 30 }, levelRange: [21, 35], weight: 4, eggBaseName: '尸犬', enemyType: 'evolved' },
+    { id: 'wild-blightspine', name: '疫刺兽', icon: '🌵', level: 27, spd: 85, rarityWeights: { white: 22, blue: 48, gold: 30 }, levelRange: [21, 35], weight: 4, eggBaseName: '疫毛兽', enemyType: 'evolved' },
+    { id: 'wild-umbra-rabbit', name: '影刃兔', icon: '🌙', level: 31, spd: 110, rarityWeights: { white: 18, blue: 42, gold: 40 }, levelRange: [21, 35], weight: 3, eggBaseName: '幽影兔', enemyType: 'evolved' },
+    { id: 'wild-bog-king', name: '毒沼王', icon: '👑', level: 33, spd: 45, rarityWeights: { white: 18, blue: 42, gold: 40 }, levelRange: [21, 35], weight: 3, eggBaseName: '毒沼蛙', enemyType: 'evolved' },
+    { id: 'wild-bloodfox-mutant', name: '血狐·异变', icon: '🦊', level: 40, spd: 95, rarityWeights: { white: 10, blue: 35, gold: 55 }, levelRange: [36, 100], weight: 1, eggBaseName: '血狐', enemyType: 'mutant' },
+    { id: 'wild-bonewolf-mutant', name: '骨狼·异变', icon: '🐺', level: 42, spd: 75, rarityWeights: { white: 10, blue: 35, gold: 55 }, levelRange: [36, 100], weight: 1, eggBaseName: '骨狼', enemyType: 'mutant' },
+    { id: 'wild-shadowrabbit-mutant', name: '幽影兔·异变', icon: '🐰', level: 45, spd: 110, rarityWeights: { white: 8, blue: 32, gold: 60 }, levelRange: [36, 100], weight: 1, eggBaseName: '幽影兔', enemyType: 'mutant' },
+    { id: 'wild-plaguebear-mutant', name: '瘟熊·异变', icon: '🐻', level: 48, spd: 30, rarityWeights: { white: 10, blue: 30, gold: 60 }, levelRange: [36, 100], weight: 1, eggBaseName: '瘟熊', enemyType: 'mutant' }
+  ]
+};
+</script>
+
+<!-- ===== 5) UI 桩 ===== -->
+<script>
+function appendConsole(cat, content, isHtml){
+  const box = document.getElementById('console');
+  if(!box) return;
+  const line = document.createElement('div');
+  line.className = 'console-line ' + (cat || 'sys');
+  if(isHtml) line.innerHTML = content; else line.textContent = content;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+window.UI = {
+  $: sel => typeof sel === 'string' && sel[0] === '#' ? document.getElementById(sel.slice(1)) : document.querySelector(sel),
+  escapeHtml: s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),
+  addLog: t => appendConsole('sys', t),
+  consoleLog: (cat, html) => appendConsole(cat, html, true),
+  switchPage: () => {},
+  showToast: m => appendConsole('sys', m),
+  renderAll: () => {},
+};
+</script>
+
+<!-- ===== 6) Pet 桩 ===== -->
+<script>
+const SAMPLE_PETS = [
+  { id:1, name:'腐烂之母', level:60, growth:35, exp:0,  spd:100, equipment:{} },
+  { id:2, name:'骨狼',     level:14, growth:9,  exp:0,  spd:75,  equipment:{} },
+  { id:3, name:'血狐',     level:9,  growth:6,  exp:0,  spd:95,  equipment:{} },
+  { id:4, name:'幽影兔',   level:18, growth:10, exp:0,  spd:110, equipment:{} },
+];
+let activePetId = 1;
+const petById = id => SAMPLE_PETS.find(p => p.id === id);
+const activePet = () => petById(activePetId);
+
+function demoStats(pet){
+  return {
+    hp: 6000, atk: 680, def: 210, spd: pet.spd || 90,
+    critRate: 0.12, critDamage: 1.5, hit: 95, dodge: 8, lifesteal: 0.2
+  };
+}
+
+window.Pet = {
+  getActivePet: activePet,
+  getPets: () => SAMPLE_PETS,
+  getStats: p => demoStats(p || activePet()),
+  getCurHp: p => { const pet = p || activePet(); if(pet.curHp == null) pet.curHp = demoStats(pet).hp; return pet.curHp; },
+  setCurHp: (p, v) => { (p || activePet()).curHp = Math.max(0, v); },
+  setActive: id => { activePetId = id; const pet = activePet(); pet.curHp = demoStats(pet).hp; },
+  getBonusText: () => '',
+  getBloodline: () => null,
+  getAwakenState: () => ({ damage: 0 }),
+  expNeed: lv => 100 + (lv||1) * 50,
+  expRange: (enemy) => { const l = (enemy && enemy.level) || 1; return { min: l*10, max: l*12 }; },
+};
+
+// 立绘加载失败兜底：显示宠物名（不回退 emoji，符合项目铁律）
+document.addEventListener('error', e => {
+  const img = e.target;
+  if(img && img.tagName === 'IMG' && img.parentElement && img.parentElement.classList.contains('stage-avatar')){
+    const name = img.parentElement.dataset.pet || '';
+    if(name){ img.remove(); img.parentElement.textContent = name; }
+  }
+}, true);
+</script>
+
+<!-- ===== 7) 真实战斗引擎 battle.js ===== -->
+<script>
+(function () {
+  'use strict';
+
+  const Config = window.Config;
+  const { pickWeighted } = window.Util;
+  const { getActivePet, getStats, getCurHp, setCurHp } = window.Pet;
+
+  let autoRunning = false;
+  let waitingRecover = false;
+  let recoverTimer = null;
+  let fightCount = 0;
+  let totalFights = 0;
+  let interval = null;
+  let nextFightTimer = null;
+  const freeze = { pet: false, enemy: false };
+  const unfreezeTimer = { pet: null, enemy: null };
+  let fightEnded = false;
+  let onFightEnd = null;
+  let selectedAreaId = null;
+  const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
+  let pendingKillBuff = false;
+  let bloodline = null;
+  let killBuffActive = false;
+  let corruptionStacks = 0;
+
+  function startAutoBattle(callback) {
+    if (autoRunning) return;
+    autoRunning = true;
+    waitingRecover = false;
+    fightCount = 0;
+    onFightEnd = callback;
+    window.UI.updateStatus('fighting', fightCount);
+    window.UI.addLog('🕹 开始自动战斗！');
+    beginFight();
+  }
+  function stopAutoBattle() {
+    if (!autoRunning) return;
+    autoRunning = false;
+    waitingRecover = false;
+    clearFreeze('pet'); clearFreeze('enemy');
+    clearInterval(interval);   interval = null;
+    clearTimeout(nextFightTimer); nextFightTimer = null;
+    clearInterval(recoverTimer); recoverTimer = null;
+    setTimeout(() => {
+      if (state.pet) setCurHp(state.petRef || getActivePet(), state.pet.hp);
+    }, 250);
+    window.UI.addLog('🛑 停止自动战斗');
+    window.UI.updateStatus('stopped', fightCount);
+  }
+  const isRunning = () => autoRunning;
+  const isWaitingRecover = () => waitingRecover;
+
+  function enterRecover(reason) {
+    waitingRecover = true;
+    window.UI.updateStatus('recovering', fightCount);
+    window.UI.addLog(reason);
+    clearInterval(recoverTimer);
+    recoverTimer = setInterval(() => {
+      const pet = getActivePet();
+      if (!pet) return;
+      if (getCurHp(pet) >= getStats(pet).hp) {
+        clearInterval(recoverTimer);
+        recoverTimer = null;
+        waitingRecover = false;
+        window.UI.addLog('💚 恢复完毕，自动继续挂机！');
+        beginFight();
+      }
+    }, 500);
+  }
+
+  function getPlayerLevel() {
+    const pet = getActivePet();
+    return pet ? (pet.level || 1) : 1;
+  }
+  function getEnemyPool() {
+    return window.EnemyData?.list || Config.battle.enemies || [];
+  }
+  function getCurrentArea() {
+    const areas = Config.battle.areas || [];
+    return areas.find(area => area.id === selectedAreaId) || null;
+  }
+  function selectArea(areaId) {
+    const area = (Config.battle.areas || []).find(item => item.id === areaId);
+    if (!area || autoRunning) return false;
+    selectedAreaId = area.id;
+    return true;
+  }
+  function getAreas() {
+    return (Config.battle.areas || []).slice();
+  }
+  function rollEnemyLevel(area, playerLevel) {
+    const range = (area && area.levelRange) || [1, 6];
+    const a = Math.max(1, Number(range[0]) || 1), b = Math.max(1, Number(range[1]) || 1);
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    const lv = Math.max(1, Number(playerLevel) || 1);
+    return Math.min(hi, Math.max(lo, lv));
+  }
+  function getAreaEnemyPool(area) {
+    const enemies = getEnemyPool();
+    const [areaMin, areaMax] = (area && area.levelRange) || [1, 60];
+    const areaIds = new Set((area && area.enemyIds) || []);
+    if (!areaIds.size) return [];
+    const inArea = enemy => {
+      const [enemyMin, enemyMax] = enemy.levelRange || [enemy.level || 1, enemy.level || 1];
+      return enemyMax >= areaMin && enemyMin <= areaMax;
+    };
+    return enemies.filter(enemy => areaIds.has(enemy.id) && inArea(enemy));
+  }
+  function setEncounterLevel(enemy, playerLevel, area) {
+    return { ...enemy, level: rollEnemyLevel(area, playerLevel) };
+  }
+  function scaleEnemyStats(enemy, area) {
+    const diff = (area && area.difficulty) || 1.0;
+    const base = (Config.battle.areaEnemyStats || {})[area && area.id] || { hp: 320, atk: 72, def: 30 };
+    const tm = (Config.battle.typeMult || {})[enemy.enemyType] || 1.0;
+    const [lo, hi] = (area && area.levelRange) || [1, 10];
+    const mid = (lo + hi) / 2;
+    const level = enemy.level || 1;
+    const clampCfg = Config.battle.levelScaleClamp || [0.25, 1.6];
+    const ratio = Math.max(clampCfg[0], Math.min(clampCfg[1], level / mid));
+    const hp  = Math.round(base.hp * ratio * tm * diff);
+    const def = Math.round(base.def * ratio * tm * diff);
+    const atk = Math.round(base.atk * ratio * tm * diff);
+    const spd = enemy.spd;
+    return { ...enemy, growth: (area && area.recGrowth) || 3, hp, maxHp: hp, atk, def, spd, _diff: diff };
+  }
+  function pickEnemy() {
+    const area = getCurrentArea();
+    if (!area) return null;
+    const level = getPlayerLevel();
+    const enemies = getAreaEnemyPool(area);
+    const picked = enemies.length ? pickWeighted(enemies, item => item.weight || 1) : null;
+    return picked ? { enemy: setEncounterLevel(picked, level, area), area, enemies } : null;
+  }
+  function beginFight() {
+    const pet = getActivePet();
+    const stats = getStats(pet);
+    const picked = pickEnemy();
+    if (!picked) {
+      window.UI.addLog(getCurrentArea() ? '⚠️ 当前地图没有可用野怪，请检查怪物池配置。' : '⚠️ 请先选择挂机地图。');
+      return;
+    }
+    const { enemy: ENEMY, area } = picked;
+    const enemyStats = scaleEnemyStats(ENEMY, area);
+    state.petRef = pet;
+    state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal };
+    state.enemy = enemyStats;
+    if (state.enemy.critRate == null) state.enemy.critRate = Config.battle.critRate;
+    if (state.enemy.critDamage == null) state.enemy.critDamage = Config.battle.critMultiplier;
+    if (state.enemy.hit == null) state.enemy.hit = 90;
+    if (state.enemy.dodge == null) {
+      const et = state.enemy.enemyType || 'normal';
+      state.enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
+    }
+    if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
+    state.petAction = 0;
+    state.enemyAction = 0;
+    const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
+      ? Config.pet.evolution.skillOf(pet.name)
+      : Config.pet.evolution.activeSkills?.[pet.name];
+    state.activeSkill = skill && state.pet.level >= skill.minLevel ? skill : null;
+    state.skillCooldown = 0;
+    state.skillQueued = false;
+    bloodline = window.Pet && window.Pet.getBloodline ? window.Pet.getBloodline(pet) : null;
+    killBuffActive = pendingKillBuff;
+    pendingKillBuff = false;
+    corruptionStacks = 0;
+    clearFreeze('pet'); clearFreeze('enemy');
+    fightEnded = false;
+    const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
+    const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
+    window.UI.resetBattle(petLabel, state.pet.icon, enemyLabel, state.enemy.icon, state.pet.maxHp, state.enemy.maxHp);
+    window.UI.updateBattleArea(area);
+    window.UI.updateStatus('fighting', fightCount);
+    window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+
+    interval = setInterval(tick, 100);
+  }
+  function getBloodlineAspdMult() {
+    if (!bloodline || bloodline.type !== 'speedAspd' || !bloodline.params) return 1;
+    const p = bloodline.params;
+    const spd = state.pet ? state.pet.spd : 0;
+    if (spd <= p.threshold) return 1;
+    const bonus = Math.min(p.cap, Math.floor((spd - p.threshold) / p.perPoint) * p.bonusPer);
+    return 1 + bonus;
+  }
+  function tick() {
+    const scale = Config.battle.speedScale || 1;
+    if (!freeze.pet)   state.petAction += state.pet.spd * getBloodlineAspdMult() / scale;
+    if (!freeze.enemy) state.enemyAction += state.enemy.spd / scale;
+    window.UI.updateAction(state.petAction, state.enemyAction);
+    if (!freeze.pet && state.petAction >= 100)     { state.petAction = 0;   doTurn('pet'); }
+    if (!freeze.enemy && state.enemyAction >= 100) { state.enemyAction = 0; doTurn('enemy'); }
+    if (!fightEnded && (state.pet.hp <= 0 || state.enemy.hp <= 0)) endFight();
+  }
+  function freezeAction(side, ms) {
+    clearTimeout(unfreezeTimer[side]);
+    if (!(ms > 0)) return;
+    freeze[side] = true;
+    unfreezeTimer[side] = setTimeout(() => { freeze[side] = false; unfreezeTimer[side] = null; }, ms);
+  }
+  function clearFreeze(side) {
+    clearTimeout(unfreezeTimer[side]);
+    unfreezeTimer[side] = null;
+    freeze[side] = false;
+  }
+  function doTurn(attacker) {
+    if (state.pet.hp <= 0 || state.enemy.hp <= 0) return;
+    const isPet = attacker === 'pet';
+    const atkData = isPet ? state.pet : state.enemy;
+    const defData = isPet ? state.enemy : state.pet;
+    if (isPet && state.activeSkill && state.skillCooldown <= 0 && !state.skillQueued && Math.random() < (state.activeSkill.triggerChance || 0.30)) {
+      state.skillQueued = true;
+    }
+    const skill = isPet && state.skillQueued ? state.activeSkill : null;
+    const awakenMult = (isPet && skill && window.Pet.getAwakenState)
+      ? ((window.Pet.getAwakenState(state.pet) || {}).damage || 0) : 0;
+    if (skill) {
+      state.skillQueued = false;
+      state.skillCooldown = skill.cooldownTurns;
+      window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    }
+    const hitAt = window.UI.animateAttack(attacker) || 320;
+    const backMs = window.UI.attackRecoverMs ? (window.UI.attackRecoverMs(attacker) || 0) : 0;
+    freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs);
+    setTimeout(() => {
+      const result = calcDamage(atkData, defData);
+      let dmgMult = 1;
+      if (isPet && bloodline) {
+        if (bloodline.type === 'killDamageBuff' && killBuffActive && bloodline.params) {
+          dmgMult *= bloodline.params.damageMult || 1.5;
+          killBuffActive = false;
+        }
+        if (bloodline.type === 'corruptionStack' && corruptionStacks > 0 && bloodline.params) {
+          dmgMult *= 1 + (bloodline.params.perStack || 0.05) * corruptionStacks;
+        }
+      }
+      const bonus = skill && !result.isMiss
+        ? Math.floor(result.damage * (skill.damageMultiplier * (1 + awakenMult) - 1)) + Math.floor(defData.maxHp * (skill.maxHpDamageRate || 0))
+        : 0;
+      const damage = Math.floor(result.damage * dmgMult) + bonus;
+      defData.hp -= damage;
+      if (result.heal > 0) {
+        atkData.hp = Math.min(atkData.maxHp, atkData.hp + result.heal);
+        window.UI.showDamage(isPet ? 'pet' : 'enemy', result.heal, 'lifesteal');
+      }
+      const target = isPet ? 'enemy' : 'pet';
+      window.UI.animateHit(target, result.isCrit);
+      window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal');
+      window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+
+      const bl = bloodline;
+      if (bl && isPet && !result.isMiss) {
+        if (bl.type === 'onCritExtraHit' && result.isCrit && bl.params && Math.random() < bl.params.chance) {
+          const extraDmg = Math.max(1, Math.floor((atkData.atk - defData.def) * (bl.params.damageMult || 1)));
+          defData.hp -= extraDmg;
+          window.UI.showDamage('enemy', extraDmg, 'normal');
+        }
+        if (bl.type === 'corruptionStack' && bl.params) {
+          corruptionStacks = Math.min(bl.params.maxStacks || 5, corruptionStacks + 1);
+        }
+        if (bl.type === 'lifestealTrueDamage' && result.heal > 0 && bl.params) {
+          const trueDmg = Math.floor(result.heal * (bl.params.ratio || 1));
+          defData.hp -= trueDmg;
+          window.UI.showDamage('enemy', trueDmg, 'normal');
+        }
+      }
+      if (bl && !isPet && !result.isMiss && bl.type === 'onHitReflect' && bl.params) {
+        const reflectDmg = Math.floor(state.pet.def * (bl.params.defRatio || 0.3));
+        atkData.hp -= reflectDmg;
+        window.UI.showDamage('enemy', reflectDmg, 'normal');
+      }
+      if (bl && !isPet && result.isMiss && bl.type === 'onDodgeCounter' && bl.params) {
+        const counterDmg = Math.max(1, Math.floor((state.pet.atk - atkData.def) * (bl.params.damageMult || 0.8)));
+        atkData.hp -= counterDmg;
+        window.UI.showDamage('enemy', counterDmg, 'normal');
+      }
+      if (bl) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+    }, hitAt);
+    if (isPet && state.skillCooldown > 0 && !skill) {
+      state.skillCooldown--;
+      window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    }
+  }
+  function useActiveSkill() {
+    if (!autoRunning || !state.pet || !state.enemy || state.enemy.hp <= 0) return false;
+    if (!state.activeSkill || state.skillCooldown > 0 || state.skillQueued) return false;
+    state.skillQueued = true;
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    return true;
+  }
+  function calcDamage(att, defStats) {
+    const atk = att.atk, def = defStats.def;
+    const hit = Math.max(0, att.hit || 0);
+    const dodge = Math.max(0, defStats.dodge || 0);
+    const hitChance = hit + dodge > 0
+      ? Math.max(0.05, Math.min(0.95, hit / (hit + dodge)))
+      : 0.05;
+    if (Math.random() >= hitChance) {
+      return { damage: 0, isCrit: false, isMiss: true, heal: 0 };
+    }
+    const rate = (att.critRate == null) ? Config.battle.critRate : att.critRate;
+    const mult = (att.critDamage == null) ? Config.battle.critMultiplier : att.critDamage;
+    const isCrit = Math.random() < rate;
+    let dmg = Math.max(1, atk - def);
+    if (isCrit) dmg = Math.floor(dmg * mult);
+    const lifesteal = att.lifesteal == null ? 0 : att.lifesteal;
+    const heal = lifesteal > 0 ? Math.floor(dmg * lifesteal) : 0;
+    return { damage: dmg, isCrit, isMiss: false, heal };
+  }
+
+  function endFight() {
+    clearInterval(interval);
+    interval = null;
+    const win = state.pet.hp > 0;
+    if (win && bloodline && bloodline.type === 'killDamageBuff') {
+      pendingKillBuff = true;
+    }
+    setCurHp(state.petRef || getActivePet(), state.pet.hp);
+    fightCount++;
+    totalFights++;
+    if (!win) window.UI.addLog('💀 战斗失败……');
+    window.UI.updateStatus('fighting', fightCount);
+    if (win && window.UI.animateVictory) window.UI.animateVictory();
+
+    if (onFightEnd) onFightEnd({ win, fightCount, enemy: state.enemy });
+
+    if (!win) {
+      enterRecover('💀 战败，等待恢复后自动再战…');
+      return;
+    }
+    const pet = state.petRef || getActivePet();
+    if (getCurHp(pet) <= getStats(pet).hp * Config.battle.stopHpRatio) {
+      enterRecover(`💤 血量低于 ${Math.round(Config.battle.stopHpRatio * 100)}%，等待恢复后自动再战…`);
+      return;
+    }
+    nextFightTimer = setTimeout(beginFight, Config.battle.nextFightDelay);
+  }
+
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, state };
+})();
+</script>
+
+<!-- ===== 8) 真实战斗 UI ui-battle.js ===== -->
+<script>
+(function () {
+  'use strict';
+
+  const UI = window.UI;
+  const { escapeHtml, $ } = UI;
+
+  const Config = window.Config;
+  const { getActivePet, getPets, getStats, setActive, getBonusText } = window.Pet;
+  const PetSprites = window.PetSprites;
+
+  function pureName(name) {
+    if (!name) return '';
+    return String(name).split(' 等级：')[0].trim();
+  }
+  function mountIcon(el, name, fallbackEmoji) {
+    if (!el) return false;
+    const n = pureName(name);
+    el.dataset.pet = n;
+    if (PetSprites && PetSprites.mountAnimated(el, n)) return true;
+    if (PetSprites && PetSprites.mount(el, n)) {
+      const img = el.firstElementChild;
+      if (img) {
+        img.classList.add('pet-breathe');
+        el.style.setProperty('--sprite', 'url("' + img.src + '")');
+      }
+      return true;
+    }
+    el.textContent = fallbackEmoji != null ? fallbackEmoji : '';
+    return false;
+  }
+  function mountIconAvatar(el, name, fallbackEmoji) {
+    if (!el) return false;
+    if (PetSprites && PetSprites.mountAvatar(el, pureName(name))) return true;
+    el.textContent = fallbackEmoji != null ? fallbackEmoji : '';
+    return false;
+  }
+
+  function updateBattleArea(area) {
+    const box = $('battle-area-info');
+    if (!box) return;
+    box.innerHTML = area
+      ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
+      : '🐣 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (stage && typeof stage.setAttribute === 'function') {
+      if (area && area.id) stage.setAttribute('data-area-id', area.id);
+      else stage.removeAttribute('data-area-id');
+      const h = stage.offsetHeight || 0;
+      if (stage.style && stage.style.setProperty) stage.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
+      if (stage.classList && !stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
+    }
+  }
+  (function bindReturnMap() {
+    const openBtn = $('btn-change-map');
+    if (openBtn && !openBtn.__mapBound) {
+      openBtn.__mapBound = true;
+      openBtn.addEventListener('click', () => {
+        if (window.UI && window.UI.switchPage) window.UI.switchPage('worldmap');
+      });
+    }
+  })();
+
+  function renderStats(totalFights, totalEquipDrops) {
+    $('stat-fights').textContent = String(totalFights);
+    $('stat-equips').textContent = String(totalEquipDrops);
+  }
+
+  function addLootEntry(html, cls) {
+    if (UI.consoleLog) UI.consoleLog('loot', html);
+  }
+  function showLoot(reward) {
+    if (!reward || reward.type === 'none') return;
+    if (reward.type === 'material') {
+      addLootEntry(`${escapeHtml(reward.material)} ×${reward.qty || 1}`, 'mat');
+      return;
+    }
+    if (reward.type === 'equipment') {
+      const r = reward.eq.rarity;
+      addLootEntry(`<span class="loot-q ${r.id === 'gold' ? 'fs-q--gold' : r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white'}">${r.label}·${escapeHtml(reward.eq.name)}</span>`, r.id);
+      if (r.id === 'gold') flashStage('loot-flash-gold', 900);
+      return;
+    }
+    if (reward.type === 'egg') {
+      addLootEntry('宠物蛋 ×1（去「宠物」页或「装备」页背包孵化）');
+      flashStage('loot-flash-blue', 900);
+      return;
+    }
+  }
+
+  const ENEMY_TYPE = {
+    normal: { label: '普通', className: 'normal' },
+    evolved: { label: '进化', className: 'evolved' },
+    mutant: { label: '变异', className: 'mutant' }
+  };
+  function getBattleEnemy() {
+    return window.Battle?.state?.enemy || null;
+  }
+  function enemyStat(value) {
+    return Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0;
+  }
+  function renderEnemyTip(enemy) {
+    const tip = $('enemy-tip');
+    if (!tip) return;
+    if (!enemy) { tip.hidden = true; return; }
+    const type = ENEMY_TYPE[enemy.enemyType] || ENEMY_TYPE.normal;
+    const weights = enemy.rarityWeights || {};
+    const er = window.Pet.expRange(enemy, window.Battle && window.Battle.getCurrentArea());
+    const experience = er.min === er.max ? String(er.min) : `${er.min}~${er.max}`;
+    const pct = (v) => Math.round((Number(v) || 0) * 100) + '%';
+    const num = (v) => enemyStat(v);
+    tip.innerHTML = `
+      <div class="enemy-tip-title">
+        <strong>${escapeHtml(enemy.name || '未知怪物')}</strong>
+        <span>Lv.${num(enemy.level)}</span>
+        <b class="enemy-type ${type.className}">${type.label}</b>
+      </div>
+      <div class="enemy-tip-group">
+        <div class="enemy-tip-heading">基础属性</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row" data-enemy-hp>生命<b>${num(enemy.hp)} / ${num(enemy.maxHp)}</b></div>
+          <div class="enemy-tip-row">攻击<b>${num(enemy.atk)}</b></div>
+          <div class="enemy-tip-row">防御<b>${num(enemy.def)}</b></div>
+          <div class="enemy-tip-row">速度<b>${num(enemy.spd)}</b></div>
+        </div>
+      </div>
+      <div class="enemy-tip-group">
+        <div class="enemy-tip-heading">战斗属性</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row">暴击<b>${pct(enemy.critRate)}</b></div>
+          <div class="enemy-tip-row">暴伤<b>${pct(enemy.critDamage)}</b></div>
+          <div class="enemy-tip-row">命中<b>${num(enemy.hit)}</b></div>
+          <div class="enemy-tip-row">闪避<b>${num(enemy.dodge)}</b></div>
+          <div class="enemy-tip-row">吸血<b>${pct(enemy.lifesteal)}</b></div>
+        </div>
+      </div>
+      <div class="enemy-tip-group enemy-tip-drop">
+        <div class="enemy-tip-heading">掉落信息</div>
+        <div class="enemy-tip-rows">
+          <div class="enemy-tip-row">难度<b>×${Number(enemy._diff || 0).toFixed(2)}</b></div>
+          <div class="enemy-tip-row">经验<b>+${escapeHtml(experience)}</b></div>
+          <div class="enemy-tip-row" style="grid-column:1/-1">掉落品质：<span class="rarity-white">白 ${Number(weights.white || 0)}%</span> · <span class="rarity-blue">蓝 ${Number(weights.blue || 0)}%</span> · <span class="rarity-gold">金 ${Number(weights.gold || 0)}%</span></div>
+        </div>
+      </div>`;
+  }
+  function updateEnemyTipHp(enemy) {
+    const row = $('enemy-tip')?.querySelector('[data-enemy-hp]');
+    if (row && enemy) row.textContent = `生命：${enemyStat(enemy.hp)} / ${enemyStat(enemy.maxHp)}`;
+  }
+  function positionEnemyTip() {
+    const tip = $('enemy-tip');
+    const icon = $('enemy-icon');
+    if (!tip || !icon) return;
+    const GAP = 14;
+    const ar = icon.getBoundingClientRect();
+    const tw = tip.offsetWidth || 280, th = tip.offsetHeight;
+    let left = ar.left - tw - GAP;
+    let top = ar.top - th + ar.height * 0.4;
+    if (left < 8) left = ar.right + GAP;
+    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+    if (top < 8) top = 8;
+    if (top + th > window.innerHeight - 8) top = window.innerHeight - th - 8;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function bindEnemyTip() {
+    const icon = $('enemy-icon');
+    const name = $('enemy-icon-name');
+    const tip = $('enemy-tip');
+    if (!icon || !name || !tip || tip.dataset.bound) return;
+    tip.dataset.bound = '1';
+    const show = () => {
+      const enemy = getBattleEnemy();
+      if (!enemy) return;
+      renderEnemyTip(enemy);
+      tip.hidden = false;
+      positionEnemyTip();
+    };
+    const hide = () => { tip.hidden = true; };
+    icon.addEventListener('mouseenter', show);
+    name.addEventListener('mouseenter', show);
+    icon.addEventListener('mouseleave', hide);
+    name.addEventListener('mouseleave', hide);
+    window.addEventListener('resize', positionEnemyTip);
+  }
+
+  function resetBattle(petName, petIcon, enemyName, enemyIcon, petMaxHp, enemyMaxHp) {
+    const enemyFighter = document.getElementById('enemy-fighter');
+    if (enemyFighter) enemyFighter.style.display = '';
+    bindEnemyTip();
+    renderEnemyTip(getBattleEnemy());
+    mountIcon($('pet-icon'), petName, petIcon);
+    $('pet-icon-name').textContent = petName;
+    mountIcon($('enemy-icon'), enemyName, enemyIcon);
+    $('enemy-icon-name').textContent = enemyName;
+    $('enemy-hp-bar').style.width = '100%';
+    $('pet-hp-bar').style.width = '100%';
+    $('pet-hp-text').textContent = `${petMaxHp}/${petMaxHp}`;
+    $('enemy-hp-text').textContent = `${enemyMaxHp}/${enemyMaxHp}`;
+    updateEnemyTipHp(getBattleEnemy());
+    mountIconAvatar($('at-racer-pet'), petName, petIcon);
+    mountIconAvatar($('at-racer-enemy'), enemyName, enemyIcon);
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (stage && stage.querySelector) {
+      const enemyBox = stage.querySelector('.fighter-enemy');
+      if (enemyBox && enemyBox.classList) {
+        const enemy = getBattleEnemy();
+        enemyBox.classList.toggle('is-mutant', !!(enemy && enemy.enemyType === 'mutant'));
+        const avatar = enemyBox.querySelector('.stage-avatar');
+        if (avatar && avatar.classList) avatar.classList.remove('defeated');
+      }
+    }
+    updateAction(0, 0);
+  }
+  function updateBars(petHp, petMaxHp, enemyHp, enemyMaxHp) {
+    $('pet-hp-bar').style.width = Math.max(0, (petHp / petMaxHp) * 100) + '%';
+    $('enemy-hp-bar').style.width = Math.max(0, (enemyHp / enemyMaxHp) * 100) + '%';
+    $('pet-hp-text').textContent = `${Math.max(0, petHp)}/${petMaxHp}`;
+    $('enemy-hp-text').textContent = `${Math.max(0, enemyHp)}/${enemyMaxHp}`;
+    const enemy = getBattleEnemy();
+    if (enemy) enemy.hp = Math.max(0, enemyHp);
+    updateEnemyTipHp(enemy);
+    const petBar = $('pet-hp-bar');
+    if (petBar && petBar.classList && typeof petBar.classList.toggle === 'function') {
+      petBar.classList.toggle('is-low', petMaxHp > 0 && petHp / petMaxHp <= 0.25);
+    }
+  }
+  function updateAction(petAction, enemyAction) {
+    setRacer('pet', petAction, enemyAction);
+    setRacer('enemy', enemyAction, petAction);
+    const p = Math.min(100, Math.max(0, petAction));
+    const e = Math.min(100, Math.max(0, enemyAction));
+    const pb = $('atk-bar-pet'); if (pb) pb.style.width = p + '%';
+    const eb = $('atk-bar-enemy'); if (eb) eb.style.width = e + '%';
+    const fill = $('at-fill'); if (fill) fill.style.height = Math.max(p, e) + '%';
+  }
+  function setRacer(side, action, other) {
+    const el = side === 'pet' ? $('at-racer-pet') : $('at-racer-enemy');
+    if (!el) return;
+    const pct = Math.min(100, Math.max(0, action));
+    el.style.setProperty('--pct', pct + '%');
+    if (action >= other && pct > 0) el.classList.add('leading');
+    else el.classList.remove('leading');
+  }
+  function flashStage(cls, ms) {
+    const stage = document.querySelector('#tab-battle .battle-stage');
+    if (!stage || !stage.classList) return;
+    stage.classList.add(cls);
+    setTimeout(() => stage.classList.remove(cls), ms);
+  }
+  const DASH_MIN = 0.24, DASH_MAX = 0.6;
+  const PACE = {
+    pet:     { charge: 160, speed: 1800, back: 0.30 },
+    normal:  { charge: 140, speed: 1950, back: 0.26 },
+    evolved: { charge: 200, speed: 1700, back: 0.36 },
+    mutant:  { charge: 300, speed: 1450, back: 0.52 }
+  };
+  function paceOf(attacker) {
+    if (attacker !== 'enemy') return PACE.pet;
+    const st = window.Battle && window.Battle.state;
+    const type = st && st.enemy && st.enemy.enemyType;
+    return PACE[type] || PACE.normal;
+  }
+  function setDashDistance(icon, foe, attacker, speed) {
+    if (!icon || !foe) return 0;
+    const a = icon.getBoundingClientRect(), b = foe.getBoundingClientRect();
+    if (!a.width || !b.width) return 0;
+    const OVERLAP = 0.4;
+    const toRight = attacker === 'pet';
+    const gap = toRight
+      ? (b.left + b.width * OVERLAP) - a.right
+      : (b.right - b.width * OVERLAP) - a.left;
+    const dist = toRight ? Math.max(0, gap) : Math.min(0, gap);
+    const dur = Math.min(DASH_MAX, Math.max(DASH_MIN, Math.abs(dist) / speed));
+    icon.style.setProperty('--dash-x', Math.round(dist) + 'px');
+    icon.style.setProperty('--dash-out', dur.toFixed(3) + 's');
+    return Math.round(dur * 1000);
+  }
+  let lastBackMs = 0;
+  function attackRecoverMs() { return lastBackMs; }
+  function animateAttack(attacker) {
+    const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
+    const foe = attacker === 'pet' ? $('enemy-icon') : $('pet-icon');
+    if (!icon) { lastBackMs = 0; return 0; }
+    const pace = paceOf(attacker);
+    lastBackMs = Math.round(pace.back * 1000);
+    const dashMs = setDashDistance(icon, foe, attacker, pace.speed);
+    icon.style.setProperty('--dash-charge', (pace.charge / 1000).toFixed(3) + 's');
+    icon.style.setProperty('--dash-back', pace.back.toFixed(3) + 's');
+    clearTimeout(icon.__chargeT);
+    clearTimeout(icon.__attackT);
+    icon.classList.remove('charging', 'attacking');
+    void icon.offsetWidth;
+    icon.classList.add('charging');
+    icon.__chargeT = setTimeout(() => {
+      icon.classList.remove('charging');
+      icon.classList.add('attacking');
+      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'), dashMs + pace.back * 1000);
+    }, pace.charge);
+    const node = icon && icon.querySelector('.pet-anim');
+    if (node && PetSprites && PetSprites.setAnim) {
+      PetSprites.setAnim(node, 'attack');
+      setTimeout(() => { if (node.isConnected) PetSprites.setAnim(node, 'idle'); }, 850);
+    }
+    return pace.charge + dashMs;
+  }
+  function animateHit(target, isCrit) {
+    const icon = target === 'pet' ? $('pet-icon') : $('enemy-icon');
+    if (!icon) return;
+    clearTimeout(icon.__hitT);
+    icon.classList.remove('hit', 'crit-hit');
+    void icon.offsetWidth;
+    const cls = isCrit ? 'crit-hit' : 'hit';
+    icon.classList.add(cls);
+    icon.__hitT = setTimeout(() => icon.classList.remove('hit', 'crit-hit'), isCrit ? 440 : 320);
+  }
+  const floatActive = new WeakMap();
+  const FLOAT_LABEL = { normal: '攻击', skill: '技能', crit: '暴击', lifesteal: '吸血', miss: '闪避' };
+  function showFloatingText(target, text, type, opts) {
+    const host = target === 'pet' ? $('pet-icon') : $('enemy-icon');
+    if (!host) return;
+    const active = floatActive.get(host) || 0;
+    if (active >= 3) {
+      setTimeout(() => showFloatingText(target, text, type, opts), 120);
+      return;
+    }
+    floatActive.set(host, active + 1);
+    const el = document.createElement('div');
+    el.className = 'fs-float ' + (type || 'normal') + (opts && opts.side === 'right' ? ' side-right' : '');
+    const label = FLOAT_LABEL[type] || '攻击';
+    const sign = type === 'lifesteal' ? '+' : type === 'miss' ? '' : '-';
+    el.textContent = type === 'miss' ? label : `${label}：${sign}${text}`;
+    host.appendChild(el);
+    setTimeout(() => {
+      el.remove();
+      floatActive.set(host, Math.max(0, (floatActive.get(host) || 1) - 1));
+    }, 850);
+  }
+  function showDamage(target, damage, type) {
+    if (type === 'crit') flashStage('stage-shake', 300);
+    showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : null);
+  }
+
+  const STATUS_TEXT = { idle: '空闲', fighting: '挂机中', stopped: '已停止', healing: '恢复中', recovering: '回血中' };
+  function updateStatus(type, fightCount) {
+    const badge = $('status-badge');
+    badge.textContent = STATUS_TEXT[type] || type;
+    badge.className = 'status-badge ' + type;
+    $('fight-count').textContent = fightCount || 0;
+  }
+
+  function renderBattleButton(label, disabled) {
+    const btn = $('btn-battle');
+    btn.textContent = label;
+    btn.disabled = !!disabled;
+  }
+  function renderActiveSkill(skill, cooldown, queued) {
+    const btn = $('btn-active-skill');
+    if (!btn) return;
+    btn.hidden = !skill;
+    if (!skill) return;
+    btn.disabled = cooldown > 0 || queued;
+    btn.textContent = queued ? `${skill.name} · 待释放` : cooldown > 0 ? `${skill.name} · 冷却 ${cooldown}` : skill.name;
+  }
+  (function bindActiveSkill() {
+    const btn = $('btn-active-skill');
+    if (!btn || btn.__skillBound) return;
+    btn.__skillBound = true;
+    btn.addEventListener('click', () => window.Battle?.useActiveSkill?.());
+  })();
+
+  function renderCombatantData() {
+    const pet = getActivePet();
+    if (!pet) return;
+    const text = $('pet-exp-text');
+    const percent = $('pet-exp-percent');
+    const fill = $('pet-exp-fill');
+    if (text && percent && fill) {
+      const need = Math.max(1, window.Pet.expNeed(pet.level));
+      const current = Math.min(Math.max(0, Math.round(pet.exp || 0)), need);
+      const progress = Math.round(current / need * 100);
+      text.textContent = `经验 ${current} / ${need}`;
+      percent.textContent = `${progress}%`;
+      fill.style.width = `${progress}%`;
+    }
+    const nameEl = $('pet-icon-name');
+    if (nameEl && pureName(nameEl.textContent) === pet.name) {
+      nameEl.textContent = `${pet.name} 等级：${pet.level || 1}级`;
+    }
+  }
+
+  function syncCombatantSnapshot() {
+    const pet = getActivePet();
+    if (!pet) return;
+    if (window.Battle && window.Battle.isRunning()) return;
+    mountIcon($('pet-icon'), pet.name, pet.icon);
+    $('pet-icon-name').textContent = `${pet.name} 等级：${pet.level || 1}级`;
+    const enemyFighter = document.getElementById('enemy-fighter');
+    if (enemyFighter) enemyFighter.style.display = 'none';
+  }
+
+  function renderRoster() {
+    const box = $('pet-roster');
+    if (!box) return;
+    box.innerHTML = '';
+    const active = getActivePet();
+    const tipBox = $('roster-tooltip');
+    for (const pet of getPets()) {
+      const s = getStats(pet);
+      const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length;
+      const bonusText = getBonusText ? getBonusText(pet) : '';
+      const btn = document.createElement('div');
+      btn.className = 'roster-pet' + (active && pet.id === active.id ? ' active' : '');
+      btn.dataset.id = pet.id;
+      const avatarSrc = PetSprites && PetSprites.avatarOf(pet.name);
+      const iconHtml = avatarSrc ? '<img class="pet-avatar-sprite" src="' + avatarSrc + '" alt="">' : `<span>${pet.icon}</span>`;
+      btn.innerHTML = `<span class="roster-pet-icon">${iconHtml}</span><span class="rp-lv">${pet.level}</span>`;
+      btn.onclick = () => {
+        if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {
+          UI.showToast('⚠️ 已上架的宠物不能出战', '请先在市场取回');
+          return;
+        }
+        setActive(pet.id);
+        if (UI.addLog) UI.addLog(`🐾 ${pet.name} 出战！`);
+        if (!(window.Battle && window.Battle.isRunning())) syncCombatantSnapshot();
+        renderRoster();
+        if (UI.renderAll) UI.renderAll();
+      };
+      box.appendChild(btn);
+    }
+    if (tipBox && !box.__rosterBound) {
+      box.__rosterBound = true;
+      const showTipFor = (pet, anchor) => {
+        const s = getStats(pet);
+        const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length;
+        const bonusText = getBonusText ? getBonusText(pet) : '';
+        const active = getActivePet();
+        tipBox.className = 'roster-tooltip enemy-tip';
+        tipBox.innerHTML = `<div class="enemy-tip-title">
+            <strong>${escapeHtml(pet.icon)} ${escapeHtml(pet.name)}</strong>
+            <span>Lv.${pet.level}</span>
+            ${active && pet.id === active.id ? '<b class="enemy-type evolved">出战</b>' : ''}
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">成长</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row">成长值<b>${pet.growth.toFixed(1)}</b></div>
+              <div class="enemy-tip-row">经验<b>${pet.exp || 0}</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">基础属性</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row" data-enemy-hp>生命<b>${s.hp}</b></div>
+              <div class="enemy-tip-row">攻击<b>${s.atk}</b></div>
+              <div class="enemy-tip-row">防御<b>${s.def}</b></div>
+              <div class="enemy-tip-row">速度<b>${s.spd}</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">战斗属性</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row">暴击<b>${Math.round(s.critRate * 100)}%</b></div>
+              <div class="enemy-tip-row">暴伤<b>${Math.round(s.critDamage * 100)}%</b></div>
+              <div class="enemy-tip-row">命中<b>${Math.round(s.hit)}</b></div>
+              <div class="enemy-tip-row">闪避<b>${Math.round(s.dodge)}</b></div>
+              <div class="enemy-tip-row">吸血<b>${Math.round(s.lifesteal * 100)}%</b></div>
+            </div>
+          </div>
+          <div class="enemy-tip-group">
+            <div class="enemy-tip-heading">装备</div>
+            <div class="enemy-tip-rows">
+              <div class="enemy-tip-row" style="grid-column:1/-1">已装备<b>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + escapeHtml(bonusText) + '）' : ''}</b></div>
+            </div>
+          </div>`;
+        const r = anchor.getBoundingClientRect();
+        tipBox.style.left = (r.right + 8) + 'px';
+        tipBox.style.top = Math.max(6, r.top) + 'px';
+        tipBox.classList.add('show');
+      };
+      const hideTip = () => tipBox.classList.remove('show');
+      box.addEventListener('mouseover', (e) => {
+        const el = e.target.closest ? e.target.closest('.roster-pet') : null;
+        if (!el) return;
+        const pet = getPets().find(p => p.id === Number(el.dataset.id));
+        if (pet) showTipFor(pet, el);
+      });
+      box.addEventListener('mouseout', (e) => {
+        if (e.target.closest && e.target.closest('.roster-pet')) hideTip();
+      });
+    }
+  }
+
+  function animateVictory() {
+    const avatar = document.querySelector('#tab-battle .fighter-enemy .stage-avatar');
+    if (!avatar || !avatar.classList) return;
+    avatar.classList.add('defeated');
+    setTimeout(() => avatar.classList.remove('defeated'), 650);
+  }
+
+  UI.renderStats = renderStats;
+  UI.showLoot = showLoot;
+  UI.resetBattle = resetBattle;
+  UI.updateBars = updateBars;
+  UI.updateAction = updateAction;
+  UI.animateAttack = animateAttack;
+  UI.attackRecoverMs = attackRecoverMs;
+  UI.animateHit = animateHit;
+  UI.animateVictory = animateVictory;
+  UI.showDamage = showDamage;
+  UI.showFloatingText = showFloatingText;
+  UI.updateStatus = updateStatus;
+  UI.renderBattleButton = renderBattleButton;
+  UI.renderActiveSkill = renderActiveSkill;
+  UI.updateBattleArea = updateBattleArea;
+  UI.renderCombatantData = renderCombatantData;
+  UI.syncCombatantSnapshot = syncCombatantSnapshot;
+  UI.renderRoster = renderRoster;
+})();
+</script>
+
+<!-- ===== 9) 演示引导 ===== -->
+<script>
+(function(){
+  const areaId = 'blight-heart';
+  Battle.selectArea(areaId);
+  UI.renderRoster();
+
+  let totalEquips = 0;
+  function rollReward(enemy){
+    const pool = (window.Config.drop && Config.drop.pool) || { none:760, material:210, equipment:15, egg:15 };
+    const entries = Object.entries(pool).map(([k,w])=>({k,w}));
+    const pick = window.Util.pickWeighted(entries, e=>e.w);
+    const type = pick.k;
+    if(type==='none') return { type:'none' };
+    if(type==='material'){
+      const mats = ['腐化结晶','瘟疫之尘','枯骨碎片','血潮残片'];
+      return { type:'material', material: mats[Math.floor(Math.random()*mats.length)], qty: 1+Math.floor(Math.random()*3) };
+    }
+    if(type==='egg') return { type:'egg' };
+    const rw = (enemy && enemy.rarityWeights) || { white:80, blue:18, gold:2 };
+    const rar = window.Util.pickWeighted(
+      [{id:'white',label:'白',w:rw.white||80},{id:'blue',label:'蓝',w:rw.blue||18},{id:'gold',label:'金',w:rw.gold||2}],
+      x=>x.w);
+    const names = { white:['锈蚀战刃','枯骨护腕','旅者斗篷'], blue:['血潮指环','冥霜匕首','腐骨胸甲'], gold:['腐变王冠','湮灭战斧','噬魂圣杯'] };
+    return { type:'equipment', eq:{ name: names[rar.id][Math.floor(Math.random()*3)], rarity: rar } };
+  }
+  function onFightEnd(res){
+    if(res.win){
+      const reward = rollReward(res.enemy);
+      if(reward && reward.type!=='none') UI.showLoot(reward);
+      if(reward && reward.type==='equipment' && reward.eq.rarity.id==='gold') totalEquips++;
+    }
+    UI.renderStats(Battle.getTotalFights(), totalEquips);
+  }
+
+  const btn = document.getElementById('btn-battle');
+  btn.addEventListener('click', ()=>{
+    if(Battle.isRunning()){
+      Battle.stopAutoBattle();
+      btn.textContent = '开始挂机';
+    } else {
+      Battle.startAutoBattle(onFightEnd);
+      btn.textContent = '停止挂机';
+    }
+  });
+
+  UI.renderStats(0,0);
+})();
+</script>
+</body>
+</html>

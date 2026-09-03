@@ -644,6 +644,13 @@
       '<textarea id="fast-import-text" class="dev-export-text" placeholder="粘贴导出的存档 JSON，或选文件后点导入"></textarea>' +
       '<div class="dev-actions-row" style="margin-top:6px"><button class="btn-mini primary" id="fast-import">导入存档</button></div>' +
       '<div class="dev-note">清档=删本地宠物/材料/蛋/装备+删云端宠物（材料/蛋云端需手动清表）；导入会覆盖本地同名状态</div>');
+    html += groupHtml('新手引导',
+      '<div class="dev-actions-row">' +
+        '<button class="btn-mini primary" id="dev-tour-replay">重播开场总览</button>' +
+        '<button class="btn-mini ghost" id="dev-guide-reset">清除引导标记</button>' +
+        '<button class="btn-mini ghost" id="dev-pet-dedupe">清理重复教学宠</button>' +
+      '</div>' +
+      '<div class="dev-note">重播=再放一次压暗聚光引导（战斗/宠物/打造/市集四站）；清除引导标记=删本账号的「看过开场/已开始/跳过/已领」标记并重置引导链，刷新后从 G1 重走（补给按库存补齐，不会重复）；清理重复教学宠=删掉云端里同名的教学副宠（如「泥沼从者」），只留最早一只</div>');
     return html;
   }
   function bindFastPanel() {
@@ -656,6 +663,69 @@
       return p;
     };
     const isLoggedIn = async () => { const u = Supabase && await Supabase.getCurrentUser(); return !!u; };
+
+    // 新手引导：重播开场总览 / 清除引导标记（反复验证引导链用）
+    const tourBtn = $('dev-tour-replay');
+    if (tourBtn) tourBtn.onclick = () => {
+      if (window.UI && window.UI.replayOpeningTour) {
+        window.UI.replayOpeningTour();
+        toast('开场总览重播中', '跟着聚光走一遍：战斗 → 宠物 → 打造 → 市集');
+      } else {
+        toast('❌ 引导引擎未加载', '检查 js/ui/ui-onboarding.js 是否引入');
+      }
+    };
+    const guideReset = $('dev-guide-reset');
+    if (guideReset) guideReset.onclick = async () => {
+      const u = (UI.getAuthUser && UI.getAuthUser()) || (Supabase && await Supabase.getCurrentUser());
+      const who = String((u && (u.email || u.id)) || 'anon').replace(/[^a-zA-Z0-9@._-]/g, '');
+      let n = 0;
+      try {
+        Object.keys(localStorage).forEach(k => {
+          if (/^fos_(tour_seen|tutorial_started|guide_skipped|grants_done|blessing_given)/.test(k)
+              && (k.indexOf(who) >= 0 || !/_[a-zA-Z0-9@._-]+$/.test(k.slice(k.indexOf('_', 4))))) {
+            localStorage.removeItem(k); n++;
+          }
+        });
+      } catch (e) { /* 忽略 */ }
+      // 云端标记一并清（本地清+云端不清 = 换不了账号重走引导）
+      if (window.Quest && window.Quest.setExtra) {
+        try {
+          const keys = ['tourSeen', 'tutorialStarted', 'guideSkipped', 'blessingGiven', 'packClaimed'];
+          await Promise.all(keys.map(k => window.Quest.setExtra(k, null).catch(() => {})));
+        } catch (e) { /* 忽略 */ }
+      }
+      // 引导链任务完成记录也重置（不清的话云端 completed 还在，G1 起不来）
+      if (window.Quest && window.Quest.resetGuideChain) {
+        try { window.Quest.resetGuideChain(); } catch (e) { console.warn('[dev] 重置引导链失败', e); }
+      }
+      toast('已清除 ' + n + ' 条引导标记（含云端）并重置引导链', '刷新页面后从 G1 重走（已发过的奖励不回收）');
+    };
+    // 清理重复教学副宠：配置 grants 里 type=pet 的名字，同名多只只留最早（云端 loadPets 按 created_at 升序，先到的在前）
+    const petDedupe = $('dev-pet-dedupe');
+    if (petDedupe) petDedupe.onclick = async () => {
+      const T = (Config.tutorialMode && Config.tutorialMode.grants) || [];
+      const names = T.filter(g => g.type === 'pet').map(g => g.name).filter(Boolean);
+      const pets = (Pet.getPets && Pet.getPets()) || [];
+      const seen = {};
+      const toDel = [];
+      pets.forEach(p => {
+        if (!p || names.indexOf(p.name) < 0) return;
+        const k = p.name;
+        if (seen[k]) toDel.push(p); else seen[k] = 1;
+      });
+      if (!toDel.length) { toast('没有重复教学宠', '云端同名教学副宠只保留最早一只'); return; }
+      if (!window.confirm('删除 ' + toDel.length + ' 只重复教学宠？（' + toDel.map(p => p.name).join('、') + '，保留最早一只）')) return;
+      let ok = 0;
+      for (const p of toDel) {
+        if (p.cloudId && Supabase && Supabase.deletePet) {
+          try { await Supabase.deletePet(p.cloudId); } catch (e) { console.warn('[dev] 删除云端重复宠失败', p.cloudId, e); continue; }
+        }
+        Pet.removePet(p.id);
+        ok++;
+      }
+      if (UI.renderAll) UI.renderAll();
+      toast('已清理 ' + ok + ' 只重复教学宠', '保留最早一只');
+    };
 
     const evoGo = $('fast-evo-go');
     if (evoGo) evoGo.onclick = async () => {
@@ -790,7 +860,7 @@
           '<button class="btn-mini primary" id="ply-search-go">搜索</button>' +
           '<button class="btn-mini ghost" id="ply-refresh">刷新</button>' +
         '</div>' +
-        '<div class="dev-note">数据来自 admin_list_users / admin_search_users / admin_ban_user / grant_gems，仅管理员邮箱可调用</div>' +
+        '<div class="dev-note">数据来自 admin_list_users / admin_search_users / admin_ban_user / grant_gems / admin_delete_user，仅管理员邮箱可调用。删除=级联清空该账号全部云端数据并删号，不可恢复，管理员主号不可删</div>' +
       '</div>' +
       '<div id="ply-list" class="dev-detail"></div>');
   }
@@ -822,6 +892,13 @@
     const fmt = t => { if (!t) return '—'; try { return new Date(t).toLocaleString('zh-CN', { hour12: false }); } catch (e) { return String(t); } };
     const safe = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
     const label = safe(u.nickname || u.email || '?');
+    // 删除按钮：管理员主号与「当前登录的自己」都不给删（后端另有 protected/self 兜底），防手滑
+    const me = (UI.getAuthUser && UI.getAuthUser()) || {};
+    const isAdminRow = !!(u.email && ADMIN.indexOf(u.email) >= 0);
+    const isMe = !!(me.id && u.id === me.id);
+    const delHtml = (isAdminRow || isMe)
+      ? '<button class="btn-mini danger" disabled title="' + (isAdminRow ? '管理员主账号不可删除' : '当前登录账号不能在这里删除') + '">删除</button>'
+      : '<button class="btn-mini danger" data-act="del" data-uid="' + u.id + '" data-name="' + label + '">删除</button>';
     return '<div class="dev-player-row">' +
       '<div class="dev-player-main"><span class="dev-player-name">' + label + '</span>' +
         '<span class="dev-player-mail">' + safe(u.email || '') + '</span></div>' +
@@ -831,11 +908,44 @@
         (u.banned ? '<span class="dev-banned">已封禁</span>' : '') +
         '<button class="btn-mini primary" data-act="gem" data-uid="' + u.id + '" data-name="' + label + '">发魔石</button>' +
         '<button class="btn-mini ghost" data-act="' + (u.banned ? 'unban' : 'ban') + '" data-uid="' + u.id + '" data-name="' + label + '">' + (u.banned ? '解封' : '封禁') + '</button>' +
+        delHtml +
       '</div></div>';
   }
   async function playerAct(btn, client) {
     const toast = (t, d) => { if (UI.showToast) UI.showToast(t, d); };
     const uid = btn.dataset.uid, act = btn.dataset.act, name = btn.dataset.name || '?';
+    if (act === 'del') {
+      // 删号是重操作：两次确认（防手滑），确认文案写明清档范围与重注册提示
+      if (!window.confirm('⚠️ 删除账号「' + name + '」？\n将清空该账号全部云端数据（宠物/装备/材料/蛋/挂单/交易记录/任务进度/钱包），并删除账号。此操作不可恢复！')) return;
+      if (!window.confirm('再次确认：删除后该邮箱可重新注册新号，重新体验新手引导。仍要删除？')) return;
+      btn.disabled = true;
+      const { data: rd, error: re } = await client.rpc('admin_delete_user', { p_user_id: uid });
+      const res = (typeof rd === 'string') ? rd : (re ? 'error' : 'ok');
+      if (res === 'ok') {
+        toast('已删除账号', name + ' 的全部云端数据已清空，可重新注册新号体验新手引导');
+        // 删除的是当前登录账号（正常不会走到：dev 面板仅管理员可见，管理员号 SQL 拒删）：
+        // 兜底清本地 fos_* 并刷新，由启动流程自然回登录页
+        const me = UI.getAuthUser && UI.getAuthUser();
+        if (me && me.id && me.id === uid) {
+          try {
+            if (window.Game && window.Game.onLogout) { await window.Game.onLogout(); }
+            else if (window.Supabase && window.Supabase.signOut) { await window.Supabase.signOut(); }
+          } catch (e) { console.warn('[dev] 删除当前号登出失败', e); }
+          try { Object.keys(localStorage).forEach(k => { if (k.indexOf('fos_') === 0) localStorage.removeItem(k); }); } catch (e) { /* 忽略 */ }
+          location.reload();
+          return;
+        }
+      }
+      else if (res === 'forbidden') toast('无权限', '仅管理员邮箱可删号');
+      else if (res === 'protected') toast('不可删除', '管理员主账号受保护');
+      else if (res === 'self') toast('不可删除', '不能删除当前登录账号');
+      else if (res === 'notfound') toast('账号不存在', '可能已被删除');
+      else if (re) toast('删除失败', re.message || String(re));
+      else toast('删除失败', String(rd || '未知返回'));
+      btn.disabled = false;
+      loadPlayers('');
+      return;
+    }
     if (act === 'gem') {
       const amt = window.prompt('给 ' + name + ' 发魔石（数量）', '100');
       if (amt == null) return;

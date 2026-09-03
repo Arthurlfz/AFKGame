@@ -116,8 +116,8 @@ A(r4.ok!==true&&/上限/.test(r4.error),'次数已满(10)：进化失败并提�
 
 /* ============ 6. 进化素材接入战斗掉落（改法一：单池·一场一抽） ============ */
 C('Config.drop.pool = { none:0, material:1, equipment:0, egg:0 }');
-C('Config.drop.materialWeights = { "进化素材":1 }'); // 只掉进化素材，便于断言
-const rr = await C('Drop.rollReward({ eggBaseName:null })');
+C('Config.drop.materialWeightsByTier[1] = { "进化素材": 1 }'); // 图1档只留进化素材占位权重，配合 areaEvolutionTiers=['进化素材'] 解析为普通进化素材
+const rr = await C('Drop.rollReward({ eggBaseName:"血狐" }, { id:"corrupted-forest" })');
 A(rr && rr.type === 'material' && rr.material === '进化素材' && rr.qty === 1, 'rollReward 掉落通用进化素材 ×1');
 A(C('Materials.getQuantity("进化素材")') >= 1, '进化素材已计入材料库存（掉落生效）');
 

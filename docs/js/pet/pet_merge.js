@@ -41,8 +41,15 @@
       !Object.values(p.equipment || {}).some(Boolean)
     );
   }
+  // 涅槃（融合）素材门槛：读 nirvana.minLevel（60）
   const canMerge = pet => {
-    const minLv = NV().minLevel || 40;
+    const minLv = NV().minLevel || 60;
+    return pet.level >= minLv && !Object.values(pet.equipment || {}).some(Boolean);
+  };
+  // 合成素材门槛：读 synthesize.minLevel（40）—— 血泪：合成页曾误用 canMerge(读60)，
+  // 全队 Lv40 却一只都显示不出来，玩家以为"没宠/没发经验包"。
+  const canSynthesize = pet => {
+    const minLv = (SYN().minLevel) || 40;
     return pet.level >= minLv && !Object.values(pet.equipment || {}).some(Boolean);
   };
 
@@ -292,7 +299,7 @@
     nirvana,              // 涅槃：主宠涨成长（新）
     synthesize,           // 合成：出全新变异宠（新）
     merge: nirvana,       // 兼容别名：旧调用 Merge.merge = 涅槃
-    getMergeCandidates, canMerge,
+    getMergeCandidates, canMerge, canSynthesize,
     calcNirvanaGrowth, calcSynthesizeGrowth,
     inheritSynthTraits, implantNirvanaTraits
   };

@@ -23,7 +23,7 @@
     const mainPet = getPets().find(p => p.id === synthMainId);
     const cands = getPets().filter(p => {
       const ec = Object.values(p.equipment || {}).filter(Boolean).length;
-      return !ec && Merge.canMerge(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
+      return !ec && Merge.canSynthesize(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
     });
     if (!cands.length) {
       const empty = document.createElement('div');

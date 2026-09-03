@@ -110,11 +110,10 @@
       return;
     }
 
-    // 已登录：写库 + 订阅广播（显示名缓存）
-    if (!window.__chatMyId) {
-      window.__chatMyId = user.id;
-      myName = (user.email || '').split('@')[0] || '玩家';
-    }
+    // 显示名：优先 profiles.nickname 缓存（登录时 loadMyProfile 已拉取），回落邮箱前缀；每次发都读最新昵称
+    window.__chatMyId = window.__chatMyId || user.id;
+    myName = (window.Supabase && window.Supabase.getMyDisplayName && window.Supabase.getMyDisplayName()) ||
+             (user.email || '').split('@')[0] || '玩家';
 
     const { data, error } = await window.Supabase.sendChatMessage(myName, text);
     if (error) {

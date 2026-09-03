@@ -56,10 +56,17 @@
     const r = card.getBoundingClientRect();
     // 容器同时挂 .equip-tip 以复用打造页 tooltip 样式，但位置用 fixed 跟随格子
     tip.style.position = 'fixed';
-    tip.style.left = (r.right + 10) + 'px';
-    tip.style.top = Math.max(6, r.top) + 'px';
     tip.style.bottom = 'auto';
     tip.style.transform = 'none';
+    // 优先显示在格子右侧；右侧放不下（详情面板/视口边界）时自动挪到左侧
+    const pad = 10, tipW = 300;
+    const rightRoom = window.innerWidth - (r.right + pad);
+    if (rightRoom >= tipW || rightRoom >= (r.left - pad)) {
+      tip.style.left = (r.right + pad) + 'px';
+    } else {
+      tip.style.left = Math.max(pad, r.left - tipW - pad) + 'px';
+    }
+    tip.style.top = Math.max(6, r.top) + 'px';
     tip.classList.add('show');
   }
   function hideBagTip() {
@@ -150,9 +157,10 @@
     const gridArea = document.createElement('div');
     gridArea.className = 'bag-grid-area';
     const grid = document.createElement('div');
-    grid.className = 'bag-item-grid';
+    grid.className = 'bag-item-grid bag-grid-real';
     gridArea.appendChild(grid);
     left.appendChild(gridArea);
+    const bagItems = [];   // 收集本页要展示的物品卡片（后续塞进真实格子槽）
 
     // 底部：统计 + 鉴定石 + 分解台
     const footer = document.createElement('div');
@@ -183,8 +191,9 @@
     detail.innerHTML = '<div class="bag-detail-empty">选择物品<br>查看详情</div>';
     layout.appendChild(detail);
 
-    // 显示详情到右侧面板
+    // 显示详情到右侧面板（点击时先收起悬浮 tooltip，避免盖住详情）
     function showDetail(html) {
+      hideBagTip();
       detail.innerHTML = html;
     }
 
@@ -232,7 +241,7 @@
           showDetail(equipTipHtml(eq, unid) + '<div style="margin-top:8px"><button class="btn-mini" onclick="document.querySelectorAll(\'.bag-subtab\').forEach(t=>{if(t.dataset.bagSubtab===\'equip\')t.click()})">去装备页穿上</button></div>');
         };
         bindTip(card, equipTipHtml(eq, unid));
-        grid.appendChild(card);
+        bagItems.push(card);
       }
     }
 
@@ -246,7 +255,7 @@
         const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div><div class="tip-line"><span>素材</span><b>×' + m.qty + '</b></div><div class="tip-line hint">用于合成/涅槃/进化/打造等消耗</div>';
         card.onclick = () => showDetail(tip);
         bindTip(card, tip);
-        grid.appendChild(card);
+        bagItems.push(card);
       }
     }
 
@@ -260,7 +269,7 @@
         const tip = '<div class="tip-name">' + c.icon + ' ' + escapeHtml(c.name) + '</div><div class="tip-line"><span>' + c.desc + '</span><b>×' + c.qty + '</b></div><div class="tip-line hint">用于装备改造</div>';
         card.onclick = () => showDetail(tip);
         bindTip(card, tip);
-        grid.appendChild(card);
+        bagItems.push(card);
       }
     }
 
@@ -275,17 +284,27 @@
         const tip = '<div class="tip-name">🥚 ' + escapeHtml(eggName) + '</div><div class="tip-line"><span>宠物蛋</span><b>×' + count + '</b></div><div class="tip-line hint">点击查看 / 孵化 ' + escapeHtml(baseName) + '，也可在市场交易</div>';
         card.onclick = () => { showDetail(tip); showEggDetail(baseName, count, eggName); };
         bindTip(card, tip);
-        grid.appendChild(card);
+        bagItems.push(card);
       }
     }
 
-    // 空状态
-    if (!grid.children.length) {
-      const empty = document.createElement('div');
-      empty.className = 'inv-empty';
-      empty.style.gridColumn = '1 / -1';
-      empty.textContent = totalCount ? '没有符合条件的物品' : '背包空空，去挂机捡装备吧';
-      grid.appendChild(empty);
+    // 空背包：仍渲染空格子，提示作为覆盖层
+    if (!bagItems.length) {
+      grid.classList.add('bag-grid-empty');
+      grid.dataset.empty = totalCount ? '没有符合条件的物品' : '背包空空，去挂机捡装备吧';
+    }
+
+    // ===== 真实背包格子：固定列数 + 空格槽（流放式凹槽网格） =====
+    const BAG_COLS = 6;      // 每行格子数
+    const BAG_MIN_ROWS = 5;  // 最少显示行数（物品少时也露出空格槽）
+    const n = bagItems.length;
+    const rows = Math.max(BAG_MIN_ROWS, Math.ceil(n / BAG_COLS));
+    const total = rows * BAG_COLS;
+    for (let i = 0; i < total; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'bag-slot' + (i >= n ? ' empty' : '');
+      if (i < n) slot.appendChild(bagItems[i]);
+      grid.appendChild(slot);
     }
   }
 

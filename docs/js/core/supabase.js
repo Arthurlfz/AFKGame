@@ -494,13 +494,51 @@
       .order('created_at', { ascending: false })
       .limit(Math.min(limit, 100));
   }
-  // 获取当前登录用户的显示名（用邮箱前缀；未登录返回 null）
-  async function getMyDisplayName() {
+  /* ---------- 玩家资料 / 昵称（profiles 表） ----------
+   * 昵称只在登录时拉一次存内存：auth.getUser() 实测 550ms，绝不能放在发言这种高频路径上。
+   * 显示优先级：profiles.nickname > 邮箱前缀（老代码兜底）> '玩家'。 */
+  let profileCache = null; // { id, nickname }
+
+  function randomNickname() {
+    const n = (window.Config && window.Config.auth && window.Config.auth.nickname) || {};
+    const pre = n.prefixes || ['灰烬'];
+    const suf = n.suffixes || ['行者'];
+    return pre[Math.floor(Math.random() * pre.length)] + suf[Math.floor(Math.random() * suf.length)] +
+      String(Math.floor(1000 + Math.random() * 9000));
+  }
+
+  // 读自己的昵称；没有资料就自动建一个（老账号 / 邮箱验证后首次登录 / 注册时没填）
+  async function loadMyProfile() {
     const user = await getCurrentUser();
-    if (!user) return null;
-    const email = (user.email || '').trim();
-    if (email) return email.split('@')[0];
-    return '玩家' + String(user.id || '').slice(0, 4);
+    if (!user) { profileCache = null; return null; }
+    const { data, error } = await client.from('profiles').select('id,nickname').eq('id', user.id).maybeSingle();
+    if (!error && data && data.nickname) { profileCache = data; return profileCache; }
+    const nick = randomNickname();
+    const { data: made, error: e2 } = await client.from('profiles')
+      .upsert({ id: user.id, nickname: nick }, { onConflict: 'id' })
+      .select('id,nickname').maybeSingle();
+    profileCache = (!e2 && made) ? made : { id: user.id, nickname: nick };
+    return profileCache;
+  }
+
+  // 设置 / 修改昵称（注册时玩家填的走这里）
+  async function setMyNickname(name) {
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, error: '未登录' };
+    const n = (window.Config && window.Config.auth && window.Config.auth.nickname) || {};
+    const nick = String(name || '').trim().slice(0, n.maxLen || 12);
+    if (!nick) return { ok: false, error: '昵称为空' };
+    const { data, error } = await client.from('profiles')
+      .upsert({ id: user.id, nickname: nick }, { onConflict: 'id' })
+      .select('id,nickname').maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    profileCache = data || { id: user.id, nickname: nick };
+    return { ok: true, nickname: profileCache.nickname };
+  }
+
+  // 同步读缓存昵称；没缓存返回 null（调用方自己回退到邮箱前缀）
+  function getMyDisplayName() {
+    return (profileCache && profileCache.nickname) || null;
   }
 
   /* ---------- 对外 API ---------- */
@@ -514,6 +552,7 @@
     getMyWallet, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     fetchQuestProgress, saveQuestProgress,
-    sendChatMessage, fetchRecentMessages, getMyDisplayName
+    sendChatMessage, fetchRecentMessages, getMyDisplayName,
+    loadMyProfile, setMyNickname
   };
 })();

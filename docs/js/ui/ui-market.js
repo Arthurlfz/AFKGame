@@ -469,7 +469,7 @@
         <div class="mk-avatar mk-avatar--item">⚔️</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
-          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}</div>
+          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
         </div>
       </div>
       <div class="mk-affix">${affixText ? escapeHtml(affixText) : '<span style="color:var(--text-faint)">无词缀</span>'}</div>
@@ -515,7 +515,7 @@
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item">🐾</div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
-          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}</div>
+          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
         </div>
       </div>
       ${traitsHtml}
@@ -540,16 +540,17 @@
   function buildEggCard(l) {
     const div = document.createElement('div');
     div.className = 'mk-card';
-    const mine = Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false;
+    // 假卖家蛋单不标"我的"（isMyEggListed 按蛋品种判，AI 蛋不该命中玩家上架标记）
+    const mine = !l.isBot && (Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false);
     const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
     const mat = Market.findMaterial(l.material_type);
     const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">🥚</div>
+        <div class="mk-egg-icon">${l.egg_icon || '🥚'}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
-          <div class="mk-meta">宠物蛋</div>
+          <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
         </div>
       </div>
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
@@ -561,9 +562,34 @@
         else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
         return;
       }
-      const res = await Market.buyEgg(l.id);
+      const res = l.isBot ? await Market.buyBotEgg(l.id) : await Market.buyEgg(l.id);
       if (res.error) showToast('❌ 购买失败', res.error);
       else { showToast('🥚 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
+    };
+    return div;
+  }
+
+  /* ---------- 材料商品卡片（AI 假卖家挂单，2026-09-03 二阶段） ---------- */
+  function buildMaterialCard(l) {
+    const div = document.createElement('div');
+    div.className = 'mk-card';
+    const mat = Market.findMaterial(l.material_type);
+    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
+    div.innerHTML = `
+      <div class="mk-card-top">
+        <div class="mk-egg-icon">${l.good_icon || '📦'}</div>
+        <div class="mk-card-info">
+          <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.good_name)}</div></div>
+          <div class="mk-meta">材料 ×${l.good_qty || 1}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
+        </div>
+      </div>
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn buy">购买</button></div>`;
+    const btn = div.querySelector('.mk-btn');
+    btn.onclick = async () => {
+      if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买'); return; }
+      const res = await Market.buyBotMaterial(l.id);
+      if (res.error) showToast('❌ 购买失败', res.error);
+      else { showToast('🎉 购买成功', `获得 ${l.good_qty || 1} × ${l.good_name}`); UI.renderAll(); }
     };
     return div;
   }
@@ -628,11 +654,12 @@
     const list = sortMarketListings(Market.getListings().filter(matchMarketListing));
     const items = sortMarketListings(Market.getItemListings().filter(matchMarketListing));
     const eggList = Market.getEggListings ? Market.getEggListings() : [];
+    const mats = Market.getBotMaterialListings ? Market.getBotMaterialListings() : [];
     const pets = list.filter(l => l.pet_id);
     const RARITY_LABEL = { white: '白装', blue: '蓝装', gold: '金装' };
 
     const cnt = $('rpCount');
-    if (cnt) cnt.textContent = '共 ' + (pets.length + items.length + eggList.length) + ' 件';
+    if (cnt) cnt.textContent = '共 ' + (pets.length + items.length + eggList.length + mats.length) + ' 件';
 
     if (pets.length) {
       const sec = document.createElement('div');
@@ -656,6 +683,17 @@
       box.appendChild(grid);
     }
 
+    if (mats.length) {
+      const sec = document.createElement('div');
+      sec.className = 'mk-section';
+      sec.innerHTML = '🧪 材料<span class="mk-count">' + mats.length + ' 件</span>';
+      box.appendChild(sec);
+      const grid = document.createElement('div');
+      grid.className = 'mk-grid';
+      for (const l of mats) grid.appendChild(buildMaterialCard(l));
+      box.appendChild(grid);
+    }
+
     if (eggList.length) {
       const sec = document.createElement('div');
       sec.className = 'mk-section';
@@ -667,7 +705,7 @@
       box.appendChild(grid);
     }
 
-    if (!pets.length && !items.length && !eggList.length) {
+    if (!pets.length && !items.length && !eggList.length && !mats.length) {
       box.innerHTML = '<div class="mk-empty">没有符合条件的商品</div>';
     }
   }

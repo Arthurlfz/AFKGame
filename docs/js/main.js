@@ -152,9 +152,71 @@
         renderAll();
         refreshStats();
         syncButton();
+        startGuideOnboarding(true);   // 新号：选宠完成 → 开场总览 tour → 引导启动
       };
     });
   }
+
+  /* ---------- 新手引导进场（2026-09-03 目标驱动主线） ----------
+   * 新号选宠完成 → 开场总览 tour（spotlight 压暗聚光 + 引路人字幕）→ 引导启动：
+   *   ① 发引导祝福（手动提速道具，玩家用掉才生效） ② 引导驱动：按任务 boostLevel 发经验包顶等级 / 走完发毕业礼包
+   * 老号 / 会话恢复：不弹 tour，只跑引导驱动（补顶等级、走完发礼包）。
+   * 全程 try 保护：引导出问题绝不能把人挡在游戏外面。 */
+  /* 开场总览看过标记（按账号，只播一次）—— 老号登录也补播一次，否则永远看不到这段引导 */
+  function tourSeenKey() {
+    const u = (window.UI && window.UI.getAuthUser ? window.UI.getAuthUser() : null) || null;
+    const k = (u && (u.email || u.id)) || 'anon';
+    return 'fos_tour_seen_' + String(k).replace(/[^a-zA-Z0-9@._-]/g, '');
+  }
+  function hasSeenTour() {
+    try {
+      if (localStorage.getItem(tourSeenKey()) === '1') return true;
+      // 云端唯一真相：清缓存/换设备后不再打扰（与引导其他标记同规则）
+      const Q = window.Quest;
+      if (Q && Q.getExtra) return Q.getExtra('tourSeen') === '1';
+    } catch (e) { /* 忽略 */ }
+    return false;
+  }
+  function markTourSeen() {
+    try { localStorage.setItem(tourSeenKey(), '1'); } catch (e) { /* 忽略 */ }
+    try { if (window.Quest && window.Quest.setExtra) window.Quest.setExtra('tourSeen', '1'); } catch (e) { /* 忽略 */ }
+  }
+
+  function startGuideOnboarding(withTour) {
+    try {
+      const TM = window.TutorialMode;
+      const t = (window.Config && window.Config.tutorialMode) || {};
+      if (!TM || t.enabled === false) return;
+      // 引导例行【立刻跑，不等开场总览播完】：
+      //   经验包顶等级 / 教学补给（钥匙：白装、蛋、副宠）/ 毕业礼包判断都在这里。
+      //   血泪：以前要等 tour 播完才跑 —— 玩家卡在 G5/G6 重登时，tour 没点完就永远拿不到白装/蛋。
+      try {
+        if (TM.grantInitialBlessing) TM.grantInitialBlessing();
+        if (TM.startGuideRoutine) TM.startGuideRoutine();
+      } catch (e) { console.warn('[引导] 例行启动失败', e); }
+      const steps = t.openingTour || [];
+      // 开场总览只是纯展示：没看过就播一次，播完/跳过只记 seen，不再重复触发例行
+      if (withTour && steps.length && !hasSeenTour() && window.Onboarding && window.Onboarding.startTour) {
+        const seen = function () { try { markTourSeen(); } catch (e) { /* 忽略 */ } };
+        // 等主界面排版稳定再播：选宠屏刚关/页面刚切换时，目标元素量到 0 尺寸，聚光框就没了
+        window.setTimeout(function () {
+          try { window.Onboarding.startTour(steps, { onDone: seen, onSkip: seen }); }
+          catch (e) { console.warn('[引导] 开场总览异常', e); seen(); }
+        }, 700);
+      }
+    } catch (e) { console.warn('[引导] 进场异常', e); }
+  }
+
+  // 重播开场总览（开发者面板 / 控制台 UI.replayOpeningTour() 可调）
+  // 重播是纯预览：播完/点跳过只记「已看过」，绝不触发引导例行（礼包/祝福/补给）——防测试循环
+  function replayOpeningTour() {
+    const t = (window.Config && window.Config.tutorialMode) || {};
+    if (!window.Onboarding || !window.Onboarding.startTour || !t.openingTour) return;
+    try { localStorage.removeItem(tourSeenKey()); } catch (e) { /* 忽略 */ }
+    const seen = function () { try { markTourSeen(); } catch (e) { /* 忽略 */ } };
+    window.Onboarding.startTour(t.openingTour, { onDone: seen, onSkip: seen });
+  }
+  if (window.UI) window.UI.replayOpeningTour = replayOpeningTour;
 
   async function clearAccountState() {
     stopAutoBattle();
@@ -210,6 +272,8 @@
     renderAll();
     refreshStats();
     syncButton();
+    // 注意：startGuideOnboarding 不在这里调——要等 restoreAllCloudData 把云装备/蛋/材料
+    // 全拉完再跑引导例行（补给按库存差量补齐，背包/蛋还没 load 完会误判成空而乱补发）。
   }
 
   /* ---------- 重新拉取云端宠物（购买后调用，新宠物进列表） ---------- */
@@ -329,11 +393,22 @@
     ]);
     // 魔石钱包 / 商店商品：失败只提示（表没建时界面自己显示"未开通"），不能挡住进游戏
     if (UI.refreshShop) { try { await UI.refreshShop(); } catch (e) { console.warn('商店数据加载失败：', e && e.message); } }
+    // 云装备/蛋/材料/宠物已全部就位 → 现在跑引导例行（经验包+钥匙补给，reconcile 不会误判）
+    startGuideOnboarding(true);
     return true;
   }
 
   // 登录/注册成功后的统一收尾
   async function onAuthenticated() {
+    // 昵称：登录/注册成功后拉一次存内存（后面聊天显示全部读缓存，不再打接口）
+    if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 昵称失败不挡进游戏 */ } }
+    // 落地注册时填的昵称：开了邮箱验证的号，注册后没 session 写不进库，登录成功后再补
+    if (Supabase.setMyNickname) {
+      try {
+        const pending = localStorage.getItem('fos_pending_nickname');
+        if (pending) { await Supabase.setMyNickname(pending); localStorage.removeItem('fos_pending_nickname'); }
+      } catch (e) { /* 暂存昵称写不进也不挡进游戏 */ }
+    }
     const ready = await restoreAllCloudData();
     if (!ready) return; // 新号：等 showStarterPicker 选完宠再启动运行时
     startGameRuntime();
@@ -352,7 +427,7 @@
     await onAuthenticated();
     return { error: null };
   }
-  async function onSignup(email, password) {
+  async function onSignup(email, password, nickname) {
     if (!email || !password) {
       const error = { message: '请输入邮箱和密码' };
       addLog('❌ 注册失败：' + error.message);
@@ -376,12 +451,19 @@
     }
     const { data, error } = await Supabase.signUp(email, password);
     if (error) { addLog('❌ 注册失败：' + (error.message || '未知错误')); return { error }; }
+    // 暂存昵称：无论邮箱验证是否开启，验证后登录都会经 onAuthenticated 落地（clearAccountState 不清 localStorage）
+    if (nickname) { try { localStorage.setItem('fos_pending_nickname', nickname); } catch (e) {} }
     if (!data.session) { // 项目开了邮箱验证 → 没有自动登录
       addLog('⚠️ 注册成功：若需邮箱验证，请先去邮箱确认，再回来登录');
       return { error: null, needsEmailConfirm: true };
     }
     await clearAccountState();
     addLog('☁️ 注册成功并已登录');
+    // 玩家填了昵称就写库；没填由 loadMyProfile 自动生成
+    if (nickname && Supabase.setMyNickname) {
+      const r = await Supabase.setMyNickname(nickname);
+      if (!r.ok) addLog('⚠️ 昵称保存失败：' + (r.error || '未知错误'));
+    }
     await onAuthenticated();
     return { error: null };
   }

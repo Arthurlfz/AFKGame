@@ -23,6 +23,8 @@
   let eggListings = [];      // 宠物蛋在售列表（真实玩家挂单）
   let botListings = [];      // 假卖家（流浪商人）装备挂单：纯前端内存，不落库、不占玩家账号
   let botPetListings = [];   // 假卖家（流浪商人）宠物挂单：纯前端内存，不落库、不占玩家账号
+  let botMaterialListings = []; // 假卖家（流浪商人）材料挂单：纯前端内存（2026-09-03 二阶段）
+  let botEggListings = [];      // 假卖家（流浪商人）宠物蛋挂单：纯前端内存（2026-09-03 二阶段）
   let myListedPets = [];     // 我上架的宠物 [{listingId, petId}]
   let myListedItems = [];    // 我上架的装备 [{listingId, itemId}]
   let myListedEggs = [];     // 我上架的蛋 [{listingId, eggType}]
@@ -128,6 +130,38 @@
       return { ok: true, petId: pet.cloudId, pet };
     })();
   }
+  // 购买流浪商人材料（以物易物）：扣收款材料 → 买到材料入包（本地+云端） → 移除假单
+  function buyBotMaterial(id) {
+    const idx = botMaterialListings.findIndex(x => x.id === id);
+    if (idx < 0) return Promise.resolve({ error: '购买失败：该商品已售出' });
+    const l = botMaterialListings[idx];
+    return (async () => {
+      const user = await Supabase.getCurrentUser();
+      if (!user) return { error: '请先登录' };
+      const spent = await Materials.spend(l.material_type, l.material_qty);
+      if (!spent.ok) return { error: spent.error };
+      await Materials.gain(l.good_name, l.good_qty || 1);
+      await Materials.flushMaterials(); // 推送云端（gain 只改本地并入队）
+      botMaterialListings.splice(idx, 1);
+      return { ok: true, good: l.good_name, qty: l.good_qty || 1 };
+    })();
+  }
+  // 购买流浪商人宠物蛋：扣收款材料 → 蛋入包（本地+云端） → 移除假单
+  function buyBotEgg(id) {
+    const idx = botEggListings.findIndex(x => x.id === id);
+    if (idx < 0) return Promise.resolve({ error: '购买失败：该商品已售出' });
+    const l = botEggListings[idx];
+    return (async () => {
+      const user = await Supabase.getCurrentUser();
+      if (!user) return { error: '请先登录' };
+      const spent = await Materials.spend(l.material_type, l.material_qty);
+      if (!spent.ok) return { error: spent.error };
+      const grant = (window.Drop && window.Drop.grantEgg) ? await window.Drop.grantEgg(l.egg_type, 1) : null;
+      if (grant && grant.ok === false) return { error: grant.error || '获得宠物蛋失败' };
+      botEggListings.splice(idx, 1);
+      return { ok: true, egg: l.egg_type };
+    })();
+  }
 
   /* ---------- 宠物上架 / 购买 / 取回 ---------- */
   async function listPet(pet, materialType, materialQty) {
@@ -202,7 +236,12 @@
   }
 
   /* ---------- 宠物蛋上架 / 购买 / 取回 ---------- */
-  const getEggListings = () => eggListings;
+  // 在售宠物蛋 = 假卖家 + 真实玩家挂单（假单排前面，市场打开就有蛋可买）
+  const getEggListings = () => [...botEggListings, ...eggListings];
+  const getBotMaterialListings = () => botMaterialListings;
+  const getBotEggListings = () => botEggListings;
+  function addBotMaterialListing(l) { botMaterialListings.unshift(l); }
+  function addBotEggListing(l) { botEggListings.unshift(l); }
   const getMyListedEggs = () => myListedEggs;
   const isMyEggListed = (eggType) => myListedEggs.some(l => l.eggType === eggType);
   async function listEgg(eggType, materialType, materialQty) {
@@ -260,6 +299,8 @@
     calcTax, calcNet, findMaterial, isPaymentMaterial,
     listPet, buy, cancelPet, listItem, buyItem, cancelItem,
     getEggListings, getMyListedEggs, isMyEggListed, listEgg, buyEgg, cancelEgg,
-    addBotListing, buyBotItem, addBotPetListing, buyBotPet, buyAsBot, buyAsBotAny
+    addBotListing, buyBotItem, addBotPetListing, buyBotPet, buyAsBot, buyAsBotAny,
+    getBotMaterialListings, addBotMaterialListing, buyBotMaterial,
+    getBotEggListings, addBotEggListing, buyBotEgg
   };
 })();

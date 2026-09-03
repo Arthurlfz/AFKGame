@@ -2,8 +2,8 @@
  * ui/ui-login.js —— LoginPage 全屏登录页组件
  * 职责：
  *  1. 绑定登录表单（邮箱 / 密码 / 登录按钮 / 注册入口）
- *  2. 登录/注册模式切换：默认登录；点「注册」切到注册模式（显示邀请码框）
- *  3. 注册校验：邀请码 + 密码强度（config.auth）
+ *  2. 登录/注册模式切换：默认登录；点「注册」切到注册模式（显示昵称框 + 邀请码框）
+ *  3. 注册校验：昵称（可留空，留空系统自动生成）+ 邀请码 + 密码强度（config.auth）
  *  4. 复用 main.js 暴露的 window.Game.onLogin / onSignup
  * 依赖：ui-common（window.UI / $）；main（window.Game）；core/config（window.Config）
  * ============================================================ */
@@ -16,6 +16,7 @@
   function bindLogin() {
     const email = $('login-email');
     const pwd = $('login-pwd');
+    const nickname = $('login-nickname');
     const invite = $('login-invite');
     const btn = $('login-btn');
     const signup = $('login-signup-btn');
@@ -31,8 +32,9 @@
     }
     function setErr(msg) { if (err) err.textContent = msg || ''; }
 
-    // 注册模式：显示邀请码框；登录模式：隐藏
+    // 注册模式：显示昵称框 + 邀请码框；登录模式：都隐藏
     function applyMode() {
+      if (nickname) nickname.style.display = mode === 'signup' ? 'block' : 'none';
       if (invite) invite.style.display = mode === 'signup' ? 'block' : 'none';
       btn.textContent = mode === 'signup' ? '注册' : '登录';
       signup.textContent = mode === 'signup' ? '已有账号？去登录' : '没有账号？注册';
@@ -51,6 +53,18 @@
       if (pw.length < minLen) return '密码至少 ' + minLen + ' 位';
       if (a.pwdRequireLetter && !/[A-Za-z]/.test(pw)) return '密码需包含字母';
       if (a.pwdRequireDigit && !/[0-9]/.test(pw)) return '密码需包含数字';
+      return null;
+    }
+
+    // 昵称校验（读 config.auth.nickname）：留空 = 交给系统自动生成；填了就要够长
+    function nickCheck(v) {
+      const n = (window.Config && window.Config.auth && window.Config.auth.nickname) || {};
+      const minLen = n.minLen || 2;
+      const maxLen = n.maxLen || 12;
+      const s = (v || '').trim();
+      if (!s) return null;
+      if (s.length < minLen) return '昵称至少 ' + minLen + ' 个字';
+      if (s.length > maxLen) return '昵称最多 ' + maxLen + ' 个字';
       return null;
     }
 
@@ -82,17 +96,21 @@
       if (btn.disabled) return;
       setErr('');
 
-      // 先校验邀请码（config 未配置邀请码则跳过）
+      // 昵称校验（留空 = 系统自动生成，填了才校验长度）
+      const nErr = nickCheck(nickname && nickname.value);
+      if (nErr) { setErr(nErr); if (nickname) nickname.focus(); return; }
+
+      // 再校验邀请码（config 未配置邀请码则跳过）
       const iErr = inviteCheck(invite && invite.value);
       if (iErr) { setErr(iErr); if (invite) invite.focus(); return; }
 
-      // 再校验密码强度
+      // 最后校验密码强度
       const pErr = pwdCheck(pwd.value);
       if (pErr) { setErr(pErr); return; }
 
       setBusy(true);
       try {
-        const result = await window.Game.onSignup(email.value.trim(), pwd.value);
+        const result = await window.Game.onSignup(email.value.trim(), pwd.value, (nickname && nickname.value || '').trim());
         if (result && result.error) setErr(result.error.message || '注册失败，请稍后重试');
       } catch (e) {
         setErr(e.message || '注册失败，请稍后重试');
@@ -106,6 +124,7 @@
     const onEnter = (e) => { if (e.key === 'Enter') (mode === 'signup' ? doSignup() : doLogin()); };
     email.addEventListener('keydown', onEnter);
     pwd.addEventListener('keydown', onEnter);
+    if (nickname) nickname.addEventListener('keydown', onEnter);
     if (invite) invite.addEventListener('keydown', onEnter);
   }
 

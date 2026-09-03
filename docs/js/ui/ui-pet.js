@@ -448,7 +448,7 @@
     const mainPet = getPets().find(p => p.id === synthMainId);
     const cands = getPets().filter(p => {
       const ec = Object.values(p.equipment || {}).filter(Boolean).length;
-      return !ec && Merge.canMerge(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
+      return !ec && Merge.canSynthesize(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
     });
     if (!cands.length) {
       const empty = document.createElement('div');
@@ -968,11 +968,27 @@
     wrap.appendChild(list);
   }
 
-  /* ---------- 宠物页顶部 5 tab 切换（资料/装备/融合/进化/宠物蛋） ---------- */
+  /* ---------- 装备界面（12 槽）在「背包窗口 · 装备」子页，这里统一一个打开入口 ----------
+   * 2026-09-03：宠物页「装备」tab 与 pane 内的按钮都走它，避免入口指向空气（G3 穿装备指引入口）。 */
+  function openEquipWindow() {
+    if (window.UI && window.UI.openBagWindow) {
+      try { window.UI.openBagWindow(); } catch (e) { console.warn('[pet] 打开背包失败', e); }
+    }
+    const sub = document.querySelector('.bag-subtab[data-bag-subtab="equip"]');
+    if (sub && sub.click) sub.click();
+  }
+
+  /* ---------- 宠物页顶部 tab 切换（资料 / 进化 / 合成 / 涅槃 / 装备 / 宠物蛋） ---------- */
   function initPetTabs() {
     const tabs = $('pet-tabs');
     if (!tabs || tabs.__petTabBound) return;
     tabs.__petTabBound = true;
+    // 装备 pane 内的直达按钮
+    const gotoBtn = $('btn-pet-equip-goto');
+    if (gotoBtn && !gotoBtn.__bound) {
+      gotoBtn.__bound = true;
+      gotoBtn.addEventListener('click', openEquipWindow);
+    }
     tabs.addEventListener('click', e => {
       const btn = e.target.closest && e.target.closest('.pet-tab');
       if (!btn) return;
@@ -980,6 +996,10 @@
       tabs.querySelectorAll('.pet-tab').forEach(t => t.classList.toggle('active', t === btn));
       document.querySelectorAll('.pet-tab-pane').forEach(p =>
         p.classList.toggle('active', p.dataset.petPane === name));
+      // 装备：切到这一栏就把装备界面带出来（不用玩家再找背包入口）
+      if (name === 'equip') openEquipWindow();
+      // 宠物蛋：孵化面板按需渲染（切到才渲染，避免宠物页首屏多跑一遍）
+      if (name === 'egg') renderEggPanel();
     });
   }
 
