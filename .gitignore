@@ -46,3 +46,19 @@ docs/tests/tmp_*.js
 # ===== 根目录 js Junction（mklink /J → docs/js，不入库，避免重复内容）=====
 js/
 
+# ===== 本地临时文件 / 归档 / demo（2026-09-03 误传后清理，不入库）=====
+archive/
+_html
+_game_screenshot*.jpeg
+新建文本文档.txt
+系统整合_full_tmp.md
+docs/_dl_skill.tmp
+docs/_preview_*.png
+docs/onboarding-demo.html
+docs/battle-demo.html
+docs/css/onboarding-demo.css
+docs/css/ui-onboarding.css
+docs/AI假人经济系统策划_v1.md
+docs/游戏UI体检报告.md
+
+

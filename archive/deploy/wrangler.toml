@@ -1,5 +1,0 @@
-# Cloudflare Pages 配置（放在仓库根）
-# pages_build_output_dir 告诉 Cloudflare Pages 静态文件在哪
-name = "afkgame"
-compatibility_date = "2026-08-27"
-pages_build_output_dir = "新demo/Mvp/原型代码"
