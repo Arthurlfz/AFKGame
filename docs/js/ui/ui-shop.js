@@ -27,7 +27,30 @@
 
   const cur = () => (Config.shop && Config.shop.currency) || '魔石';
 
+  // 魔石系统总开关：Config.shop.enabled === false → 整条魔石线下线（界面隐藏 + 不打接口）
+  const enabled = () => !(Config.shop && Config.shop.enabled === false);
+
+  // 开关 → 界面可见性。renderShop 每次 renderAll 都会走，状态不会漂移；
+  // 用 inline display（不是 hidden 属性）：.tab-page.active / .sb-btn 的 display 规则会盖掉 [hidden]。
+  function applyVisibility() {
+    const on = enabled();
+    const set = (el, show) => { if (el) el.style.display = show ? '' : 'none'; };
+    set($('gem-balance'), on && !shopMissing);
+    document.querySelectorAll('[data-page="shop"]').forEach(b => set(b, on));
+    set($('tab-shop'), on);
+    // 关掉后若正停在商店页（hash 直达 / 旧收藏链接），退回主城，否则会整页空白
+    if (!on && UI.switchPage) {
+      const shopPage = $('tab-shop');
+      if (shopPage && shopPage.classList.contains('active')) UI.switchPage('capital');
+    }
+  }
+
   /* ---------- 拉取（登录时、买完后各调一次） ---------- */
+  async function refreshShop() {
+    applyVisibility();
+    if (!enabled()) return;
+    await Promise.all([refreshWallet(), refreshProducts(), refreshOrders()]);
+  }
   async function refreshWallet() {
     const w = await Supabase.getMyWallet();
     wallet = { gems: w.gems || 0, totalRecharged: w.totalRecharged || 0, missing: !!w.missing };
@@ -46,23 +69,22 @@
     orders = o.data || [];
     renderShop();
   }
-  async function refreshShop() {
-    await Promise.all([refreshWallet(), refreshProducts(), refreshOrders()]);
-  }
-
   /* ---------- 顶栏余额 ---------- */
   function renderGemChip() {
     const chip = $('gem-balance');
-    if (!chip) return;
-    chip.style.display = shopMissing ? 'none' : '';
-    chip.textContent = `🪙 ${wallet.gems} ${cur()}`;
-    chip.title = `魔石余额 ${wallet.gems} · 累计充值 ${wallet.totalRecharged}`;
+    if (chip) {
+      chip.textContent = `🪙 ${wallet.gems} ${cur()}`;
+      chip.title = `魔石余额 ${wallet.gems} · 累计充值 ${wallet.totalRecharged}`;
+    }
+    applyVisibility();
   }
 
   /* ---------- 页面渲染 ---------- */
   function renderShop() {
+    applyVisibility();
     const root = $('shop-root');
     if (!root) return;
+    if (!enabled()) { root.innerHTML = ''; return; }
     if (shopMissing) {
       root.innerHTML = `<div class="shop-missing">
         <div class="shop-missing-title">🪙 魔石商店尚未开通</div>

@@ -1,11 +1,11 @@
 /* ============================================================
- * ui/ui-equipment.js —— 装备页 UI（背包 / 筛选 / 多选 / 孵化 / 分解）
+ * ui/ui-equipment.js —— 装备页 UI（背包 / 筛选 / 多选 / 分解）
  * 职责：
- *  1. 背包渲染（穿装备 / 孵化宠物蛋 / 多选批量分解 / 锁定）
+ *  1. 背包渲染（穿装备 / 多选批量分解 / 锁定）
  *  2. 筛选栏（稀有度 / T 阶 / 锁定）与工具栏（计数 / 全选 / 批量分解）
  *  3. 一键分解确认框 + 批量分解确认框
  *  4. 装备详情浮层（前后缀分组）
- * 依赖：equipment / drop / market / salvage（只读查询与流程接口）；通用组件来自 ui-common
+ * 依赖：equipment / market / salvage（只读查询与流程接口）；通用组件来自 ui-common
  * 注：打造按钮点击后调用 ui-craft 的 UI.openCraftPanel（跨文件走公共命名空间）
  * ============================================================ */
 (function () {
@@ -17,7 +17,6 @@
   const Config = window.Config;
   const { getActivePet } = window.Pet;
   const { getInventory, equipItem, describeItem, scoreOf } = window.Equipment;
-  const { getEggCount, hatchEgg } = window.Drop;
   const Materials = window.Materials;
   const Market = window.Market;
   const Salvage = window.Salvage;
@@ -95,32 +94,10 @@
     btn.onclick = openBatchSalvagePanel;
   }
 
-  /* ---------- 背包（穿装备 / 孵化宠物蛋 / 多选批量分解） ---------- */
+  /* ---------- 背包（穿装备 / 多选批量分解） ---------- */
   function renderInventory() {
     const list = $('inv-list');
     list.innerHTML = '';
-
-    const eggs = getEggCount();
-    if (eggs > 0) {
-      const egg = document.createElement('div');
-      egg.className = 'inv-item';
-      egg.innerHTML = `<div class="info"><div class="ename">🥚 宠物蛋 ×${eggs}</div><div class="edesc">${UI.isLoggedIn() ? '孵化出新的宠物伙伴' : '登录后才能孵化'}</div></div>`;
-      const btn = document.createElement('button');
-      btn.className = 'btn-sm alt';
-      btn.textContent = UI.isLoggedIn() ? '孵化' : '🔒 登录后孵化';
-      btn.disabled = !UI.isLoggedIn();
-      btn.onclick = async () => {
-        const res = await hatchEgg();
-        if (!res) return;
-        if (res.error) { showToast('❌ 无法孵化', res.error); return; }
-        addLog(`🐣 孵化成功！获得新宠物 ${res.baby.name}（成长值 ${res.baby.growth}）！`);
-        showToast('🐣 孵化成功！', `${res.baby.icon} ${res.baby.name}｜成长值 ${res.baby.growth}｜已出战`);
-        if (res.saveError) addLog('⚠️ 云端存档失败，宠物仅保存在本地');
-        UI.renderAll();
-      };
-      egg.appendChild(btn);
-      list.appendChild(egg);
-    }
 
     const pet = getActivePet();
     const filtered = getFilteredInventory();
@@ -215,7 +192,7 @@
     }
     list.appendChild(grid);
 
-    if (eggs === 0 && getInventory().length === 0) {
+    if (getInventory().length === 0) {
       const empty = document.createElement('div');
       empty.className = 'inv-empty';
       empty.textContent = '背包空空如也，去刷图吧';
