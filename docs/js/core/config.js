@@ -272,13 +272,13 @@ window.Config = {
        * 原数值下 Lv9~11 裸装新手只剩个位数血、胜率跌到 41%。下调后全程剩余血 ≥25%。 */
       'plague-swamp':     { hp: 460, atk: 80, def: 38 },
       'shadow-mountains': { hp: 771, atk: 155, def: 66 },
-      'bone-wastes':      { hp: 1038, atk: 206, def: 89 },
-      'blood-rift':       { hp: 1304, atk: 256, def: 112 },
-      'echo-cliffs':      { hp: 1571, atk: 307, def: 135 },
-      'rotfen-bog':       { hp: 1837, atk: 358, def: 158 },
-      'ember-hollow':     { hp: 2107, atk: 408, def: 180 },
-      'soul-abyss':       { hp: 2374, atk: 459, def: 203 },
-      'blight-heart':     { hp: 2641, atk: 510, def: 226 },
+      'bone-wastes':      { hp: 924, atk: 184, def: 79 },
+      'blood-rift':       { hp: 1172, atk: 230, def: 101 },
+      'echo-cliffs':      { hp: 1380, atk: 270, def: 119 },
+      'rotfen-bog':       { hp: 1611, atk: 314, def: 139 },
+      'ember-hollow':     { hp: 1853, atk: 359, def: 158 },
+      'soul-abyss':       { hp: 1909, atk: 369, def: 164 },
+      'blight-heart':     { hp: 2126, atk: 411, def: 182 },
       /* ---- 2026-08-31 第二幕 7 图（61-100 级）：按既有等差外推（每图 hp+267/atk+51/def+23）----
        * 与图 6-10 同一套规则：怪数值=图中点基准 × 等级缩放（clamp 0.25~1.6）× typeMult。
        * 2026-09-03 拍板 60 级封顶后：本 7 图为【预留毕业图】（保留不删）——等级段 61-100 超上限、
@@ -304,9 +304,9 @@ window.Config = {
       { id: 'shadow-mountains', name: '白骨旷野', levelRange: [13, 18], recommended: '成长 7', recGrowth: 7, background: '白骨旷野', difficulty: 1.0, enemyIds: ['wild-bonewolf', 'wild-shadowrabbit', 'wild-plaguebear', 'wild-bogfrog', 'wild-corpsehound', 'wild-plaguecat'] },
       { id: 'bone-wastes', name: '幽影迷境', levelRange: [19, 24], recommended: '成长 9', recGrowth: 9, background: '幽影迷境', difficulty: 1.0, enemyIds: ['wild-bloodfang-fox', 'wild-netherfrost-wolf', 'wild-withermaw', 'wild-blightspine', 'wild-umbra-rabbit', 'wild-bog-king'] },
       { id: 'blood-rift', name: '血潮裂谷', levelRange: [25, 30], recommended: '成长 11', recGrowth: 11, background: '血潮裂谷', difficulty: 1.0, enemyIds: ['wild-bloodfang-fox', 'wild-netherfrost-wolf', 'wild-withermaw', 'wild-blightspine', 'wild-umbra-rabbit', 'wild-bog-king'] },
-      { id: 'echo-cliffs', name: '回响崖', levelRange: [31, 36], recommended: '成长 13', recGrowth: 13, background: '回响崖', difficulty: 1.0, enemyIds: ['wild-bog-king', 'wild-umbra-rabbit', 'wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-bloodfox-mutant', 'wild-plaguebear-mutant'] },
-      { id: 'rotfen-bog', name: '腐沼泽', levelRange: [37, 42], recommended: '成长 15', recGrowth: 15, background: '腐沼泽', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
-      { id: 'ember-hollow', name: '余烬渊', levelRange: [43, 48], recommended: '成长 17', recGrowth: 17, background: '余烬渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
+      { id: 'echo-cliffs', name: '回响崖', levelRange: [31, 36], recommended: '成长 13', recGrowth: 13, background: '回响崖', difficulty: 1.0, enemyMult: 1.1, enemyIds: ['wild-bog-king', 'wild-umbra-rabbit', 'wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-bloodfox-mutant', 'wild-plaguebear-mutant'] },
+      { id: 'rotfen-bog', name: '腐沼泽', levelRange: [37, 42], recommended: '成长 15', recGrowth: 15, background: '腐沼泽', difficulty: 1.0, enemyMult: 1.1, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
+      { id: 'ember-hollow', name: '余烬渊', levelRange: [43, 48], recommended: '成长 17', recGrowth: 17, background: '余烬渊', difficulty: 1.0, enemyMult: 1.1, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
       { id: 'soul-abyss', name: '魂渊', levelRange: [49, 54], recommended: '成长 19', recGrowth: 19, background: '魂渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
       { id: 'blight-heart', name: '腐变之源', levelRange: [55, 60], recommended: '成长 21', recGrowth: 21, background: '腐变之源', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
       /* ---- 2026-08-31 第二幕 7 图（腐变之源打穿后，污染往更深处扩散）----
@@ -370,8 +370,8 @@ window.Config = {
       13: { '区域材料': 132, '进化素材': 112, '增缀石': 26, '剥离石': 34, '合成之石': 60, '神圣石': 58, '涅磐兽': 55, '鉴定石': 8 },
       14: { '区域材料': 135, '进化素材': 118, '增缀石': 22, '剥离石': 32, '合成之石': 62, '神圣石': 62, '涅磐兽': 62, '鉴定石': 7 },
       15: { '区域材料': 138, '进化素材': 124, '增缀石': 18, '剥离石': 30, '合成之石': 65, '神圣石': 66, '涅磐兽': 68, '鉴定石': 6 },
-      16: { '区域材料': 140, '进化素材': 128, '增缀石': 16, '剥离石': 28, '合成之石': 67, '神圣石': 68, '涅磐兽': 70, '鉴定石': 5 },
-      17: { '区域材料': 140, '进化素材': 132, '增缀石': 14, '剥离石': 26, '合成之石': 70, '神圣石': 70, '涅磐兽': 75, '鉴定石': 4 }
+      16: { '区域材料': 140, '进化素材': 128, '增缀石': 16, '剥离石': 28, '合成之石': 67, '神圣石': 68, '涅磐兽': 70, '鉴定石': 5, '锁定石': 2 },
+      17: { '区域材料': 140, '进化素材': 132, '增缀石': 14, '剥离石': 26, '合成之石': 70, '神圣石': 70, '涅磐兽': 75, '鉴定石': 4, '锁定石': 2 }
     },
     // 进化素材档位权重（仅在本图 areaEvolutionTiers 允许的档位里生效）：
     // 高档相对权重更高 → 深处"只掉传说"的图传说频率拉满，中段多档图传说也偏多（出现时机的梯度）。
@@ -617,6 +617,13 @@ window.Config = {
       blue:  { 3: 35, 4: 65 },
       gold:  { 1: 2,  2: 13, 3: 85 }
     },
+    // 词缀 T 阶装备等级门槛（POE 式 ilvl gate）：T 阶要装备等级(ilvl)达到门槛才可能 roll 出。
+    // 装备 ilvl = 掉落它的图档怪等级下限（图10 怪 55 级 → ilvl 55 → T1 开放）。
+    // 低于门槛抽到高档 T 会降级到当前 ilvl 允许的最高 T（图4 金装抽到 T1 也只会出 T4）。
+    // 打造(重铸/增缀)沿用装备出生时的 ilvl，不会因换图刷高而解锁 —— T1 只在图10+ 的装备上出现。
+    affixIlvlGates: { 1: 55, 2: 40, 3: 25, 4: 1, 5: 1 },
+    // 图档 → 怪等级下限（兜底换算：老装备没有 ilvl 时按图档近似；与 battle.areas levelRange 对齐）
+    areaLevels: [1, 7, 13, 19, 25, 31, 37, 43, 49, 55, 61, 67, 73, 79, 85, 91, 97],
     // 底材 T 阶分布：每张图一套权重（数字 = 权重，T1 最优 → T5 最差）。
     // 以前是 drop.js 里的线性插值（图6 → T1 占 33%，顶级底材太常见）；改显式表，策划一眼能调。
     // 曲线：图1 几乎摸不到 T1（1%），图6 也才 20% —— T1 底材是"运气好才有的"。
@@ -714,6 +721,14 @@ window.Config = {
       name: '增缀石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_rune_stone.png" alt="">',
       effect: '新增一条随机且不重复的词缀。',
       rule: '装备已有 3 条词缀时无法使用。'
+    },
+    // 锁定石（2026-09-03 新增）：锁定一条词缀，重铸/神圣时该词缀保持不变、剥离不会移除它。
+    // 锁定后每次重铸/神圣，每条已锁定的词缀额外消耗 1 颗锁定石（持续消耗，防毕业太快）。
+    // 只从图 16/17 掉落（materialWeightsByTier），锁定上限 maxLocked 条。
+    lock: {
+      name: '锁定石', amount: 1, maxLocked: 4, icon: '<img class="mat-img" src="assets/icons/final/item_fused_stone.png" alt="">',
+      effect: '锁定一条词缀：重铸/神圣时该词缀保持不变，剥离也不会移除它。',
+      rule: '锁定后每次重铸/神圣，每条已锁定的词缀额外消耗 1 颗锁定石；最多锁 4 条；仅图 16/17 掉落。'
     }
   },
 

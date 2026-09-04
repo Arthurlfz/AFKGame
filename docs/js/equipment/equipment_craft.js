@@ -29,18 +29,26 @@
   //  1. 本地先行：改词缀 + 本地扣材料（界面立即生效）
   //  2. 云端并行：cloudSpend（RPC 扣材料）+ updateCloudItem（单条更新词缀）
   //  3. 任一失败 → 回滚本地（词缀还原 + 材料加回）并提示
-  async function applyCraft(eq, stoneName, stoneAmount, apply, onApplied) {
+  async function applyCraft(eq, stoneName, stoneAmount, apply, onApplied, extraStone) {
     const user = await Supabase.getCurrentUser();
     if (!user) return { error: '请先登录账号' };
     if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
     if (Market.isItemListed(eq.cloudId)) return { error: '装备正在市场出售，先取回再打造' };
     if (Materials.getQuantity(stoneName) < stoneAmount) return { error: `需要 ${stoneAmount} 颗${stoneName}，去挂机刷吧` };
+    // 锁定石附加消耗（2026-09-03）：reforge/reroll 时每条已锁定词缀额外扣 1 颗锁定石（方案 B 持续消耗）
+    if (extraStone && Materials.getQuantity(extraStone.name) < extraStone.amount) {
+      return { error: `需要 ${extraStone.amount} 颗${extraStone.name}（已锁定 ${extraStone.amount} 条词缀），去图 16/17 挂机刷吧` };
+    }
 
     // 本地先行：改词缀 + 本地扣材料
     const applied = apply(); // { changed, onFail() } 或 { error }
     if (applied.error) return applied;
     const spentLocal = Materials.spendLocal(stoneName, stoneAmount);
     if (!spentLocal.ok) { applied.onFail(); return { error: spentLocal.error || '材料不足' }; }
+    if (extraStone) {
+      const spentExtra = Materials.spendLocal(extraStone.name, extraStone.amount);
+      if (!spentExtra.ok) { Materials.gainLocal(stoneName, stoneAmount); applied.onFail(); return { error: spentExtra.error || '材料不足' }; }
+    }
 
     // 本地已生效（词缀改好、石头扣了）→ 立刻通知界面刷新，不等云端。
     // 实测打造要串 getUser + rpc 两次往返（约 0.9 秒），等它回来再刷新，
@@ -56,16 +64,19 @@
     // pending 通常为空（4 秒自动上报窗口），多数情况这里立即返回，不耽误时间。
     await Materials.flushMaterials();
 
-    // 云端并行同步（材料扣减 + 装备词缀更新，各 1 次请求）
-    const [sp, up] = await Promise.all([
+    // 云端并行同步（材料扣减 + 装备词缀更新，各 1 次请求；附加石头再 +1 次）
+    const cloudOps = [
       Materials.cloudSpend(stoneName, stoneAmount),
       Items.updateCloudItem(eq, { affixes: eq.affixes, rarity: eq.rarity.id })  // 颜色(增缀/剥离后条数变了)一并回写，否则刷新页面颜色回退
-    ]);
+    ];
+    if (extraStone) cloudOps.push(Materials.cloudSpend(extraStone.name, extraStone.amount));
+    const [sp, up] = await Promise.all(cloudOps);
     const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null) || (up && up.error);
     if (syncErr) {
-      // 回滚本地：词缀还原 + 材料加回
+      // 回滚本地：词缀还原 + 材料加回（含附加石头）
       applied.onFail();
       Materials.gainLocal(stoneName, stoneAmount);
+      if (extraStone) Materials.gainLocal(extraStone.name, extraStone.amount);
       return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
     }
     // 任务进度上报：所有 type=craft 的任务 +1（重铸/剥离/神圣/增缀四种石头都算打造）
@@ -78,22 +89,27 @@
   // 返回 { ok, changed: {old, new} } 或 { error }
   async function reforge(eq, onApplied) {
     const C = Config.craft.reforge;
+    // 锁定石（2026-09-03）：重铸时已锁定的词缀保持不变，每条已锁定词缀额外消耗 1 颗锁定石（持续消耗）
+    const lockedCount = flattenAffixes(eq.affixes).filter(a => a.locked).length;
+    const extra = lockedCount ? { name: Config.craft.lock.name, amount: lockedCount } : null;
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);
       const oldRarity = eq.rarity;
       // 重铸的 T 阶【必须跟着装备稀有度走】：以前这里写死 randInt(1,5) 且不看成色，
       // 白装也能洗出全 T1（还能洗到 6 条），稀有度系统被整个绕过。
+      // 已锁定的词缀【完全保留】（类型 / T 阶 / 数值 / 位置 / fixed 标记都不动），未锁定的才重洗。
+      const lockedTypes = new Set((old.prefix || []).concat(old.suffix || []).filter(a => a.locked).map(a => a.type));
       const rollBucket = (category) => {
-        const pool = AFFIX_POOL.filter(a => a.category === category);
-        const chosen = [];
-        const used = new Set();
+        const pool = AFFIX_POOL.filter(a => a.category === category && !lockedTypes.has(a.type));
+        const chosen = (old[category] || []).filter(a => a.locked).slice(); // 保留锁定词缀（原对象引用，标记保留）
+        const used = new Set(chosen.map(a => a.type));
         const cnt = randInt(0, 3);
         for (let i = 0; i < cnt; i++) {
           const avail = pool.filter(a => !used.has(a.type));
           if (!avail.length) break;
           const aff = pick(avail);
           used.add(aff.type);
-          const tier = window.Equipment.rollAffixTier(eq.rarity.id);
+          const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
           const T = tierOf(tier);
           chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) });
         }
@@ -103,16 +119,19 @@
       let suffix = rollBucket('suffix');
       if (prefix.length + suffix.length === 0) {
         const bucket = Math.random() < 0.5 ? 'prefix' : 'suffix';
-        const aff = pick(AFFIX_POOL.filter(a => a.category === bucket));
-        const tier = window.Equipment.rollAffixTier(eq.rarity.id);
-        const T = tierOf(tier);
-        const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
-        if (bucket === 'prefix') prefix = [one]; else suffix = [one];
+        const pool = AFFIX_POOL.filter(a => a.category === bucket && !lockedTypes.has(a.type));
+        if (pool.length) {
+          const aff = pick(pool);
+          const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
+          const T = tierOf(tier);
+          const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
+          if (bucket === 'prefix') prefix = [one]; else suffix = [one];
+        }
       }
       eq.affixes = { prefix, suffix };
       syncRarity(eq); // 重铸会重摇词缀条数 → 颜色按新条数同步
       return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
-    }, onApplied);
+    }, onApplied, extra);
   }
 
   /* ---------- 剥离：随机移除一条词缀（仅剩 1 条时不可用） ---------- */
@@ -121,8 +140,10 @@
     const C = Config.craft.strip;
     const locs = affixLocations(eq);
     if (locs.length <= 1) return { error: '装备仅剩 1 条词缀，无法剥离' };
+    const unlockable = locs.filter(l => !l.aff.locked); // 锁定的词缀不会被剥离
+    if (!unlockable.length) return { error: '所有词缀都已锁定，先解锁才能剥离' };
     return applyCraft(eq, C.name, C.amount, () => {
-      const loc = pick(locs);
+      const loc = pick(unlockable);
       const old = normalizeAffixes(eq.affixes);
       const oldRarity = eq.rarity;
       const removed = eq.affixes[loc.bucket][loc.index];
@@ -148,10 +169,14 @@
   async function reroll(eq, onApplied) {
     const C = Config.craft.holy;
     if (affixCount(eq) === 0) return { error: '这件装备没有词缀，无法重铸' };
+    // 锁定石（2026-09-03）：神圣石重 Roll 时锁定的词缀数值也不变，每条已锁定词缀额外消耗 1 颗锁定石
+    const lockedCount = flattenAffixes(eq.affixes).filter(a => a.locked).length;
+    const extra = lockedCount ? { name: Config.craft.lock.name, amount: lockedCount } : null;
 
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes); // 深拷贝嵌套结构，便于回滚与对比
       const rerollBucket = arr => arr.map(a => {
+        if (a.locked) return { ...a };          // 锁定的词缀：数值也不动
         const T = tierOf(a.tier);               // 用该词缀自身的 T 阶区间重随机
         return { ...a, value: randInt(T.min, T.max) };
       });
@@ -161,7 +186,7 @@
         changed: { old, new: changed },
         onFail: () => { eq.affixes = old; }     // 云同步失败时整组还原
       };
-    }, onApplied);
+    }, onApplied, extra);
   }
 
   /* ---------- 增缀石：按前后缀优先级给装备【新增】一条随机词缀 ---------- */
@@ -188,7 +213,7 @@
       const old = normalizeAffixes(eq.affixes);  // 深拷贝嵌套结构，便于回滚与对比
       const oldRarity = eq.rarity;
       const aff = pick(pool);
-      const tier = window.Equipment.rollAffixTier(eq.rarity.id); // 按稀有度加权，白/蓝加不出 T1
+      const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq)); // 按稀有度加权 + 装备等级解锁，白/蓝加不出 T1
       const T = tierOf(tier);
       const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
       eq.affixes[target] = [...eq.affixes[target], added];
@@ -198,6 +223,45 @@
         onFail: () => { eq.affixes = old; eq.rarity = oldRarity; }      // 云同步失败时整组还原
       };
     }, onApplied);
+  }
+
+  /* ---------- 锁定石：锁定一条词缀（重铸/神圣/剥离时保持不变） ---------- */
+  // 锁定：消耗 1 颗锁定石；锁定的词缀在重铸/神圣中【完全不变】、剥离不会移除。
+  // 锁定后每次重铸/神圣，每条已锁定词缀额外消耗 1 颗锁定石（持续消耗，防毕业太快）。
+  // 上限：每件装备最多锁 Config.craft.lock.maxLocked（4）条。锁定标记挂在词缀对象上（locked:true），
+  // 随 affixes 一起存取/上云（normalizeAffixes 保留全部字段），不需要改数据库表。
+  // loc 由 affixLocations(eq) 提供（{ bucket, index, aff }），UI 点击对应词缀行传入。
+  async function lockAffix(eq, loc, onApplied) {
+    const C = Config.craft.lock;
+    const aff = loc && loc.aff;
+    if (!aff) return { error: '词缀不存在' };
+    if (aff.locked) return { error: '该词缀已锁定' };
+    const lockedCount = flattenAffixes(eq.affixes).filter(a => a.locked).length;
+    if (lockedCount >= C.maxLocked) return { error: '最多同时锁定 ' + C.maxLocked + ' 条词缀，先解锁再锁新的' };
+    return applyCraft(eq, C.name, C.amount, () => {
+      const old = normalizeAffixes(eq.affixes);
+      aff.locked = true;
+      return { changed: { old, new: eq.affixes }, onFail: () => { delete aff.locked; } };
+    }, onApplied);
+  }
+
+  // 解锁：免费（放弃锁定，不消耗石头），只回写云端 affixes
+  async function unlockAffix(eq, loc) {
+    const aff = loc && loc.aff;
+    if (!aff) return { error: '词缀不存在' };
+    if (!aff.locked) return { error: '该词缀未锁定' };
+    const user = await Supabase.getCurrentUser();
+    if (!user) return { error: '请先登录账号' };
+    if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
+    if (Market.isItemListed(eq.cloudId)) return { error: '装备正在市场出售，先取回再操作' };
+    const old = normalizeAffixes(eq.affixes);
+    delete aff.locked;
+    const { error } = await Items.updateCloudItem(eq, { affixes: eq.affixes, rarity: eq.rarity.id });
+    if (error) {
+      eq.affixes = old;
+      return { ok: false, error: '云端同步失败：' + (error.message || error) };
+    }
+    return { ok: true, changed: { old, new: eq.affixes } };
   }
 
   /* ---------- 魂铸：把宠物血脉/觉醒特质铸进装备（独立词缀，永久不可剥离/重铸/神圣石洗） ----------
@@ -283,5 +347,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Craft = { reforge, strip, reroll, augment, affixText, soulCast };
+  window.Craft = { reforge, strip, reroll, augment, lockAffix, unlockAffix, affixText, soulCast };
 })();

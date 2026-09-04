@@ -34,6 +34,7 @@
   const unfreezeTimer = { pet: null, enemy: null };
   let fightEnded = false;   // 本场是否已结算（tick 与伤害结算都可能触发，防重复）
   let onFightEnd = null;   // main.js 注入的每场结算回调
+  let lastTickTs = 0;      // 战斗计时基准（tick 按真实流逝时间补步，后台节流不减速）
   let selectedAreaId = null;
   const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
   // 血统被动：跨场状态
@@ -161,7 +162,7 @@
   function scaleEnemyStats(enemy, area) {
     const diff = (area && area.difficulty) || 1.0;
     const base = (Config.battle.areaEnemyStats || {})[area && area.id] || { hp: 320, atk: 72, def: 30 };
-    const tm = (Config.battle.typeMult || {})[enemy.enemyType] || 1.0;
+    const tm = ((area && area.enemyMult) || (Config.battle.typeMult || {})[enemy.enemyType]) || 1.0;
     const [lo, hi] = (area && area.levelRange) || [1, 10];
     const mid = (lo + hi) / 2;
     const level = enemy.level || 1;
@@ -231,6 +232,7 @@
     window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
     window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
 
+    lastTickTs = Date.now(); // 开场基准：防上一场遗留的 lastTickTs 造成首 tick 跳步
     interval = setInterval(tick, 100);
   }
   // 血统被动：疫毛兽 疾风步 — 速度超阈值后每N点+攻速，上限cap
@@ -242,7 +244,16 @@
     const bonus = Math.min(p.cap, Math.floor((spd - p.threshold) / p.perPoint) * p.bonusPer);
     return 1 + bonus;
   }
+  // 战斗计时按【真实流逝时间】推进（2026-09-03）：浏览器切后台会把 setInterval 节流到 1 次/秒甚至更低，
+  // 旧逻辑固定 100ms 步进 → 后台行动条慢 10 倍+，经验/掉落跟着几乎停摆（挂机游戏致命）。
+  // 现在每 tick 用 Date.now() 算真实毫秒差 → 换算成 100ms 步数一次性补足 → 挂机速度与前台一致。
   function tick() {
+    const now = Date.now();
+    const steps = Math.min(Math.max(1, Math.floor((now - lastTickTs) / 100)), 600); // 封顶 60 秒/次，防极端堆积
+    lastTickTs = now;
+    for (let i = 0; i < steps && !fightEnded; i++) step();
+  }
+  function step() {
     // 进度条满值固定 100，累加 = 速度 / speedScale（config 校正攻速量级，改这一个数即调整体快慢）
     // 谁在演出谁就冻在当前位置（立绘还在对方脸上/收招回位的路上），对手不受牵连
     const scale = Config.battle.speedScale || 1;

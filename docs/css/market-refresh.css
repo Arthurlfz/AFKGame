@@ -86,6 +86,7 @@
 .mk-sell-price-row label{font-size:.82rem;color:var(--text-dim);}
 .mk-sell-qty-input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:.95rem;}
 .mk-sell-qty-input:focus{border-color:var(--accent);outline:none;}
+.mk-sell-qty-input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
 
 /* 响应式 */
 @media (max-width:1200px){.market-page{grid-template-columns:230px minmax(0,1fr);}}

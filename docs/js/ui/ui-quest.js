@@ -302,7 +302,19 @@
     if (UI.switchPage) UI.switchPage(page);
     if (guide && guide.tab) {
       const btn = document.querySelector('.pet-tab[data-pet-tab="' + guide.tab + '"]');
-      if (btn && btn.click) btn.click();
+      if (btn && btn.click) {
+        btn.click();
+      } else {
+        // 顶部 tab 按钮已移除（宠物页精简 2026-09-03）：直接激活对应 pane 兜底，引导不断链
+        const pane = document.querySelector('.pet-tab-pane[data-pet-pane="' + guide.tab + '"]');
+        if (pane) {
+          document.querySelectorAll('.pet-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.pet-tab-pane').forEach(p => p.classList.remove('active'));
+          pane.classList.add('active');
+          if (guide.tab === 'egg' && window.UI.renderEggPanel) window.UI.renderEggPanel();
+          if (guide.tab === 'equip') { const gb = document.getElementById('btn-pet-equip-goto'); if (gb) gb.click(); }
+        }
+      }
     }
     // 战斗页地图条要跟着刷新（与世界地图选图进战斗页的做法一致）
     if (page === 'battle') {

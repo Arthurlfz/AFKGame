@@ -543,11 +543,17 @@
     });
 
     // 非战斗回血时钟（每秒驱动一次；挂机中「等待回血」状态也回血，回满后 battle 自动继续）
+    // 2026-09-03：改成按真实流逝秒数补血（dtSec）——浏览器切后台节流到 1 次/分钟时，
+    // 后台一秒一秒回血会慢 60 倍，回血时钟也跟着停摆；用 dt 补偿后回血速度与前台一致。
+    let lastRegenTs = Date.now();
     setInterval(() => {
+      const now = Date.now();
+      const dtSec = Math.min(Math.max(0.1, (now - lastRegenTs) / 1000), 60); // 封顶 60 秒/次
+      lastRegenTs = now;
       if (isRunning() && !isWaitingRecover()) return;
       const pet = getActivePet();
       if (!pet) return;
-      if (regenTick(pet, 1)) renderAll();
+      if (regenTick(pet, dtSec)) renderAll();
       const maxHp = getStats(pet).hp;
       updateStatus(getCurHp(pet) < maxHp ? 'healing' : 'idle', 0);
       syncButton();

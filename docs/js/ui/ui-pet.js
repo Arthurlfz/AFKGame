@@ -742,7 +742,7 @@
         tip.className = 'equip-tip';
         const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
         const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-        const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
+        const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
         const base = eq.base || { label: '攻击', value: 0 };
         let soulLine = '';
         if (eq.soulAffix) {
@@ -854,7 +854,7 @@
       tip.className = 'equip-tip';
       const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
       const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-      const itemLevel = eq.level ?? eq.itemLevel ?? eq.areaTier ?? 1;
+      const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
       const base = eq.base || { label: '攻击', value: 0 };
       tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}`;
 

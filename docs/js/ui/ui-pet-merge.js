@@ -56,8 +56,14 @@
     if (!mb || !sb || !pb || !cb) return;
     const M = Config.nirvana || Config.merge || {};
     if (!main) {
-      mb.innerHTML = '<div class="hint">← 先在左侧选一只主宠</div>';
-      sb.innerHTML = ''; pb.innerHTML = ''; cb.innerHTML = '';
+      // 空态（无选中主宠）：显示玩法说明，避免「未选择主宠 / ＋ / 空目标」的占位感（2026-09-03）
+      const matName2 = M.material && M.material.name || '涅槃兽';
+      const matAmt2 = M.material && M.material.amount || 1;
+      const haveMat2 = Materials.getQuantity ? Materials.getQuantity(matName2) : 0;
+      mb.innerHTML = '<div class="es-tip">🦚 涅槃是什么</div>';
+      sb.innerHTML = '<div class="es-tip">主宠吸收副宠的成长值，等级重置回 <b>Lv.1</b>，突破成长上限继续养成。</div>';
+      pb.innerHTML = '<div class="es-tip">条件：主宠 <b>Lv.' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；消耗 <b>' + matAmt2 + ' 只' + matName2 + '</b>（当前持有 ' + haveMat2 + '）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
+      cb.innerHTML = '';
       return;
     }
     const matName = M.material && M.material.name || '涅槃兽';

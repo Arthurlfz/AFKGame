@@ -21,7 +21,7 @@
     const { data, error } = await db().from('equip_items').insert({
       user_id: user.id,
       name: eq.name, slot: eq.slot,
-      base_stat: eq.base, affixes: eq.affixes,
+      base_stat: eq.base, affixes: { ...eq.affixes, _ilvl: eq.ilvl ?? null },
       tier: eq.tier, rarity: eq.rarity.id,
       locked: !!eq.locked,
       soul_affix: eq.soulAffix || null
@@ -37,6 +37,7 @@
   // 更新云端装备字段（打造后词缀变化；需已登录 + 装备有 cloudId）
   async function updateCloudItem(eq, patch) {
     if (!eq.cloudId) return { data: null, error: new Error('装备未同步云端') };
+    if (patch && patch.affixes) patch.affixes = { ...patch.affixes, _ilvl: eq.ilvl ?? null };
     return db().from('equip_items').update(patch).eq('id', eq.cloudId);
   }
   // 批量删除云端装备（分解用；空数组直接返回成功）。
@@ -51,6 +52,8 @@
   // 旧数据兼容：历史词缀没有 tier 字段，按稀有度补默认档（金 T2 / 蓝 T4 / 白 T5）
   const DEFAULT_AFFIX_TIER = { gold: 2, blue: 4, white: 5 };
   function fromCloud(row) {
+    // 装备等级(ilvl)随 affixes JSON 的 _ilvl 键持久化（避免加 DB 列）；旧装备无则 null → 兜底换算
+    const ilvl = (row.affixes && row.affixes._ilvl) != null ? row.affixes._ilvl : null;
     const norm = normalizeAffixes(row.affixes);
     // 云端 base_stat 兜底（早期数据可能为 null/缺字段）：给默认攻击基底，避免属性计算炸（曾导致回血时钟中断）
     const base = (row.base_stat && row.base_stat.type)
@@ -61,6 +64,7 @@
       cloudId: row.id,
       name: row.name || '旧装备', slot: row.slot || '武器',
       tier: row.tier || 4,
+      ilvl: ilvl != null ? Number(ilvl) : null,
       rarity: { id: 'white', label: '白', color: '#b2aa9c' }, // 占位，下面按词缀条数统一重算
       base,
       affixes: { prefix: norm.prefix, suffix: norm.suffix },

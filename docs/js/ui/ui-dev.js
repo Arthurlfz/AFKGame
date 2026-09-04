@@ -490,6 +490,7 @@
     const pet = (window.Pet && window.Pet.getActivePet) ? window.Pet.getActivePet() : null;
     const startLv = pet ? pet.level : 1;
     const startGr = (pet && typeof pet.growth === 'number') ? pet.growth.toFixed(1) : '5';
+    const petOpts = ((Config.pet && Config.pet.starters) || []).map(ps => '<option value="' + ps.name + '"' + (ps.name === '腐噕兽' ? ' selected' : '') + '>' + (ps.icon || '') + ' ' + ps.name + '</option>').join('');
     return groupHtml('掉落 / 战斗模拟器',
       '<div class="dev-row"><div class="dev-row-head"><span class="dev-label">模拟地图</span></div>' +
         '<select class="dev-input" id="sim-area">' + areaOpts + '</select></div>' +
@@ -502,7 +503,28 @@
       '</div>' +
       '<div class="dev-note">复用真实 rollReward（dry 无副作用）+ Pet.expFromBattle/grantExp，统计掉落分布与升级曲线</div>' +
       '<div id="sim-summary" class="dev-sim-summary"></div>' +
-      '<div id="sim-charts"></div>');
+      '<div id="sim-charts"></div>') +
+      '<section class="dev-group"><div class="dev-group-title">强度校验（裸装 / 自定义装备胜率）</div>' +
+      '<div class="dev-note">选宠 + 成长 + 装备词条加成，扫图1-10 全部怪池【最差】胜率。穿装 &lt;85% 标红=卡脚；裸装 ≥60% 提示=装备价值弱。</div>' +
+      '<div class="dev-inline">' +
+        '<label class="dev-inline-label">宠物<select class="dev-input" id="chk-pet">' + petOpts + '</select></label>' +
+        '<label class="dev-inline-label">成长<input class="dev-input" id="chk-growth" type="number" step="0.5" min="1" max="30" value="5.5" style="width:56px"></label>' +
+        '<label class="dev-inline-label">场次<input class="dev-input" id="chk-n" type="number" min="500" max="10000" step="500" value="2000" style="width:64px"></label>' +
+      '</div>' +
+      '<div class="dev-note">装备词条（穿装档）：攻%/血%/防% 为乘法，速/命中/闪避/暴击/爆伤为加法。全 0 = 裸装。</div>' +
+      '<div class="dev-inline">' +
+        '<label class="dev-inline-label">攻+%<input class="dev-input" id="chk-atk" type="number" step="5" min="0" value="30" style="width:52px"></label>' +
+        '<label class="dev-inline-label">血+%<input class="dev-input" id="chk-hp" type="number" step="5" min="0" value="8" style="width:52px"></label>' +
+        '<label class="dev-inline-label">防+%<input class="dev-input" id="chk-def" type="number" step="5" min="0" value="15" style="width:52px"></label>' +
+        '<label class="dev-inline-label">速+<input class="dev-input" id="chk-spd" type="number" min="0" value="0" style="width:52px"></label>' +
+        '<label class="dev-inline-label">命中+<input class="dev-input" id="chk-hit" type="number" min="0" value="0" style="width:52px"></label>' +
+        '<label class="dev-inline-label">闪避+<input class="dev-input" id="chk-dodge" type="number" min="0" value="0" style="width:52px"></label>' +
+        '<label class="dev-inline-label">暴击+%<input class="dev-input" id="chk-crit" type="number" min="0" value="0" style="width:52px"></label>' +
+        '<label class="dev-inline-label">爆伤+%<input class="dev-input" id="chk-cdmg" type="number" min="0" value="0" style="width:52px"></label>' +
+        '<button class="btn-mini primary" id="chk-run">跑强度校验</button>' +
+      '</div>' +
+      '<div id="chk-result"></div>' +
+      '</section>';
   }
   function bindSimPanel() {
     const body = $('dev-body'); if (!body) return;
@@ -521,6 +543,8 @@
       } catch (e) { toast('❌ 模拟出错', e && e.message); }
       finally { run.disabled = false; run.textContent = '跑模拟'; }
     };
+    const chkRun = $('chk-run');
+    if (chkRun) chkRun.onclick = () => runStrengthCheck();
   }
   async function runSim(areaIdx, N, startLv, startGr) {
     const Pet = window.Pet, Drop = window.Drop, Materials = window.Materials;
@@ -554,6 +578,137 @@
     } finally { Materials.gain = origGain; }
     levelSeries.push({ battle: N - 1, level: pet.level });
     return { counts, mat, egg, totalExp, finalLevel: pet.level, levelUps, levelSeries, N, area };
+  }
+  /* ---------- 强度校验：扫图1-10，三宠（均衡/重甲/极速）裸装·穿装最差胜率 ---------- */
+  function getStrengthSimState(name) {
+    const b = Config.battle || {};
+    const pet = (Config.pet || {});
+    const base = (pet.starters || []).filter(x => x.name === name)[0] || {};
+    const prof = (pet.petProfiles && pet.petProfiles[name]) || pet.defaultPetProfile || {};
+    const spd = (pet.speeds && pet.speeds[name]) || 80;
+    const list = (window.EnemyData && window.EnemyData.list) || [];
+    return { b: b, base: base, prof: prof, spd: spd, list: list };
+  }
+  function strengthPetStats(lv, growth, eq, st) {
+    const C = st.base.statCoeff || { hp: 5, atk: 2, def: 1 };
+    return {
+      hp: Math.round((st.base.baseHp + Math.round(lv * growth * C.hp)) * (eq.hp || 1)),
+      atk: Math.round((st.base.baseAtk + Math.round(lv * growth * C.atk)) * (eq.atk || 1)),
+      def: Math.round((st.base.baseDef + Math.round(lv * growth * C.def)) * (eq.def || 1)),
+      spd: st.spd, hit: st.prof.hit || 90, dodge: st.prof.dodge || 5,
+      critRate: (st.prof.critRate || 8) / 100, critDamage: (st.prof.critDamage || 150) / 100, lifesteal: st.prof.lifesteal || 0
+    };
+  }
+  function strengthEnemyStats(enemy, area, lv, st) {
+    const b = st.b;
+    const diff = area.difficulty || 1.0;
+    const base = (b.areaEnemyStats && b.areaEnemyStats[area.id]) || { hp: 320, atk: 72, def: 30 };
+    const tm = (area.enemyMult || (b.typeMult && b.typeMult[enemy.enemyType])) || 1.0;
+    const lo = area.levelRange[0], hi = area.levelRange[1];
+    const mid = (lo + hi) / 2;
+    const clampCfg = b.levelScaleClamp || [0.25, 1.6];
+    const ratio = Math.max(clampCfg[0], Math.min(clampCfg[1], lv / mid));
+    const dodge = enemy.enemyType === 'mutant' ? 12 : enemy.enemyType === 'evolved' ? 8 : 5;
+    return {
+      hp: Math.round(base.hp * ratio * tm * diff),
+      atk: Math.round(base.atk * ratio * tm * diff),
+      def: Math.round(base.def * ratio * tm * diff),
+      spd: enemy.spd || 50, hit: 90, dodge: dodge,
+      critRate: b.critRate || 0.1, critDamage: b.critMultiplier || 1.5, lifesteal: 0
+    };
+  }
+  function strengthHitChance(h, d) { return Math.max(0.05, Math.min(0.95, h / (h + d))); }
+  function strengthFight(pet, enemy) {
+    let pA = 0, eA = 0, php = pet.hp, ehp = enemy.hp, guard = 0;
+    while (php > 0 && ehp > 0 && guard++ < 5000) {
+      pA += pet.spd; eA += enemy.spd;
+      const pR = pA >= 100, eR = eA >= 100;
+      if (pR && eR) { if (pet.spd >= enemy.spd) { pA = 0; pTurn(); eA = 0; eTurn(); } else { eA = 0; eTurn(); pA = 0; pTurn(); } }
+      else if (pR) { pA = 0; pTurn(); }
+      else if (eR) { eA = 0; eTurn(); }
+      if (php <= 0 || ehp <= 0) break;
+    }
+    return php > 0;
+    function pTurn() {
+      if (Math.random() < strengthHitChance(pet.hit, enemy.dodge)) {
+        let dmg = Math.max(1, pet.atk - enemy.def);
+        if (Math.random() < pet.critRate) dmg = Math.floor(dmg * pet.critDamage);
+        ehp -= dmg;
+        if (pet.lifesteal > 0) php = Math.min(pet.hp, php + Math.floor(dmg * pet.lifesteal));
+      }
+    }
+    function eTurn() {
+      if (Math.random() < strengthHitChance(enemy.hit, pet.dodge)) {
+        let dmg = Math.max(1, enemy.atk - pet.def);
+        if (Math.random() < enemy.critRate) dmg = Math.floor(dmg * enemy.critDamage);
+        php -= dmg;
+        if (enemy.lifesteal > 0) ehp = Math.min(enemy.hp, ehp + Math.floor(dmg * enemy.lifesteal));
+      }
+    }
+  }
+  function strengthWinRate(st, area, enemy, lv, growth, eq, N) {
+    let wins = 0;
+    const pet = strengthPetStats(lv, growth, eq, st);
+    for (let i = 0; i < N; i++) {
+      const es = strengthEnemyStats(enemy, area, lv, st);
+      if (strengthFight(pet, es)) wins++;
+    }
+    return wins / N;
+  }
+  async function runStrengthCheck() {
+    const out = $('chk-result'); if (!out) return;
+    const growth = Number($('chk-growth').value) || 5.5;
+    const N = Math.max(500, Math.min(10000, Math.floor(Number($('chk-n').value) || 2000)));
+    const PECS = [
+      { name: '腐噜兽', role: '均衡' },
+      { name: '瘟熊', role: '重甲' },
+      { name: '幽影兔', role: '极速' }
+    ];
+    const areas = (Config.battle.areas || []).filter(a => a.levelRange[1] <= 60);
+    const eq = { hp: 1.08, atk: 1.3, def: 1.15 };   // 参考玩家：成长5.5 + 基础装备（config 设计口径）
+    const bareEq = { hp: 1, atk: 1, def: 1 };
+    out.innerHTML = '<div class="dev-note">校验中（成长 ' + growth + '，每怪 ' + N + ' 场，' + PECS.length + ' 只宠）…</div>';
+    let rows = '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px"><thead><tr>' +
+      '<th style="text-align:left;padding:4px 6px;border-bottom:1px solid #4a3f28">宠物</th>' +
+      '<th style="padding:4px 6px;border-bottom:1px solid #4a3f28">裸装最差</th>' +
+      '<th style="padding:4px 6px;border-bottom:1px solid #4a3f28">穿装最差</th>' +
+      '<th style="padding:4px 6px;border-bottom:1px solid #4a3f28">判定</th></tr></thead><tbody>';
+    let worstAll = 1, worstAllDesc = '';
+    for (let pi = 0; pi < PECS.length; pi++) {
+      const pec = PECS[pi];
+      const st = getStrengthSimState(pec.name);
+      if (!st.base.name) { rows += '<tr><td style="padding:4px 6px;text-align:left">' + pec.name + '</td><td colspan="3" style="padding:4px 6px;color:#f87171">未找到数据</td></tr>'; continue; }
+      let gW = 1, gAt = '', bW = 1, bAt = '';
+      for (let idx = 0; idx < areas.length; idx++) {
+        const area = areas[idx];
+        const enemies = (st.list || []).filter(en => (area.enemyIds || []).indexOf(en.id) >= 0 &&
+          (en.levelRange ? en.levelRange[1] >= area.levelRange[0] && en.levelRange[0] <= area.levelRange[1] : (en.level || 1) >= area.levelRange[0] && (en.level || 1) <= area.levelRange[1]));
+        if (!enemies.length) continue;
+        const lvs = [area.levelRange[0], area.levelRange[1]];
+        for (let ei = 0; ei < enemies.length; ei++) {
+          for (let li = 0; li < lvs.length; li++) {
+            const g = strengthWinRate(st, area, enemies[ei], lvs[li], growth, eq, N);
+            const b = strengthWinRate(st, area, enemies[ei], lvs[li], growth, bareEq, N);
+            if (g < gW) { gW = g; gAt = '图' + (idx + 1); }
+            if (b < bW) { bW = b; bAt = '图' + (idx + 1); }
+          }
+        }
+      }
+      if (gW < worstAll) { worstAll = gW; worstAllDesc = pec.name + '（' + pec.role + '）@' + gAt; }
+      const pct = x => (x * 100).toFixed(0) + '%';
+      const status = gW >= 0.95 ? '稳过' : gW >= 0.85 ? '有挑战' : '卡脚';
+      const color = gW >= 0.95 ? '#4ade80' : gW >= 0.85 ? '#facc15' : '#f87171';
+      const note = bW >= 0.60 ? '⚠️ 裸装也能打，装备价值弱' : (bW < 0.30 ? '装备刚需' : '裸装会翻车');
+      rows += '<tr><td style="padding:4px 6px;border-bottom:1px solid #2c2517;text-align:left">' + pec.name + '<span style="color:#8a7a5a;font-size:11px">（' + pec.role + ' spd' + st.spd + '）</span></td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #2c2517">' + pct(bW) + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #2c2517;color:' + color + '">' + pct(gW) + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid #2c2517;color:' + color + '">' + status + '@' + gAt + ' · ' + note + '</td></tr>';
+      await new Promise(r => setTimeout(r, 0));
+      out.innerHTML = rows + '</tbody></table>' + '<div class="dev-note">已扫 ' + (pi + 1) + '/' + PECS.length + ' 宠…</div>';
+    }
+    rows += '</tbody></table>';
+    const gColor = worstAll >= 0.95 ? '#4ade80' : worstAll >= 0.85 ? '#facc15' : '#f87171';
+    out.innerHTML = rows + '<div style="margin-top:6px;font-size:12px;color:' + gColor + '">最危险宠物：' + worstAllDesc + ' 穿装胜率 ' + (worstAll * 100).toFixed(1) + '% — ' + (worstAll >= 0.95 ? '无卡脚' : worstAll >= 0.85 ? '有挑战但能过' : '存在卡脚，需下调怪强度') + '</div>';
   }
   function renderSimResult(res) {
     if (!res) return;

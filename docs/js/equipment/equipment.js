@@ -112,13 +112,33 @@
   const TIER_BY_RARITY = { gold: 1, blue: 2, white: 4 };
   // 词缀 T 阶抽取（唯一入口）：按 config.equipment.affixTierWeights 的稀有度权重抽。
   // 掉落 / 重铸 / 增缀 都调这里 —— 以前重铸是 randInt(1,5) 且不看成色，白装能洗出全 T1。
-  function rollAffixTier(rarityId) {
+  function rollAffixTier(rarityId, ilvl) {
     const w = (Config.equipment.affixTierWeights || {})[rarityId];
     const entries = Object.entries(w || { 4: 60, 5: 40 });
     const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
     let r = Math.random() * total;
-    for (const [t, v] of entries) { r -= (Number(v) || 0); if (r < 0) return Number(t); }
-    return Number(entries[entries.length - 1][0]);
+    let picked = Number(entries[entries.length - 1][0]);
+    for (const [t, v] of entries) { r -= (Number(v) || 0); if (r < 0) { picked = Number(t); break; } }
+    // 装备等级解锁（POE 式 ilvl gate）：T 阶要装备等级达到门槛才能 roll 出。
+    // ilvl 为空视为 100（存量装备不追溯，避免刷新后降级破坏市场）；低于门槛抽到高档 T → 降到允许的最高 T。
+    const lv = ilvl == null ? 100 : Number(ilvl);
+    const gates = (Config.equipment.affixIlvlGates || {});
+    let best = 5;
+    for (const [t, g] of Object.entries(gates)) { if (lv >= Number(g) && Number(t) < best) best = Number(t); }
+    if (picked < best) picked = best;
+    return picked;
+  }
+  // 图档 → 怪等级下限（兜底换算用；与 config.areaLevels 对齐）
+  function levelOfAreaTier(t) {
+    const arr = (Config.equipment.areaLevels) || [];
+    const v = Number(arr[Number(t) - 1]);
+    return isFinite(v) && v > 0 ? v : 1;
+  }
+  // 装备等级(ilvl)：新装备出生时写入；老装备按图档兜底换算；都没有视为 100（存量不追溯）
+  function ilvlOf(eq) {
+    if (eq && eq.ilvl != null) return Number(eq.ilvl);
+    if (eq && eq.areaTier != null) return levelOfAreaTier(eq.areaTier);
+    return 100;
   }
   // 稀有度（颜色）由词缀总条数唯一决定：1 条=白 / 2 条=蓝 / 3 条及以上=金。
   // 掉落时先由图档定稀有度→再定词缀条数区间（白1/蓝2/金3~6），故与条数一致；
@@ -134,12 +154,13 @@
   }
   // generateEquipment(rarity, areaTier=1, materialTier=3)：基底=部位基准×地图档次×底材 T 阶系数。
   // 白装 1 条、蓝装 2 条、金装至少 3 条词缀；每件装备仍保证带 1 条基础词缀。
-  function generateEquipment(rarity, areaTier, materialTier) {
+  function generateEquipment(rarity, areaTier, materialTier, ilvl) {
     rarity = rarity || Config.equipment.rarities[0];
     // 图档上限与 baseTierMultipliers 档数一致（地图 10 图后这里还钳 6 → 图7~10 掉落和图6 一样强，已修）
     const maxTier = (Config.equipment.baseTierMultipliers || []).length || 6;
     areaTier = Math.max(1, Math.min(maxTier, areaTier || 1));
     materialTier = Math.max(1, Math.min(5, materialTier || 3));
+    if (ilvl == null) ilvl = levelOfAreaTier(areaTier);
     const slot = Util.pick(SLOTS);
     const info = SLOT_INFO[slot];
     const multiplier = (Config.equipment.baseTierMultipliers[areaTier - 1] || 1) *
@@ -163,14 +184,14 @@
       // 按词缀权重加权抽取：基础战斗词缀常出、资源/极品词缀稀出（POE 式）
       const aff = Util.pickWeighted(available.map(a => ({ ...a, weight: a.weight || 50 })));
       pool.splice(pool.indexOf(aff), 1);
-      const tier = rollAffixTier(rarity.id); // T 阶按稀有度加权（白/蓝抽不到 T1）
+      const tier = rollAffixTier(rarity.id, ilvl); // T 阶按稀有度加权 + 装备等级解锁（白/蓝抽不到 T1，低等级抽不到高档 T）
       const tiers = aff.type === 'spd' ? Config.equipment.speedAffixTiers : Config.equipment.affixTiers;
       const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
       const fixed = ['hit', 'dodge', 'spd'].includes(aff.type);
       affixes[aff.category].push({ type: aff.type, label: aff.label, tier, value: Util.randInt(T.min, T.max), fixed });
     }
     const eq = {
-      id: uid++, name: Util.pick(info.names), slot, areaTier, materialTier,
+      id: uid++, name: Util.pick(info.names), slot, areaTier, materialTier, ilvl,
       tier: materialTier, rarity: { id: rarity.id, label: rarity.label, color: rarity.color },
       base, baseStats, affixes, cloudId: null, locked: false, fresh: true
     };
@@ -358,7 +379,7 @@
   /* ---------- 对外 API ---------- */
   window.Equipment = {
     SLOTS, AFFIX_POOL, affixCategory, normalizeAffixes, flattenAffixes, affixCount, affixLocations,
-    pickRarity, generateEquipment, rollAffixTier, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
+    pickRarity, generateEquipment, rollAffixTier, ilvlOf, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
     equipItem, unequip, getEquipBonuses, describeItem, formatAffix, formatAffixHtml, affixRange, rarityOf, baseOf
   };
 })();

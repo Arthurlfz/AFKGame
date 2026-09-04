@@ -6,14 +6,14 @@
 <title>宠物养成循环原型</title>
 <!-- 设计变量（颜色/尺寸/字体统一在 vars.css；v3 视觉规范 design-tokens.css 后加载覆盖同名变量，全站升级 v3 水墨配色） -->
 <link rel="stylesheet" href="css/vars.css?v=6571f00a">
-<link rel="stylesheet" href="css/design-tokens.css?v=388a08a4">
+<link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
-<link rel="stylesheet" href="css/app.css?v=cefcdb31">
-<link rel="stylesheet" href="css/game.css?v=20260903u">
+<link rel="stylesheet" href="css/app.css?v=20260903c">
+<link rel="stylesheet" href="css/game.css?v=20260903lock">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=bbafbacc">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260903c">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
-<link rel="stylesheet" href="css/market-refresh.css?v=d3732457">
+<link rel="stylesheet" href="css/market-refresh.css?v=20260903c">
 <link rel="stylesheet" href="css/market-cascade.css?v=caf34f5e">
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
@@ -261,8 +261,6 @@
           <button class="pet-tab" data-pet-tab="evolve">进化</button>
           <button class="pet-tab" data-pet-tab="synth">合成</button>
           <button class="pet-tab" data-pet-tab="merge">涅槃</button>
-          <button class="pet-tab" data-pet-tab="equip">装备</button>
-          <button class="pet-tab" data-pet-tab="egg">宠物蛋</button>
         </div>
 
         <!-- 资料 tab：出战宠物详情 + 宠物列表 -->
@@ -807,7 +805,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260903sec"></script>
+<script src="js/core/config.js?v=20260904growth"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -833,46 +831,46 @@ window.PetSprites = {
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=302bb613"></script>
 <script src="js/core/supabase.js?v=20260903sec"></script>
-<script src="js/equipment/equipment.js?v=8f507a6a"></script>
+<script src="js/equipment/equipment.js?v=20260903ilvl"></script>
     <script src="js/pet/pet.js?v=591129e0"></script>
-<script src="js/core/items.js?v=32a26709"></script>
+<script src="js/core/items.js?v=20260903ilvl"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
-<script src="js/core/drop.js?v=1b5e2f35"></script>
+<script src="js/core/drop.js?v=20260903ilvl"></script>
 <script src="js/core/market.js?v=3d044442"></script>
 <script src="js/core/market_bot.js?v=20260903sec"></script>
-<script src="js/equipment/equipment_craft.js?v=785fd82c"></script>
+<script src="js/equipment/equipment_craft.js?v=20260903ilvl"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260903x"></script>
 <script src="js/pet/pet_evolve.js?v=78511b8a"></script>
 <script src="js/core/quest.js?v=20260903w"></script>
 <script src="js/core/tutorial_mode.js?v=20260903z"></script>
-<script src="js/core/battle.js?v=11832020"></script>
+<script src="js/core/battle.js?v=20260904growth"></script>
 <script src="js/ui/ui-common.js?v=20260903j"></script>
 <script src="js/ui/ui-console.js?v=fa16bb1d"></script>
 <script src="js/ui/ui-shell.js?v=1e45bd1d"></script>
 <script src="js/ui/ui-worldmap.js?v=c02315e7"></script>
-<script src="js/ui/ui-capital.js?v=0a5ac952"></script>
+<script src="js/ui/ui-capital.js?v=20260903notab"></script>
 
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
-<script src="js/ui/ui-quest.js?v=20260903p"></script>
+<script src="js/ui/ui-quest.js?v=20260903notab"></script>
 <script src="js/ui/ui-battle.js?v=c0c142e4"></script>
-<script src="js/ui/ui-pet.js?v=20260903x"></script>
+<script src="js/ui/ui-pet.js?v=20260903ilvl"></script>
 <script src="js/ui/ui-pet-evolve.js?v=196095dd"></script>
-<script src="js/ui/ui-pet-merge.js?v=9249467a"></script>
+<script src="js/ui/ui-pet-merge.js?v=20260903nirvana"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260903x"></script>
 <script src="js/ui/ui-bag.js?v=b8cdb91a"></script>
-<script src="js/ui/ui-equipment.js?v=13d42bcc"></script>
-<script src="js/ui/ui-craft.js?v=9983d4b9"></script>
+<script src="js/ui/ui-equipment.js?v=20260903ilvl"></script>
+<script src="js/ui/ui-craft.js?v=20260903lock"></script>
 <script src="js/ui/ui-market.js?v=7a70ce5d"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>
 <script src="js/ui/ui-codex.js?v=94ab55e8"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
-<script src="js/ui/ui-dev.js?v=20260903u"></script>
-<script src="js/main.js?v=20260903sec"></script>
+<script src="js/ui/ui-dev.js?v=20260904chk22"></script>
+<script src="js/main.js?v=20260903bg"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->
 <div class="bag-tooltip equip-tip" id="bag-tooltip"></div>

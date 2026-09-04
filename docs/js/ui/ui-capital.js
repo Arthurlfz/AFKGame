@@ -27,9 +27,14 @@
       go: () => {
         if (!window.UI.switchPage) return;
         window.UI.switchPage('pet');
-        // 切到「宠物蛋」tab（模拟点击，复用 initPetTabs 的事件委托）
-        const eggTab = document.querySelector('.pet-tab[data-pet-tab="egg"]');
-        if (eggTab) eggTab.click();
+        // 宠物页顶部「宠物蛋」tab 已移除（2026-09-03 精简）：直接激活蛋 pane + 渲染，不依赖 tab 按钮
+        const pane = document.querySelector('.pet-tab-pane[data-pet-pane="egg"]');
+        if (pane) {
+          document.querySelectorAll('.pet-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.pet-tab-pane').forEach(p => p.classList.remove('active'));
+          pane.classList.add('active');
+          if (window.UI.renderEggPanel) window.UI.renderEggPanel();
+        }
       }
     },
     {

@@ -49,6 +49,7 @@
   padding: 11px 14px; color: var(--text); font-size: 1.083rem; outline: none; transition: border-color .12s;
 }
 .login-panel input:focus { border-color: var(--accent); }
+.login-panel input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .login-panel input::placeholder { color: var(--text-faint); }
 .login-btn {
   margin-top: 4px; width: 100%; padding: 12px 0;

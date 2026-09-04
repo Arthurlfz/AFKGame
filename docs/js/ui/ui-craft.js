@@ -26,13 +26,25 @@
       const inSell = Market.isItemListed(eq.cloudId);
       const pfx = eq.affixes.prefix || [];
       const sfx = eq.affixes.suffix || [];
+      // 锁定石（2026-09-03）：已锁定的词缀在重铸/神圣中保持不变，每条额外消耗 1 锁定石
+      const lockedCount = flattenAffixes(eq.affixes).filter(a => a.locked).length;
+      const lockCfg = C.lock || { name: '锁定石', amount: 1, maxLocked: 4 };
+      const lockBtn = (a, bucket, idx) => {
+        const locked = !!a.locked;
+        const disabled = (!locked && lockedCount >= lockCfg.maxLocked) ? ' disabled' : '';
+        return `<button class="craft-lock-btn${locked ? ' on' : ''}" data-lock-bucket="${bucket}" data-lock-idx="${idx}"${disabled} title="${locked ? '点击解锁（免费）' : '消耗 1 锁定石锁定该词缀'}">${locked ? '🔒' : '🔓'}</button>`;
+      };
+      const affixLine = (a, bucket, idx) => {
+        const locked = !!a.locked;
+        return `<div class="grp-line ${bucket}${locked ? ' locked' : ''}">${Craft.affixText(a)} ${lockBtn(a, bucket, idx)}</div>`;
+      };
       const affixGroupHtml = `
         <div class="craft-affix-group">
           <div class="grp-title">前缀（${pfx.length}/3）</div>
-          ${pfx.map(a => `<div class="grp-line prefix">${Craft.affixText(a)}</div>`).join('') || '<span class="hint">无</span>'}
+          ${pfx.map((a, i) => affixLine(a, 'prefix', i)).join('') || '<span class="hint">无</span>'}
           <hr class="craft-affix-divider">
           <div class="grp-title">后缀（${sfx.length}/3）</div>
-          ${sfx.map(a => `<div class="grp-line suffix">${Craft.affixText(a)}</div>`).join('') || '<span class="hint">无</span>'}
+          ${sfx.map((a, i) => affixLine(a, 'suffix', i)).join('') || '<span class="hint">无</span>'}
         </div>`;
       const stoneTip = key => {
         const stone = C[key];
@@ -51,12 +63,13 @@
           <div class="craft-resource-item"><span class="resource-icon">✂️</span><span>${stoneTip('strip')}</span><b>×${Materials.getQuantity(C.strip.name)}</b></div>
           <div class="craft-resource-item holy"><span class="resource-icon">🔮</span><span>${stoneTip('holy')}</span><b>×${Materials.getQuantity(C.holy.name)}</b></div>
           <div class="craft-resource-item"><span class="resource-icon">➕</span><span>${stoneTip('augment')}</span><b>×${Materials.getQuantity(C.augment.name)}</b></div>
+          <div class="craft-resource-item lock"><span class="resource-icon">🔒</span><span>${stoneTip('lock')}</span><b>×${Materials.getQuantity(lockCfg.name)}</b></div>
         </div>
         <div class="craft-section-label">打造操作</div>
         <div class="craft-actions craft-action-grid">
-          <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1 · 全部重洗</span></button>
+          <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1${lockedCount ? ` + ${lockedCount} 锁定石` : ''} · 锁定词缀保留</span></button>
           <button class="btn-mini alt" id="craft-strip" ${(flattenAffixes(eq.affixes).length <= 1) ? 'disabled' : ''}>✂️ 剥离石<span>${flattenAffixes(eq.affixes).length <= 1 ? '仅剩 1 条' : '消耗 1 · 移除词缀'}</span></button>
-          <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1 · 重 Roll 数值</span></button>
+          <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1${lockedCount ? ` + ${lockedCount} 锁定石` : ''} · 重 Roll 数值</span></button>
           <button class="btn-mini augment" id="craft-augment" ${(flattenAffixes(eq.affixes).length >= 6) ? 'disabled' : ''}>➕ 增缀石<span>${flattenAffixes(eq.affixes).length >= 6 ? '前后缀已满' : '消耗 1 · 新增词缀'}</span></button>
         </div>
         ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
@@ -71,8 +84,8 @@
           (onApplied) => Craft.reforge(eq, onApplied),
           (r) => {
             const ns = flattenAffixes(r.changed.new);
-            $('craft-result').innerHTML = `🎲 重铸完成：全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-            addLog(`🎲 重铸成功：${eq.name} 词缀全部重洗`);
+            $('craft-result').innerHTML = `🎲 重铸完成：${lockedCount ? '锁定词缀保留，未锁定词缀' : '全部词缀'}已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+            addLog(`🎲 重铸成功：${eq.name} ${lockedCount ? '未锁定词缀已重洗（锁定 ' + lockedCount + ' 条保留）' : '词缀全部重洗'}`);
             showToast('🎲 重铸完成', `词条已全部随机重洗`);
             render(); // 重建按钮：恢复可用
             if (UI.renderInventory) UI.renderInventory();
@@ -113,6 +126,30 @@
             if (UI.renderInvToolbar) UI.renderInvToolbar();
           });
       };
+      // 词缀锁定 / 解锁：点击词缀行右侧 🔒/🔓 按钮（锁定消耗 1 锁定石，解锁免费）
+      body.querySelectorAll('.craft-lock-btn').forEach(btn => {
+        btn.onclick = () => {
+          if (inSell) return;
+          const bucket = btn.dataset.lockBucket;
+          const idx = Number(btn.dataset.lockIdx);
+          const aff = (eq.affixes[bucket] || [])[idx];
+          if (!aff) return;
+          const loc = { bucket, index: idx, aff };
+          const isLocking = !aff.locked;
+          return craftOptimistic(btn, isLocking ? '🔒 锁定中…' : '🔓 解锁中…',
+            async (onApplied) => {
+              const r = isLocking ? await Craft.lockAffix(eq, loc, onApplied) : await Craft.unlockAffix(eq, loc);
+              return r;
+            },
+            (r) => {
+              const nowLocked = !!aff.locked;
+              $('craft-result').innerHTML = `${nowLocked ? '🔒 已锁定' : '🔓 已解锁'}：${Craft.affixText(aff)}`;
+              addLog(`${nowLocked ? '🔒 锁定' : '🔓 解锁'}词缀：${eq.name} ${Craft.affixText(aff)}`);
+              showToast(nowLocked ? '🔒 已锁定' : '🔓 已解锁', `${Craft.affixText(aff)}`);
+              render(); // 重建：刷新锁定标记 / 按钮态 / 数量
+            });
+        };
+      });
       bindSoulCast(eq, render);
       const btnAug = body.querySelector('#craft-augment');
       if (btnAug) btnAug.onclick = () => {

@@ -166,7 +166,7 @@
         if (upR) rarity = Config.equipment.rarities.find(x => x.id === upR) || rarity;
       }
       const matTier = rollMaterialTier(areaTier);
-      const eq = generateEquipment(rarity, areaTier, matTier);
+      const eq = generateEquipment(rarity, areaTier, matTier, (area && area.levelRange && area.levelRange[0]) || 1);
       eq.identified = false;          // 掉落即未鉴定，背包里灰框，鉴定后揭晓
       if (!dry) {
         addToInventory(eq);
