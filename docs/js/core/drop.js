@@ -127,8 +127,7 @@
       name = (am && am.name) || null;
     }
     if (!name) return null;
-    const qty = (res && res.dropQty && res.dropQty >= 2) ? 2 : 1;
-    return { name, qty };
+    return { name, qty: 1 }; // dropQty 不再给数量（原 ≥2 才生效等于永无效），改在 rollReward 乘掉落池权重
   }
 
   /* ---------- 掉落（改法一：单池·一场一抽） ---------- */
@@ -144,12 +143,15 @@
     const activePet = window.Pet.getActivePet();
     const res = (activePet && getEquipBonuses(activePet).resources) || { dropQty: 1, dropRare: 1, matDrop: 1 };
 
-    // 单池一次抽取：总权重归一化；"材料率"词缀拉高 material 档权重
+    // 单池一次抽取：总权重归一化；"材料率"词缀拉高 material 档权重；
+    // "掉落数量"词缀（2026-09-04 改法）拉高 material/equipment 档权重（+8% → 权重×1.08），
+    // 语义 = "更容易掉东西"而不是"一次掉两个"，还原词缀本意且不抬通胀。
     const pool = D.pool || {};
+    const qtyMul = 1 + ((res.dropQty || 1) - 1);
     const entries = [
       ['none', pool.none || 0],
-      ['material', (pool.material || 0) * (res.matDrop || 1)],
-      ['equipment', pool.equipment || 0],
+      ['material', (pool.material || 0) * (res.matDrop || 1) * qtyMul],
+      ['equipment', (pool.equipment || 0) * qtyMul],
       ['egg', pool.egg || 0]
     ];
     const tier = weightedPick(entries);

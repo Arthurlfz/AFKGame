@@ -605,6 +605,61 @@ window.Config = {
       { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 4 },
       { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
     ],
+    /* ---------- 词缀独立数值表（2026-09-04 拍板） ----------
+     * 痛点：以前暴伤和吸血共用 affixTiers（6~8），但暴伤从 150% 起跳、吸血从 0 起跳，
+     * 同一张表导致"暴伤+8"是废条、"吸血+8"是神条 —— 数字小不代表收益小，量纲必须各自定标。
+     * 原则：总量守恒（各属性 T1 期望战力打平），%只乘底座不乘成长值。
+     * 每张表 tier 1~5，T1 最强；未列出的属性继续走 affixTiers。
+     */
+    lifestealAffixTiers: [   // 吸血%（移入前缀池后定标）：T1 4% 一击回 4% 伤害，可感知
+      { tier: 1, min: 3, max: 4 }, { tier: 2, min: 2, max: 3 }, { tier: 3, min: 2, max: 2 },
+      { tier: 4, min: 1, max: 1 }, { tier: 5, min: 1, max: 1 }
+    ],
+    critDamageAffixTiers: [  // 暴伤%：基础暴伤 150%，T1 +25 到 175% 才有感
+      { tier: 1, min: 18, max: 25 }, { tier: 2, min: 12, max: 16 }, { tier: 3, min: 8, max: 10 },
+      { tier: 4, min: 4, max: 6 }, { tier: 5, min: 2, max: 3 }
+    ],
+    critAffixTiers: [        // 暴击率%：基础 5%，T1 +8 到 13%，暴击流核心
+      { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 3 },
+      { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
+    ],
+    penAffixTiers: [         // 穿透（固定值，无视X点防御）：对照怪物防御区间校准（高图怪 def 数百，T1 破防有感）
+      { tier: 1, min: 30, max: 40 }, { tier: 2, min: 20, max: 28 }, { tier: 3, min: 12, max: 18 },
+      { tier: 4, min: 6, max: 10 }, { tier: 5, min: 2, max: 5 }
+    ],
+    dmgBonusAffixTiers: [    // 最终伤害+X%：万金油进攻词缀
+      { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 3 },
+      { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
+    ],
+    drAffixTiers: [          // 受伤减免X%（受击侧乘 (1-dr)，clamp 最低承伤 10%）：坦克流核心
+      { tier: 1, min: 4, max: 5 }, { tier: 2, min: 3, max: 3 }, { tier: 3, min: 2, max: 2 },
+      { tier: 4, min: 1, max: 1 }, { tier: 5, min: 1, max: 1 }
+    ],
+    // 底材命中随 ilvl 成长：命中+5 死数改为分段区间表（底材管"下限的身份"，词缀管"上限的博弈"）。
+    // ilvl 低于段起点取最低段；高于最高段取最高段；ilvl 为空的存量装备走 100（不追溯）。
+    baseHitByIlvl: [
+      { minIlvl: 1,  min: 3, max: 5 },    // 图1~3（ilvl 1~19）
+      { minIlvl: 25, min: 5, max: 8 },    // 图5~7（ilvl 25~37）
+      { minIlvl: 43, min: 8, max: 12 },   // 图8~9（ilvl 43~49）
+      { minIlvl: 55, min: 12, max: 16 },  // 图10~12（ilvl 55~67）：后期怪闪避高，底材命中是真收益
+      { minIlvl: 73, min: 16, max: 22 }   // 图13+（ilvl 73+）
+    ],
+    // 部位词缀偏好：同部位某些词缀权重 ×N（1 = 不变；0 = 该部位绝不出现）。
+    // 意图：武器偏进攻、靴子偏速度、护甲偏坦克 —— 让"刷哪个部位"有方向感。
+    slotAffixWeights: {
+      武器: { atk: 2, dmgBonus: 2, pen: 2, hp: 0.5, def: 0.5 },
+      戒指: { crit: 2, critDamage: 2 },
+      项链: { crit: 1.5, critDamage: 1.5, dmgBonus: 1.5 },
+      头盔: { def: 1.5, hit: 1.5 },
+      护甲: { hp: 2, def: 2, dr: 2, atk: 0.5 },
+      盾牌: { def: 2, dr: 1.5, dodge: 1.5 },
+      靴子: { spd: 3, dodge: 1.5 },
+      腰带: { hp: 1.5, lifesteal: 1.5 },
+      斗篷: { dodge: 2, dr: 1.5, spd: 1.5 },
+      饰品: { hit: 2, crit: 1.5 },
+      护符: { lifesteal: 3, hp: 1.5 },
+      徽章: { crit: 1.5, critDamage: 1.5, dmgBonus: 1.5 }
+    },
     // 词缀 T 阶：按稀有度「加权」抽取（T1 最好 → T5 最差）。
     // 以前是 [min,max] 均匀随机：金装 [1,3] → 每条词缀 33% 是 T1，顶级词缀泛滥、没有求而不得感。
     // 第一次改加权后金装 T1 仍 8%（玩家实测"太容易出现 T1"）→ 2026-08-30 再砍到底：
@@ -682,8 +737,8 @@ window.Config = {
      *     把攻击/暴击这些真战力词缀全碾压，评分就失去意义了。
      */
     score: {
-      stat: { atk: 1, hp: 0.2, def: 1, spd: 1.5, hit: 1, dodge: 1, crit: 2, critDamage: 0.5, lifesteal: 3 },
-      pct:  { atk: 5, hp: 5, def: 5 },
+      stat: { atk: 1, hp: 0.2, def: 1, spd: 1.5, hit: 1, dodge: 1, crit: 2, critDamage: 0.5, lifesteal: 3, pen: 1 },
+      pct:  { atk: 5, hp: 5, def: 5, dmgBonus: 6, dr: 8 },
       resource: { dropQty: 8, dropRare: 6, matDrop: 6 }
     },
     // 稀有度（颜色）由词缀总条数唯一决定：1 条=白 / 2 条=蓝 / 3 条及以上=金。

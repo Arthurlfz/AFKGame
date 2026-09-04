@@ -19,7 +19,21 @@
   const Market = window.Market;
   const { randInt, pick } = window.Util;
 
-  const tierOf = t => Config.equipment.affixTiers.find(x => x.tier === t);
+  // 词缀数值表分派（2026-09-04 独立定标）：与 equipment.js 的 affixTiersFor 同一套映射，杜绝两套口径
+  const AFFIX_TIER_TABLES = {
+    spd: () => Config.equipment.speedAffixTiers,
+    lifesteal: () => Config.equipment.lifestealAffixTiers,
+    crit: () => Config.equipment.critAffixTiers,
+    critDamage: () => Config.equipment.critDamageAffixTiers,
+    pen: () => Config.equipment.penAffixTiers,
+    dmgBonus: () => Config.equipment.dmgBonusAffixTiers,
+    dr: () => Config.equipment.drAffixTiers
+  };
+  const tierOf = (t, type) => {
+    const get = type && AFFIX_TIER_TABLES[type];
+    const tiers = (get ? get() : null) || Config.equipment.affixTiers;
+    return tiers.find(x => x.tier === t);
+  };
   // 词缀 T 阶的颜色（T1 最好 → 暗金，T5 最差 → 灰；低饱和金属系）
   const TIER_COLORS = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f', 4: '#7f9fc4', 5: '#6c7684' };
   // 特质坐标系 → 词缀坐标系（魂铸词缀必须用词缀 type 参与 getEquipBonuses 结算）
@@ -110,7 +124,7 @@
           const aff = pick(avail);
           used.add(aff.type);
           const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
-          const T = tierOf(tier);
+          const T = tierOf(tier, aff.type);
           chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) });
         }
         return chosen;
@@ -123,7 +137,7 @@
         if (pool.length) {
           const aff = pick(pool);
           const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
-          const T = tierOf(tier);
+          const T = tierOf(tier, aff.type);
           const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
           if (bucket === 'prefix') prefix = [one]; else suffix = [one];
         }
@@ -154,8 +168,8 @@
   }
 
   // 词缀展示：如「攻击 +12%（T4）」，带 T 阶颜色
-  // 命中/闪避/速度为固定值词缀（fixed），不显示 %，其余（atk/hp/def/crit/critDamage/lifesteal/dropQty/dropRare/matDrop）为百分比
-  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd']);
+  // 命中/闪避/速度/穿透为固定值词缀（fixed），不显示 %，其余（atk/hp/def/crit/critDamage/lifesteal/dmgBonus/dr/dropQty/dropRare/matDrop）为百分比
+  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd', 'pen']);
   function affixText(aff) {
     const color = TIER_COLORS[aff.tier] || '#9a9a9a';
     const suffix = FIXED_AFFIX_TYPES.has(aff.type) ? '' : '%';
@@ -177,7 +191,7 @@
       const old = normalizeAffixes(eq.affixes); // 深拷贝嵌套结构，便于回滚与对比
       const rerollBucket = arr => arr.map(a => {
         if (a.locked) return { ...a };          // 锁定的词缀：数值也不动
-        const T = tierOf(a.tier);               // 用该词缀自身的 T 阶区间重随机
+        const T = tierOf(a.tier, a.type);       // 用该词缀自身的 T 阶区间重随机
         return { ...a, value: randInt(T.min, T.max) };
       });
       const changed = { prefix: rerollBucket(old.prefix), suffix: rerollBucket(old.suffix) };
@@ -207,14 +221,14 @@
 
     const used = flattenAffixes(eq.affixes).map(a => a.type); // 已有类型（全局不重复）
     const pool = AFFIX_POOL.filter(a => a.category === target && !used.includes(a.type));
-    if (!pool.length) return { error: target === 'prefix' ? '前缀类型已用尽（攻击/生命/防御均已占用）' : '后缀类型已用尽（速度/暴击率/吸血均已占用）' };
+    if (!pool.length) return { error: target === 'prefix' ? '前缀类型已用尽（攻击/生命/防御/吸血均已占用）' : '后缀类型已用尽' };
 
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);  // 深拷贝嵌套结构，便于回滚与对比
       const oldRarity = eq.rarity;
       const aff = pick(pool);
       const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq)); // 按稀有度加权 + 装备等级解锁，白/蓝加不出 T1
-      const T = tierOf(tier);
+      const T = tierOf(tier, aff.type);
       const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
       eq.affixes[target] = [...eq.affixes[target], added];
       syncRarity(eq); // 词缀+1 → 颜色按条数同步（如白→蓝→金）

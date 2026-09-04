@@ -308,6 +308,10 @@
       hit: baseHit + (flat.hit || 0) + blHit,
       dodge: baseDodge + (flat.dodge || 0) + blDodge,
       lifesteal: baseLs + (flat.lifesteal || 0) / 100,
+      // 三个新词缀字段（穿透固定值 / 伤害加成% / 受伤减免%）：battle.calcDamage 结算用
+      pen: (flat.pen || 0),
+      dmgBonus: (flat.dmgBonus || 0),
+      dr: (flat.dr || 0),
       growth: pet.growth || 0
     };
   }
@@ -332,6 +336,10 @@
     if (Math.round(h)) parts.push('命中+' + Math.round(h));
     if (Math.round((s.critRate - bCrit) * 100)) parts.push('暴击+' + Math.round((s.critRate - bCrit) * 100) + '%');
     if (Math.round((s.lifesteal - bLs) * 100)) parts.push('吸血+' + Math.round((s.lifesteal - bLs) * 100) + '%');
+    // 三个新词缀属性：穿透为固定值，伤害加成/受伤减免为百分比点数
+    if (Math.round(s.pen || 0)) parts.push('穿透+' + Math.round(s.pen));
+    if (Math.round(s.dmgBonus || 0)) parts.push('伤害+' + Math.round(s.dmgBonus) + '%');
+    if (Math.round(s.dr || 0)) parts.push('减伤+' + Math.round(s.dr) + '%');
     return parts.length ? parts.join(' ') : '无';
   }
 

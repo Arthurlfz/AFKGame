@@ -28,7 +28,7 @@
   /* ---------- 装备规则（数值来自 config.js，名字/词缀池留在本地） ---------- */
   const SLOTS = ['武器', '戒指', '项链', '头盔', '护甲', '盾牌', '靴子', '腰带', '斗篷', '饰品', '护符', '徽章'];
   const B = Config.equipment.baseValues;
-  const LABELS = { atk: '攻击', hp: '生命', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血' };
+  const LABELS = { atk: '攻击', hp: '生命', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血', pen: '穿透', dmgBonus: '伤害加成', dr: '受伤减免' };
   const NAMES = {
     武器: ['短剑', '战斧', '长弓', '法杖'], 戒指: ['铁戒', '骨戒'], 项链: ['狼牙项链', '灵魂项链'],
     头盔: ['铁盔', '骨盔'], 护甲: ['锁甲', '胸甲'], 盾牌: ['圆盾', '塔盾'],
@@ -45,12 +45,15 @@
     { type: 'atk', label: '攻击', category: 'prefix', weight: 100 },
     { type: 'hp', label: '生命', category: 'prefix', weight: 100 },
     { type: 'def', label: '防御', category: 'prefix', weight: 100 },
+    { type: 'lifesteal', label: '吸血', category: 'prefix', weight: 60 },  // 2026-09-04 吸血移入前缀：续航是"大方向型"属性，适合前缀一眼定去留
     { type: 'spd', label: '速度', category: 'suffix', weight: 60 },
     { type: 'crit', label: '暴击率', category: 'suffix', weight: 55 },
     { type: 'critDamage', label: '暴击伤害', category: 'suffix', weight: 45 },
     { type: 'hit', label: '命中', category: 'suffix', weight: 50 },
     { type: 'dodge', label: '闪避', category: 'suffix', weight: 40 },
-    { type: 'lifesteal', label: '吸血', category: 'suffix', weight: 35 },
+    { type: 'pen', label: '穿透', category: 'suffix', weight: 45 },         // 固定值：无视X点防御，克制高防怪
+    { type: 'dmgBonus', label: '伤害加成', category: 'suffix', weight: 45 },// 最终伤害+X%
+    { type: 'dr', label: '受伤减免', category: 'suffix', weight: 40 },      // 受到伤害-X%（clamp 最低承伤10%）
     { type: 'dropQty', label: '掉落数量', category: 'suffix', weight: 15 },
     { type: 'dropRare', label: '掉落稀有度', category: 'suffix', weight: 12 },
     { type: 'matDrop', label: '材料掉率', category: 'suffix', weight: 10 }
@@ -128,6 +131,30 @@
     if (picked < best) picked = best;
     return picked;
   }
+  // 词缀数值表分派：每属性独立 T1~T5 表（2026-09-04），未列出的走通用 affixTiers。
+  // 生成（generateEquipment）、roll 区间展示（affixRange）共用这一张分派表，杜绝两套口径。
+  const AFFIX_TIER_TABLES = {
+    spd: () => Config.equipment.speedAffixTiers,
+    lifesteal: () => Config.equipment.lifestealAffixTiers,
+    crit: () => Config.equipment.critAffixTiers,
+    critDamage: () => Config.equipment.critDamageAffixTiers,
+    pen: () => Config.equipment.penAffixTiers,
+    dmgBonus: () => Config.equipment.dmgBonusAffixTiers,
+    dr: () => Config.equipment.drAffixTiers
+  };
+  function affixTiersFor(type) {
+    const get = AFFIX_TIER_TABLES[type];
+    const t = get ? get() : Config.equipment.affixTiers;
+    return t || Config.equipment.affixTiers;
+  }
+  // 底材命中随 ilvl 成长：查 config.equipment.baseHitByIlvl 分段表，取 min~max 随机。
+  // ilvl 为空的存量装备走 100（不追溯，与 ilvlOf 兜底一致）。
+  function rollBaseHit(ilvl) {
+    const table = Config.equipment.baseHitByIlvl || [];
+    let seg = table[0] || { min: 3, max: 5 };
+    for (const s of table) if (Number(ilvl || 100) >= s.minIlvl) seg = s;
+    return Util.randInt(seg.min, seg.max);
+  }
   // 图档 → 怪等级下限（兜底换算用；与 config.areaLevels 对齐）
   function levelOfAreaTier(t) {
     const arr = (Config.equipment.areaLevels) || [];
@@ -171,23 +198,30 @@
     const base = { type: firstBase.type, label: firstBase.label, value: baseStats[firstBase.type] };
     const count = Util.randInt(rarity.affixMin, rarity.affixMax);
     const affixes = { prefix: [], suffix: [] };
+    // 底材命中：随 ilvl 成长的区间值（取代固定 +5 死数），作为基础词缀（base:true 无 T 阶区间）
     const baselineType = baseStats.hit !== undefined ? 'hit' : 'crit';
-    const baseline = { type: baselineType, label: LABELS[baselineType], tier: 5, value: baselineType === 'hit' ? 5 : 2, base: true };
+    const baseline = { type: baselineType, label: LABELS[baselineType], tier: 5,
+      value: baselineType === 'hit' ? rollBaseHit(ilvl) : 2, base: true };
     affixes.suffix.push(baseline);
     const pool = AFFIX_POOL.filter(a => a.type !== baselineType);
     // 补词缀：targetCount 为词缀总条数上限（含基础词缀）。每次只选「目标桶未满(≤3)」的类型，
     // 避免前缀/后缀超过单桶上限 3 条（金装 4~6 条时若全堆一个桶会爆结构）。
     const targetCount = Math.min(count, 7); // 结构上限：基础1 + 前缀3 + 后缀3 = 7
+    const slotW = (Config.equipment.slotAffixWeights || {})[slot] || {};
     while (affixCount({ affixes }) < targetCount && pool.length) {
       const available = pool.filter(a => (affixes[a.category] || []).length < 3);
       if (!available.length) break;
-      // 按词缀权重加权抽取：基础战斗词缀常出、资源/极品词缀稀出（POE 式）
-      const aff = Util.pickWeighted(available.map(a => ({ ...a, weight: a.weight || 50 })));
+      // 按词缀权重加权抽取：基础战斗词缀常出、资源/极品词缀稀出（POE 式）；
+      // 再乘部位偏好（slotAffixWeights）：武器偏进攻、靴子偏速度、护甲偏坦克
+      const aff = Util.pickWeighted(available.map(a => ({
+        ...a, weight: (a.weight || 50) * (slotW[a.type] != null ? slotW[a.type] : 1)
+      })).filter(a => a.weight > 0));
+      if (!aff) break;
       pool.splice(pool.indexOf(aff), 1);
       const tier = rollAffixTier(rarity.id, ilvl); // T 阶按稀有度加权 + 装备等级解锁（白/蓝抽不到 T1，低等级抽不到高档 T）
-      const tiers = aff.type === 'spd' ? Config.equipment.speedAffixTiers : Config.equipment.affixTiers;
+      const tiers = affixTiersFor(aff.type);
       const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
-      const fixed = ['hit', 'dodge', 'spd'].includes(aff.type);
+      const fixed = ['hit', 'dodge', 'spd', 'pen'].includes(aff.type);
       affixes[aff.category].push({ type: aff.type, label: aff.label, tier, value: Util.randInt(T.min, T.max), fixed });
     }
     const eq = {
@@ -298,8 +332,10 @@
         else if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
         // 机制百分比词缀（暴击/暴伤/吸血）：直接加「百分比点数」（如 +6% → flat.lifesteal += 6，getStats 再 /100 转小数）
         else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-        // 固定值词缀（命中/闪避/速度）：直接加数值
-        else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        // 固定值词缀（命中/闪避/速度/穿透）：直接加数值
+        else if (['hit', 'dodge', 'spd', 'pen'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        // 独立结算词缀（最终伤害+X% / 受伤减免X%）：加百分比点数，battle.js 结算时使用
+        else if (['dmgBonus', 'dr'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
         else own[aff.type] = (own[aff.type] || 0) + (stats[aff.type] || 0) * (aff.value || 0) / 100;
       }
       // 魂铸词缀（独立于 affixes：不会被重铸/剥离/神圣石影响，永久保留；type 走词缀坐标系 critRate→crit）
@@ -318,8 +354,8 @@
 
   /* ---------- 展示文案 ---------- */
   // 词缀展示统一入口：命中/闪避/速度为固定值词缀，不显示 %；攻击/生命/防御词缀按成长相关百分比显示，其余机制/资源词缀按配置显示。
-  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd']);
-  const PERCENT_AFFIX_TYPES = new Set(['atk', 'hp', 'def', 'crit', 'critDamage', 'lifesteal', 'dropQty', 'dropRare', 'matDrop']);
+  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd', 'pen']);
+  const PERCENT_AFFIX_TYPES = new Set(['atk', 'hp', 'def', 'crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'dropQty', 'dropRare', 'matDrop']);
   function formatAffix(a) {
     return `${a.label} +${a.value}${FIXED_AFFIX_TYPES.has(a.type) ? '' : PERCENT_AFFIX_TYPES.has(a.type) ? '%' : ''}`;
   }
@@ -334,8 +370,7 @@
    */
   function affixRange(a) {
     if (!a || !a.type || a.base || !a.tier) return null;
-    const tiers = a.type === 'spd' ? Config.equipment.speedAffixTiers : Config.equipment.affixTiers;
-    const T = (tiers || []).find(t => t.tier === a.tier);
+    const T = (affixTiersFor(a.type) || []).find(t => t.tier === a.tier);
     return T ? { min: T.min, max: T.max } : null;
   }
   // 词缀的 HTML 行（带区间 + 高亮）。cls 可传 tip-prefix / tip-suffix / tip-affix 等控制样式。

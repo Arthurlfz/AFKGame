@@ -196,7 +196,7 @@
     const { enemy: ENEMY, area } = picked;
     const enemyStats = scaleEnemyStats(ENEMY, area);
     state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
-    state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal };
+    state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
     state.enemy = enemyStats;
     // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
     // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
@@ -208,6 +208,10 @@
       state.enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
     }
     if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
+    // 敌人侧三新词缀兜底：怪物没配就是 0，calcDamage 行为与旧版一致
+    if (state.enemy.pen == null) state.enemy.pen = 0;
+    if (state.enemy.dmgBonus == null) state.enemy.dmgBonus = 0;
+    if (state.enemy.dr == null) state.enemy.dr = 0;
     state.petAction = 0;
     state.enemyAction = 0;
     // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
@@ -373,8 +377,10 @@
     window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
     return true;
   }
-  // 完整伤害结算：命中判定 → 攻防减法 → 暴击 → 吸血
+  // 完整伤害结算：命中判定 → 攻防减法(含穿透) → 暴击 → 伤害加成% → 受伤减免%(clamp) → 吸血
   // 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
+  // 2026-09-04 新增三个纯数值词缀结算（怪物侧字段缺省=0，行为不变）：
+  //   穿透 pen：减法伤害里无视 pen 点防御；伤害加成 dmgBonus/100：结果乘 (1+x)；受伤减免 dr/100：受击侧乘 (1-x)，最低承伤 clamp 10%。
   function calcDamage(att, defStats) {
     const atk = att.atk, def = defStats.def;
     const hit = Math.max(0, att.hit || 0);
@@ -388,8 +394,15 @@
     const rate = (att.critRate == null) ? Config.battle.critRate : att.critRate;
     const mult = (att.critDamage == null) ? Config.battle.critMultiplier : att.critDamage;
     const isCrit = Math.random() < rate;
-    let dmg = Math.max(1, atk - def);
+    // 穿透：只削防御，不把防御削成负数（负防御会放大伤害，穿透不该有这个收益）
+    const effDef = Math.max(0, def - Math.max(0, att.pen || 0));
+    let dmg = Math.max(1, atk - effDef);
     if (isCrit) dmg = Math.floor(dmg * mult);
+    // 伤害加成%：进攻侧最终乘区
+    if (att.dmgBonus) dmg = Math.floor(dmg * (1 + att.dmgBonus / 100));
+    // 受伤减免%：受击侧乘区，最低承伤 10%（防坦克无限叠成免伤）
+    const dr = Math.min(90, Math.max(0, defStats.dr || 0));
+    if (dr > 0) dmg = Math.max(1, Math.floor(dmg * (1 - dr / 100)));
     // 吸血：命中且造成伤害时，按伤害 × 攻击者吸血率回血
     const lifesteal = att.lifesteal == null ? 0 : att.lifesteal;
     const heal = lifesteal > 0 ? Math.floor(dmg * lifesteal) : 0;

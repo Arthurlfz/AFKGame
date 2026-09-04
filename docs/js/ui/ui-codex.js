@@ -199,6 +199,11 @@
     const areaRows = (E.baseTierMultipliers || []).map((m, i) => [`第 ${i + 1} 档`, '×' + m]);
     const tierRows = (E.affixTiers || []).map(t => ['T' + t.tier, `${t.min} 到 ${t.max}`]);
     const spdRows = (E.speedAffixTiers || []).map(t => ['T' + t.tier, `${t.min} 到 ${t.max}`]);
+    // 独立定标的词缀数值表（2026-09-04）：各属性量纲不同，共用一张表会失衡（吸血+8 神条、暴伤+8 废条）
+    const customTables = [
+      ['吸血', E.lifestealAffixTiers], ['暴击率', E.critAffixTiers], ['暴击伤害', E.critDamageAffixTiers],
+      ['穿透', E.penAffixTiers], ['伤害加成', E.dmgBonusAffixTiers], ['受伤减免', E.drAffixTiers]
+    ].filter(x => x[1]);
     const prefixList = pool.filter(a => a.category === 'prefix').map(a => escapeHtml(a.label));
     const suffixList = pool.filter(a => a.category === 'suffix').map(a => escapeHtml(a.label));
 
@@ -213,10 +218,15 @@
       + table(['词缀档', '数值区间'], tierRows)
       + note('速度词缀使用独立区间：')
       + table(['速度词缀档', '数值区间'], spdRows)
+      + customTables.map(([label, rows]) =>
+          note(label + '词缀使用独立区间：') + table([label + '词缀档', '数值区间'],
+            rows.map(t => ['T' + t.tier, `${t.min} 到 ${t.max}`]))
+        ).join('')
       + note('最终属性怎么算：')
       + rules([
         '攻击 / 生命 / 防御 = 宠物裸属性 ×（1 + 百分比词缀总和）+ 装备底材固定值',
-        '暴击 / 暴击伤害 / 吸血 / 命中 / 闪避 / 速度 = 宠物底子 + 装备底材 + 词缀'
+        '暴击 / 暴击伤害 / 吸血 / 命中 / 闪避 / 速度 = 宠物底子 + 装备底材 + 词缀',
+        '穿透 = 无视 X 点防御（只削防御不成负数）；伤害加成 = 最终伤害 +X%；受伤减免 = 受到伤害 -X%（最低承伤 10%）'
       ]);
   }
 
