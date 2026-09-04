@@ -24,6 +24,7 @@
   /* ---------- 装备筛选 + 多选（仅装备页，不影响数据结构） ---------- */
   let invFilter = { rarity: null, tier: null, lock: null }; // lock: 'locked' | 'unlocked' | null
   let selectedEqIds = new Set(); // 选中的装备本地 id
+  let activeEqId = null; // 右侧详情面板当前聚焦的装备 id（主从式 2026-09-04）
 
   // 按当前筛选条件过滤背包
   function getFilteredInventory() {
@@ -110,8 +111,9 @@
       const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
       const card = document.createElement('div');
       const selected = selectedEqIds.has(eq.id);
-      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '');
-      // 卡片也显示词缀（含 roll 区间）：POE 式卡片 = 名字 + 词缀行列表
+      const active = activeEqId === eq.id;
+      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '') + (active ? ' active' : '');
+      // 卡片只显示核心信息；详情与打造统一进右侧面板（2026-09-04 主从式，去掉 hover 浮层）
       const affRows = (window.Equipment.flattenAffixes ? window.Equipment.flattenAffixes(eq.affixes) : [])
         .filter(a => !a.base)
         .map(a => window.Equipment.formatAffixHtml(a, 'tip-affix'))
@@ -123,13 +125,13 @@
         <div class="ec-meta">${r.label}装 · T${eq.tier ?? 4}</div>
         <div class="ec-slot">${eq.slot || '武器'}｜${b.label}+${b.value}</div>
         <div class="ec-affixes">${affRows || '<div class="tip-empty">无词缀</div>'}</div>`;
-      const tip = document.createElement('div');
-      tip.className = 'equip-tip';
-      tip.innerHTML = buildEquipTip(eq, pet); // 传 pet：详情里要算「换上这件」相对身上装备的属性增减
-      card.appendChild(tip);
       card.onclick = () => {
+        // 锁定装备：可查看/打造，但不参与多选分解
         if (eq.locked) {
-          showToast('🔒 已锁定', '锁定装备不能分解，先点 🔓 解锁');
+          activeEqId = eq.id;
+          renderInventory();
+          renderInvToolbar();
+          renderEqDetail(eq);
           return;
         }
         if (selectedEqIds.has(eq.id)) selectedEqIds.delete(eq.id);
@@ -137,12 +139,15 @@
           selectedEqIds.add(eq.id);
           if (eq.fresh) eq.fresh = false;
         }
+        activeEqId = eq.id;
         renderInventory();
         renderInvToolbar();
+        renderEqDetail(eq);
       };
 
       const actions = document.createElement('div');
       actions.className = 'ec-actions';
+      // 快捷穿上保留；打造/上架/详情 → 右侧面板
       const btn = document.createElement('button');
       btn.className = 'btn-sm';
       btn.textContent = '穿上';
@@ -158,25 +163,6 @@
         }
       };
       actions.appendChild(btn);
-      if (UI.isLoggedIn() && eq.cloudId && !Market.isItemListed(eq.cloudId)) {
-        const craftBtn = document.createElement('button');
-        craftBtn.className = 'btn-sm craft';
-        craftBtn.textContent = '打造';
-        craftBtn.onclick = (e) => {
-          e.stopPropagation();
-          UI.openCraftPanel(eq);
-        };
-        actions.appendChild(craftBtn);
-        // 上架直达：跳市场页并自动展开该装备的上架表单（复用市场页现有逻辑）
-        const sellBtn = document.createElement('button');
-        sellBtn.className = 'btn-sm alt';
-        sellBtn.textContent = '上架';
-        sellBtn.onclick = (e) => {
-          e.stopPropagation();
-          UI.openSellForItem(eq);
-        };
-        actions.appendChild(sellBtn);
-      }
       const lockBtn = document.createElement('button');
       lockBtn.className = 'btn-sm lock' + (eq.locked ? ' on' : '');
       lockBtn.textContent = eq.locked ? '🔒' : '🔓';
@@ -386,10 +372,63 @@
       ${buildEquipCompare(pet, eq)}`;
   }
 
+  /* ---------- 主从式右侧面板：装备详情 + 打造（2026-09-04） ---------- */
+  function renderEqDetail(eq) {
+    const panel = $('eq-detail');
+    if (!panel) return;
+    const body = $('eq-detail-body');
+    if (!eq || !body) {
+      if ($('eq-detail-empty')) $('eq-detail-empty').style.display = '';
+      if (body) body.style.display = 'none';
+      return;
+    }
+    if ($('eq-detail-empty')) $('eq-detail-empty').style.display = 'none';
+    body.style.display = 'flex';
+    panel.classList.remove('lock-mode'); // 重置锁定模式（打造区切换时会再设回）
+    const pet = getActivePet();
+    const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
+    const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
+    const inSell = Market.isItemListed(eq.cloudId);
+    const info = $('eq-detail-info');
+    info.innerHTML = `
+      <div class="eq-detail-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}${eq.locked ? ' <span class="eq-lock">🔒</span>' : ''}</div>
+      <div class="eq-detail-meta">${r.label}装 · T${eq.tier ?? 4} · ${eq.slot || '武器'}｜${b.label}+${b.value}</div>
+      <div class="eq-detail-compare">${buildEquipCompare(pet, eq)}</div>
+      <div class="eq-detail-actions">
+        <button class="btn-sm primary" id="eq-detail-equip">⚔️ 穿上</button>
+        ${(UI.isLoggedIn() && eq.cloudId && !inSell) ? '<button class="btn-sm alt" id="eq-detail-sell">💰 上架</button>' : ''}
+        ${inSell ? '<span class="hint">在售中，先取回才能操作</span>' : ''}
+      </div>`;
+    const eqBtn = $('eq-detail-equip');
+    if (eqBtn) eqBtn.onclick = () => {
+      const changes = equipDeltas(pet, eq);
+      const res = equipItem(pet, eq.id);
+      if (res) {
+        addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
+        if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
+        UI.renderAll();
+        renderEqDetail(eq);
+      }
+    };
+    const sellBtn = $('eq-detail-sell');
+    if (sellBtn) sellBtn.onclick = () => UI.openSellForItem(eq);
+    // 打造区交给 ui-craft 渲染（含锁定词缀 A 方案）
+    const craftEl = $('eq-detail-craft');
+    if (craftEl && UI.renderCraftInto) UI.renderCraftInto(craftEl, eq);
+  }
+  function hideEqDetail() {
+    const body = $('eq-detail-body');
+    if (body) body.style.display = 'none';
+    if ($('eq-detail-empty')) $('eq-detail-empty').style.display = '';
+    activeEqId = null;
+  }
+
   /* ---------- 对外 API（装备页） ---------- */
   UI.renderInvFilter = renderInvFilter;
   UI.renderInvToolbar = renderInvToolbar;
   UI.renderInventory = renderInventory;
+  UI.renderEqDetail = renderEqDetail;
+  UI.hideEqDetail = hideEqDetail;
   UI.openSalvagePanel = openSalvagePanel;
   UI.closeSalvagePanel = closeSalvagePanel;
   UI.openBatchSalvagePanel = openBatchSalvagePanel;

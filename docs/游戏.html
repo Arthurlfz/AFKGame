@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260903lock">
+<link rel="stylesheet" href="css/game.css?v=20260904md">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260903c">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
@@ -460,7 +460,7 @@
       <div class="panel">
         <div class="panel-title">背包
           <span class="panel-actions">
-            <span class="hint">悬停看详情 · 点选装备可多选 · 上架在「市场」页</span>
+            <span class="hint">点选装备看详情与打造 · 多选用于批量分解 · 上架在「市场」页</span>
             <button class="btn-mini danger" id="btn-salvage">🗑 一键分解</button>
           </span>
         </div>
@@ -470,7 +470,18 @@
           <button class="btn-mini ghost" id="btn-select-all">全选</button>
           <button class="btn-mini danger" id="btn-salvage-selected" disabled>批量分解（0）</button>
         </div>
-        <div class="inv-list" id="inv-list"></div>
+        <div class="inv-master-detail">
+          <div class="inv-list-wrap">
+            <div class="inv-list" id="inv-list"></div>
+          </div>
+          <aside class="eq-detail" id="eq-detail" aria-label="装备详情与打造面板">
+            <div class="eq-detail-empty" id="eq-detail-empty">← 点选一件装备，右侧显示详情与打造</div>
+            <div class="eq-detail-body" id="eq-detail-body" style="display:none">
+              <div class="eq-detail-info" id="eq-detail-info"></div>
+              <div class="eq-detail-craft" id="eq-detail-craft"></div>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
 
@@ -862,8 +873,8 @@ window.PetSprites = {
 <script src="js/ui/ui-pet-merge.js?v=20260903nirvana"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260903x"></script>
 <script src="js/ui/ui-bag.js?v=b8cdb91a"></script>
-<script src="js/ui/ui-equipment.js?v=20260903ilvl"></script>
-<script src="js/ui/ui-craft.js?v=20260903lock"></script>
+<script src="js/ui/ui-equipment.js?v=20260904md"></script>
+<script src="js/ui/ui-craft.js?v=20260904md"></script>
 <script src="js/ui/ui-market.js?v=7a70ce5d"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>

@@ -2574,3 +2574,49 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .craft-lock-btn:disabled { opacity:.35; cursor:not-allowed; }
 .craft-resource-item.lock { border-color:rgba(201,168,106,.45); }
 .craft-resource-item.lock .resource-icon { color:#c9a86a; }
+
+/* ============ 主从式背包：左网格 + 右侧详情/打造面板（2026-09-04） ============ */
+.inv-master-detail { display:flex; align-items:flex-start; gap:14px; margin-top:8px; }
+.inv-list-wrap { flex:1; min-width:0; }
+/* 背包卡片放大（原 170px -> 220px） */
+.equip-grid { grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px; }
+.eq-detail {
+  flex:none; width:372px; max-width:44vw; position:sticky; top:8px;
+  display:flex; flex-direction:column; max-height:calc(100vh - 160px);
+  background:var(--panel); background-image:var(--tex-grain);
+  border:1px solid var(--accent-dim); border-radius:4px;
+  box-shadow:var(--shadow-panel);
+}
+.eq-detail-empty {
+  padding:28px 16px; text-align:center; color:var(--text-faint); font-size:0.917rem; line-height:1.8;
+}
+.eq-detail-body { display:flex; flex-direction:column; min-height:0; }
+.eq-detail-info { padding:12px 14px 8px; border-bottom:1px solid var(--line); }
+.eq-detail-craft { flex:1; min-height:0; overflow:auto; padding:10px 14px; }
+.eq-detail-name { font-size:1.15rem; font-weight:700; }
+.eq-detail-meta { color:var(--text-dim); font-size:0.833rem; margin-top:2px; }
+.eq-detail-compare { margin-top:8px; font-size:0.833rem; color:var(--text-dim); line-height:1.7; }
+.eq-detail-compare .up { color:#7fae7f; }
+.eq-detail-compare .down { color:#e06c6c; }
+.eq-detail-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+/* 打造面板在右侧面板内的词缀行：flex 对齐锁定按钮 */
+.eq-detail .craft-affix-group .grp-line { display:flex; align-items:center; gap:6px; padding:2px 4px; border-radius:3px; cursor:default; }
+/* ---- 锁定模式（A 方案）：词缀行可点选 ---- */
+.eq-detail.lock-mode .craft-affix-group .grp-line { cursor:pointer; }
+.eq-detail.lock-mode .craft-affix-group .grp-line.lock-select { background:rgba(201,168,106,.18); border:1px solid rgba(201,168,106,.5); }
+.eq-detail.lock-mode .craft-affix-group .grp-line.locked { border:1px solid rgba(201,168,106,.45); }
+.lock-mode-bar {
+  display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;
+  padding:8px 10px; margin-top:8px; border:1px solid rgba(201,168,106,.4);
+  background:rgba(201,168,106,.08); border-radius:3px; font-size:0.833rem; color:var(--text-dim); line-height:1.5;
+}
+.lock-mode-bar b { color:var(--accent-hi); }
+.lock-mode-bar .btn-mini { flex:none; }
+.craft-lock-mode-btn {
+  width:100%; margin-top:6px; padding:8px 0; border:1px solid rgba(201,168,106,.45);
+  background:rgba(201,168,106,.1); color:var(--accent-hi); font-size:0.917rem; border-radius:3px; cursor:pointer;
+}
+.craft-lock-mode-btn:hover { background:rgba(201,168,106,.2); }
+.craft-lock-mode-btn.on { border-color:var(--accent-hi); background:rgba(201,168,106,.22); }
+/* 卡片词缀行（主从式后不再挂整卡浮层）：锁定态角标 */
+.equip-card .ec-affixes .tip-affix { display:inline; }
