@@ -101,7 +101,7 @@
       <div class="craft-result" id="craft-result"></div>
       ${soulCastHtml(eq, inSell)}`;
     // 同步右侧面板 lock-mode 态（CSS 高亮词缀行可点选）
-    const host = document.getElementById('eq-detail');
+    const host = el.closest ? el.closest('.eq-detail') : null;
     if (host) { if (lockMode) host.classList.add('lock-mode'); else host.classList.remove('lock-mode'); }
     const resultEl = el.querySelector('#craft-result');
 

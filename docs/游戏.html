@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260904md">
+<link rel="stylesheet" href="css/game.css?v=20260904wb">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260903c">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
@@ -637,58 +637,64 @@
         <div id="bag-root"></div>
       </div>
       <div class="bag-subpane" data-bag-subpane="equip" style="display:none">
-        <div class="equip-layout">
-            <div class="pcol">
-              <div class="panel pet-hero-panel">
-                <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
-                <div class="pet-hero">
-                  <div class="pet-hero-art">
-                    <div class="pet-avatar" id="eqp-avatar">❔</div>
-                  </div>
-                  <div class="pet-hero-info">
-                    <div class="pet-name"><span id="eqp-name">我的宠物</span><span class="lv" id="eqp-level">Lv.1</span></div>
-                    <div class="exp-bar-wrap"><div class="exp-bar" id="eqp-exp-bar" style="width:0%"></div></div>
-                    <div class="exp-text" id="eqp-exp-text">0/15</div>
-                    <div class="pet-hero-reborn" id="eqp-reborn">转生 0 次</div>
-                  </div>
+        <div class="equip-workbench">
+          <div class="ew-col ew-pet">
+            <div class="panel">
+              <div class="panel-title">当前装备<span class="hint">点击槽位看详情 · 脱下在右侧</span></div>
+              <div class="equip-slots" id="equip-slots"></div>
+            </div>
+<div class="panel pet-hero-panel">
+              <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
+              <div class="pet-hero">
+                <div class="pet-hero-art">
+                  <div class="pet-avatar" id="eqp-avatar">❔</div>
                 </div>
-                <div class="pet-stats">
-                  <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="eqp-growth">5.0</span></div>
-                  <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="eqp-hp">100</span></div>
-                  <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="eqp-atk">20</span></div>
-                  <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="eqp-def">10</span></div>
-                  <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="eqp-spd">8</span></div>
-                  <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="eqp-crit">10%</span></div>
-                  <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="eqp-critdmg">150%</span></div>
-                  <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="eqp-hit">90%</span></div>
-                  <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="eqp-dodge">5%</span></div>
-                  <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="eqp-ls">0%</span></div>
-                  <div class="pstat pstat-bonus bonus-tip">
-                    <span class="pstat-label">装备加成</span><span class="pstat-value" id="eqp-bonus">无</span>
-                    <div class="bonus-pop" id="eqp-bonus-pop"></div>
-                  </div>
+                <div class="pet-hero-info">
+                  <div class="pet-name"><span id="eqp-name">我的宠物</span><span class="lv" id="eqp-level">Lv.1</span></div>
+                  <div class="exp-bar-wrap"><div class="exp-bar" id="eqp-exp-bar" style="width:0%"></div></div>
+                  <div class="exp-text" id="eqp-exp-text">0/15</div>
+                  <div class="pet-hero-reborn" id="eqp-reborn">转生 0 次</div>
+                </div>
+              </div>
+              <div class="pet-stats">
+                <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="eqp-growth">5.0</span></div>
+                <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="eqp-hp">100</span></div>
+                <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="eqp-atk">20</span></div>
+                <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="eqp-def">10</span></div>
+                <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="eqp-spd">8</span></div>
+                <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="eqp-crit">10%</span></div>
+                <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="eqp-critdmg">150%</span></div>
+                <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="eqp-hit">90%</span></div>
+                <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="eqp-dodge">5%</span></div>
+                <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="eqp-ls">0%</span></div>
+                <div class="pstat pstat-bonus bonus-tip">
+                  <span class="pstat-label">装备加成</span><span class="pstat-value" id="eqp-bonus">无</span>
+                  <div class="bonus-pop" id="eqp-bonus-pop"></div>
                 </div>
               </div>
             </div>
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">当前装备<span class="hint">点击槽位脱下 · 悬停看属性</span></div>
-                <div class="equip-slots" id="equip-slots"></div>
-                <div class="equip-go-craft">
-                  <button type="button" class="fs-btn fs-btn--ghost" data-nav="equip">🛠️ 去「装备打造」页做新装备</button>
-                </div>
-              </div>
-            </div>
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">换装背包<span class="hint">给当前出战宠物穿上 · 悬停看属性</span></div>
-                <div class="equip-inv" id="pet-equip-inv"></div>
-              </div>
+            <div class="panel">
+              <div class="panel-title">当前装备<span class="hint">点击槽位看详情 · 脱下在右侧</span></div>
+              <div class="equip-slots" id="equip-slots"></div>
             </div>
           </div>
+          <div class="ew-col ew-bag">
+            <div class="panel">
+              <div class="panel-title">换装背包<span class="hint">点选装备 · 右侧详情与打造</span></div>
+              <div class="equip-inv" id="pet-equip-inv"></div>
+            </div>
+          </div>
+          <div class="ew-col ew-detail">
+            <aside class="eq-detail" id="bag-eq-detail" aria-label="装备详情与打造">
+              <div class="eq-detail-empty">← 点选一件装备，右侧显示详情与打造</div>
+              <div class="eq-detail-body" style="display:none">
+                <div class="eq-detail-info"></div>
+                <div class="eq-detail-craft"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
       </div>
-    </div>
-  </aside>
 </div>
 
 <!-- 聊天弹窗（底部居中滑出、透明可调，与右侧装备打造抽屉不重叠；点侧边栏/消息条「💬 聊天」打开） -->
@@ -816,7 +822,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260904growth"></script>
+<script src="js/core/config.js?v=20260904affix2"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -842,20 +848,20 @@ window.PetSprites = {
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=302bb613"></script>
 <script src="js/core/supabase.js?v=20260903sec"></script>
-<script src="js/equipment/equipment.js?v=20260903ilvl"></script>
-    <script src="js/pet/pet.js?v=591129e0"></script>
+<script src="js/equipment/equipment.js?v=20260904affix2"></script>
+    <script src="js/pet/pet.js?v=20260904affix2"></script>
 <script src="js/core/items.js?v=20260903ilvl"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
-<script src="js/core/drop.js?v=20260903ilvl"></script>
+<script src="js/core/drop.js?v=20260904affix2"></script>
 <script src="js/core/market.js?v=3d044442"></script>
 <script src="js/core/market_bot.js?v=20260903sec"></script>
-<script src="js/equipment/equipment_craft.js?v=20260903ilvl"></script>
+<script src="js/equipment/equipment_craft.js?v=20260904affix2"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260903x"></script>
 <script src="js/pet/pet_evolve.js?v=78511b8a"></script>
 <script src="js/core/quest.js?v=20260903w"></script>
 <script src="js/core/tutorial_mode.js?v=20260903z"></script>
-<script src="js/core/battle.js?v=20260904growth"></script>
+<script src="js/core/battle.js?v=20260904affix2"></script>
 <script src="js/ui/ui-common.js?v=20260903j"></script>
 <script src="js/ui/ui-console.js?v=fa16bb1d"></script>
 <script src="js/ui/ui-shell.js?v=1e45bd1d"></script>
@@ -868,17 +874,17 @@ window.PetSprites = {
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
 <script src="js/ui/ui-quest.js?v=20260903notab"></script>
 <script src="js/ui/ui-battle.js?v=c0c142e4"></script>
-<script src="js/ui/ui-pet.js?v=20260903ilvl"></script>
+<script src="js/ui/ui-pet.js?v=20260904wb"></script>
 <script src="js/ui/ui-pet-evolve.js?v=196095dd"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260903nirvana"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260903x"></script>
 <script src="js/ui/ui-bag.js?v=b8cdb91a"></script>
-<script src="js/ui/ui-equipment.js?v=20260904md"></script>
-<script src="js/ui/ui-craft.js?v=20260904md"></script>
+<script src="js/ui/ui-equipment.js?v=20260904affix2"></script>
+<script src="js/ui/ui-craft.js?v=20260904wb"></script>
 <script src="js/ui/ui-market.js?v=7a70ce5d"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>
-<script src="js/ui/ui-codex.js?v=94ab55e8"></script>
+<script src="js/ui/ui-codex.js?v=20260904affix2"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
 <script src="js/ui/ui-dev.js?v=20260904chk22"></script>
 <script src="js/main.js?v=20260903bg"></script>

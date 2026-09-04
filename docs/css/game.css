@@ -2620,3 +2620,25 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .craft-lock-mode-btn.on { border-color:var(--accent-hi); background:rgba(201,168,106,.22); }
 /* 卡片词缀行（主从式后不再挂整卡浮层）：锁定态角标 */
 .equip-card .ec-affixes .tip-affix { display:inline; }
+
+/* ============ 背包窗口 POE 打造穿戴工作区（2026-09-04） ============ */
+/* 浮窗调大：舒服区间 = 主屏 1920x1080 基准；小屏按视口收缩，不超出屏幕 */
+.bag-window { width:min(1560px, 96vw); height:min(940px, 92vh); }
+/* 三区：左 宠物+装备槽 | 中 背包网格 | 右 详情+打造 */
+.equip-workbench { display:grid; grid-template-columns:minmax(360px,440px) minmax(280px,1fr) minmax(340px,400px); gap:12px; height:100%; min-height:0; }
+.bag-subpane[data-bag-subpane="equip"] { height:100%; }
+.equip-workbench .ew-col { min-width:0; min-height:0; display:flex; flex-direction:column; gap:10px; overflow:auto; }
+.equip-workbench .ew-col.ew-detail { overflow:hidden; }
+/* 中栏背包：网格化卡片（POE stash 感） */
+.equip-workbench .ew-bag .equip-inv { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; align-content:start; }
+.equip-workbench .equip-inv-filter { grid-column:1/-1; flex-wrap:wrap; }
+.equip-workbench .quick-eq { display:flex; flex-direction:column; align-items:stretch; gap:4px; padding:8px; border:1px solid var(--line); border-radius:4px; cursor:pointer; }
+.equip-workbench .quick-eq:hover { border-color:var(--accent); }
+.equip-workbench .quick-eq.selected { border-color:var(--accent-hi); background:rgba(201,141,79,.12); }
+.equip-workbench .quick-eq .qe-name { white-space:normal; font-size:0.917rem; }
+.equip-workbench .quick-eq .qe-meta { align-self:flex-start; font-size:0.8rem; }
+.equip-workbench .quick-eq .btn-sm { align-self:flex-start; }
+/* 右栏详情+打造面板占满整栏 */
+.equip-workbench .ew-detail .eq-detail { width:100%; max-width:none; position:static; height:100%; max-height:none; top:auto; }
+.equip-workbench .ew-pet .panel { flex:none; }
+.equip-workbench .ew-pet .equip-slots { flex:1; min-height:0; }

@@ -738,28 +738,14 @@
       if (eq) {
         item.style.color = rarity.color;
         item.innerHTML = `<span class="slot-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span><span class="sub">${escapeHtml(describeItem(eq))}</span></span>`;
-        const tip = document.createElement('div');
-        tip.className = 'equip-tip';
-        const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
-        const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-        const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
-        const base = eq.base || { label: '攻击', value: 0 };
-        let soulLine = '';
-        if (eq.soulAffix) {
-          const a = eq.soulAffix;
-          const sFlat = ['hit', 'dodge', 'spd'].indexOf(a.type) >= 0;
-          soulLine = `<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">${escapeHtml(a.label || '')}${a.tier ? ' T' + a.tier : ''}${a.value != null ? ' +' + a.value + (sFlat ? '' : '%') : ''}</div>`;
-        }
-        tip.innerHTML = `<div class="tip-name" style="color:${rarity.color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}${soulLine}`;
-        item.appendChild(tip);
-        item.onclick = (e) => { e.stopPropagation(); item.classList.toggle('open'); };
+        // 点槽位 → 右侧面板显示穿戴详情（可脱下）；不再挂 hover 浮层（根治遮挡）
+        item.onclick = (e) => { e.stopPropagation(); bagActiveEqId = eq.id; if (UI.renderBagEqDetail) UI.renderBagEqDetail(eq); };
         const takeBtn = document.createElement('button');
         takeBtn.className = 'btn-sm ghost slot-unequip';
         takeBtn.textContent = '脱下';
         takeBtn.onclick = (e) => { e.stopPropagation(); const taken = unequip(pet, slot); if (taken) { addLog(`脱下 ${taken.name}，放回背包`); UI.renderAll(); } };
         item.appendChild(takeBtn);
-        div.title = '点击脱下';
-        div.onclick = () => { const taken = unequip(pet, slot); if (taken) { addLog(`脱下 ${taken.name}，放回背包`); UI.renderAll(); } };
+        div.title = '点击看详情';
       } else {
         item.textContent = '空槽';
         div.title = '空装备槽';
@@ -778,6 +764,7 @@
   /* ---------- 换装背包（装备 tab：给当前出战宠物穿上背包里的装备，悬停看属性面板） ---------- */
   // 换装背包筛选状态（模块级，避免 renderAll 高频重建时重置）
   const equipInvFilter = { slot: 'all', rarity: 'all', baseTier: 'all', affixTier: 'all', affixType: 'all' };
+  let bagActiveEqId = null; // 背包窗口「装备」子页当前选中（右侧详情+打造）
   const EQUIP_INV_SLOTS = window.Equipment.SLOTS || [];
 
   function renderPetEquipInv() {
@@ -848,16 +835,7 @@
     }
     for (const eq of list) {
       const row = document.createElement('div');
-      row.className = 'quick-eq q-' + (eq.rarity && eq.rarity.id ? eq.rarity.id : 'white');
-      // 装备属性面板（悬停 + 点击看）
-      const tip = document.createElement('div');
-      tip.className = 'equip-tip';
-      const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
-      const detailLine = (list, cls) => (list || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-      const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
-      const base = eq.base || { label: '攻击', value: 0 };
-      tip.innerHTML = `<div class="tip-name" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}</div><div class="tip-line">等级：<b>${itemLevel}</b></div><div class="tip-section">基底词缀</div><div class="tip-base">${escapeHtml(base.label)} +${base.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div><div class="tip-section">前缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<div class="tip-section">后缀</div>${detailLine(detailAffixes.suffix, 'tip-suffix')}${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}`;
-
+      row.className = 'quick-eq q-' + (eq.rarity && eq.rarity.id ? eq.rarity.id : 'white') + (bagActiveEqId === eq.id ? ' selected' : '');
       const name = document.createElement('span');
       name.className = 'qe-name';
       name.innerHTML = `<span class="qe-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="qe-copy">${escapeHtml(eq.name)}</span>`;
@@ -881,8 +859,12 @@
         }
       };
       row.appendChild(btn);
-      row.appendChild(tip);
-      row.onclick = () => row.classList.toggle('open');
+      // 点卡片 → 右侧面板详情+打造（选中高亮；不再挂 hover 浮层，根治遮挡）
+      row.onclick = () => {
+        bagActiveEqId = eq.id;
+        renderPetEquipInv();
+        if (UI.renderBagEqDetail) UI.renderBagEqDetail(eq);
+      };
       box.appendChild(row);
     }
   }

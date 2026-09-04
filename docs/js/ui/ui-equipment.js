@@ -311,7 +311,10 @@
     { key: 'critDamage', label: '暴击伤害', scale: 100, unit: '%', digits: 0 },
     { key: 'hit',        label: '命中',     scale: 1,   unit: '',  digits: 0 },
     { key: 'dodge',      label: '闪避',     scale: 1,   unit: '',  digits: 0 },
-    { key: 'lifesteal',  label: '吸血',     scale: 100, unit: '%', digits: 0 }
+    { key: 'lifesteal',  label: '吸血',     scale: 100, unit: '%', digits: 0 },
+    { key: 'pen',        label: '穿透',     scale: 1,   unit: '',  digits: 0 },
+    { key: 'dmgBonus',   label: '伤害加成', scale: 1,   unit: '%', digits: 0 },
+    { key: 'dr',         label: '受伤减免', scale: 1,   unit: '%', digits: 0 }
   ];
   // 试穿候选装备后的最终属性（浅拷贝，不碰真实状态）
   function previewStatsWith(pet, eq) {
@@ -373,53 +376,64 @@
   }
 
   /* ---------- 主从式右侧面板：装备详情 + 打造（2026-09-04） ---------- */
-  function renderEqDetail(eq) {
-    const panel = $('eq-detail');
-    if (!panel) return;
-    const body = $('eq-detail-body');
+  /* ---------- 详情+打造面板（2026-09-04 容器化）
+   * renderEqDetailInto(hostEl, eq)：侧边栏装备页 / 背包窗口通用。
+   * 容器结构约定：.eq-detail > .eq-detail-empty + .eq-detail-body(.eq-detail-info + .eq-detail-craft)
+   */
+  function renderEqDetailInto(hostEl, eq) {
+    if (!hostEl) return;
+    const body = hostEl.querySelector('.eq-detail-body');
     if (!eq || !body) {
-      if ($('eq-detail-empty')) $('eq-detail-empty').style.display = '';
+      const emptyEl = hostEl.querySelector('.eq-detail-empty');
+      if (emptyEl) emptyEl.style.display = '';
       if (body) body.style.display = 'none';
       return;
     }
-    if ($('eq-detail-empty')) $('eq-detail-empty').style.display = 'none';
+    const emptyEl = hostEl.querySelector('.eq-detail-empty');
+    if (emptyEl) emptyEl.style.display = 'none';
     body.style.display = 'flex';
-    panel.classList.remove('lock-mode'); // 重置锁定模式（打造区切换时会再设回）
+    hostEl.classList.remove('lock-mode'); // 重置锁定模式（打造区切换时会再设回）
     const pet = getActivePet();
     const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
     const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
     const inSell = Market.isItemListed(eq.cloudId);
-    const info = $('eq-detail-info');
-    info.innerHTML = `
-      <div class="eq-detail-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}${eq.locked ? ' <span class="eq-lock">🔒</span>' : ''}</div>
-      <div class="eq-detail-meta">${r.label}装 · T${eq.tier ?? 4} · ${eq.slot || '武器'}｜${b.label}+${b.value}</div>
-      <div class="eq-detail-compare">${buildEquipCompare(pet, eq)}</div>
-      <div class="eq-detail-actions">
-        <button class="btn-sm primary" id="eq-detail-equip">⚔️ 穿上</button>
-        ${(UI.isLoggedIn() && eq.cloudId && !inSell) ? '<button class="btn-sm alt" id="eq-detail-sell">💰 上架</button>' : ''}
-        ${inSell ? '<span class="hint">在售中，先取回才能操作</span>' : ''}
-      </div>`;
-    const eqBtn = $('eq-detail-equip');
-    if (eqBtn) eqBtn.onclick = () => {
-      const changes = equipDeltas(pet, eq);
-      const res = equipItem(pet, eq.id);
-      if (res) {
-        addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
-        if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
-        UI.renderAll();
-        renderEqDetail(eq);
-      }
-    };
-    const sellBtn = $('eq-detail-sell');
-    if (sellBtn) sellBtn.onclick = () => UI.openSellForItem(eq);
-    // 打造区交给 ui-craft 渲染（含锁定词缀 A 方案）
-    const craftEl = $('eq-detail-craft');
+    const info = hostEl.querySelector('.eq-detail-info');
+    if (info) {
+      info.innerHTML = `
+        <div class="eq-detail-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}${eq.locked ? ' <span class="eq-lock">🔒</span>' : ''}</div>
+        <div class="eq-detail-meta">${r.label}装 · T${eq.tier ?? 4} · ${eq.slot || '武器'}｜${b.label}+${b.value}</div>
+        <div class="eq-detail-compare">${buildEquipCompare(pet, eq)}</div>
+        <div class="eq-detail-actions">
+          <button class="btn-sm primary" id="eq-detail-equip">⚔️ 穿上</button>
+          ${(UI.isLoggedIn() && eq.cloudId && !inSell) ? '<button class="btn-sm alt" id="eq-detail-sell">💰 上架</button>' : ''}
+          ${inSell ? '<span class="hint">在售中，先取回才能操作</span>' : ''}
+        </div>`;
+      const eqBtn = info.querySelector('#eq-detail-equip');
+      if (eqBtn) eqBtn.onclick = () => {
+        const changes = equipDeltas(pet, eq);
+        const res = equipItem(pet, eq.id);
+        if (res) {
+          addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
+          if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
+          UI.renderAll();
+          renderEqDetailInto(hostEl, eq);
+        }
+      };
+      const sellBtn = info.querySelector('#eq-detail-sell');
+      if (sellBtn) sellBtn.onclick = () => UI.openSellForItem(eq);
+    }
+    const craftEl = hostEl.querySelector('.eq-detail-craft');
     if (craftEl && UI.renderCraftInto) UI.renderCraftInto(craftEl, eq);
   }
+  function renderEqDetail(eq) { renderEqDetailInto($('eq-detail'), eq); } // 侧边栏装备页
+  function renderBagEqDetail(eq) { renderEqDetailInto($('bag-eq-detail'), eq); } // 背包窗口装备子页
   function hideEqDetail() {
-    const body = $('eq-detail-body');
+    const hostEl = $('eq-detail');
+    if (!hostEl) return;
+    const body = hostEl.querySelector('.eq-detail-body');
     if (body) body.style.display = 'none';
-    if ($('eq-detail-empty')) $('eq-detail-empty').style.display = '';
+    const emptyEl = hostEl.querySelector('.eq-detail-empty');
+    if (emptyEl) emptyEl.style.display = '';
     activeEqId = null;
   }
 
@@ -428,6 +442,8 @@
   UI.renderInvToolbar = renderInvToolbar;
   UI.renderInventory = renderInventory;
   UI.renderEqDetail = renderEqDetail;
+  UI.renderEqDetailInto = renderEqDetailInto;
+  UI.renderBagEqDetail = renderBagEqDetail;
   UI.hideEqDetail = hideEqDetail;
   UI.openSalvagePanel = openSalvagePanel;
   UI.closeSalvagePanel = closeSalvagePanel;
