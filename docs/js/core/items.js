@@ -37,7 +37,7 @@
   // 更新云端装备字段（打造后词缀变化；需已登录 + 装备有 cloudId）
   async function updateCloudItem(eq, patch) {
     if (!eq.cloudId) return { data: null, error: new Error('装备未同步云端') };
-    if (patch && patch.affixes) patch.affixes = { ...patch.affixes, _ilvl: eq.ilvl ?? null };
+    if (patch && patch.affixes) patch.affixes = { ...patch.affixes, _ilvl: eq.ilvl ?? null, _lockPrefix: !!eq.lockPrefix, _lockSuffix: !!eq.lockSuffix };
     return db().from('equip_items').update(patch).eq('id', eq.cloudId);
   }
   // 批量删除云端装备（分解用；空数组直接返回成功）。
@@ -69,6 +69,9 @@
       base,
       affixes: { prefix: norm.prefix, suffix: norm.suffix },
       locked: !!row.locked, // 锁定状态（防分解，存库）
+      // POE 锁前锁后（2026-09-04）：affixes JSON 附加键 _lockPrefix/_lockSuffix（与 _ilvl 同模式，零 DB 改动）
+      lockPrefix: !!(row.affixes && row.affixes._lockPrefix),
+      lockSuffix: !!(row.affixes && row.affixes._lockSuffix),
       // 魂铸词缀（DB 列 soul_affix → 内存字段 soulAffix 驼峰；旧库无列则 null）
       soulAffix: row.soul_affix || null
     };

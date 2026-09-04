@@ -21,64 +21,55 @@
   /* ---------- 装备打造面板（重铸石 / 剥离石 / 神圣石 / 增缀石 / 锁定词缀） ----------
    * 2026-09-04 主从式：打造内容渲染进「背包页右侧面板」的打造容器（renderCraftInto(el, eq)），
    * openCraftPanel 改为重定向到 UI.renderEqDetail；旧抽屉 craft-modal 不再打开。
-   * 锁定词缀 A 方案：进入「锁定模式」→ 词缀行点选（未锁=待锁、已锁=待解锁）→ 确认条统一结算。
+   * 锁定改为 POE 锁前/锁后（2026-09-04 拍板）：只锁一边（eq.lockPrefix / eq.lockSuffix），
+   * 锁定侧在重铸/神圣中整组保留、剥离/增缀不触及；重铸/神圣时按锁定侧条数扣锁定石。
    */
-  let lockMode = false; // 锁定模式开关
-  let lockSel = new Set(); // 本次操作要改变状态的词缀位置 'bucket:idx'
-
-  function lockModeBarHtml(eq) {
-    let toLock = 0, toUnlock = 0;
-    lockSel.forEach(k => {
-      const [b, i] = k.split(':');
-      const a = (eq.affixes[b] || [])[+i];
-      if (a && a.locked) toUnlock++; else toLock++;
-    });
-    const cfg = Config.craft.lock || { name: '锁定石', amount: 1 };
-    return `<div class="lock-mode-bar" id="craft-lockbar">
-      <span>已选 <b>${lockSel.size}</b> 条 · 锁定 ${toLock}（-${toLock} ${cfg.name}）· 解锁 ${toUnlock}（免费）</span>
-      <span>
-        <button class="btn-mini primary" id="craft-lock-confirm"${lockSel.size ? '' : ' disabled'}>确认${toLock ? '（-'+toLock+' 石）' : ''}</button>
-        <button class="btn-mini ghost" id="craft-lock-cancel">取消</button>
-      </span>
-    </div>`;
-  }
-
   function renderCraftInto(el, eq) {
     activeCraftEq = eq;
     const C = Config.craft;
     const inSell = Market.isItemListed(eq.cloudId);
     const pfx = eq.affixes.prefix || [];
     const sfx = eq.affixes.suffix || [];
-    const lockedCount = flattenAffixes(eq.affixes).filter(a => a.locked).length;
-    const lockCfg = C.lock || { name: '锁定石', amount: 1, maxLocked: 4 };
-    const affixLine = (a, bucket, idx) => {
-      const locked = !!a.locked;
-      const sel = lockSel.has(bucket + ':' + idx);
-      if (lockMode) {
-        return `<div class="grp-line ${bucket}${locked ? ' locked' : ''}${sel ? ' lock-select' : ''}" data-lock-sel="${bucket}:${idx}" style="cursor:pointer">${Craft.affixText(a)}${sel ? '<span style="margin-left:4px;color:#c9a86a">' + (locked ? '待解锁' : '待锁定') + '</span>' : ''}</div>`;
-      }
-      const disabled = (!locked && lockedCount >= lockCfg.maxLocked) ? ' disabled' : '';
-      return `<div class="grp-line ${bucket}${locked ? ' locked' : ''}">${Craft.affixText(a)} <button class="craft-lock-btn${locked ? ' on' : ''}" data-lock-bucket="${bucket}" data-lock-idx="${idx}"${disabled} title="${locked ? '点击解锁（免费）' : '消耗 1 锁定石锁定该词缀'}">${locked ? '🔒' : '🔓'}</button></div>`;
-    };
+    const lockPrefix = !!eq.lockPrefix, lockSuffix = !!eq.lockSuffix;
+    const lockCfg = C.lock || { name: '锁定石', amount: 1 };
+    const lockStone = Materials.getQuantity(lockCfg.name);
+    const affixLine = (a) => `<div class="grp-line">${Craft.affixText(a)}</div>`;
+    const grpTitle = (label, cnt, locked) =>
+      `<div class="grp-title">${label}（${cnt}/3）${locked ? '<span class="grp-lock">🔒 已锁</span>' : ''}</div>`;
     const affixGroupHtml = `
       <div class="craft-affix-group">
-        <div class="grp-title">前缀（${pfx.length}/3）</div>
-        ${pfx.map((a, i) => affixLine(a, 'prefix', i)).join('') || '<span class="hint">无</span>'}
+        ${grpTitle('前缀', pfx.length, lockPrefix)}
+        ${pfx.map(affixLine).join('') || '<span class="hint">无</span>'}
         <hr class="craft-affix-divider">
-        <div class="grp-title">后缀（${sfx.length}/3）</div>
-        ${sfx.map((a, i) => affixLine(a, 'suffix', i)).join('') || '<span class="hint">无</span>'}
+        ${grpTitle('后缀', sfx.length, lockSuffix)}
+        ${sfx.map(affixLine).join('') || '<span class="hint">无</span>'}
       </div>`;
     const stoneTip = key => {
       const stone = C[key];
       return `<span class="craft-stone-tip-wrap"><span class="craft-stone-name">${stone.name}</span><span class="craft-stone-tip" role="tooltip"><b>${stone.name}</b><span>${stone.effect}</span><em>${stone.rule}</em></span></span>`;
     };
-    const lockModeBtn = `<button class="craft-lock-mode-btn${lockMode ? ' on' : ''}" id="craft-lockmode">${lockMode ? '✕ 取消锁定' : '🔒 锁定词缀'}</button>`;
+    // POE 锁前锁后：锁定侧在重铸/神圣中整组保留，按条数扣锁定石；只能锁一边
+    const lockSideBtn = (side, label) => {
+      const locked = side === 'prefix' ? lockPrefix : lockSuffix;
+      const blocked = side === 'prefix' ? lockSuffix : lockPrefix;
+      const cost = (side === 'prefix' ? pfx.length : sfx.length);
+      return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '锁定后重铸/神圣保留该侧')}">
+        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 点击解锁（免费）' : '重铸/神圣保留该侧 · 耗 ' + cost + ' ' + lockCfg.name}</span></button>`;
+    };
+    const lockAreaHtml = `
+      <div class="craft-section-label">锁定（锁前 / 锁后）<span class="craft-lock-count">${lockCfg.name} ×${lockStone}</span></div>
+      <div class="craft-lock-sides">${lockSideBtn('prefix', '锁前缀')}${lockSideBtn('suffix', '锁后缀')}</div>
+      <div class="craft-lock-note">只锁一边 · 重铸/神圣时按锁定侧条数扣${lockCfg.name} · ${lockCfg.name}仅图16/17掉落</div>`;
+    const lockActive = lockPrefix || lockSuffix;
+    const lockCost = lockPrefix ? pfx.length : (lockSuffix ? sfx.length : 0);
+    const reforgeSub = lockPrefix ? `前缀锁定保留 · +${pfx.length} ${lockCfg.name}` : (lockSuffix ? `后缀锁定保留 · +${sfx.length} ${lockCfg.name}` : '全部词缀重洗');
+    const soulHtml = soulCastHtml(eq, inSell);
+    const soulFold = eq.soulAffix
+      ? `<div class="craft-section-label">魂铸（宠物 → 装备）</div>${soulHtml}`
+      : `<details class="craft-soul-details"><summary>魂铸（宠物 → 装备）<span class="craft-soul-fold-hint">▸ 点击展开</span></summary><div class="craft-soul-fold-body">${soulHtml}</div></details>`;
     el.innerHTML = `
       <div class="craft-eq">
-        <div class="ename" style="color:${rarityOf(eq).color}">${eq.name} <span style="font-size:0.833rem">${rarityOf(eq).label}装·T${eq.tier}</span></div>
-        <div class="edesc">${eq.slot}｜${eq.base.label}+${eq.base.value}</div>
         ${affixGroupHtml}
-        <div class="craft-affixcount">前缀 ${pfx.length}/3 · 后缀 ${sfx.length}/3</div>
       </div>
       <div class="craft-section-label">打造资源</div>
       <div class="craft-stones craft-resource-grid">
@@ -86,23 +77,19 @@
         <div class="craft-resource-item"><span class="resource-icon">✂️</span><span>${stoneTip('strip')}</span><b>×${Materials.getQuantity(C.strip.name)}</b></div>
         <div class="craft-resource-item holy"><span class="resource-icon">🔮</span><span>${stoneTip('holy')}</span><b>×${Materials.getQuantity(C.holy.name)}</b></div>
         <div class="craft-resource-item"><span class="resource-icon">➕</span><span>${stoneTip('augment')}</span><b>×${Materials.getQuantity(C.augment.name)}</b></div>
-        <div class="craft-resource-item lock"><span class="resource-icon">🔒</span><span>${stoneTip('lock')}</span><b>×${Materials.getQuantity(lockCfg.name)}</b></div>
+        <div class="craft-resource-item lock"><span class="resource-icon">🔒</span><span>${stoneTip('lock')}</span><b>×${lockStone}</b></div>
       </div>
+      ${lockAreaHtml}
       <div class="craft-section-label">打造操作</div>
       <div class="craft-actions craft-action-grid">
-        <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1${lockedCount ? ` + ${lockedCount} 锁定石` : ''} · 锁定词缀保留</span></button>
-        <button class="btn-mini alt" id="craft-strip" ${(flattenAffixes(eq.affixes).length <= 1) ? 'disabled' : ''}>✂️ 剥离石<span>${flattenAffixes(eq.affixes).length <= 1 ? '仅剩 1 条' : '消耗 1 · 移除词缀'}</span></button>
-        <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1${lockedCount ? ` + ${lockedCount} 锁定石` : ''} · 重 Roll 数值</span></button>
-        <button class="btn-mini augment" id="craft-augment" ${(flattenAffixes(eq.affixes).length >= 6) ? 'disabled' : ''}>➕ 增缀石<span>${flattenAffixes(eq.affixes).length >= 6 ? '前后缀已满' : '消耗 1 · 新增词缀'}</span></button>
+        <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1${lockCost ? ' + ' + lockCost + ' ' + lockCfg.name : ''} · ${reforgeSub}</span></button>
+        <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''}>✂️ 剥离石<span>${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '消耗 1 · 移除未锁侧词缀'}</span></button>
+        <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1${lockCost ? ' + ' + lockCost + ' ' + lockCfg.name : ''} · 重 Roll 未锁侧数值</span></button>
+        <button class="btn-mini augment" id="craft-augment" ${(pfx.length >= 3 && sfx.length >= 3) ? 'disabled' : ''}>➕ 增缀石<span>${(pfx.length >= 3 && sfx.length >= 3) ? '前后缀已满' : '消耗 1 · 新增到未锁侧'}</span></button>
       </div>
-      ${lockModeBtn}
-      ${lockMode ? lockModeBarHtml(eq) : ''}
       ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
       <div class="craft-result" id="craft-result"></div>
-      ${soulCastHtml(eq, inSell)}`;
-    // 同步右侧面板 lock-mode 态（CSS 高亮词缀行可点选）
-    const host = el.closest ? el.closest('.eq-detail') : null;
-    if (host) { if (lockMode) host.classList.add('lock-mode'); else host.classList.remove('lock-mode'); }
+      ${soulFold}`;
     const resultEl = el.querySelector('#craft-result');
 
     /* 乐观 UI（打造的四种石头共用） */
@@ -118,7 +105,6 @@
         if (!appliedEarly) showResult(res);
       });
     }
-    // 打造按钮统一防连点：点击后立即禁用（云同步期间再点无效），完成后恢复。
     const btnReforge = el.querySelector('#craft-reforge');
     if (btnReforge) btnReforge.onclick = () => {
       if (inSell) return;
@@ -126,8 +112,8 @@
         (onApplied) => Craft.reforge(eq, onApplied),
         (r) => {
           const ns = flattenAffixes(r.changed.new);
-          resultEl.innerHTML = `🎲 重铸完成：${lockedCount ? '锁定词缀保留，未锁定词缀' : '全部词缀'}已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-          addLog(`🎲 重铸成功：${eq.name} ${lockedCount ? '未锁定词缀已重洗（锁定 ' + lockedCount + ' 条保留）' : '词缀全部重洗'}`);
+          resultEl.innerHTML = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧' : '全部词缀'}已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+          addLog(`🎲 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留）' : '词缀全部重洗'}`);
           showToast('🎲 重铸完成', `词条已全部随机重洗`);
           renderCraftInto(el, eq);
           if (UI.renderInventory) UI.renderInventory();
@@ -166,78 +152,6 @@
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
     };
-    // ---- 锁定模式（A 方案）：词缀行点选 + 确认条统一结算 ----
-    if (lockMode) {
-      el.querySelectorAll('[data-lock-sel]').forEach(div => {
-        div.onclick = () => {
-          const k = div.dataset.lockSel;
-          if (lockSel.has(k)) lockSel.delete(k); else lockSel.add(k);
-          renderCraftInto(el, eq);
-        };
-      });
-      const lc = el.querySelector('#craft-lock-confirm');
-      if (lc) lc.onclick = async () => {
-        if (inSell || !lockSel.size) return;
-        const locs = [];
-        lockSel.forEach(k => {
-          const [b, i] = k.split(':');
-          const a = (eq.affixes[b] || [])[+i];
-          if (a) locs.push({ bucket: b, index: +i, aff: a, want: !a.locked });
-        });
-        const toLock = locs.filter(l => l.want).length;
-        const lockedCountNow = flattenAffixes(eq.affixes).filter(a => a.locked).length;
-        if (lockedCountNow + toLock > lockCfg.maxLocked) {
-          resultEl.innerHTML = `<span class="err">❌ 最多同时锁定 ${lockCfg.maxLocked} 条词缀，先解锁再锁新的</span>`;
-          return;
-        }
-        await runWithLoading(lc, '应用中…', async () => {
-          let firstErr = null;
-          for (const l of locs) {
-            const r = l.want ? await Craft.lockAffix(eq, l, () => {}) : await Craft.unlockAffix(eq, l);
-            if (r && r.error) { firstErr = r.error; break; }
-          }
-          lockMode = false; lockSel.clear();
-          renderCraftInto(el, eq);
-          if (firstErr) resultEl.innerHTML = `<span class="err">❌ ${firstErr}</span>`;
-          else { resultEl.innerHTML = `🔒 锁定操作完成（${toLock} 条锁定 / ${locs.length - toLock} 条解锁）`; showToast('🔒 已更新', `锁定 ${toLock} · 解锁 ${locs.length - toLock}`); }
-          if (UI.renderInventory) UI.renderInventory();
-          if (UI.renderInvToolbar) UI.renderInvToolbar();
-        });
-      };
-      const lcCancel = el.querySelector('#craft-lock-cancel');
-      if (lcCancel) lcCancel.onclick = () => { lockMode = false; lockSel.clear(); renderCraftInto(el, eq); };
-    } else {
-      // 非锁定模式：词缀行右侧 🔒/🔓 小按钮（逐条锁定，保留）
-      el.querySelectorAll('.craft-lock-btn').forEach(btn => {
-        btn.onclick = () => {
-          if (inSell) return;
-          const bucket = btn.dataset.lockBucket;
-          const idx = Number(btn.dataset.lockIdx);
-          const aff = (eq.affixes[bucket] || [])[idx];
-          if (!aff) return;
-          const loc = { bucket, index: idx, aff };
-          const isLocking = !aff.locked;
-          return craftOptimistic(btn, isLocking ? '🔒 锁定中…' : '🔓 解锁中…',
-            async (onApplied) => {
-              return isLocking ? await Craft.lockAffix(eq, loc, onApplied) : await Craft.unlockAffix(eq, loc);
-            },
-            (r) => {
-              const nowLocked = !!aff.locked;
-              resultEl.innerHTML = `${nowLocked ? '🔒 已锁定' : '🔓 已解锁'}：${Craft.affixText(aff)}`;
-              addLog(`${nowLocked ? '🔒 锁定' : '🔓 解锁'}词缀：${eq.name} ${Craft.affixText(aff)}`);
-              showToast(nowLocked ? '🔒 已锁定' : '🔓 已解锁', `${Craft.affixText(aff)}`);
-              renderCraftInto(el, eq);
-            });
-        };
-      });
-    }
-    const lmBtn = el.querySelector('#craft-lockmode');
-    if (lmBtn) lmBtn.onclick = () => {
-      if (inSell) return;
-      lockMode = !lockMode; lockSel.clear();
-      renderCraftInto(el, eq);
-    };
-    // 增缀石
     const btnAug = el.querySelector('#craft-augment');
     if (btnAug) btnAug.onclick = () => {
       if (inSell || (eq.affixes.prefix.length >= 3 && eq.affixes.suffix.length >= 3)) return;
@@ -253,6 +167,22 @@
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
     };
+    // ---- 锁定按钮（POE 锁前锁后）：切换 eq.lockPrefix / eq.lockSuffix，免费，云同步 ----
+    el.querySelectorAll('.craft-lock-side-btn').forEach(btn => {
+      btn.onclick = async () => {
+        if (inSell) return;
+        const side = btn.dataset.lockSide;
+        const locked = side === 'prefix' ? eq.lockPrefix : eq.lockSuffix;
+        const sideName = side === 'prefix' ? '前缀' : '后缀';
+        const res = locked ? await Craft.unlockSide(eq, side) : await Craft.lockSide(eq, side);
+        if (res && res.error) { resultEl.innerHTML = `<span class="err">❌ ${res.error}</span>`; return; }
+        resultEl.innerHTML = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（重铸/神圣时保留 · 按条数扣${lockCfg.name}）`;
+        showToast(locked ? '🔓 已解锁' : '🔒 已锁定', `${sideName}${locked ? '解锁' : '锁定'}成功`);
+        renderCraftInto(el, eq);
+        if (UI.renderInventory) UI.renderInventory();
+        if (UI.renderInvToolbar) UI.renderInvToolbar();
+      };
+    });
     bindSoulCast(el, eq, () => renderCraftInto(el, eq));
   }
 
@@ -312,8 +242,7 @@
       const color = S_TIER_COLOR[a.tier] || '#c9a86a';
       const val = (a.value != null && !['skillDmg'].includes(a.type))
         ? '+' + a.value + (['hit', 'dodge', 'spd'].includes(a.type) ? '' : '%') : '';
-      return `<div class="craft-section-label">魂铸（宠物 → 装备）</div>
-        <div class="craft-soul-block">
+      return `<div class="craft-soul-block">
           <div class="craft-soul-affix" style="color:${color}">${a.label || '魂·?'} <b>T${a.tier}</b> ${val} <em>（${a.source || ''} · 永久不可剥离）</em></div>
           <div class="craft-soul-note">每件装备最多 1 条魂铸词缀 · 可随装备交易</div>
         </div>`;
@@ -356,8 +285,7 @@
       }
     }
     const canCast = !!selPet && (T.source === 'awaken' || !!(soulState.traitId || (selPet.traits || []).length === 1));
-    return `<div class="craft-section-label">魂铸（宠物 → 装备）</div>
-      <div class="craft-soul-block">
+    return `<div class="craft-soul-block">
         <div class="craft-soul-tiers">${tierBtns}</div>
         <div class="craft-soul-desc">${T.label}：${T.source === 'awaken' ? '铸觉醒特质（固定 T1）' : '铸血脉特质'} · 消耗装备 + 宠物（消失）+ ${matCount} 颗${mat}</div>
         <div class="craft-soul-pets">${petRows}</div>

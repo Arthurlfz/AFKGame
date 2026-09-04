@@ -2642,3 +2642,146 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .equip-workbench .ew-detail .eq-detail { width:100%; max-width:none; position:static; height:100%; max-height:none; top:auto; }
 .equip-workbench .ew-pet .panel { flex:none; }
 .equip-workbench .ew-pet .equip-slots { flex:1; min-height:0; }
+
+/* ============ 背包 POE 工作区压缩版 + 锁前锁后（2026-09-04） ============ */
+/* 一屏看完：压缩左栏宠物卡、orbit 槽位、右栏打造区 */
+.bag-window .ew-pet .pet-hero-panel .pet-hero { padding:6px 8px 4px; gap:4px; }
+.bag-window .ew-pet .pet-hero-panel .pet-hero-art { width:52px; height:52px; border-width:1px; }
+.bag-window .ew-pet .pet-hero-panel .pet-stats { flex-direction:row; flex-wrap:wrap; gap:4px; padding:6px 6px; }
+.bag-window .ew-pet .pet-hero-panel .pstat { flex:1 1 20%; min-width:56px; padding:4px 2px 5px; gap:1px; }
+.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size:0.667rem; }
+.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size:0.833rem; }
+.bag-window .ew-pet .pet-hero-panel .bonus-tip { flex:1 1 100%; }
+.bag-window .equip-orbit > .equip-slot { padding:3px 3px; }
+.bag-window .equip-orbit .slot-name { font-size:0.75rem; }
+/* 打造区紧凑 */
+.equip-workbench .craft-affix-group { margin-top:2px; font-size:0.917rem; line-height:1.5; }
+.equip-workbench .craft-affix-group .grp-title { margin-top:2px; }
+.equip-workbench .craft-section-label { margin:8px 0 4px; }
+.equip-workbench .craft-resource-grid, .equip-workbench .craft-action-grid { gap:4px; }
+.equip-workbench .craft-resource-item { padding:4px 8px; }
+.equip-workbench .craft-action-grid .btn-mini { min-height:44px; padding:4px 6px; }
+.equip-workbench .craft-result { margin-top:4px; min-height:14px; font-size:0.833rem; }
+/* 锁前锁后区（POE 对齐） */
+.craft-lock-sides { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.craft-lock-side-btn { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:7px 8px; border:1px solid var(--line); border-radius:4px; background:var(--inset); cursor:pointer; text-align:left; }
+.craft-lock-side-btn .clsb-icon { font-size:0.917rem; }
+.craft-lock-side-btn .clsb-label { font-weight:700; color:var(--text); font-size:0.917rem; }
+.craft-lock-side-btn .clsb-sub { font-size:0.75rem; color:var(--text-dim); line-height:1.4; }
+.craft-lock-side-btn.on { border-color:rgba(201,168,106,.6); background:rgba(201,168,106,.12); }
+.craft-lock-side-btn.on .clsb-label { color:var(--accent-hi); }
+.craft-lock-side-btn:disabled { opacity:.5; cursor:not-allowed; }
+.craft-lock-count { float:right; color:var(--accent-hi); font-size:0.8rem; }
+.craft-lock-note { font-size:0.75rem; color:var(--text-faint); margin-top:4px; line-height:1.4; }
+/* 词缀组锁定标记 */
+.craft-affix-group .grp-lock { font-size:0.75rem; color:var(--accent-hi); margin-left:6px; }
+/* 装备名锁定 tag */
+.eq-lock-tag { display:inline-block; padding:0 6px; margin-left:6px; border:1px solid rgba(201,168,106,.5); border-radius:3px; font-size:0.75rem; color:var(--accent-hi); background:rgba(201,168,106,.1); vertical-align:middle; }
+/* 魂铸折叠 */
+.craft-soul-details { margin-top:8px; border-top:1px dashed rgba(201,168,106,.3); padding-top:6px; }
+.craft-soul-details summary { cursor:pointer; color:var(--text-dim); font-weight:700; font-size:0.833rem; letter-spacing:1px; list-style:none; user-select:none; }
+.craft-soul-details summary::-webkit-details-marker { display:none; }
+.craft-soul-details summary::before { content:'▸ '; color:var(--accent-hi); }
+.craft-soul-details[open] summary::before { content:'▾ '; }
+.craft-soul-fold-hint { font-weight:400; color:var(--text-faint); font-size:0.75rem; margin-left:6px; }
+.craft-soul-fold-body { margin-top:6px; }
+
+
+/* ============ orbit 强制压缩 + 宠物卡 flex（2026-09-04，覆盖 2181/2182 原规则） ============ */
+.bag-window .equip-slots { display: block; min-height: 0 !important; padding: 6px !important; overflow: visible; }
+.bag-window .equip-orbit { grid-template-rows: repeat(5, minmax(0, 1fr)) !important; height: 258px !important; min-height: 0 !important; padding: 8px !important; gap: 5px !important; overflow: hidden; }
+.bag-window .equip-orbit-center { padding: 4px !important; }
+.bag-window .equip-orbit-art { width: min(100%, 70px) !important; }
+.bag-window .equip-orbit-name { margin-top: 2px !important; font-size: 0.75rem !important; }
+.bag-window .equip-orbit > .equip-slot { padding: 2px 3px !important; }
+.bag-window .equip-orbit .slot-item { min-height: 24px !important; margin-top: 1px !important; }
+/* 宠物卡：属性改为 flex 换行（3 列 × 4 行），压缩到一屏 */
+.bag-window .ew-pet .pet-hero-panel .pet-stats { display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 4px !important; padding: 6px 6px !important; }
+.bag-window .ew-pet .pet-hero-panel .pstat { flex: 1 1 30% !important; min-width: 56px !important; padding: 3px 4px 4px !important; gap: 1px !important; }
+.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size: 0.667rem !important; }
+.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size: 0.8rem !important; }
+.bag-window .ew-pet .pet-hero-panel .pet-hero { padding: 5px 8px 3px !important; gap: 4px !important; }
+.bag-window .ew-pet .pet-hero-panel .pet-hero-art { width: 48px !important; height: 48px !important; border-width: 1px !important; }
+.bag-window .ew-pet .pet-hero-panel .bonus-tip { flex: 1 1 100% !important; }
+
+/* ============ 一屏兜底 + 宠物卡二次压缩（2026-09-04） ============ */
+.equip-workbench .ew-col { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.bag-window .ew-pet .pet-hero-panel .pstat { flex: 1 1 23% !important; min-width: 0 !important; padding: 2px 3px 3px !important; }
+.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size: 0.75rem !important; line-height: 1.2 !important; }
+.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size: 0.625rem !important; }
+.bag-window .ew-pet .pet-hero-panel .pet-hero { padding: 4px 8px 2px !important; }
+.bag-window .ew-pet .pet-hero-panel .pet-hero-art { width: 44px !important; height: 44px !important; }
+.bag-window .ew-pet .pet-hero-panel .pet-name .lv { font-size: 0.75rem !important; }
+.bag-window .ew-pet .pet-hero-panel .exp-bar-wrap { height: 6px !important; }
+
+/* ============ 右栏打造区激进压缩（2026-09-04） ============ */
+.equip-workbench .craft-eq { padding: 4px 6px !important; }
+.equip-workbench .craft-eq .ename { font-size: 0.917rem !important; }
+.equip-workbench .craft-affix-group { line-height: 1.35 !important; margin-top: 0 !important; }
+.equip-workbench .craft-affix-group .grp-title { font-size: 0.75rem !important; margin: 3px 0 1px !important; }
+.equip-workbench .craft-affix-group .grp-line { font-size: 0.833rem !important; }
+.equip-workbench .craft-affix-divider { margin: 3px 0 !important; }
+.equip-workbench .craft-affixcount { font-size: 0.75rem !important; margin-top: 2px !important; }
+.equip-workbench .craft-section-label { margin: 6px 0 3px !important; font-size: 0.8rem !important; }
+/* 资源：5 项单行 */
+.equip-workbench .craft-resource-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 3px !important; }
+.equip-workbench .craft-resource-item { flex-direction: column !important; align-items: center !important; padding: 3px 2px !important; gap: 1px !important; text-align: center !important; }
+.equip-workbench .craft-resource-item .resource-icon { font-size: 0.833rem !important; }
+.equip-workbench .craft-resource-item > span { font-size: 0.667rem !important; }
+.equip-workbench .craft-resource-item > b { font-size: 0.75rem !important; }
+/* 锁定：按钮横排 */
+.craft-lock-sides { gap: 4px !important; }
+.craft-lock-side-btn { flex-direction: row !important; align-items: center !important; gap: 6px !important; padding: 5px 6px !important; }
+.craft-lock-side-btn .clsb-label { font-size: 0.833rem !important; }
+.craft-lock-side-btn .clsb-sub { font-size: 0.667rem !important; line-height: 1.3 !important; }
+.craft-lock-note { margin-top: 2px !important; font-size: 0.667rem !important; }
+/* 操作：1 行 4 个按钮 */
+.equip-workbench .craft-action-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 4px !important; }
+.equip-workbench .craft-action-grid .btn-mini { min-height: 58px !important; padding: 4px 2px !important; font-size: 0.75rem !important; flex-direction: column !important; gap: 2px !important; }
+.equip-workbench .craft-action-grid .btn-mini span { font-size: 0.625rem !important; line-height: 1.25 !important; }
+.equip-workbench .craft-result { margin-top: 3px !important; font-size: 0.75rem !important; }
+
+/* ============ 右栏详情+打造 一屏压缩（2026-09-04，第三轮） ============ */
+#bag-eq-detail .eq-detail-info { padding: 6px 8px !important; }
+#bag-eq-detail .eq-detail-info .tip-name { font-size: 0.917rem !important; margin-bottom: 1px !important; }
+#bag-eq-detail .eq-detail-info .tip-line { font-size: 0.75rem !important; line-height: 1.35 !important; }
+#bag-eq-detail .eq-detail-info .tip-section { font-size: 0.75rem !important; margin: 3px 0 1px !important; }
+#bag-eq-detail .eq-detail-info .tip-base { font-size: 0.75rem !important; }
+#bag-eq-detail .eq-detail-info .tip-empty { font-size: 0.75rem !important; }
+#bag-eq-detail .eq-detail-info .btn-sm { padding: 2px 8px !important; font-size: 0.75rem !important; }
+/* craft 再压 */
+.equip-workbench .craft-affix-group .grp-line { font-size: 0.8rem !important; line-height: 1.3 !important; }
+.equip-workbench .craft-affix-divider { display: none !important; }
+.equip-workbench .craft-resource-item { padding: 2px 1px !important; }
+.craft-lock-side-btn { padding: 4px 5px !important; }
+.craft-lock-side-btn .clsb-sub { font-size: 0.625rem !important; }
+.craft-lock-note { margin-top: 1px !important; font-size: 0.625rem !important; line-height: 1.2 !important; }
+.equip-workbench .craft-action-grid .btn-mini { min-height: 50px !important; }
+.equip-workbench .craft-soul-details { margin-top: 4px !important; padding-top: 3px !important; }
+
+/* ============ 右栏最终收紧（2026-09-04，第四轮） ============ */
+#bag-eq-detail .eq-detail-info .tip-line { line-height: 1.3 !important; }
+#bag-eq-detail .eq-detail-info .tip-section { margin: 2px 0 0 !important; }
+#bag-eq-detail .eq-detail-info .btn-sm { padding: 1px 6px !important; }
+.equip-workbench .craft-affix-group .grp-line { line-height: 1.25 !important; }
+.equip-workbench .craft-affix-group .grp-title { margin: 2px 0 0 !important; }
+.craft-lock-side-btn { padding: 3px 4px !important; }
+.craft-lock-side-btn .clsb-sub { display: none !important; }
+.craft-lock-note { font-size: 0.583rem !important; }
+.equip-workbench .craft-action-grid .btn-mini { min-height: 46px !important; }
+.equip-workbench .craft-soul-details { margin-top: 3px !important; padding-top: 2px !important; }
+
+/* ============ 右栏收尾压缩（2026-09-04，第五轮：确保魂铸入口可见） ============ */
+#bag-eq-detail .eq-detail-info .tip-name { font-size: 0.85rem !important; }
+#bag-eq-detail .eq-detail-info .tip-line { line-height: 1.25 !important; font-size: 0.72rem !important; }
+#bag-eq-detail .eq-detail-info .tip-section { margin: 1px 0 0 !important; }
+#bag-eq-detail .eq-detail-info .btn-sm { padding: 1px 4px !important; }
+.equip-workbench .craft-affix-group .grp-line { line-height: 1.2 !important; }
+.equip-workbench .craft-result { margin-top: 2px !important; font-size: 0.7rem !important; min-height: 12px !important; }
+.craft-lock-note { margin-top: 0 !important; font-size: 0.55rem !important; }
+.equip-workbench .craft-soul-details { margin-top: 2px !important; padding-top: 1px !important; }
+
+/* ============ craft-eq 精简 + note 收敛（2026-09-04） ============ */
+.craft-lock-note { display: none !important; }
+.equip-workbench .craft-eq { padding: 2px 6px !important; }
+.equip-workbench .craft-affix-group { margin-top: 0 !important; }
