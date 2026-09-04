@@ -100,19 +100,17 @@
   }
 
   /* ---------- 重铸：随机重铸装备词缀（数量 / 类型 / T 阶 / 数值 全部随机） ---------- */
-  // POE 锁前锁后（2026-09-04 拍板）：锁定前缀 → 前缀整组保留（条数/类型/T阶/数值/位置全不动），后缀整组重 roll；
-  // 锁定后缀 → 反之。两侧都锁 → 禁止。成本（方案 B 持续消耗）：锁定侧按条数额外扣锁定石（每条 1 颗）。
-  // 返回 { ok, changed: {old, new} } 或 { error }
+  // POE 锁前锁后 + 一次性锁定（2026-09-04 拍板）：锁定前缀 → 前缀整组保留，后缀整组重 roll；锁定后缀 → 反之。
+  // 锁定石是消耗品：锁定动作耗 1 颗（见 lockSide）；重铸生效后【锁定自动失效】，再锁需重新上锁定石。
+  // 两侧都锁 → 禁止。返回 { ok, changed: {old, new} } 或 { error }
   async function reforge(eq, onApplied) {
     const C = Config.craft.reforge;
     const lockPrefix = !!eq.lockPrefix, lockSuffix = !!eq.lockSuffix;
     if (lockPrefix && lockSuffix) return { error: '只能锁定前缀或后缀其中一边，先解锁另一边' };
-    const lockSide = lockPrefix ? 'prefix' : (lockSuffix ? 'suffix' : null);
-    const lockedCount = lockSide ? (eq.affixes[lockSide] || []).length : 0;
-    const extra = lockedCount ? { name: Config.craft.lock.name, amount: lockedCount } : null;
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);
       const oldRarity = eq.rarity;
+      const oldLockPrefix = eq.lockPrefix, oldLockSuffix = eq.lockSuffix;
       const rollBucket = (category, keep) => {
         if (keep) return (old[category] || []).slice(); // 锁定侧：整组保留（原对象引用）
         const pool = AFFIX_POOL.filter(a => a.category === category);
@@ -145,8 +143,11 @@
       }
       eq.affixes = { prefix, suffix };
       syncRarity(eq); // 重铸会重摇词缀条数 → 颜色按新条数同步
-      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
-    }, onApplied, extra);
+      // POE 一次性：锁定效果在本次重铸后失效，需重新上锁定石
+      delete eq.lockPrefix;
+      delete eq.lockSuffix;
+      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; eq.lockPrefix = oldLockPrefix; eq.lockSuffix = oldLockSuffix; } };
+    }, onApplied);
   }
 
   /* ---------- 剥离：随机移除一条词缀（仅剩 1 条时不可用） ---------- */
@@ -185,12 +186,9 @@
   async function reroll(eq, onApplied) {
     const C = Config.craft.holy;
     if (affixCount(eq) === 0) return { error: '这件装备没有词缀，无法重铸' };
-    // POE 锁前锁后：锁定侧数值也不动（重 Roll 未锁侧），按锁定侧条数额外扣锁定石
+    // POE 锁前锁后：锁定侧数值也不动（只重 Roll 未锁侧）；神圣石不消耗锁定（POE 中工艺词缀不受神圣影响，锁定状态保留）
     const lockPrefix = !!eq.lockPrefix, lockSuffix = !!eq.lockSuffix;
     if (lockPrefix && lockSuffix) return { error: '只能锁定前缀或后缀其中一边，先解锁另一边' };
-    const lockSide = lockPrefix ? 'prefix' : (lockSuffix ? 'suffix' : null);
-    const lockedCount = lockSide ? (eq.affixes[lockSide] || []).length : 0;
-    const extra = lockedCount ? { name: Config.craft.lock.name, amount: lockedCount } : null;
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes); // 深拷贝嵌套结构，便于回滚与对比
       const rerollBucket = (arr, keep) => arr.map(a => {
@@ -204,7 +202,7 @@
         changed: { old, new: changed },
         onFail: () => { eq.affixes = old; }     // 云同步失败时整组还原
       };
-    }, onApplied, extra);
+    }, onApplied);
   }
 
   /* ---------- 增缀石：按前后缀优先级给装备【新增】一条随机词缀 ---------- */
@@ -251,28 +249,25 @@
     }, onApplied);
   }
 
-  /* ---------- 锁定石：POE 锁前/锁后（2026-09-04 拍板） ----------
-   * 只锁一边：eq.lockPrefix 或 eq.lockSuffix（布尔）。锁定侧在重铸/神圣中整组保留、剥离/增缀不触及。
-   * 锁定状态切换免费（不耗石）；重铸/神圣时按锁定侧条数额外扣锁定石（方案 B 持续消耗）。
+  /* ---------- 锁定石：POE 锁前/锁后，一次性消耗（2026-09-04 拍板） ----------
+   * 只锁一边：eq.lockPrefix 或 eq.lockSuffix（布尔）。锁定侧在重铸中整组保留、剥离/增缀不触及。
+   * 锁定动作消耗 1 颗锁定石（applyCraft）；重铸生效后【锁定自动失效】，需重新上锁定石。
+   * 神圣石（重 Roll 数值）保留锁定；剥离/增缀不触及锁定侧、不消耗锁定。
    * 持久化：affixes JSON 附加键 _lockPrefix/_lockSuffix（与 _ilvl 同模式，零 DB 改动）。
    * side 取值 'prefix' | 'suffix'。
    */
   async function lockSide(eq, side, onApplied) {
-    const user = await Supabase.getCurrentUser();
-    if (!user) return { error: '请先登录账号' };
-    if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
-    if (Market.isItemListed(eq.cloudId)) return { error: '装备正在市场出售，先取回再操作' };
+    const C = Config.craft.lock;
     if (side === 'prefix' && eq.lockSuffix) return { error: '已锁定后缀，先解锁后缀才能锁前缀' };
     if (side === 'suffix' && eq.lockPrefix) return { error: '已锁定前缀，先解锁前缀才能锁后缀' };
-    const oldP = eq.lockPrefix, oldS = eq.lockSuffix;
-    if (side === 'prefix') eq.lockPrefix = true; else eq.lockSuffix = true;
-    if (onApplied) { try { onApplied({ ok: true }); } catch (e) {} }
-    const up = await Items.updateCloudItem(eq, { affixes: eq.affixes }); // affixes 携带 _lockPrefix/_lockSuffix
-    if (up && up.error) {
-      eq.lockPrefix = oldP; eq.lockSuffix = oldS;
-      return { ok: false, error: '云端同步失败，已回滚：' + (up.error.message || up.error), rolledBack: true };
-    }
-    return { ok: true };
+    return applyCraft(eq, C.name, C.amount, () => {
+      const oldP = eq.lockPrefix, oldS = eq.lockSuffix;
+      if (side === 'prefix') eq.lockPrefix = true; else eq.lockSuffix = true;
+      return {
+        changed: { old: { lockPrefix: !!oldP, lockSuffix: !!oldS }, new: { lockPrefix: !!eq.lockPrefix, lockSuffix: !!eq.lockSuffix } },
+        onFail: () => { eq.lockPrefix = oldP; eq.lockSuffix = oldS; }
+      };
+    }, onApplied);
   }
   // 解锁：免费（放弃锁定，不消耗石头），只回写云端 affixes
   async function unlockSide(eq, side, onApplied) {

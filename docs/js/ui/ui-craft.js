@@ -52,17 +52,15 @@
     const lockSideBtn = (side, label) => {
       const locked = side === 'prefix' ? lockPrefix : lockSuffix;
       const blocked = side === 'prefix' ? lockSuffix : lockPrefix;
-      const cost = (side === 'prefix' ? pfx.length : sfx.length);
-      return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '锁定后重铸/神圣保留该侧')}">
-        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 点击解锁（免费）' : '重铸/神圣保留该侧 · 耗 ' + cost + ' ' + lockCfg.name}</span></button>`;
+      return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 重铸保留该侧（一次）')}">
+        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 重铸后失效 · 点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 重铸保留该侧（一次）'}</span></button>`;
     };
     const lockAreaHtml = `
       <div class="craft-section-label">锁定（锁前 / 锁后）<span class="craft-lock-count">${lockCfg.name} ×${lockStone}</span></div>
       <div class="craft-lock-sides">${lockSideBtn('prefix', '锁前缀')}${lockSideBtn('suffix', '锁后缀')}</div>
-      <div class="craft-lock-note">只锁一边 · 重铸/神圣时按锁定侧条数扣${lockCfg.name} · ${lockCfg.name}仅图16/17掉落</div>`;
+      <div class="craft-lock-note">锁定消耗 1 ${lockCfg.name} · 只锁一边 · 重铸后自动失效（POE 一次性） · ${lockCfg.name}仅图16/17掉落</div>`;
     const lockActive = lockPrefix || lockSuffix;
-    const lockCost = lockPrefix ? pfx.length : (lockSuffix ? sfx.length : 0);
-    const reforgeSub = lockPrefix ? `前缀锁定保留 · +${pfx.length} ${lockCfg.name}` : (lockSuffix ? `后缀锁定保留 · +${sfx.length} ${lockCfg.name}` : '全部词缀重洗');
+    const reforgeSub = lockActive ? '锁定侧重铸后自动失效' : '全部词缀重洗';
     const soulHtml = soulCastHtml(eq, inSell);
     const soulFold = eq.soulAffix
       ? `<div class="craft-section-label">魂铸（宠物 → 装备）</div>${soulHtml}`
@@ -82,9 +80,9 @@
       ${lockAreaHtml}
       <div class="craft-section-label">打造操作</div>
       <div class="craft-actions craft-action-grid">
-        <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1${lockCost ? ' + ' + lockCost + ' ' + lockCfg.name : ''} · ${reforgeSub}</span></button>
+        <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1 · ${reforgeSub}</span></button>
         <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''}>✂️ 剥离石<span>${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '消耗 1 · 移除未锁侧词缀'}</span></button>
-        <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1${lockCost ? ' + ' + lockCost + ' ' + lockCfg.name : ''} · 重 Roll 未锁侧数值</span></button>
+        <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1 · 重 Roll 未锁侧数值（保留锁定）</span></button>
         <button class="btn-mini augment" id="craft-augment" ${(pfx.length >= 3 && sfx.length >= 3) ? 'disabled' : ''}>➕ 增缀石<span>${(pfx.length >= 3 && sfx.length >= 3) ? '前后缀已满' : '消耗 1 · 新增到未锁侧'}</span></button>
       </div>
       ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
@@ -112,8 +110,8 @@
         (onApplied) => Craft.reforge(eq, onApplied),
         (r) => {
           const ns = flattenAffixes(r.changed.new);
-          resultEl.innerHTML = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧' : '全部词缀'}已重洗（数量 / 类型 / T 阶 / 数值 随机）<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-          addLog(`🎲 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留）' : '词缀全部重洗'}`);
+          resultEl.innerHTML = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · 🔒锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+          addLog(`🎲 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}`);
           showToast('🎲 重铸完成', `词条已全部随机重洗`);
           renderCraftInto(el, eq);
           if (UI.renderInventory) UI.renderInventory();
@@ -176,7 +174,7 @@
         const sideName = side === 'prefix' ? '前缀' : '后缀';
         const res = locked ? await Craft.unlockSide(eq, side) : await Craft.lockSide(eq, side);
         if (res && res.error) { resultEl.innerHTML = `<span class="err">❌ ${res.error}</span>`; return; }
-        resultEl.innerHTML = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（重铸/神圣时保留 · 按条数扣${lockCfg.name}）`;
+        resultEl.innerHTML = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（消耗 1 ${lockCfg.name} · 重铸后失效）`;
         showToast(locked ? '🔓 已解锁' : '🔒 已锁定', `${sideName}${locked ? '解锁' : '锁定'}成功`);
         renderCraftInto(el, eq);
         if (UI.renderInventory) UI.renderInventory();
