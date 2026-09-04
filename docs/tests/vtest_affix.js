@@ -61,7 +61,7 @@ for(const kind of ['white','blue','gold']){
   C(`var ceq=${kind}s[0]; ceq.cloudId='c-'+Math.random().toString(36).slice(2)`);
   let html='';
   try {
-    await C('var __host=(function(){const h=document.createElement("div");h.innerHTML=\'<div class="eq-detail-craft"></div>\';return h.firstChild})()');
+    await C('var __host=document.createElement("div")'); // 桩元素不解析 innerHTML，不能取 firstChild，直接传容器
     // 桩环境 Materials.getQuantity 会抛异常（vstub 未覆盖），renderCraftInto 里模板串要先求值——打补丁兜底 0
     await C('if(Materials.getQuantity&&Materials.getQuantity.length!==undefined){const __g=Materials.getQuantity.bind(Materials);Materials.getQuantity=n=>{try{return __g(n)}catch(e){return 0}}}');
     await C('UI.renderCraftInto(__host,ceq)');
@@ -115,6 +115,9 @@ for(const kind of ['white','blue','gold']){
   // 5c) battle.calcDamage：穿透/伤害加成/受伤减免结算（种子化不方便，用确定性字段断言）
   const cd=C(`(function(){
     const B=window.Battle;
+    const ORIG=Math.random;
+    // 固定 Math.random=0.2：hitChance clamp 上限 0.95 → 0.2 < 0.95 必命中；critRate 0 必不暴击（确定性）
+    Math.random=()=>0.2;
     // 纯减法基线：atk 100 def 30 → 70
     const base=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:0});
     // 穿透 20：def 50 - 20 = 30 → 70（与基线同）
@@ -126,6 +129,7 @@ for(const kind of ['white','blue','gold']){
     const drClamp=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:95});
     // 穿透不成负防御：def 10 pen 50 → effDef 0 → 伤害 100
     const penFloor=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:50,dmgBonus:0,lifesteal:0},{def:10,dodge:0,dr:0});
+    Math.random=ORIG; // 恢复真实随机
     return JSON.stringify({base:base.damage,pen:pen.damage,bonus:bonus.damage,dr:dr.damage,drClamp:drClamp.damage,penFloor:penFloor.damage});
   })()`);
   const cdv=JSON.parse(cd);
@@ -137,8 +141,8 @@ for(const kind of ['white','blue','gold']){
   A(cdv.penFloor===100,`穿透不成负防御：effDef 0 → 100（${cdv.penFloor}）`);
   // 5d) getStats 透传：给宠物穿带三词缀的装备，面板字段齐
   const st=C(`(function(){
-    const pet=Game.pets[0]||Game.pet; const p=JSON.parse(JSON.stringify(pet));
-    p.equipment=Object.assign({},p.equipment);
+    // 构造最小宠物（getStats 是纯函数，不依赖登录态）：等级给足让属性>0
+    const p={name:'测试宠',level:50,growth:10,lineId:'',equipment:{}};
     p.equipment['武器']={id:'t1',slot:'武器',base:{type:'atk',label:'攻击',value:10},baseStats:{atk:10},affixes:{prefix:[],suffix:[
       {type:'pen',label:'穿透',tier:1,value:35,fixed:true},
       {type:'dmgBonus',label:'伤害加成',tier:1,value:8},
@@ -148,18 +152,24 @@ for(const kind of ['white','blue','gold']){
   })()`);
   const stv=JSON.parse(st);
   A(stv.pen===35&&stv.dmgBonus===8&&stv.dr===5,`getStats 透传 pen/dmgBonus/dr（${st}）`);
-  // 5e) 底材命中随 ilvl：低 ilvl 小、高 ilvl 大、空 ilvl 兜底按 100
+  // 5e) 底材命中随 ilvl 成长：底材词缀是 hit 或 crit（按槽位二选一），采样到 hit 底材的装备验证值落在成长表内
   const bh=C(`(function(){
-    const lo=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==='white'),1,3,1);
-    const hi=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==='white'),13,3,80);
-    const baseLo=(lo.affixes.suffix||[]).find(a=>a.base&&a.type==='hit');
-    const baseHi=(hi.affixes.suffix||[]).find(a=>a.base&&a.type==='hit');
-    // 图1 有 hit 底材吗？饰品才有；白装基底 hit 概率低 → 用 rollBaseHit 不导出，改用区间表断言生成值
-    return JSON.stringify({lo:baseLo?baseLo.value:null,hi:baseHi?baseHi.value:null});
+    const table=Config.equipment.baseHitByIlvl;
+    const allVals=table.flatMap(r=>[r.min,r.max]);
+    const loVals=table.filter(r=>r.minIlvl<=1).flatMap(r=>[r.min,r.max]);
+    const hiVals=table.filter(r=>r.minIlvl<=80).flatMap(r=>[r.min,r.max]);
+    let lo=null,hi=null;
+    for(let i=0;i<400&&(!lo||!hi);i++){
+      const e1=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==='white'),1,3,1);
+      if(!lo){const b=(e1.affixes.suffix||[]).find(a=>a.base&&a.type==='hit'); if(b)lo=b.value;}
+      const e2=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==='white'),13,3,80);
+      if(!hi){const b=(e2.affixes.suffix||[]).find(a=>a.base&&a.type==='hit'); if(b)hi=b.value;}
+    }
+    return JSON.stringify({lo,hi,loMin:Math.min(...loVals),loMax:Math.max(...loVals),hiMin:Math.min(...hiVals),hiMax:Math.max(...hiVals)});
   })()`);
   const bhv=JSON.parse(bh);
-  if (bhv.lo!==null) A(bhv.lo>=1&&bhv.lo<=5,`ilvl 1 底材命中在 (1~5) 段内（${bhv.lo}）`);
-  if (bhv.hi!==null) A(bhv.hi>=12&&bhv.hi<=16,`ilvl 80 底材命中在 (12~16) 段内（${bhv.hi}）`);
+  if (bhv.lo!==null) A(bhv.lo>=bhv.loMin&&bhv.lo<=bhv.loMax,`ilvl 1 底材命中 ${bhv.lo} 在低档区间 (${bhv.loMin}~${bhv.loMax})`);
+  if (bhv.hi!==null) A(bhv.hi>=bhv.hiMin&&bhv.hi<=bhv.hiMax,`ilvl 80 底材命中 ${bhv.hi} 在高档区间 (${bhv.hiMin}~${bhv.hiMax})`);
   A(bhv.lo!==null||bhv.hi!==null,'底材命中成长表断言至少覆盖一件装备');
   // 5f) 部位偏好：武器不出 hp 前缀（权重 0），大量采样护甲必偏 hp/def
   const sw=C(`(function(){

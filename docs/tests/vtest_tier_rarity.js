@@ -41,9 +41,11 @@ A(t1 >= 1 && t1 <= 3, `金装 T1 概率在设计值附近（${t1.toFixed(1)}% �
 // 基础词缀（base:true，固定 T5）不参与统计
 const scan = (rarityId, count) => C(`(function(){
   const R=Config.equipment.rarities.find(r=>r.id==='${rarityId}');
+  // 图10（areaTier 10 → ilvl 55）：T1 的 ilvl gate 是 55，只有图10+ 才可能出 T1，
+  // 旧扫描用图6（ilvl 31）时 T1 全被 gate 降级，0 条属正常设计。
   let t1=0,t2=0,total=0;
   for(let i=0;i<${count};i++){
-    const eq=Equipment.generateEquipment(R, 6, 1);
+    const eq=Equipment.generateEquipment(R, 10, 1);
     for(const a of Equipment.flattenAffixes(eq.affixes)){
       if(a.base)continue; total++;
       if(a.tier===1)t1++; if(a.tier===2)t2++;
@@ -60,8 +62,8 @@ A(sg.t1 > 0, '生成的金装能出 T1 词缀');
 /* ---------- 3. 重铸不许绕过稀有度（静态检查，防回归） ---------- */
 const craftSrc = fs.readFileSync('../js/equipment/equipment_craft.js', 'utf8');
 A(craftSrc.indexOf('randInt(1, 5)') < 0, '重铸/增缀代码里没有写死的 randInt(1, 5)（不看成色的老写法）');
-A((craftSrc.match(/rollAffixTier\(eq\.rarity\.id\)/g) || []).length >= 3,
-  '重铸（两处）与增缀都改成按稀有度抽 T 阶');
+A((craftSrc.match(/rollAffixTier\(eq\.rarity\.id,\s*window\.Equipment\.ilvlOf\(eq\)\)/g) || []).length >= 3,
+  '重铸（两处）与增缀都改成按稀有度抽 T 阶（带 ilvl gate）');
 
 /* ---------- 4. 底材 T 阶：T1 在图6 也才 20% ---------- */
 const mt = C(`JSON.stringify(Config.equipment.materialTierWeights||{})`);

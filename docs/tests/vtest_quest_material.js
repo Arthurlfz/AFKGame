@@ -31,13 +31,18 @@ ctx.Materials.gain = async name => gained.push(name);
 ctx.Equipment = { pickRarity() {}, generateEquipment() {}, addToInventory() {}, getEquipBonuses: () => ({ resources: { dropQty: 1, dropRare: 1, matDrop: 1 } }) };
 ctx.window.Equipment = ctx.Equipment;
 ctx.window.Items = {};
-// 改法一：用单池权重强制只掉区域材料（none/material/equipment/egg + materialWeights 子权重）
+// 改法一：用单池权重强制只掉区域材料（none/material/equipment/egg + materialWeightsByTier 子权重）。
+// 注意：drop.js 已改用 materialWeightsByTier（按图档），旧全局 materialWeights 已弃用——
+// 子池必须 mock 到 ByTier，否则 corrupted-forest(tier 3) 的真实子池含进化素材，会随机抽到而失败。
 ctx.Config.drop.pool = { none: 0, material: 1, equipment: 0, egg: 0 };
-ctx.Config.drop.materialWeights = { '区域材料': 1 };
+ctx.Config.drop.materialWeights = { '区域材料': 1 }; // 兼容留旧键
+ctx.Config.drop.materialWeightsByTier = { 1: { '区域材料': 1 } }; // corrupted-forest = areas[0] → tier 1，子池只留区域材料
 vm.runInContext(fs.readFileSync('../js/core/drop.js', 'utf8'), ctx);
 
 (async () => {
-  await ctx.Drop.rollReward({}, { id: 'corrupted-forest' });
+  const rr = await ctx.Drop.rollReward({}, { id: 'corrupted-forest' });
+  console.log('ROLL:', JSON.stringify(rr));
+  console.log('GAINED:', JSON.stringify(gained));
   if (gained.length !== 1 || gained[0] !== '枯荣种荚') throw new Error(`Area material drop mismatch: ${gained}`);
   console.log('PASS: m2 reads 5 枯荣种荚 from Materials');
   console.log('PASS: corrupted-forest area drop gains 枯荣种荚');

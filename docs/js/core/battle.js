@@ -402,7 +402,7 @@
     if (att.dmgBonus) dmg = Math.floor(dmg * (1 + att.dmgBonus / 100));
     // 受伤减免%：受击侧乘区，最低承伤 10%（防坦克无限叠成免伤）
     const dr = Math.min(90, Math.max(0, defStats.dr || 0));
-    if (dr > 0) dmg = Math.max(1, Math.floor(dmg * (1 - dr / 100)));
+    if (dr > 0) dmg = Math.max(1, Math.floor(dmg * (100 - dr) / 100)); // 整数运算避免 70*0.1=6.999… 的浮点陷阱
     // 吸血：命中且造成伤害时，按伤害 × 攻击者吸血率回血
     const lifesteal = att.lifesteal == null ? 0 : att.lifesteal;
     const heal = lifesteal > 0 ? Math.floor(dmg * lifesteal) : 0;
@@ -446,5 +446,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, state };
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, state, calcDamage };
 })();

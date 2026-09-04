@@ -15,7 +15,8 @@ for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment
 const A=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('PASS: '+m)}
 const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
-const PREFIX_TYPES=['atk','hp','def'], SUFFIX_TYPES=['spd','crit','lifesteal'];
+// 2026-09-04 吸血移入前缀池（equipment.js AFFIX_POOL 同口径），新增三类纯数值词缀归后缀
+const PREFIX_TYPES=['atk','hp','def','lifesteal'], SUFFIX_TYPES=['spd','crit','critDamage','pen','dmgBonus','dr'];
 // 从 VM 上下文取一次 T 阶数值区间表，供 Node 侧做区间断言（Node 侧无 Config）
 const TIERS=JSON.parse(C('JSON.stringify(Config.equipment.affixTiers)'));
 const tierRange=t=>TIERS.find(x=>x.tier===t);

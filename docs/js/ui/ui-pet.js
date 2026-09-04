@@ -139,7 +139,7 @@
       awEl.style.display = aw ? '' : 'none';
       if (aw) {
         // 觉醒加成：{stat, value} 扁平结构 → 中文属性名 + 百分比（spd 例外，为绝对值）
-        const STAT_CN = { hp: '生命', atk: '攻击', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血' };
+        const STAT_CN = { hp: '生命', atk: '攻击', def: '防御', spd: '速度', crit: '暴击率', critDamage: '暴击伤害', hit: '命中', dodge: '闪避', lifesteal: '吸血', pen: '穿透', dmgBonus: '伤害加成', dr: '受伤减免' };
         const ab = aw.bonus;
         let btxt = '';
         if (ab && ab.stat != null) {

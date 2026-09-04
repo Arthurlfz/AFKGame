@@ -28,7 +28,9 @@ const qBefore=C('Materials.getQuantity(Config.craft.holy.name)');
 A(qBefore===2,'神圣石初始 2 颗');
 // 先把每条词缀数值压到各自 T 阶最小值，并把 Math.random 钉到 0.999 → randInt 必取最大值
 // 这样 new = max，old = min，保证「数值确实变化」且「落在 T 阶范围」
-C('heq.affixes.prefix.concat(heq.affixes.suffix).forEach(a=>{a.value=Config.equipment.affixTiers.find(t=>t.tier===a.tier).min})');
+// 独立数值表分派（与 equipment.js affixTiersFor 同口径）：spd/lifesteal/crit 等各自有专属表
+C('var __T=(t,type)=>({spd:Config.equipment.speedAffixTiers,lifesteal:Config.equipment.lifestealAffixTiers,crit:Config.equipment.critAffixTiers,critDamage:Config.equipment.critDamageAffixTiers,pen:Config.equipment.penAffixTiers,dmgBonus:Config.equipment.dmgBonusAffixTiers,dr:Config.equipment.drAffixTiers}[type]||Config.equipment.affixTiers).find(x=>x.tier===t)');
+C('heq.affixes.prefix.concat(heq.affixes.suffix).forEach(a=>{a.value=__T(a.tier,a.type).min})');
 C('globalThis.__rand=Math.random; Math.random=()=>0.999');   // 在 context 内控制随机
 const oldJson=C('JSON.stringify(Equipment.flattenAffixes(heq.affixes).map(a=>({type:a.type,tier:a.tier,value:a.value})))');
 const r=await C('Craft.reroll(heq)');
@@ -37,7 +39,7 @@ A(r.ok===true,'重Roll 成功返回 ok');
 // 词缀类型 / T 阶不变；数值变为该 T 阶最大值（=变化且在区间内）
 // 注意：固定值类词缀（速度/命中/闪避）的高 T 阶区间可能退化成单点（min===max），
 // 那种词缀重 Roll 数值必然不变，属正常，不算「没重 Roll」。
-const check=C(`(function(){const old=JSON.parse('${oldJson}');const cur=Equipment.flattenAffixes(heq.affixes);for(let i=0;i<cur.length;i++){const a=cur[i],o=old[i];const T=Config.equipment.affixTiers.find(t=>t.tier===a.tier);if(a.type!==o.type)return 'type';if(a.tier!==o.tier)return 'tier';if(a.value<T.min||a.value>T.max)return 'range';if(a.value===o.value&&T.min!==T.max)return 'unchanged'}return 'ok'})()`);
+const check=C(`(function(){const old=JSON.parse('${oldJson}');const cur=Equipment.flattenAffixes(heq.affixes);for(let i=0;i<cur.length;i++){const a=cur[i],o=old[i];const T=__T(a.tier,a.type);if(a.type!==o.type)return 'type';if(a.tier!==o.tier)return 'tier';if(a.value<T.min||a.value>T.max)return 'range';if(a.value===o.value&&T.min!==T.max)return 'unchanged'}return 'ok'})()`);
 console.log('  重Roll前 '+oldJson);
 console.log('  重Roll后 '+C('JSON.stringify(Equipment.flattenAffixes(heq.affixes).map(a=>({type:a.type,tier:a.tier,value:a.value})))'));
 A(check==='ok',`类型/T阶不变、数值在区间内且已变化 (got:${check})`);
