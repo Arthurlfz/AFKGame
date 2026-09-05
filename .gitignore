@@ -44,7 +44,9 @@ docs/tests/_tmp_*.js
 docs/tests/tmp_*.js
 
 # ===== 根目录 js Junction（mklink /J → docs/js，不入库，避免重复内容）=====
-js/
+# 必须带前导斜杠：不带斜杠的 js/ 会匹配任意层级的 js 目录（含 docs/js/），
+# 导致 docs/js 下新增的 js 文件无法 git add（历史 tracked 文件不受影响，所以长期没暴露）。
+/js/
 
 # ===== 本地临时文件 / 归档 / demo（2026-09-03 误传后清理，不入库）=====
 archive/
