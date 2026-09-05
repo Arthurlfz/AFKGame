@@ -7,7 +7,7 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, fet
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
-for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js','../js/ui/ui-codex.js','../js/ui/ui-pet-synth.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-market-records.js','../js/ui/ui-market-sell.js', '../js/main.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of require('./vtest_files').FILES) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 const C = code => vm.runInContext(code, ctx);
 const A = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ': ' + m); if (!c) process.exitCode = 1 };
 const S = ms => new Promise(r => setTimeout(r, ms));
