@@ -857,20 +857,6 @@ img.pet-avatar-sprite.inline { display:inline-block; vertical-align:-6px; margin
 }
 .sell-btn:hover { background:rgba(201,141,79,.12); }
 .sell-btn.recall { border-color:var(--line-hi); color:var(--text-dim); }
-.merge-btn {
-  margin-top:5px; width:100%; padding:3px 0; border:1px solid var(--metal-dim); border-radius:1px;
-  font-size:0.833rem; font-weight:700; cursor:pointer; background:transparent; color:var(--metal);
-}
-.merge-btn:hover { border-color:var(--metal); color:#fff; }
-/* 合成按钮（出全新·异变稀有宠）：用蓝紫"合成/稀有"主题色区分涅槃 */
-.merge-btn.synth { border-color:#5b6ee1; color:#9aa8ff; }
-.merge-btn.synth:hover { border-color:#7c8aff; color:#fff; background:rgba(91,110,225,.14); }
-.evolve-btn {
-  margin-top:5px; width:100%; padding:3px 0; border:1px solid var(--accent); border-radius:1px;
-  font-size:0.833rem; font-weight:700; cursor:pointer; background:transparent; color:var(--accent-hi);
-}
-.evolve-btn:hover { border-color:var(--accent-hi); background:rgba(242,182,50,.12); }
-.merge-cand.evolve-route.disabled { opacity:.45; cursor:not-allowed; border-color:var(--line); color:var(--text-faint); }
 .sell-input {
   width:100%; margin-top:5px; padding:5px 8px; border:1px solid var(--line-hi); border-radius:1px;
   background:var(--inset); color:var(--text); font-size:0.917rem; box-sizing:border-box; outline:none;
@@ -944,33 +930,6 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 .modal-title { font-size:1.083rem; font-weight:700; color:var(--accent-hi); margin-bottom:10px; letter-spacing:1px; }
 .modal-actions { text-align:right; margin-top:12px; }
-.merge-main { font-size:1rem; color:var(--text); margin-bottom:8px; }
-.merge-tip { font-size:0.917rem; color:var(--text-dim); margin:6px 0; }
-.merge-cands { margin-top:8px; }
-.merge-cand {
-  display:block; width:100%; margin:5px 0; padding:8px 12px; text-align:left;
-  background:var(--inset); color:var(--text); border:1px solid var(--line); border-radius:2px;
-  font-size:1rem; cursor:pointer;
-}
-.merge-cand:hover { border-color:var(--accent); }
-.merge-preview {
-  margin-top:10px; padding:10px; background:var(--inset); border:1px solid var(--accent);
-  border-radius:2px; color:var(--text-dim); font-size:1rem; line-height:1.8;
-}
-.merge-preview b { color:var(--accent-hi); }
-.merge-stats { margin-top:8px; color:var(--text); font-size:1rem; font-weight:700; }
-/* 融合变异提示（组合命中时高亮，金色稀有感） */
-.merge-mutation {
-  margin-top:8px; padding:6px 8px; background:rgba(201,168,106,.12);
-  border:1px solid rgba(201,168,106,.5); border-radius:2px;
-  color:var(--text); font-size:1rem; line-height:1.7;
-}
-.merge-mutation b { color:#c9a86a; }
-/* 融合合成限制提示（对齐口袋精灵2：副宠成长下限 / 60分水岭） */
-.merge-limit { margin-top:6px; padding:5px 8px; border-radius:2px; font-size:0.917rem; line-height:1.7; }
-.merge-limit.hint { background:rgba(95,115,148,.08); border:1px solid var(--line); color:var(--text-dim); }
-.merge-limit.warn { background:rgba(220,38,38,.1); border:1px solid rgba(220,38,38,.4); color:var(--text); }
-.merge-limit.warn b { color:#f28b82; }
 /* 打造面板：右侧滑出抽屉 */
 .craft-drawer-host {
   position:fixed; inset:0; z-index:100; pointer-events:none; overflow:visible;

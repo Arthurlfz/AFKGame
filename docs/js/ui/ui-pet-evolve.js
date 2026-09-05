@@ -168,87 +168,9 @@
     if (el && E) el.innerHTML = `进化：消耗 <b>${E.materialName || '进化素材'} ×1</b>走一段进化树（等级不变、成长提升、名字变化），单宠最多进化 <b>${E.maxEvolveTimes || 10} 次</b>，吃满后需<b>融合(转生)</b>重置次数继续`;
   }
 
-  function openEvolvePanel(pet) {
-    const E = Config.pet.evolution || {};
-    const body = $('evolve-body');
-    const routes = Evolve.getEvolutionRoutes(pet);
-    const maxTimes = E.maxEvolveTimes || 10;
-    const times = pet.evolveTimes || 0;
-    const maxed = times >= maxTimes;
-    // 进化素材按已进化次数分档（1~3普通/4~6精粹/7~10传说），面板用 Evolve.getRouteMaterial 拿当前档素材
-    const rm = (routes.length && Evolve.getRouteMaterial(pet, 0)) || null;
-    const matName = (rm && rm.name) || E.materialName || '进化素材';
-    const have = rm ? rm.have : Materials.getQuantity(matName);
-    let html = `<div class="merge-main">${iconHtml(pet.name, true)} ${pet.name}（Lv.${pet.level} · 成长 ${pet.growth.toFixed(1)}）</div>`;
-    html += `<div class="merge-preview">进化次数 <b>${times}/${maxTimes}</b>；转生 <b>${pet.rebornCount || 0} 次</b>；消耗 <b>${matName} ×1</b>（持有 ${have}）</div>`;
-    if (maxed) {
-      html += `<div class="merge-preview"> 进化已达上限(${maxTimes}次)，需通过<b>融合(转生)</b>重置进化次数后才能继续</div>`;
-    } else if (!routes.length) {
-      html += `<div class="merge-preview">该形态无法再进化</div>`;
-    } else {
-      html += `<div class="merge-tip">选择进化方向（<b>等级不变</b>、每次成长+0.1~0.2、主要<b>更换形态</b>；成长大幅提升靠<b>融合</b>）</div>`;
-      html += '<div class="merge-cands">'+ routes.map((r, i) => {
-        const ok = pet.level >= (r.minLevel || 1);
-        const sub = r.keepForm ? '成长+（形态不变）': (r.minLevel ? '需 Lv.'+ r.minLevel : '可进化');
-        return `<button class="merge-cand evolve-route${ok ? '': 'disabled'}" data-i="${i}"${ok ? '': 'disabled'}>
-          ${iconHtml(r.to, true)} ${r.to}<br><small>${sub}</small></button>`;
-      }).join('') + '</div>';
-    }
-    body.innerHTML = html;
-    $('evolve-modal').style.display = 'flex';
-
-    body.querySelectorAll('.evolve-route').forEach(btn => {
-      btn.onclick = () => {
-        if (btn.disabled) return;
-        const i = Number(btn.dataset.i);
-        const route = routes[i];
-        const cur = getStats(pet);
-        const boost = window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]);
-        const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
-        const next = getStats({ ...pet, growth: nextGrowth }); // 等级不变，仅成长提升
-        const row = (label, a, b) => {
-          const cls = b > a ? 'delta-up': '';
-          const arrow = b > a ? '▲': '';
-          return `<div class="delta-row ${cls}"><span>${label}</span><span>${a} → ${b} ${arrow}</span></div>`;
-        };
-        const statHtml = row('生命', cur.hp, next.hp) + row('攻击', cur.atk, next.atk)
-          + row('防御', cur.def, next.def) + row('速度', cur.spd, next.spd);
-        const formText = route.keepForm
-          ? `形态不变，成长值提升`
-          : `进化后名字变为【${route.to}】`;
-        body.innerHTML = `
-          <div class="merge-main">${iconHtml(pet.name)} ${pet.name}（Lv.${pet.level} · 成长 ${pet.growth.toFixed(1)}）</div>
-          <div class="merge-preview">
-            <div>路线：<b>${iconHtml(route.to)} ${route.to}</b>（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
-            <div>消耗：<b>${matName} ×1</b>（当前持有 ${have}）</div>
-            <div class="hint">等级不变（Lv.${pet.level}）；${formText}；进化次数 ${times}→${times + 1}</div>
-            <div class="merge-stats">属性变化（等级不变）：</div>
-            ${statHtml}
-            <div style="margin-top:8px"><button class="btn-mini primary" id="evolve-ok">确认进化</button></div>
-          </div>`;
-        body.querySelector('#evolve-ok').onclick = async () => {
-          const origName = pet.name;
-          const origGrowth = pet.growth;
-          const res = await Evolve.evolve(pet.id, i);
-          if (res.error) { showToast('进化失败', res.error); return; }
-          const changed = res.keepForm ? '（形态不变）': '';
-          addLog(`进化成功！${origName} 成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${changed}，进化次数 ${res.pet.evolveTimes}/${maxTimes}`);
-          showToast('进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)} · 进化次数 ${res.pet.evolveTimes}/${maxTimes}</small>`);
-          if (UI.showDialog) UI.showDialog({ icon: '', speaker: '进化', text: `进化成功！<br>${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}` });
-          closeEvolvePanel();
-          UI.renderAll();
-        };
-      };
-    });
-  }
-  function closeEvolvePanel() {
-    $('evolve-modal').style.display = 'none';
-  }
 
 
   /* ---------- 对外 API ---------- */
   UI.renderEvolveTab = renderEvolveTab;
   UI.renderEvolveHint = renderEvolveHint;
-  UI.openEvolvePanel = openEvolvePanel;
-  UI.closeEvolvePanel = closeEvolvePanel;
 })();

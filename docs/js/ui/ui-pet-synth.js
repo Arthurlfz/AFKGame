@@ -131,79 +131,8 @@
     };
   }
 
-  function openSynthPanel(main) {
-    const S = Config.synthesize || {};
-    const body = $('merge-body');
-    if (Object.values(main.equipment || {}).some(Boolean)) {
-      body.innerHTML = `
-        <div class="merge-main">${iconHtml(main.name)} ${main.name}（Lv.${main.level} · 成长 ${main.growth.toFixed(1)}）</div>
-        <div class="merge-preview"> <b>${main.name} 穿着装备，不能合成。</b><br>请先卸下装备再合成。</div>`;
-      $('merge-modal').style.display = 'flex';
-      return;
-    }
-    const cands = Merge.getMergeCandidates(main.id, S);
-    const baseHtml = `
-      <div class="merge-main">主素材：${iconHtml(main.name)} ${main.name}（Lv.${main.level} · 成长 ${main.growth.toFixed(1)}）</div>
-      <div class="merge-tip">消耗 <b>${S.material && S.material.amount} 颗${S.material && S.material.name}</b>（持有 ${Materials.getQuantity(S.material && S.material.name)}）· 概率 <b>${Math.round((S.mutation && S.mutation.chance || 0) * 100)}%</b> 合成出全新「·异变」稀有宠</div>
-      <div class="merge-tip">选择副素材（两只素材宠都会消失，合成一只新宠）：</div>`;
-    let html = baseHtml;
-    if (!cands.length) {
-      html += `<div class="inv-empty">没有可用的副素材（需要另一只 ${S.minLevel} 级、不在出售、没穿装备的宠物）</div>`;
-    } else {
-      html += '<div class="merge-cands">'+ cands.map(c =>
-        `<button class="merge-cand" data-id="${c.id}">${iconHtml(c.name)} ${c.name}（成长 ${c.growth.toFixed(1)}）</button>`
-      ).join('') + '</div>';
-    }
-    body.innerHTML = html;
-    $('merge-modal').style.display = 'flex';
-
-    body.querySelectorAll('.merge-cand').forEach(btn => {
-      btn.onclick = () => {
-        const sub = getPets().find(p => p.id === Number(btn.dataset.id));
-        if (!sub) return;
-        // 预览两种结果：普通合成 vs 变异合成
-        const normalGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, false) : null;
-        const mutatedGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, true) : null;
-        const mutPct = Math.round((S.mutation && S.mutation.chance || 0) * 100);
-        body.innerHTML = baseHtml + `
-          <div class="merge-preview">
-            <div>合成结果：一只全新的 <b>${iconHtml(main.name)} ${main.name}${mutPct ? '（·异变）': ''}</b>，等级回 1</div>
-            <div>普通成长：<b>${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</b></div>
-            ${mutPct ? `<div class="merge-mutation"> 有 <b>${mutPct}%</b> 概率变异：新宠成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」后缀，更稀有</div>` : ''}
-            <div>两只素材宠（${main.name}、${sub.name}）都将消失，消耗 ${S.material.amount} 颗${S.material.name}</div>
-            <div style="margin-top:8px"><button class="btn-mini primary" id="merge-ok">确认合成</button></div>
-          </div>`;
-        const okBtn = body.querySelector('#merge-ok');
-        okBtn.onclick = async () => {
-          // 连点防护：合成要跑多次云端往返（getUser/扣材料/建档/删素材），期间按钮仍可点，
-          // 一次点击可能跑出两只新宠并扣两份材料 → 先禁用，跑完再放开
-          if (okBtn.disabled) return;
-          okBtn.disabled = true;
-          try {
-            const res = await Merge.synthesize(main.id, sub.id);
-            if (res.error) { showToast('合成失败', res.error); return; }
-            if (res.cloudWarn) showToast('云端建档失败', res.cloudWarn + '，请刷新页面重试');
-            if (res.mutated) {
-              addLog(`合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
-              showToast('合成变异成功！', `${iconHtml(res.baby.name)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)} · 全新稀有宠</small>`);
-              if (UI.showDialog) UI.showDialog({ icon: '', speaker: '合成', text: `合成变异成功！<br>${res.mainName}+${res.subName} → <b style="color:#c9a86a">【${res.baby.name}】</b><br>成长值 ${res.newGrowth.toFixed(1)}` });
-            } else {
-              addLog(`合成成功！${res.mainName}+${res.subName} 合成了新宠 ${res.baby.name}（成长 ${res.newGrowth.toFixed(1)}）`);
-              showToast('合成成功！', `${iconHtml(res.baby.name)} ${res.baby.name}｜成长值 ${res.newGrowth.toFixed(1)}`);
-            }
-            closeMergePanel();
-            if (res.baby && res.baby.id) { setActive(res.baby.id); }
-            UI.renderAll();
-          } finally {
-            okBtn.disabled = false;
-          }
-        };
-      };
-    });
-  }
 
 
   /* ---------- 对外 API ---------- */
   UI.renderSynthTab = renderSynthTab;
-  UI.openSynthPanel = openSynthPanel;
 })();
