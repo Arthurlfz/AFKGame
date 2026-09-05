@@ -61,7 +61,7 @@
     const { error } = await Supabase.updatePet(pet.cloudId, {
       level: pet.level, exp: Math.max(0, Math.round(pet.exp || 0))
     });
-    if (error) addLog('⚠️ 进度云端同步失败：' + (error.message || '未知错误'));
+    if (error) addLog('⚠️ 进度保存失败，请稍后重试');
   }
 
   /* ---------- 每场结算（由 battle.js 每场结束调用） ---------- */
@@ -89,7 +89,7 @@
           addLog(`✦ ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`);
         }
       }
-      showLoot(await rollReward(enemy, area)); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料
+      showLoot(await rollReward(enemy, area, { boss: false, enemyLevel: (enemy && enemy.level) || undefined })); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料；ilvl 挂钩实际怪等级
       // 任务进度上报：type=kill 的任务 +1（任务配了 area 的只算该图，没配的任意图都算；
       // petName 供宠物专属任务区分「哪只宠打的」——配了 petName 的任务只认对应宠）
       if (window.Quest && window.Quest.reportType) window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
@@ -152,7 +152,7 @@
         const user = await Supabase.getCurrentUser();
         if (user) {
           const { data: saved, error } = await Supabase.savePet(pet);
-          if (error) addLog('⚠️ 开局宠物云端建档失败：' + (error.message || '未知错误'));
+          if (error) addLog('⚠️ 宠物保存失败，请稍后重试');
           else if (saved && saved.id) {
             pet.cloudId = saved.id;
             await Supabase.updatePet(pet.cloudId, { is_active: true });
@@ -267,7 +267,7 @@
     if (window.Quest && window.Quest.loadCloudProgress) await window.Quest.loadCloudProgress();
     const { data, error } = await Supabase.loadPets();
     if (error) {
-      addLog('⚠️ 读取云端宠物失败：' + (error.message || '未知错误'));
+      addLog('⚠️ 宠物数据读取失败，请刷新重试');
       // 云端读取失败：为避免卡死，给一个进入游戏的机会（无宠物时走选宠）
       if (!getPets().length) showStarterPicker();
       return;
@@ -275,7 +275,6 @@
     if (data && data.length) {
       setCloudPets(data);
       const active = getActivePet();
-      if (active) addLog(`☁️ 已从云端读取 ${data.length} 只宠物，出战 ${active.name}`);
     } else {
       // 云端无宠物 = 新号：弹开局选宠（选完建档），不再走"本地残留宠物建档"逻辑
       showStarterPicker();
@@ -343,7 +342,7 @@
     const user = await Supabase.getCurrentUser();
     if (!user) return;
     const { data, error } = await Items.loadCloudItems();
-    if (error) { addLog('⚠️ 读取云端装备失败：' + (error.message || '未知错误')); return; }
+    if (error) { addLog('⚠️ 装备数据读取失败，请刷新重试'); return; }
     Items.setCloudItems(data || []);
     await restorePetEquipment(); // 背包就绪后，把各宠物身上的装备按 cloudId 挂回去
     renderAll();
@@ -377,7 +376,7 @@
     const user = await Supabase.getCurrentUser();
     if (!user) return;
     const { data, error } = await Materials.loadCloudMaterials();
-    if (error) { addLog('⚠️ 读取云端材料失败：' + (error.message || '未知错误')); return; }
+    if (error) { addLog('⚠️ 材料数据读取失败，请刷新重试'); return; }
     Materials.setCloudMaterials(data || []);
     renderAll();
   }
@@ -387,7 +386,7 @@
     const user = await Supabase.getCurrentUser();
     if (!user) return;
     const { error, eggMap } = await Supabase.loadEggCount();
-    if (error) { addLog('⚠️ 读取云端宠物蛋失败：' + (error.message || '未知错误')); return; }
+    if (error) { addLog('⚠️ 宠物蛋数据读取失败，请刷新重试'); return; }
     // 必须按品种整体恢复：只恢复总数的话，所有蛋会被摊成一个通用品种，
     // 刷新后品种（血狐/骨狼…）丢失，界面会显示成"宠物蛋蛋"。
     Drop.setEggs(eggMap || {});
@@ -539,6 +538,11 @@
         refreshStats();
         syncButton();
       };
+      // A refresh must reclaim an existing server session; otherwise the DB says
+      // active while the new page's in-memory bridge starts as inactive.
+      Promise.resolve(IdleBridge.resumeActive && IdleBridge.resumeActive()).catch(function (e) {
+        console.warn('[idle] resume failed', e);
+      });
     }
 
     const battleBtn = document.getElementById('btn-battle');
@@ -558,9 +562,9 @@
         }
         if (IdleBridge && IdleBridge.enabled) {
           // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
-          addLog('⏳ 正在连接挂机服务器…');
+          addLog('⏳ 正在开始挂机…');
           const r = await IdleBridge.start(area, getActivePet());
-          if (r && r.error) addLog('⚠️ 服务器托管未启用（' + r.error + '），请刷新重试，或在网址加 ?noidle=1 用本地挂机');
+          if (r && r.error) addLog('⚠️ 挂机启动失败，请刷新后重试');
         } else {
           startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
         }

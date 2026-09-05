@@ -226,6 +226,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .wm-marker--capital:hover .wm-marker-icon { transform: scale(1.1); box-shadow: 0 0 0 2px rgb(0 0 0 / .5), 0 0 18px rgb(var(--action-gold-rgb) / .7); }
 .wm-marker-name { display: block; margin: 6px auto 0; width: max-content; padding: 2px 8px; color: var(--accent-hi); background: rgb(12 17 18 / .86); border: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 2px; line-height: normal; }
 .wm-marker-lv { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: var(--danger); background: rgb(12 17 18 / .86); border: 1px solid rgb(var(--hp-hi-rgb) / .4); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: normal; }
+/* 首通标记（2026-09-05 地图系统 A 项）：已首通的图，红点转金色 + ✓ 徽标 */
+.wm-marker--cleared .wm-marker-dot { background: rgb(var(--action-gold-rgb)); border-color: #fff; box-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .8), inset 0 0 4px rgb(0 0 0 / .4); }
+.wm-marker-pass { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #1a1b1c; background: rgb(var(--action-gold-rgb)); border: 1px solid #fff; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; line-height: 1.4; }
+.wm-tip-pass { color: var(--text-dim); font-weight: 700; }
+.wm-tip-pass--done { color: rgb(var(--action-gold-rgb)); }
 .worldmap-tip { position: absolute; z-index: 5; min-width: 150px; max-width: 240px; padding: 10px 12px; background: rgb(24 32 33 / .96); border: 1px solid var(--line-hi); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel); pointer-events: none; text-align: left; }
 .worldmap-tip[hidden] { display: none; }
 .wm-tip-name { color: var(--accent-hi); font-weight: 700; margin-bottom: 4px; }

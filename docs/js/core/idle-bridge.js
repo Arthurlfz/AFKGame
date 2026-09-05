@@ -76,7 +76,8 @@
   }
 
   /* ---------- 确定性剧本：同种子预演下一段战斗 ---------- */
-  function hashSeed(parts) {
+  // Keep the seed construction byte-for-byte identical to settle-core.hashSeed(...parts).
+  function hashSeed(...parts) {
     let h = 2166136261;
     for (const p of parts) {
       const s = String(p || '');
@@ -108,7 +109,7 @@
       const c = Supabase.getClient();
       if (!c) return Promise.resolve(null);
       return c.from('idle_sessions')
-        .select('id,last_settled_at')
+        .select('id,last_settled_at,pet_id,area_id')
         .eq('status', 'active')
         .order('started_at', { ascending: false })
         .limit(1)
@@ -128,27 +129,30 @@
   async function buildNextScript(startHp, seconds) {
     const pet = Pet.getActivePet();
     if (!pet) { warn('剧本失败：无出战宠物'); return null; }
-    const s = await Supabase.getSession();
+    const [s, session, m] = await Promise.all([
+      Supabase.getSession(),
+      fetchMySession(),
+      loadSim()
+    ]);
     const uid = s && s.user && s.user.id;
     if (!uid) { warn('剧本失败：无登录态'); return null; }
-    const session = await fetchMySession();
     if (!session || !session.id || !session.last_settled_at) {
       warn('剧本失败：会话查询为空（last_settled_at 拿不到）');
       return null;
     }
     const area = window.Battle.getCurrentArea();
     if (!area) { warn('剧本失败：无挂机地图'); return null; }
-    const m = await loadSim();
     if (!m || !m.simulateSessionScript) { warn('剧本失败：模拟器加载失败'); return null; }
     try {
       const sc = m.simulateSessionScript({
         pet: pet,
         areaId: area.id,
         seconds: seconds || (SETTLE_MS / 1000),
-        seed: hashSeed([uid, session.id, session.last_settled_at]),
+        seed: hashSeed(uid, session.id, session.last_settled_at),
         config: window.Config,
         enemyList: (window.EnemyData && window.EnemyData.list) || [],
-        curHp: startHp
+        curHp: startHp,
+        fightOffset: totalFights // 跨段累计场数：Boss 每整百场出现一次（与服务器 settle 的 session.total_fights 同锚）
       });
       if (!sc || !sc.events || !sc.events.length) { warn('剧本失败：模拟产出 0 场'); return null; }
       return sc;
@@ -197,6 +201,29 @@
     return { ok: true };
   }
 
+  // Reconnect to a server-owned session after refresh/login. The server remains
+  // authoritative; this only restores the local display and triggers catch-up.
+  async function resumeActive() {
+    if (!ENABLED || active) return { ok: !!active };
+    const session = await fetchMySession();
+    if (!session || !session.id || !session.pet_id) return { ok: false, error: 'NO_ACTIVE_SESSION' };
+    const pet = Pet.getPets && Pet.getPets().find(function (p) { return p.cloudId === session.pet_id; });
+    if (!pet) return { ok: false, error: 'PET_NOT_FOUND' };
+    const B = window.Battle;
+    if (B && B.selectArea && session.area_id) B.selectArea(session.area_id);
+    const area = B && B.getCurrentArea ? B.getCurrentArea() : null;
+    if (!area || area.id !== session.area_id) return { ok: false, error: 'AREA_NOT_FOUND' };
+    petId = session.pet_id;
+    totalFights = 0;
+    shownFights = 0;
+    active = true;
+    if (window.UI) window.UI.updateStatus('fighting', 0);
+    startShow();
+    await settleNow();
+    schedule();
+    return { ok: true, resumed: true };
+  }
+
   function stop() {
     if (!active) return;
     active = false;
@@ -225,14 +252,14 @@
         if (window.UI) window.UI.updateStatus('stopped', totalFights);
         return r;
       }
-      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机结算失败（' + r.error + '），继续挂机中…');
+      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机暂时没有更新，正在继续运行…');
       return r;
     }
     applyResult(r);
     // 掉落/任务对账：服务器这次窗口打了 r.fights 场，演出只结算了 shownFights 场。
     // 差额（剧本时长估计偏差、切后台节流、剧本生成失败等）也要给玩家东西，
     // 否则「服务器算进了经验和场数，玩家却没看到掉落」= 掉在空气里。
-    compensateFights((r.fights || 0) - shownFights);
+    compensateFights((r.fights || 0) - shownFights, r.detail || []);
     shownFights = 0;   // 新剧本重新计数
     // 下一段剧本时长用这次窗口的真实秒数：服务器按真实时间记账，演出按同样长度演
     if (r.elapsedSec > 0) lastElapsedSec = r.elapsedSec;
@@ -253,6 +280,7 @@
       const sc = await buildNextScript(curHp, seconds);
       if (sc && sc.events && sc.events.length) {
         script = sc;
+        if (Number.isFinite(Number(sc.events[0].hpStart))) showHp = Number(sc.events[0].hpStart);
         scriptT0 = performance.now();
         scriptIdx = -1; // gaugeTick 取第一个事件
         nextScriptTryAt = 0;
@@ -271,23 +299,38 @@
    * 只补掉落与任务进度，**不补经验**——经验/等级由服务器写库（applyResult 已覆盖）。
    * 补发上限 20 场：切后台被节流很久回来时不会一口气刷几十条掉落把日志冲垮。
    */
-  function compensateFights(missing) {
+  function compensateFights(missing, detail) {
     const n = Math.max(0, Math.min(20, Number(missing) || 0));
     if (n <= 0) return;
     const area = window.Battle && window.Battle.getCurrentArea ? window.Battle.getCurrentArea() : null;
     const pet = Pet.getActivePet();
     for (let i = 0; i < n; i++) {
+      const row = Array.isArray(detail) ? detail[i] : null;
       if (window.Quest && window.Quest.reportType) {
         window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
+        if (row && row.boss) window.Quest.reportType('boss', 1, { areaId: area ? area.id : null });
       }
-      const foe = (window.Battle && window.Battle.pickScaledEnemy) ? window.Battle.pickScaledEnemy() : null;
-      if (area && foe && window.Drop && window.Drop.rollReward) {
-        window.Drop.rollReward(foe, area).then(function (r2) {
+      const foe = row && row.name
+        ? { name: row.name, level: Number(row.lv) || 1 }
+        : ((window.Battle && window.Battle.pickScaledEnemy) ? window.Battle.pickScaledEnemy() : null);
+      if (window.UI && window.UI.addLog && foe) {
+        const xpText = row && row.exp != null ? `：经验 +${row.exp}` : '';
+        window.UI.addLog(`⚔️ 击败 ${foe.name} Lv.${foe.level || 1}${xpText}`);
+      }
+      const serverReward = row && Object.prototype.hasOwnProperty.call(row, 'reward') ? row.reward : null;
+      if (serverReward) {
+        Promise.resolve().then(async function () {
+          if (serverReward.type === 'material' && serverReward.material && window.Materials && window.Materials.gain) {
+            if (window.Materials.gainLocal) window.Materials.gainLocal(serverReward.material, Number(serverReward.qty) || 1);
+          }
+          if (serverReward.type !== 'none' && window.UI && window.UI.showLoot) window.UI.showLoot(serverReward);
+        });
+      } else if (area && foe && window.Drop && window.Drop.rollReward) {
+        window.Drop.rollReward(foe, area, { boss: !!(row && row.boss), enemyLevel: Number((row && row.lv) || 1) || 1 }).then(function (r2) {
           if (r2 && window.UI && window.UI.showLoot) window.UI.showLoot(r2);
         });
       }
     }
-    if (window.UI && window.UI.addLog) window.UI.addLog(`⚡ 补发 ${n} 场未演出的掉落（服务器已结算）`);
     if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
   }
 
@@ -333,6 +376,8 @@
     const area = B && B.getCurrentArea();
     // 怪等级只能来自剧本（f.enemyLevel）：不传就会退回怪的静态 level，画面与真账错位
     const lv = (fightEvt && fightEvt.enemyLevel) || enemyData.level || 1;
+    // Align the displayed player HP with the authoritative script at each fight boundary.
+    if (fightEvt && Number.isFinite(Number(fightEvt.hpStart))) showHp = Number(fightEvt.hpStart);
     const scaled = (B && B.scaleEnemyOf) ? B.scaleEnemyOf(enemyData, lv) : Object.assign({}, enemyData);
     if (!scaled) return;
     scaled.raw = enemyData;   // 自检重挂用未缩放的原始数据（否则会被二次缩放）
@@ -403,6 +448,12 @@
     const hitAt = UI.animateAttack(side) || 320;
     const backMs = UI.attackRecoverMs ? (UI.attackRecoverMs(side) || 0) : 0;
     freezeUntil[side] = now + hitAt + backMs;
+    // Pause both visible gauges only until the hit lands. The attacker's own
+    // recovery remains frozen separately, so the other side does not inherit
+    // the extra recovery delay. This is presentation-only.
+    const freezeBothUntil = now + hitAt;
+    freezeUntil.pet = Math.max(freezeUntil.pet, freezeBothUntil);
+    freezeUntil.enemy = Math.max(freezeUntil.enemy, freezeBothUntil);
     setTimeout(function () {
       if (!active || waitingHeal) return;
       if (isPet && skillCd > 0) skillCd--;
@@ -503,6 +554,13 @@
 
     // 剧本时间到：本场结束（胜负 + 配额结算 + 场前判定）
     if (t >= f.t1) {
+      // RAF timing can skip the final interpolation frame; snap to the scripted result.
+      if (Number.isFinite(Number(f.hpLeft))) showHp = Number(f.hpLeft);
+      if (showEnemy && f.win) showEnemy.hp = 0;
+      if (f.win && showEnemy && UI.updateBars) {
+        // Render the terminal zero before removing the enemy from the scene.
+        UI.updateBars(Math.round(showHp), maxHp, 0, showEnemy.maxHp || 100);
+      }
       if (f.win) {
         settleKill(f);
         if (UI.animateVictory) UI.animateVictory();
@@ -511,6 +569,12 @@
       }
       showEnemy = null;
       scriptIdx++;
+      // Each simulated fight starts with fresh action gauges. Do not carry the
+      // previous enemy's nearly-full gauge into the next encounter.
+      gauge.pet = 0;
+      gauge.enemy = 0;
+      freezeUntil.pet = now;
+      freezeUntil.enemy = now;
       const stop2 = ((C.battle || {}).stopHpRatio) || 0.3;
       const needHeal = (!f.win || showHp <= maxHp * stop2);
       const ef = document.getElementById('enemy-fighter');
@@ -550,18 +614,52 @@
     const area = window.Battle.getCurrentArea();
     const pet = Pet.getActivePet();
     shownFights++; // 与服务器 r.fights 对账用（差额场次在 settle 时补发掉落）
+    // Update the visible experience bar immediately for this displayed kill.
+    // The next server settle overwrites it with the authoritative level/exp.
+    if (pet && Number(f.exp) > 0 && window.Pet && window.Pet.grantExp) {
+      window.Pet.grantExp(pet, Number(f.exp));
+    }
     if (window.Quest && window.Quest.reportType) {
       window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
+    }
+    if (area && window.Quest && window.Quest.getReadyLoop) {
+      const ready = window.Quest.getReadyLoop(area.id);
+      if (ready && !settleKill._loopNotice) settleKill._loopNotice = {};
+      const noticeKey = 'loop_' + area.id;
+      if (ready && !settleKill._loopNotice[noticeKey]) {
+        settleKill._loopNotice[noticeKey] = true;
+        if (window.UI && window.UI.consoleLog) window.UI.consoleLog('system', `<b>📜 地图委托完成</b> ${ready.name} 已收集 ${ready.need} 个材料`, { action: 'openQuest' });
+        if (window.UI && window.UI.addLog) window.UI.addLog(`📜 ${ready.name} 已完成，可领取奖励`);
+      }
+      if (!ready && settleKill._loopNotice) settleKill._loopNotice['loop_' + area.id] = false;
+    }
+    // 守关 Boss：上报 boss 类型任务（首通判定：击杀数 ≥1 且未完成 → 任务完成可领一次性奖励）
+    if (f.isBoss && f.win && window.Quest && window.Quest.reportType) {
+      window.Quest.reportType('boss', 1, { areaId: area ? area.id : null });
     }
     if (window.UI && window.UI.addLog) {
       window.UI.addLog(`⚔ 击败 ${f.enemyName} Lv.${f.enemyLevel}：经验 +${f.exp}`);
     }
-    const foe = Object.assign({}, f.enemy, { level: f.enemyLevel });
-    if (area && window.Drop && window.Drop.rollReward) {
-      window.Drop.rollReward(foe, area).then(function (r) {
-        if (r && window.UI && window.UI.showLoot) window.UI.showLoot(r);
+    // 新战报的 reward 已由服务器决定；页面只负责入包和展示。
+    // 兼容旧版战报（没有 reward 字段）时才走旧掉落逻辑。
+    const serverReward = f && Object.prototype.hasOwnProperty.call(f, 'reward') ? f.reward : null;
+    if (serverReward) {
+      Promise.resolve().then(async function () {
+        let shown = serverReward;
+        if (serverReward.type === 'material' && serverReward.material && window.Materials && window.Materials.gain) {
+          if (window.Materials.gainLocal) window.Materials.gainLocal(serverReward.material, Number(serverReward.qty) || 1);
+        }
+        if (shown && shown.type !== 'none' && window.UI && window.UI.showLoot) window.UI.showLoot(shown);
         if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
       });
+    } else {
+      const foe = Object.assign({}, f.enemy, { level: f.enemyLevel });
+      if (area && window.Drop && window.Drop.rollReward) {
+        window.Drop.rollReward(foe, area, { boss: !!f.isBoss, enemyLevel: Number(f.enemyLevel) || 1 }).then(function (r) {
+          if (r && window.UI && window.UI.showLoot) window.UI.showLoot(r);
+          if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
+        });
+      }
     }
   }
 
@@ -616,7 +714,7 @@
   }
 
   window.IdleBridge = {
-    start, stop, settleNow,
+    start, resumeActive, stop, settleNow,
     isActive: function () { return active; },
     enabled: ENABLED,
     getTotalFights: function () { return totalFights; },

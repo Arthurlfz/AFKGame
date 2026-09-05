@@ -56,16 +56,24 @@
   // 底材 T 阶随机：直接读 config.equipment.materialTierWeights（每图一套显式权重）。
   // 以前是这里线性插值算权重（图6 → T1 占 33%，顶级底材太常见）；
   // 改配置表后策划能一眼调，且 T1 在图6 也只有 20%。
-  function rollMaterialTier(areaTier) {
+  function rollMaterialTier(areaTier, ilvl) {
     const table = (Config.equipment.materialTierWeights || {})[areaTier] || { 5: 50, 4: 30, 3: 15, 2: 4, 1: 1 };
     const entries = Object.entries(table);
     const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
     let r = Math.random() * total;
+    let picked = 5;
     for (const [t, v] of entries) {
       r -= (Number(v) || 0);
-      if (r < 0) return Number(t);
+      if (r < 0) { picked = Number(t); break; }
     }
-    return 5;
+    // 底材 ilvl 门槛（与词缀共用 affixIlvlGates：T1≥55/T2≥40/T3≥25）：低于门槛抽到高档底材 → 降到允许最高 T。
+    // 挂钩「实际击杀怪等级」：低图普通怪出不了顶级底材，越级杀高等级怪有奖励。
+    const lv = ilvl == null ? 100 : Number(ilvl);
+    const gates = (Config.equipment.affixIlvlGates) || {};
+    let best = 5;
+    for (const [t, g] of Object.entries(gates)) { if (lv >= Number(g) && Number(t) < best) best = Number(t); }
+    if (picked < best) picked = best;
+    return picked;
   }
 
   // 宠物蛋按品种计数：{ '血狐': 2, '骨狼': 1 }（已登录以云端 pet_egg 为准，本地同步）
@@ -143,6 +151,34 @@
     const activePet = window.Pet.getActivePet();
     const res = (activePet && getEquipBonuses(activePet).resources) || { dropQty: 1, dropRare: 1, matDrop: 1 };
 
+    // 守关 Boss 掉落（2026-09-05 地图系统）：必掉金装 + 本图区域材料×5，不参与单池概率。
+    // ilvl = 实际 Boss 等级（图段上限）→ 底材/词缀门槛自然吃满，低图 Boss 也出不了顶级底材。
+    if (opts && opts.boss) {
+      const areaList = Config.battle.areas || [];
+      const areaIdx = area && area.id ? areaList.findIndex(a => a.id === area.id) : -1;
+      const maxTier = (Config.equipment.baseTierMultipliers || []).length || 17;
+      const areaTier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
+      const ilvl = (opts && opts.enemyLevel) || (area && area.levelRange && area.levelRange[1]) || 1;
+      const gold = Config.equipment.rarities.find(x => x.id === 'gold') || Config.equipment.rarities[0];
+      const matTier = rollMaterialTier(areaTier, ilvl);
+      const eq = generateEquipment(gold, areaTier, matTier, ilvl);
+      eq.identified = false;
+      const am = (D.areaMaterials && D.areaMaterials[area && area.id]) || null;
+      let mat = null;
+      if (am && am.name) {
+        mat = { material: am.name, qty: 5 };
+        if (!dry) await Materials.gain(am.name, 5); // dry 只抽样，不落库
+      }
+      if (!dry) {
+        addToInventory(eq);
+        totalEquipDrops++;
+        if (window.Quest && window.Quest.reportType) window.Quest.reportType('equipDrop', 1);
+        const { error } = await Items.saveItem(eq);
+        return { type: 'boss', eq, material: mat, saveError: error || null };
+      }
+      return { type: 'boss', eq, material: mat, dry: true };
+    }
+
     // 单池一次抽取：总权重归一化；"材料率"词缀拉高 material 档权重；
     // "掉落数量"词缀（2026-09-04 改法）拉高 material/equipment 档权重（+8% → 权重×1.08），
     // 语义 = "更容易掉东西"而不是"一次掉两个"，还原词缀本意且不抬通胀。
@@ -167,8 +203,10 @@
         const upR = rarity.id === 'white' ? 'blue' : (rarity.id === 'blue' ? 'gold' : null);
         if (upR) rarity = Config.equipment.rarities.find(x => x.id === upR) || rarity;
       }
-      const matTier = rollMaterialTier(areaTier);
-      const eq = generateEquipment(rarity, areaTier, matTier, (area && area.levelRange && area.levelRange[0]) || 1);
+      // ilvl 挂钩「实际击杀怪等级」（2026-09-05 拍板：与怪物等级挂钩，不再按图档下限）
+      const ilvl = (opts && opts.enemyLevel) || (area && area.levelRange && area.levelRange[0]) || 1;
+      const matTier = rollMaterialTier(areaTier, ilvl);
+      const eq = generateEquipment(rarity, areaTier, matTier, ilvl);
       eq.identified = false;          // 掉落即未鉴定，背包里灰框，鉴定后揭晓
       if (!dry) {
         addToInventory(eq);

@@ -40,9 +40,32 @@
       }).join('');
       distHtml = `<div class="wm-tip-sub">材料掉落分布</div>${rows}`;
     }
+    // 守关 Boss（2026-09-05 地图系统）：该图怪池 level 最高怪，挂机每累计 100 场出现
+    const enemyList = (window.EnemyData && window.EnemyData.list) || [];
+    const bossEnemy = (a && a.enemyIds ? enemyList.filter(e => (a.enemyIds || []).indexOf(e.id) >= 0) : [])
+      .sort((x, y) => (y.level || 0) - (x.level || 0))[0];
+    const bossName = bossEnemy ? '霸主·' + bossEnemy.name : '霸主·？？？';
+    // 首通状态：该图 Boss 首通任务已完成（Quest.completed 云端同步）
+    const cleared = !!(window.Quest && window.Quest.isAreaCleared && window.Quest.isAreaCleared(point.areaId));
+    const firstPass = cleared
+      ? '<span class="wm-tip-pass wm-tip-pass--done">✓ 已首通</span>'
+      : '<span class="wm-tip-pass">未首通</span>';
+    // 地图委托：把“这张图现在值得刷什么”直接放进信息卡
+    const loopQuest = window.Quest && window.Quest.getQuests
+      ? window.Quest.getQuests().find(q => q.type === 'collect_loop' && q.area === point.areaId)
+      : null;
+    const loopHtml = loopQuest
+      ? `<div class="wm-tip-sub">地图委托</div>`
+        + `<div class="wm-tip-line">${UI.escapeHtml ? UI.escapeHtml(loopQuest.name) : loopQuest.name}：${loopQuest.progress}/${loopQuest.need}</div>`
+        + `<div class="wm-drop-bar wm-drop-bar--quest"><span class="wm-drop-fill" style="width:${loopQuest.need ? Math.min(100, Math.round(loopQuest.progress / loopQuest.need * 100)) : 0}%"></span></div>`
+        + `<div class="wm-tip-line">完成奖励：${Object.entries(loopQuest.reward || {}).map(([n, v]) => `${UI.escapeHtml ? UI.escapeHtml(n) : n} ×${v}`).join('、')}${loopQuest.expReward ? `、经验 +${loopQuest.expReward}` : ''}</div>`
+      : '';
     return `
       <div class="wm-tip-name">${UI.escapeHtml ? UI.escapeHtml(point.name) : point.name}</div>
       <div class="wm-tip-line">建议等级：${UI.escapeHtml ? UI.escapeHtml(String(lv)) : lv}</div>
+      <div class="wm-tip-line">守关 Boss：${UI.escapeHtml ? UI.escapeHtml(bossName) : bossName}（每 100 场）</div>
+      <div class="wm-tip-line">首通：${firstPass}</div>
+      ${loopHtml}
       ${distHtml}
       <div class="wm-tip-line">金装概率：约 ${gold}</div>
       <div class="wm-tip-cta">点击进入挂机</div>`;
@@ -195,6 +218,18 @@
       }
       rendered = true;
     }
+    // 首通状态变化后同步标记（canvas 不重建，只更新 class 与 ✓ 徽标）
+    if (window.Quest && window.Quest.isAreaCleared) {
+      const markers = canvas.querySelectorAll('.wm-marker');
+      for (let i = 0; i < markers.length; i++) {
+        const m = markers[i];
+        if (!m || !m.dataset || !m.dataset.areaId) continue;
+        const done = window.Quest.isAreaCleared(m.dataset.areaId);
+        m.classList.toggle('wm-marker--cleared', !!done);
+        const pass = m.querySelector('.wm-marker-pass');
+        if (pass) pass.textContent = done ? '✓' : '';
+      }
+    }
   }
   // 取野图怪物等级段（来自对应 area 的 levelRange，纯展示）
   function markerLevelText(point) {
@@ -214,13 +249,19 @@
     el.style.top = point.y + '%';
     el.setAttribute('aria-label', point.name);
     el.title = point.name;
+    if (point.areaId) el.dataset.areaId = point.areaId;
     const nameHTML = '<span class="wm-marker-name">' + (UI.escapeHtml ? UI.escapeHtml(point.name) : point.name) + '</span>';
     // 野图在名字下方显示怪物等级段
     const lv = markerLevelText(point);
     const lvHTML = lv ? '<span class="wm-marker-lv">' + lv + '</span>' : '';
+    // 首通标记（2026-09-05）：金色 ✓ 徽标，随 Quest.isAreaCleared 状态
+    const cleared = point.type !== 'capital' && !!(window.Quest && window.Quest.isAreaCleared && window.Quest.isAreaCleared(point.areaId));
+    if (cleared) el.classList.add('wm-marker--cleared');
+    const passHTML = point.type !== 'capital'
+      ? '<span class="wm-marker-pass">' + (cleared ? '✓' : '') + '</span>' : '';
     el.innerHTML = point.type === 'capital'
       ? '<span class="wm-marker-icon">' + (point.icon || '🏯') + '</span>' + nameHTML
-      : '<span class="wm-marker-dot"></span>' + nameHTML + lvHTML;
+      : '<span class="wm-marker-dot"></span>' + nameHTML + lvHTML + passHTML;
     return el;
   }
 

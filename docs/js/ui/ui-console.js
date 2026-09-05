@@ -153,7 +153,7 @@
     return '<div class="chat-msg ' + m.cat + '">' +
       '<span class="chat-time">' + m.time + '</span>' +
       '<span class="chat-ic">' + (m.cat === 'loot' ? '✦' : '⚙️') + '</span>' +
-      '<span class="chat-text">' + m.html + '</span></div>';
+      '<span class="chat-text">' + m.html + (m.action === 'openQuest' ? ' <button class="chat-action" data-chat-action="openQuest">去领取</button>' : '') + '</span></div>';
   }
 
   /* 渲染单个容器的频道 tab（点谁切谁，切后刷新所有容器） */
@@ -175,6 +175,9 @@
     if (!listEl) return;
     const rows = history.filter(m => m.cat === activeTab);
     listEl.innerHTML = rows.length ? rows.map(chatMsgHtml).join('') : '<div class="chat-empty">该频道暂无消息</div>';
+    listEl.querySelectorAll('[data-chat-action]').forEach(btn => {
+      btn.onclick = () => { if (btn.dataset.chatAction === 'openQuest' && UI.openQuestPanel) UI.openQuestPanel(); };
+    });
     listEl.scrollTop = listEl.scrollHeight;
   }
 

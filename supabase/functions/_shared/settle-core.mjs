@@ -96,6 +96,29 @@ function grantExp(expIn, levelIn, totalExp, config) {
   return { exp: expLeft, level, leveled, crystal };
 }
 
+// Server-authoritative material reward.  Keep this deliberately small and
+// deterministic: the same settle cursor always produces the same drops.
+const AREA_MATERIALS = {
+  'corrupted-forest': '枯荣种荚', 'plague-swamp': '泣腐之泪',
+  'shadow-mountains': '白骨残片', 'bone-wastes': '幽影魂丝',
+  'blood-rift': '血潮凝晶', 'echo-cliffs': '回响之羽',
+  'rotfen-bog': '腐沼黏液', 'ember-hollow': '余烬残灰',
+  'soul-abyss': '魂渊之尘', 'blight-heart': '腐变之心',
+  'rift-fissure': '裂隙碎片', 'black-blood-moor': '黑血凝块',
+  'bone-abyss': '深渊骸片', 'plague-heart': '疫潮胞核',
+  'soul-nest': '噬魂丝茧', 'annihilation-hall': '湮灭残响',
+  'blight-origin': '本源腐核'
+};
+
+function rewardForFight(fight, areaId, seed, index) {
+  if (!fight || !fight.win) return { type: 'none' };
+  const material = AREA_MATERIALS[areaId];
+  if (!material) return { type: 'none' };
+  if (fight.isBoss) return { type: 'material', material, qty: 5, boss: true };
+  const roll = (hashSeed(seed, areaId, index) % 10000) / 10000;
+  return roll < 0.18 ? { type: 'material', material, qty: 1 } : { type: 'none' };
+}
+
 // 完整结算计划（纯计算）：输入会话/宠物/装备/时长 → 输出模拟结果 + 落库 patch
 function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyList }) {
   const byId = new Map((equipItems || []).map(it => [String(it.id), it]));
@@ -107,10 +130,15 @@ function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyL
     seed,
     config,
     enemyList,
-    curHp: pet.curHp
+    curHp: pet.curHp,
+    fightOffset: session.total_fights || 0 // 跨段累计：Boss 每整百场出现一次
   });
   const g = grantExp(pet.exp, pet.level, result.totalExp, config);
-  const detail = result.fights.slice(-50).map(f => ({ win: f.win, lv: f.enemyLevel, name: f.enemyName, exp: f.exp, hp: f.hpLeft }));
+  const offset = Math.max(0, result.fights.length - 50);
+  const detail = result.fights.slice(-50).map((f, i) => ({
+    win: f.win, lv: f.enemyLevel, name: f.enemyName, exp: f.exp, hp: f.hpLeft,
+    boss: !!f.isBoss, reward: rewardForFight(f, session.area_id, seed, offset + i)
+  }));
   return {
     result, // simulateSession 完整输出
     exp: g,
@@ -145,4 +173,4 @@ function hashSeed(...parts) {
   return h >>> 0;
 }
 
-export { petFromRow, itemRowToEquip, grantExp, settlePlan, hashSeed, resolveLineId, num };
+export { petFromRow, itemRowToEquip, grantExp, settlePlan, hashSeed, resolveLineId, num, rewardForFight };

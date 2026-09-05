@@ -38,6 +38,16 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+/* ---------- 守关 Boss（2026-09-05 地图系统） ----------
+ * 每累计 100 场出现 1 次（跨结算段累计：fightOffset = 本段开始前的会话总场数）。
+ * Boss = 该图怪池 level 最高的怪，等级=图段上限，血×5、攻×1.5，名字前缀「霸主·」。
+ * 是模拟逻辑不是新数据 → 服务器无需新增 enemy 数据，config-server 零改动。 */
+const BOSS_INTERVAL = 100;
+function pickBossEnemy(pool) {
+  let best = pool[0];
+  for (const e of pool) { if ((e.level || 0) > (best.level || 0)) best = e; }
+  return best;
+}
 
 /* ============================================================
  * 属性计算（从 pet.js 移植：baseStats / statParts / getEquipBonuses /
@@ -273,7 +283,9 @@ function simulateFight(input) {
   const lv = Number(pet.level) || 1;
   const range = (area && area.levelRange) || [1, 6];
   const lo = Math.min(range[0], range[1]), hi = Math.max(range[0], range[1]);
-  const enemyLevel = Math.min(hi, Math.max(lo, Math.max(1, lv)));
+  // 守关 Boss（2026-09-05）：等级=图段上限（不受宠物等级钳制），血×5、攻×1.5
+  const isBoss = !!(enemyData && enemyData.isBoss);
+  const enemyLevel = isBoss ? hi : Math.min(hi, Math.max(lo, Math.max(1, lv)));
   const enemy = { ...enemyData, level: enemyLevel };
   // 怪数值 = 图中点基准 × clamp(怪等级/图中点) × typeMult × diff（battle.js scaleEnemyStats）
   const diff = (area && area.difficulty) || 1.0;
@@ -283,11 +295,11 @@ function simulateFight(input) {
   const mid = (arLo + arHi) / 2;
   const clampCfg = B.levelScaleClamp || [0.25, 1.6];
   const ratio = Math.max(clampCfg[0], Math.min(clampCfg[1], (enemy.level || 1) / mid));
-  const hp = Math.round(base.hp * ratio * tm * diff);
+  const hp = Math.round(base.hp * ratio * tm * diff * (isBoss ? 5 : 1));
   const def = Math.round(base.def * ratio * tm * diff);
-  const atk = Math.round(base.atk * ratio * tm * diff);
+  const atk = Math.round(base.atk * ratio * tm * diff * (isBoss ? 1.5 : 1));
   const E = {
-    name: enemy.name, icon: enemy.icon, level: enemyLevel,
+    name: (isBoss ? '霸主·' : '') + enemy.name, icon: enemy.icon, level: enemyLevel,
     hp, maxHp: hp, atk, def,
     spd: enemy.spd, // 与前端一致：enemy-data 必配 spd；缺省则 NaN（前端同样行为）
     critRate: enemy.critRate != null ? enemy.critRate : B.critRate,
@@ -429,7 +441,7 @@ function simulateFight(input) {
     win,
     petHpLeft: Math.max(0, Math.round(P.hp)),
     enemyHpLeft: Math.round(E.hp), // 怪血保留打穿后的负值（与前端 endFight 后 state.enemy.hp 一致）
-    petMaxHp: P.maxHp, enemyLevel: E.level, enemyName: E.name, enemyType: enemy.enemyType,
+    petMaxHp: P.maxHp, enemyLevel: E.level, enemyName: E.name, enemyType: enemy.enemyType, isBoss,
     durationMs: t, // 战斗耗时（前端 tick 每 100ms 一步，到 endFight 为止）
     events, killBuffActive, corruptionStacks
   };
@@ -455,7 +467,7 @@ function expFromBattle(enemyLevel, area, config, rnd) {
  * 输入：{ pet, areaId, seconds, seed, config, enemyList, curHp }
  * ============================================================ */
 function simulateSession(input) {
-  const { pet, areaId, seconds, seed, config, enemyList, curHp } = input;
+  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset } = input;
   const rnd = mulberry32(seed || 1);
   const B = config.battle;
   const area = (B.areas || []).find(a => a.id === areaId);
@@ -507,7 +519,10 @@ function simulateSession(input) {
     }
     // 满血且不在 recover：打一场
     if (!pool.length) break;
-    const picked = pickWeighted(pool, x => x.weight || 1, rnd);
+    // 守关 Boss：跨段累计场数（fightOffset + 本段场数）到整百出 Boss
+    const fightNo = totalFights + (Number(fightOffset) || 0);
+    const isBossTurn = (fightNo + 1) % BOSS_INTERVAL === 0;
+    const picked = isBossTurn ? { ...pickBossEnemy(pool), isBoss: true } : pickWeighted(pool, x => x.weight || 1, rnd);
     const fight = simulateFight({
       pet, stats, area, enemyData: picked, config, rnd,
       curHp: hp, pendingKillBuff
@@ -517,7 +532,7 @@ function simulateSession(input) {
     totalFights++;
     const xp = fight.win ? expFromBattle(fight.enemyLevel, area, config, rnd) : 0;
     if (fight.win) totalExp += xp;
-    fights.push({ win: fight.win, enemyLevel: fight.enemyLevel, enemyName: fight.enemyName, exp: xp, hpLeft: hp });
+    fights.push({ win: fight.win, enemyLevel: fight.enemyLevel, enemyName: fight.enemyName, exp: xp, hpLeft: hp, isBoss: !!fight.isBoss });
     // 扣除战斗耗时（前端 tick 每 100ms 一步推进到 endFight，真实挂机同样消耗这些时间）
     msLeft -= fight.durationMs;
     // 战败 → 等待回血；血量低 → 等待回血；健康 → 场间隔（nextFightDelay）
@@ -547,7 +562,7 @@ function simulateSession(input) {
  * ⚠️ 本函数只存在于前端副本；改 simulateSession 循环结构时必须同步这里。
  * ============================================================ */
 function simulateSessionScript(input) {
-  const { pet, areaId, seconds, seed, config, enemyList, curHp } = input;
+  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset } = input;
   const rnd = mulberry32(seed || 1);
   const B = config.battle;
   const area = (B.areas || []).find(a => a.id === areaId);
@@ -585,7 +600,9 @@ function simulateSessionScript(input) {
       continue;
     }
     if (!pool.length) break;
-    const picked = pickWeighted(pool, x => x.weight || 1, rnd);
+    const fightNo = events.length + (Number(fightOffset) || 0);
+    const isBossTurn = (fightNo + 1) % BOSS_INTERVAL === 0;
+    const picked = isBossTurn ? { ...pickBossEnemy(pool), isBoss: true } : pickWeighted(pool, x => x.weight || 1, rnd);
     const hpStart = hp, t0 = tMs;
     const fight = simulateFight({ pet, stats, area, enemyData: picked, config, rnd, curHp: hp, pendingKillBuff });
     hp = fight.petHpLeft;
@@ -594,7 +611,7 @@ function simulateSessionScript(input) {
     events.push({
       type: 'fight', t0, t1: tMs + fight.durationMs,
       win: fight.win, enemy: picked, enemyLevel: fight.enemyLevel, enemyName: fight.enemyName,
-      exp: xp, hpStart, hpLeft: hp, durationMs: fight.durationMs
+      exp: xp, hpStart, hpLeft: hp, durationMs: fight.durationMs, isBoss: !!fight.isBoss
     });
     tMs += fight.durationMs; msLeft -= fight.durationMs;
     const stopRatio = B.stopHpRatio || 0.3;

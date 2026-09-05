@@ -142,6 +142,7 @@
   function isUnlocked(q) {
     // 新手链：前置任务完成才解锁（第一条无前置）
     if (q.category === 'tutorial') return q.requires ? !!completed[q.requires] : true;
+    if (q.type === 'collect_loop') return isAreaCleared(q.area);
     const active = window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null;
     const lv = active ? active.level : 0;
     return lv >= (q.unlockLevel || 1);
@@ -154,7 +155,7 @@
       const p = (window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null);
       return p ? Math.max(1, Number(p.level) || 1) : 0;
     }
-    if (q.type === 'collect') return Materials.getQuantity(q.matName);
+    if (q.type === 'collect' || q.type === 'collect_loop') return Materials.getQuantity(q.matName);
     // 宠物养成链的「孵化」任务：玩家已经拥有该宠（含开局选择）→ 视为 1/1 已完成，
     // 否则开局选的那只宠的孵化任务永远做不了（开局选择不算 hatch）。
     if (q.type === 'hatch' && q.petName) {
@@ -167,6 +168,7 @@
 
   // 一次性任务看 completed，日常看当天是否交过
   function isFinished(q) {
+    if (q.repeatable) return false;
     return q.repeat ? !!dailyDone[q.id] : !!completed[q.id];
   }
 
@@ -178,12 +180,21 @@
         id: q.id, category: q.category || 'main', type: q.type || 'collect',
         area: q.area, matName: q.matName, petName: q.petName, name: q.name, need: q.need,
         reward: q.reward, rewardGear: q.rewardGear || null, unlockLevel: q.unlockLevel, requires: q.requires,
-        repeat: !!q.repeat, guide: q.guide,
+        repeat: !!q.repeat, repeatable: !!q.repeatable, expReward: q.expReward, guide: q.guide,
         have, progress: Math.min(have, q.need), done: have >= q.need,
         unlocked: isUnlocked(q), finished: isFinished(q),
         accepted: q.category === 'tutorial' || accepted.has(q.id)
       };
     });
+  }
+
+  function getReadyLoop(areaId) {
+    const q = (Config.drop.quests || []).find(x => x.type === 'collect_loop' && x.area === areaId);
+    if (!q || !isUnlocked(q)) return null;
+    return currentProgress(q) >= q.need ? {
+      id: q.id, name: q.name, area: q.area, material: q.matName,
+      need: q.need, reward: q.reward, expReward: q.expReward || 0
+    } : null;
   }
 
   // 引导条用：新手链里第一条「已解锁但未交」的任务（线性，走完返回 null）
@@ -232,7 +243,7 @@
     let changed = false;
     for (const q of (Config.drop.quests || [])) {
       if (q.type !== type || completed[q.id]) continue;
-      if (type === 'kill' && q.area && ctx.areaId && q.area !== ctx.areaId) continue;
+      if ((type === 'kill' || type === 'boss') && q.area && ctx.areaId && q.area !== ctx.areaId) continue;
       if (q.petName && ctx.petName !== q.petName) continue;
       progress[q.id] = (progress[q.id] || 0) + (amount || 1);
       changed = true;
@@ -282,8 +293,13 @@
    *   - 扣材料失败：一份奖励都还没发出去，回滚成未完成让玩家重来 —— 安全。
    *   - 发奖失败：绝不回滚。回滚等于撤销「已交」，玩家能再点一次再领一份；
    *     宁可让玩家少拿一次，也不能让奖励可重复领（经济能刷就废了）。 */
-  function markFinished(q) { if (q.repeat) dailyDone[q.id] = true; else completed[q.id] = true; }
-  function unmarkFinished(q) { if (q.repeat) delete dailyDone[q.id]; else delete completed[q.id]; }
+  // 2026-09-05 地图系统：某图是否已首通 = 该图 Boss 首通任务已完成（completed 云端同步，天然持久化）
+  function isAreaCleared(areaId) {
+    const q = (Config.drop.quests || []).find(x => x.type === 'boss' && x.area === areaId);
+    return !!q && isFinished(q);
+  }
+  function markFinished(q) { if (q.repeatable) return; if (q.repeat) dailyDone[q.id] = true; else completed[q.id] = true; }
+  function unmarkFinished(q) { if (q.repeatable) return; if (q.repeat) delete dailyDone[q.id]; else delete completed[q.id]; }
 
   /* ---------- 任务经验奖励（2026-08-31 用户拍板「固定值 · 大方档」：经验是奖励主体，材料是辅助） ----------
    * 完成一次任务 = 给当前出战宠物【固定】经验（与等级无关）：
@@ -293,6 +309,7 @@
    */
   const QUEST_EXP_FIXED = { tutorial: 300, main: 1000, daily: 100, achieve: 3000, pet: 600 };
   function questExpOf(q) {
+    if (q && q.expReward != null) return Number(q.expReward) || 0;
     return QUEST_EXP_FIXED[q && q.category] || 0;
   }
 
@@ -313,7 +330,7 @@
     markFinished(q);
     try {
       // 收集类先扣材料：扣失败说明没货，此时奖励一份未发，回滚是安全的
-      if (q.type === 'collect') {
+      if (q.type === 'collect' || q.type === 'collect_loop') {
         const spent = await Materials.spend(q.matName, q.need);
         if (!spent.ok) {
           unmarkFinished(q);
@@ -329,7 +346,7 @@
       })() : null;
       // 成就要保留累计战绩，其余类型交完清零（成就已 completed，不再显示，清零无影响）
       if (q.category !== 'achieve') progress[q.id] = 0;
-      accepted.delete(id);
+      if (!q.repeatable) accepted.delete(id);
       // 装备奖励：背包里没有装备时，下一条「穿装备」任务无从下手（见 grantGear 注释）
       const gearTask = q.rewardGear ? grantGear(q.rewardGear) : null;
       // 状态到这儿已经全部落定，发奖和落盘互不依赖，并行跑：
@@ -427,10 +444,10 @@
 
   /* ---------- 对外 API ---------- */
   window.Quest = {
-    getQuests, getGuideQuest, acceptQuest, completeQuest,
+    getQuests, getReadyLoop, getGuideQuest, acceptQuest, completeQuest,
     reportType, skipGuide, abandonQuest, toggleTrack, getTracked, loadCloudProgress, reset,
     getExtra, setExtra, resetGuideChain,
-    isFinished, isUnlocked,
+    isFinished, isUnlocked, isAreaCleared,
     questExpOf, QUEST_EXP_FIXED
   };
 })();

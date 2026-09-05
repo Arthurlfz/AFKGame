@@ -16,7 +16,7 @@
 
   // 任务类型标签（13 种）
   const TYPE_LABEL = {
-    collect: '收集', kill: '击败', evolve: '进化', nirvana: '涅槃',
+    collect: '收集', collect_loop: '地图委托', kill: '击败', evolve: '进化', nirvana: '涅槃',
     synth: '合成', soulcast: '魂铸', hatch: '孵化', craft: '打造', salvage: '分解',
     equipDrop: '获得装备', equip: '穿装备', list: '上架', trade: '成交'
   };
@@ -47,6 +47,7 @@
     const pn = q.petName;
     switch (q.type) {
       case 'collect': return `收集「${q.matName}」×${q.need}`;
+      case 'collect_loop': return `在「${areaName(q.area)}」收集「${q.matName}」×${q.need}，交完继续下一轮`;
       case 'kill': return pn ? `带「${pn}」击败 ${q.need} 只` : (q.area ? `在「${areaName(q.area)}」击败 ${q.need} 只` : `击败 ${q.need} 只`);
       case 'evolve': return pn ? `「${pn}」进化 ${q.need} 次` : `进化 ${q.need} 次`;
       case 'nirvana': return `涅槃 ${q.need} 次`;

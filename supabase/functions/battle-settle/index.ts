@@ -18,6 +18,16 @@ import serverConfig from '../_shared/config-server.mjs';
 import enemyList from '../_shared/enemy-data-server.mjs';
 import { settlePlan, hashSeed } from '../_shared/settle-core.mjs';
 
+function mergeConfig(base: any, override: any): any {
+  if (!override || typeof override !== 'object' || Array.isArray(override)) return base;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(override)) {
+    out[k] = (v && typeof v === 'object' && !Array.isArray(v))
+      ? mergeConfig(base?.[k] || {}, v) : v;
+  }
+  return out;
+}
+
 // 允许跨域（前端 netlify 静态页调用）
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +65,10 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
   if (userErr || !userData?.user) return json({ ok: false, error: 'BAD_TOKEN' }, 401);
   const uid = userData.user.id;
+
+  let runtimeConfig = serverConfig;
+  const { data: cfgRow } = await supabase.from('game_config_overrides').select('config').eq('id', true).maybeSingle();
+  if (cfgRow?.config && userData.user.email === '776492620@qq.com') runtimeConfig = mergeConfig(serverConfig, cfgRow.config);
 
   let body;
   try { body = await req.json(); } catch { return json({ ok: false, error: 'BAD_JSON' }); }
@@ -127,7 +141,7 @@ Deno.serve(async (req) => {
     equipItems,
     seconds: settleSec,
     seed: hashSeed(uid, session.id, session.last_settled_at),
-    config: serverConfig,
+    config: runtimeConfig,
     enemyList
   });
 
@@ -137,9 +151,13 @@ Deno.serve(async (req) => {
     p_fights: plan.result.totalFights,
     p_exp: plan.result.totalExp,
     p_detail: JSON.stringify(plan.detail),
-    p_now: now
+    p_now: now,
+    p_expected_last_settled_at: session.last_settled_at
   });
   if (settleErr) return json({ ok: false, error: 'SETTLE_RPC_FAILED', detail: settleErr.message }, 500);
+  if (settleRes && settleRes.error === 'STALE_SETTLE_CURSOR') {
+    return json({ ok: false, error: 'SETTLE_ALREADY_ADVANCED' });
+  }
 
   // 7) 宠物写回（双条件防越权）
   //    缺列容错：老库可能缺 exp 等附加列（前端 supabase.js 有 missingPetCols 同款机制），
@@ -164,6 +182,22 @@ Deno.serve(async (req) => {
     petUpdErr = e;
   }
   if (petUpdErr) return json({ ok: false, error: 'PET_UPDATE_FAILED', detail: petUpdErr.message }, 500);
+
+  // 奖励由服务器直接入账。battle_settle 已用游标幂等，重复请求不会再次走到这里。
+  // 当前先落材料；装备/宠物蛋沿用同一 detail 结构接入对应表。
+  const rewardTotals: Record<string, number> = {};
+  for (const reward of (plan.detail || []).map((x: any) => x.reward)) {
+    if (reward && reward.type === 'material' && reward.material) {
+      rewardTotals[reward.material] = (rewardTotals[reward.material] || 0) + Math.max(1, Math.floor(Number(reward.qty) || 1));
+    }
+  }
+  for (const [material, amount] of Object.entries(rewardTotals)) {
+    const { error: rewardErr } = await supabase.rpc('add_material', {
+      p_name: material,
+      p_amount: amount
+    });
+    if (rewardErr) return json({ ok: false, error: 'REWARD_GRANT_FAILED', detail: rewardErr.message }, 500);
+  }
 
   return json({
     ok: true,

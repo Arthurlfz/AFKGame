@@ -1,4 +1,35 @@
 -- ============================================================
+-- 0. 服务器配置覆盖（管理员可实时调整；未设置字段沿用代码默认值）
+create table if not exists public.game_config_overrides (
+  id boolean primary key default true check (id),
+  config jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users(id)
+);
+alter table public.game_config_overrides enable row level security;
+drop policy if exists "game_config_read_authenticated" on public.game_config_overrides;
+create policy "game_config_read_authenticated" on public.game_config_overrides
+  for select to authenticated using (true);
+
+create or replace function public.admin_get_config()
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if auth.jwt() ->> 'email' <> '776492620@qq.com' then return '{}'::jsonb; end if;
+  return coalesce((select config from public.game_config_overrides where id = true), '{}'::jsonb);
+end; $$;
+grant execute on function public.admin_get_config() to authenticated;
+
+create or replace function public.admin_save_config(p_config jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if auth.jwt() ->> 'email' <> '776492620@qq.com' then return jsonb_build_object('ok', false, 'error', 'forbidden'); end if;
+  insert into public.game_config_overrides(id, config, updated_at, updated_by)
+  values (true, coalesce(p_config, '{}'::jsonb), now(), auth.uid())
+  on conflict (id) do update set config = excluded.config, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+  return jsonb_build_object('ok', true);
+end; $$;
+grant execute on function public.admin_save_config(jsonb) to authenticated;
+
 -- 管理员工具 RPC：玩家管理 + 运营统计
 -- 用法：Supabase Dashboard → SQL Editor → 整段粘贴 → Run（幂等，可重复执行）
 -- 全部函数校验调用者邮箱 = 管理员邮箱（与 grant_gems 一致），非管理员返回空或 'forbidden'。

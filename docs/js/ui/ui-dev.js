@@ -171,6 +171,8 @@
       '<div class="dev-actions-row">' +
         '<button class="btn-mini ghost" id="dev-reset-all">一键复原全部</button>' +
         '<button class="btn-mini primary" id="dev-export">导出当前配置 JSON</button>' +
+        '<button class="btn-mini primary" id="dev-cloud-save" title="把当前调参保存到 Supabase">☁ 保存到云端</button>' +
+        '<button class="btn-mini ghost" id="dev-cloud-load" title="从 Supabase 读取调参">☁ 读取云端配置</button>' +
       '</div>' +
       '<div class="dev-export-box" id="dev-export-box" style="display:none">' +
         '<div class="dev-export-hint">当前 Config 完整 JSON（复制后手动合并回 config.js）：</div>' +
@@ -223,6 +225,25 @@
     const resetAll = $('dev-reset-all'); if (resetAll) resetAll.onclick = resetAllFields;
     const exp = $('dev-export'); if (exp) exp.onclick = doExport;
     const copy = $('dev-copy'); if (copy) copy.onclick = copyExport;
+    const cloudSave = $('dev-cloud-save');
+    if (cloudSave) cloudSave.onclick = async () => {
+      if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可保存云端配置');
+      const S = window.Supabase;
+      const r = S && S.getClient ? await S.getClient().rpc('admin_save_config', { p_config: Config }) : { error: { message: '未连接 Supabase' } };
+      UI.showToast && UI.showToast(r.error ? '保存失败' : '已保存', r.error ? r.error.message : '新结算将使用云端配置');
+    };
+    const cloudLoad = $('dev-cloud-load');
+    if (cloudLoad) cloudLoad.onclick = async () => {
+      if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可读取云端配置');
+      const S = window.Supabase;
+      const r = S && S.getClient ? await S.getClient().rpc('admin_get_config') : { error: { message: '未连接 Supabase' } };
+      if (r.error) return UI.showToast && UI.showToast('读取失败', r.error.message);
+      if (r.data && typeof r.data === 'object') {
+        Object.assign(Config, r.data);
+        renderBody();
+        UI.showToast && UI.showToast('已读取', '当前页面配置已更新');
+      }
+    };
   }
   function resetAllFields() {
     SCHEMA.forEach(g => {

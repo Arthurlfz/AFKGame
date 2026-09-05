@@ -529,6 +529,20 @@ window.Config = {
       { id: 'm67', category: 'main', type: 'synth', need: 5, unlockLevel: 97, name: '本源合成', reward: { 合成之石: 6, 传说进化素材: 10 } },
       { id: 'm68', category: 'main', type: 'equipDrop', need: 34, unlockLevel: 98, name: '腐变的源头', reward: { 神圣石: 10, 增缀石: 10 } },
 
+      /* ---- 2026-09-05 守关 Boss 首通（地图系统 A 项，图1-10）：击败该图 Boss 即首通，一次性奖励 ----
+       * 奖励 = 区域材料×20 + 重铸石×3 + 该图档进化素材×3（图1-2 普通 / 图3-4 精粹 / 图5+ 传说）。
+       * 挂机每累计 100 场（第 100/200/300…场）出现守关 Boss「霸主·XX」，首次击杀即首通。 */
+      { id: 'boss1', category: 'main', type: 'boss', area: 'corrupted-forest', need: 1, unlockLevel: 1, name: '首通·枯荣之地', hint: '挂机累计 100 场出现守关 Boss，击败它即首通此图', reward: { 枯荣种荚: 20, 重铸石: 3, 进化素材: 3 } },
+      { id: 'boss2', category: 'main', type: 'boss', area: 'plague-swamp', need: 1, unlockLevel: 7, name: '首通·泣腐泥沼', hint: '击败守关 Boss，首通此图', reward: { 泣腐之泪: 20, 重铸石: 3, 进化素材: 3 } },
+      { id: 'boss3', category: 'main', type: 'boss', area: 'shadow-mountains', need: 1, unlockLevel: 13, name: '首通·白骨旷野', hint: '击败守关 Boss，首通此图', reward: { 白骨残片: 20, 重铸石: 3, 精粹进化素材: 3 } },
+      { id: 'boss4', category: 'main', type: 'boss', area: 'bone-wastes', need: 1, unlockLevel: 19, name: '首通·幽影迷境', hint: '击败守关 Boss，首通此图', reward: { 幽影魂丝: 20, 重铸石: 3, 精粹进化素材: 3 } },
+      { id: 'boss5', category: 'main', type: 'boss', area: 'blood-rift', need: 1, unlockLevel: 25, name: '首通·血潮裂谷', hint: '击败守关 Boss，首通此图', reward: { 血潮凝晶: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss6', category: 'main', type: 'boss', area: 'echo-cliffs', need: 1, unlockLevel: 31, name: '首通·回响崖', hint: '击败守关 Boss，首通此图', reward: { 回响之羽: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss7', category: 'main', type: 'boss', area: 'rotfen-bog', need: 1, unlockLevel: 37, name: '首通·腐沼泽', hint: '击败守关 Boss，首通此图', reward: { 腐沼黏液: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3 } },
+
       /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「🐾 宠物」分类。
        * ⚠️ 机制约定（2026-08-31 用户拍板）：
        *   · petName 字段 = 进度只算「该宠出战」时（reportType 带 ctx.petName，quest.js 里过滤）
@@ -562,6 +576,17 @@ window.Config = {
       { id: 'pe24', category: 'pet', type: 'evolve', petName: '幽影兔', need: 1, unlockLevel: 43, name: '幽影兔的进化', reward: { 涅磐兽: 2 } },
 
       /* ---- 日常 12 条：每日 00:00 刷新，可重复 ---- */
+      /* ---- 地图委托：收集本图材料，交完立即进入下一轮 ---- */
+      { id: 'loop_corrupted_forest', category: 'main', type: 'collect_loop', area: 'corrupted-forest', matName: '枯荣种荚', need: 50, repeatable: true, name: '枯荣采集委托', reward: { 重铸石: 5 }, expReward: 210 },
+      { id: 'loop_plague_swamp', category: 'main', type: 'collect_loop', area: 'plague-swamp', matName: '泣腐之泪', need: 50, repeatable: true, name: '泣腐采集委托', reward: { 重铸石: 5 }, expReward: 570 },
+      { id: 'loop_shadow_mountains', category: 'main', type: 'collect_loop', area: 'shadow-mountains', matName: '白骨残片', need: 50, repeatable: true, name: '白骨采集委托', reward: { 重铸石: 8 }, expReward: 930 },
+      { id: 'loop_bone_wastes', category: 'main', type: 'collect_loop', area: 'bone-wastes', matName: '幽影魂丝', need: 50, repeatable: true, name: '幽影采集委托', reward: { 重铸石: 8 }, expReward: 1290 },
+      { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 50, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 5 }, expReward: 1650 },
+      { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 增缀石: 5 }, expReward: 2010 },
+      { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 5 }, expReward: 2370 },
+      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 剥离石: 5 }, expReward: 2730 },
+      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 5 }, expReward: 3090 },
+      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 神圣石: 5 }, expReward: 3450 },
       { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
       { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },
       { id: 'd3', category: 'daily', type: 'collect', matName: '枯荣种荚', need: 20, repeat: true, name: '晨间采集·种荚', reward: { 剥离石: 1 } },

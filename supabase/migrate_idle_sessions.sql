@@ -74,12 +74,14 @@ create policy "battle_logs_select_own" on public.battle_logs
 -- 行为：幂等推进 last_settled_at / total_fights / total_exp；回写宠物当前血量
 --       （p_pet_cur_hp 可选：P1 先由 EF 直接 update pets，此处预留）
 -- ============================================================
+drop function if exists public.battle_settle(uuid, integer, integer, jsonb, timestamptz);
 create or replace function public.battle_settle(
   p_session_id uuid,
   p_fights     integer,
   p_exp        integer,
   p_detail     jsonb default '[]'::jsonb,
-  p_now        timestamptz default now()
+  p_now        timestamptz default now(),
+  p_expected_last_settled_at timestamptz default null
 )
 returns jsonb
 language plpgsql
@@ -99,6 +101,11 @@ begin
   end if;
   if v_row.status <> 'active' then
     return jsonb_build_object('ok', false, 'error', 'SESSION_NOT_ACTIVE', 'status', v_row.status);
+  end if;
+  if p_expected_last_settled_at is not null
+     and v_row.last_settled_at <> p_expected_last_settled_at then
+    return jsonb_build_object('ok', false, 'error', 'STALE_SETTLE_CURSOR',
+      'last_settled_at', v_row.last_settled_at);
   end if;
 
   -- 幂等批次号：本次结算的 batch_seq = 现有日志数 + 1

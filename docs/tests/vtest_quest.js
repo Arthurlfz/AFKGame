@@ -27,15 +27,15 @@ const C = code => vm.runInContext(code, ctx);
 
   /* ---------- 数据完整性 ---------- */
   const total = C('Config.drop.quests.length');
-  A(total === 120, '任务总数 120 条（实际 ' + total + '）');
+  A(total === 140, '任务总数 140 条（含 10 条地图委托，实际 ' + total + '）');
   const count = cat => C(`Config.drop.quests.filter(q=>q.category==='${cat}').length`);
   A(count('tutorial') === 10, '新手成长 10 条');
-  A(count('main') === 68, '主线 68 条（17 图 × 4）');
+  A(count('main') === 88, '主线 88 条（含 10 条地图委托）');
   A(count('daily') === 12, '日常 12 条');
   A(count('achieve') === 6, '成就 6 条');
   A(count('pet') === 24, '宠物专属 24 条（8 宠 × 3 养成链）');
   const types = C('JSON.stringify([...new Set(Config.drop.quests.map(q=>q.type))].sort())');
-  A(JSON.parse(types).length === 14, '覆盖 14 种任务类型（实际 ' + JSON.parse(types).length + ' 种）');
+  A(JSON.parse(types).length === 16, '覆盖 16 种任务类型（含地图委托，实际 ' + JSON.parse(types).length + ' 种）');
 
   /* ---------- 新手链前置依赖 ---------- */
   A(C(`Config.drop.quests.find(q=>q.id==='g1') && !Config.drop.quests.find(q=>q.id==='g1').requires`), '新手第一条 g1 无前置');
