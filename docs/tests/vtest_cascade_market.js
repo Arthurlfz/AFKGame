@@ -27,7 +27,7 @@ const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-l
   // 预置默认筛选（在 ui-market.js 加载前写入 localStorage）
   C(`localStorage.setItem("marketFilters",JSON.stringify({kind:"all",slot:"all",rarity:"all",tier:"all",baseTier:"all",growth:"desc",sort:"latest",affixFilters:[],trait:"all"}))`);
   // UI 层
-  for (const f of ['../js/ui/ui-common.js', '../js/ui/ui-shell.js', '../js/ui/ui-login.js', '../js/ui/ui-dialog.js', '../js/ui/ui-popover.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-market-records.js', '../js/ui/ui-market-sell.js', '../js/main.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+  for (const f of ['../js/ui/ui-common.js', '../js/ui/ui-shell.js', '../js/ui/ui-login.js', '../js/ui/ui-dialog.js', '../js/ui/ui-popover.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-market-records.js', '../js/ui/ui-market-sell.js', '../js/main.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 
   await S(300); await C('Game.onLogin("ui@test.com","123456")'); await S(300);
 

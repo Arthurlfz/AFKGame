@@ -486,6 +486,7 @@
     const pet = getActivePet();
     if (!pet) return;
     if (window.Battle && window.Battle.isRunning()) return; // 战斗中：立绘由 beginFight 快照维护
+    if (window.IdleBridge && window.IdleBridge.isActive()) return; // 服务器托管挂机：敌方立绘由演出循环维护，不能藏（藏了 = 宠物打空气）
     mountIcon($('pet-icon'), pet.name, pet.icon);
     $('pet-icon-name').textContent = `${pet.name} 等级：${pet.level || 1}级`;
     // 未开战：隐藏敌方（避免显示占位怪）

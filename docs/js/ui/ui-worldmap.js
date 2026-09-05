@@ -128,7 +128,12 @@
       }
       // 挂机中直接换图：先停挂机 → 切到新图（不自动重启挂机，避免误操作）
       const wasRunning = Battle.isRunning && Battle.isRunning();
-      if (wasRunning) Battle.stopAutoBattle && Battle.stopAutoBattle();
+      if (wasRunning) {
+        // 服务器托管会话一起停，否则服务器还在旧图替我们打
+        // （最多丢最后 30 秒：换图是玩家主动操作，不值得为这点收益加异步等待）
+        if (window.IdleBridge) window.IdleBridge.stop();
+        Battle.stopAutoBattle && Battle.stopAutoBattle();
+      }
       if (!Battle.selectArea(point.areaId)) {
         // 选图失败（极端情况，比如图 id 不对），恢复挂机状态并提示
         UI.showToast && UI.showToast('无法进入', '该图暂不可用。');

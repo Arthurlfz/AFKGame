@@ -23,6 +23,10 @@
   const Materials = window.Materials;
   const Equipment = window.Equipment;
   const MarketBot = window.MarketBot; // 市场冷启动（流浪商人假卖家），可能未加载 → 判空调用
+  const IdleBridge = window.IdleBridge; // 服务器权威挂机桥接层（URL 加 ?noidle=1 可整体关闭退回本地挂机）
+
+  // 服务器托管挂机中：经验/等级/血量由服务器写库，本地不许再写，否则两边互相覆盖
+  const serverManaged = () => !!(IdleBridge && IdleBridge.isActive());
 
   /* ---------- 累计统计（战斗场数/获得装备数） ---------- */
   function refreshStats() {
@@ -88,6 +92,54 @@
     renderAll();
     refreshStats();
     syncButton();
+  }
+
+  /* ---------- 战报结算（服务器托管挂机专用） ----------
+   * 服务器真打，本地放电影：战报带来的场数就是真实场数（一套账，无需相减）。
+   * 按战报 roll 掉落 + 上报任务 kill 计数，汇总成一条播报。
+   */
+  let reportBusy = false;   // 防重入：上一批战报还在结算时，新战报先记账稍后处理
+  let reportPending = 0;
+  async function settleReport(fights) {
+    if (!fights || fights <= 0) return;
+    if (reportBusy) { reportPending += fights; return; }
+    reportBusy = true;
+    try {
+      const area = window.Battle.getCurrentArea();
+      if (!area || !window.Battle.pickEnemy) return;
+      // 任务：服务器替我们打了几场就报几场 kill（配了 area 的任务只算该图）
+      const pet = getActivePet();
+      if (window.Quest && window.Quest.reportType) {
+        window.Quest.reportType('kill', fights, { areaId: area.id, petName: pet ? pet.name : null });
+      }
+      const mats = {};
+      let equip = 0, egg = 0;
+      for (let i = 0; i < fights; i++) {
+        const picked = window.Battle.pickEnemy();
+        if (!picked) break;
+        const r = await rollReward(picked.enemy, area);
+        if (!r) continue;
+        if (r.type === 'equipment') equip++;
+        else if (r.type === 'egg') egg++;
+        else if (r.type === 'material' && r.material) mats[r.material] = (mats[r.material] || 0) + (r.qty || 1);
+        // 分批让出主线程：批量 roll 时不让画面/输入卡住
+        if (i % 8 === 7) await new Promise(function (res) { setTimeout(res, 0); });
+      }
+      const parts = [];
+      if (equip) parts.push(`装备 ×${equip}`);
+      if (egg) parts.push(`宠物蛋 ×${egg}`);
+      Object.keys(mats).forEach(function (k) { parts.push(`${k} ×${mats[k]}`); });
+      addLog(parts.length
+        ? `🎁 战报 ${fights} 场：${parts.join('、')}`
+        : `🎁 战报 ${fights} 场（这次没掉东西）`);
+      renderAll();
+      refreshStats();
+      syncButton();
+    } finally {
+      reportBusy = false;
+      // 结算期间又到的战报，接着处理
+      if (reportPending > 0) { const p = reportPending; reportPending = 0; settleReport(p); }
+    }
   }
 
   /* ---------- 开局选宠 ---------- */
@@ -219,6 +271,7 @@
   if (window.UI) window.UI.replayOpeningTour = replayOpeningTour;
 
   async function clearAccountState() {
+    if (IdleBridge) IdleBridge.stop(); // 登出 / 换号：服务器托管会话也要停，否则换号后还在算
     stopAutoBattle();
     flushPetProgress();                                // 登出/切账号前把经验补写云端
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
@@ -496,7 +549,7 @@
   /* ---------- 按钮状态机 ---------- */
   // 挂机中（含等待回血）→「停止挂机」；血量不满→禁用「恢复中 x%」；空闲满血→「开始自动战斗」
   function syncButton() {
-    if (isRunning()) {
+    if (isRunning() || serverManaged()) {
       renderBattleButton('停止挂机', false);
       return;
     }
@@ -517,17 +570,35 @@
     if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
     if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
+    // 服务器托管挂机：每次战报回来，按服务器场数结算掉落与任务
+    if (IdleBridge) {
+      IdleBridge.onChange = function (fights) {
+        if (fights > 0) settleReport(fights);
+      };
+    }
+
     const battleBtn = document.getElementById('btn-battle');
-    if (battleBtn) battleBtn.addEventListener('click', () => {
-      if (isRunning()) {
-        stopAutoBattle();                // 挂机中 → 手动停止
-        flushPetProgress();              // 停手时把攒的经验补写云端（否则要等下一次节流）
+    if (battleBtn) battleBtn.addEventListener('click', async () => {
+      if (isRunning() || serverManaged()) {
+        const wasManaged = serverManaged();
+        // 托管期间先把最后一段战报结算回来，再停
+        if (wasManaged) await IdleBridge.settleNow();
+        if (IdleBridge) IdleBridge.stop();
+        stopAutoBattle();                // 本地模式停止（托管时本地循环本就没跑，no-op）
+        if (!wasManaged) flushPetProgress(); // 托管时经验由服务器写库，本地别再 flush
       } else if (getCurHp(getActivePet()) >= getStats(getActivePet()).hp) {
-        if (!window.Battle.getCurrentArea()) {
+        const area = window.Battle.getCurrentArea();
+        if (!area) {
           addLog('⚠️ 请先选择挂机地图。');
           return;
         }
-        startAutoBattle(handleFightEnd); // 满血才允许开始
+        if (IdleBridge && IdleBridge.enabled) {
+          // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
+          const r = await IdleBridge.start(area, getActivePet());
+          if (r && r.error) addLog('⚠️ 服务器托管未启用（' + r.error + '），请刷新重试，或在网址加 ?noidle=1 用本地挂机');
+        } else {
+          startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
+        }
       }
       syncButton();
     });
@@ -537,7 +608,8 @@
     // （beforeunload 里的异步请求常被浏览器掐掉，visibilitychange 更可靠）
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'hidden') return;
-      flushPetProgress();
+      // 服务器托管期间经验/等级由服务器写库，本地这次切后台补写会把服务器真值盖掉（双写冲突）
+      if (!serverManaged()) flushPetProgress();
       // 掉落攒着还没上报的材料：切后台/关标签页前补一次，否则这批收益会丢
       if (Materials.flushMaterials) Materials.flushMaterials();
     });
@@ -550,6 +622,7 @@
       const now = Date.now();
       const dtSec = Math.min(Math.max(0.1, (now - lastRegenTs) / 1000), 60); // 封顶 60 秒/次
       lastRegenTs = now;
+      if (serverManaged()) return;           // 托管时血量/状态由服务器战报管，本地回血时钟不插手
       if (isRunning() && !isWaitingRecover()) return;
       const pet = getActivePet();
       if (!pet) return;

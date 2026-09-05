@@ -34,9 +34,11 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   A(dt.indexOf('trait-pill') >= 0 && dt.indexOf('铁壁') >= 0, `孵化弹窗包含特质块（${dt.slice(0,60)}）`);
 
   // 3) 合成/涅槃预览：静态验证 traitInheritLine 已接入预览函数 + 概率读 Config（动态数值在 vtest_trait_soulcast 已测）
-  const src = fs.readFileSync('../js/ui/ui-pet.js', 'utf8');
-  A(src.includes('traitInheritLine(main, sub, \'nirvana\')'), '涅槃预览函数调用 traitInheritLine');
-  A(src.includes('traitInheritLine(main, sub, \'synth\')'), '合成预览函数调用 traitInheritLine');
+  // 合成/涅槃预览的实现在 ui-pet-synth.js / ui-pet-merge.js（它们后加载覆盖同名 UI API，不在 ui-pet.js）
+  const srcMerge = fs.readFileSync('../js/ui/ui-pet-merge.js', 'utf8');
+  const srcSynth = fs.readFileSync('../js/ui/ui-pet-synth.js', 'utf8');
+  A(/traitInheritLine\(main, sub, ?'nirvana'\)/.test(srcMerge), '涅槃预览函数调用 traitInheritLine');
+  A(/traitInheritLine\(main, sub, ?'synth'\)/.test(srcSynth), '合成预览函数调用 traitInheritLine');
   const TI = JSON.parse(C('JSON.stringify(Config.traitInherit || {})'));
   const TN = JSON.parse(C('JSON.stringify(Config.traitNirvana || {})'));
   A(Math.round((TI.mainKeep || 0) * 100) === 70 && Math.round((TI.subKeep || 0) * 100) === 40,

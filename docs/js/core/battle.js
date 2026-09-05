@@ -248,12 +248,16 @@
     const bonus = Math.min(p.cap, Math.floor((spd - p.threshold) / p.perPoint) * p.bonusPer);
     return 1 + bonus;
   }
-  // 战斗计时按【真实流逝时间】推进（2026-09-03）：浏览器切后台会把 setInterval 节流到 1 次/秒甚至更低，
-  // 旧逻辑固定 100ms 步进 → 后台行动条慢 10 倍+，经验/掉落跟着几乎停摆（挂机游戏致命）。
-  // 现在每 tick 用 Date.now() 算真实毫秒差 → 换算成 100ms 步数一次性补足 → 挂机速度与前台一致。
+  // 战斗计时推进（2026-09-05 服务器托管版）：
+  // 纯本地挂机（?noidle=1）：按真实流逝时间补步（2026-09-03 修后台慢 60 倍的历史 bug）——
+  //   浏览器后台把 setInterval 节流到 1 次/分钟，每 tick 按 Date.now() 差值换算步数一次补足。
+  // 服务器托管挂机（默认）：**绝不补步**。本地只是演出，后台被冻就让它冻（服务器在算）；
+  //   补步在切回前台瞬间会同步狂跑几百步 → 一秒几十场的爆发狂跳 + 掉落刷屏 + 与服务器数值打架
+  //   （9-04 用户实测踩坑），每 tick 固定 1 步，演出从暂停处慢慢继续。
   function tick() {
     const now = Date.now();
-    const steps = Math.min(Math.max(1, Math.floor((now - lastTickTs) / 100)), 600); // 封顶 60 秒/次，防极端堆积
+    const managed = window.IdleBridge && window.IdleBridge.isActive();
+    const steps = managed ? 1 : Math.min(Math.max(1, Math.floor((now - lastTickTs) / 100)), 600); // 本地模式封顶 60 秒/次
     lastTickTs = now;
     for (let i = 0; i < steps && !fightEnded; i++) step();
   }
@@ -446,5 +450,11 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, state, calcDamage };
+  // 服务器托管挂机的演出/掉落用：挑一只本图怪并按图强度缩放（与真实战斗同一套数值来源）
+  function pickScaledEnemy() {
+    const picked = pickEnemy();
+    if (!picked) return null;
+    return scaleEnemyStats(picked.enemy, picked.area);
+  }
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, state, calcDamage };
 })();

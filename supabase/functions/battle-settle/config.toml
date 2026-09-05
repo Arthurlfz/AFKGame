@@ -1,0 +1,6 @@
+[functions.battle-settle]
+verify_jwt = true
+# 结算是 CPU 型任务（逐场模拟），给足内存/时长
+memory = 512
+# 300s 上限：一次最长结算 1 小时会话也够（模拟 30w tick 内完成）
+max_duration = 300
