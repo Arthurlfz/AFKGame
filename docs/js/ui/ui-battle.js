@@ -121,6 +121,12 @@
     mutant: { label: '变异', className: 'mutant' }
   };
   function getBattleEnemy() {
+    // 服务器托管挂机：本地 battle.js 从不开场（state.enemy 恒 null），
+    // 画面上的怪由 idle-bridge 的演出循环持有 → 回退读它，
+    // 否则敌方 tooltip / 名字 / 血量同步全是空的（或本地模式的残留怪）。
+    if (window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive()) {
+      return (window.IdleBridge.getShowEnemy && window.IdleBridge.getShowEnemy()) || null;
+    }
     return window.Battle?.state?.enemy || null;
   }
   function enemyStat(value) {

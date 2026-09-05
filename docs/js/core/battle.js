@@ -456,11 +456,17 @@
     if (!picked) return null;
     return scaleEnemyStats(picked.enemy, picked.area);
   }
-  // 剧本驱动演出：把剧本指定的怪按当前图强度缩放（怪由剧本决定，不能随机）
-  function scaleEnemyOf(enemyData) {
+  // 剧本驱动演出：把剧本指定的怪按当前图强度缩放（怪由剧本决定，不能随机）。
+  // ⚠️ level 必须由调用方（剧本事件 f.enemyLevel）显式传入：
+  //    enemy-data 里每只怪自带一个**静态 level**（如血狐·异变 = 40），那是图档参考值，
+  //    不是这场战斗的实际等级（实际 = clamp(宠物等级, 图等级段)，如 50）。
+  //    不传就用静态值 → 画面上的怪等级/血上限/攻防全按错误等级缩放，
+  //    与服务器真账打的不是同一只怪（日志 Lv.50、画面 Lv.40）。
+  function scaleEnemyOf(enemyData, level) {
     const area = getCurrentArea();
     if (!area || !enemyData) return null;
-    return scaleEnemyStats(Object.assign({ level: enemyData.level || 1 }, enemyData), area);
+    const lv = Number(level) || Number(enemyData.level) || 1;
+    return scaleEnemyStats(Object.assign({}, enemyData, { level: lv }), area);
   }
   window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage };
 })();

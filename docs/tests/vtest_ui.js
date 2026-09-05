@@ -57,5 +57,37 @@ A(sellBox.innerHTML!=='<marker>保留</marker>'&&sellBox.children.length>0,'取�
 /* ============ 3. 脱下装备按钮（renderEquipSlots 不崩 + 逻辑接口存在） ============ */
 C('UI.renderAll()'); // 宠物页装备槽渲染不崩
 A(typeof C('Equipment.unequip')==='function','脱下接口 Equipment.unequip 存在');
+
+/* ============ 4. 服务器托管挂机：画面怪 = 服务器打的那只（前后端不匹配回归） ============ */
+// 4.1 scaleEnemyOf 必须用剧本传入的战斗等级，不能被怪的静态 level 顶掉
+//     （enemy-data 每只怪自带静态 level，用它缩放 → 画面等级/血量与真账错位）
+C(`(function(){
+  Battle.selectArea(Battle.getAreas()[0].id);
+  globalThis.__raw = EnemyData.list[0];
+  globalThis.__byScript = Battle.scaleEnemyOf(globalThis.__raw, 1);
+  globalThis.__byStatic = Battle.scaleEnemyOf(globalThis.__raw);
+})()`);
+A(C('globalThis.__byScript.level')===1,'scaleEnemyOf 传入剧本等级 1 → 画面怪等级=1（不被静态 level 覆盖）');
+A(C('globalThis.__byStatic.level')===C('globalThis.__raw.level'),'不传等级时回退怪的静态 level（保底不崩）');
+A(C('globalThis.__byScript.hp')<C('globalThis.__byStatic.hp'),
+  '等级真的进了缩放公式（Lv1 血 '+C('globalThis.__byScript.hp')+' < 静态 Lv'+C('globalThis.__raw.level')+' 血 '+C('globalThis.__byStatic.hp')+'）');
+
+// 4.2 托管时 UI 的敌方数据源回退到 IdleBridge.getShowEnemy
+//     （Battle.state.enemy 在托管模式下恒 null → tooltip/名字/血量同步全是空）
+C('globalThis.__origIsActive = IdleBridge.isActive;');
+C('IdleBridge.isActive = function(){ return true; }');
+C('globalThis.__showEnemy = { name:"演出怪", level:50, maxHp:999, hp:999, enemyType:"mutant" }; IdleBridge.getShowEnemy = function(){ return globalThis.__showEnemy; }');
+C('UI.updateBars(500, 1000, 333, 999)');
+A(C('globalThis.__showEnemy.hp')===333,'托管时 updateBars 读到演出怪（血写回 333，证明不是 null）');
+A(C('typeof IdleBridge.getShowEnemy')==='function','IdleBridge.getShowEnemy 已导出（UI 回退入口存在）');
+C('IdleBridge.isActive = globalThis.__origIsActive;'); // 还原，避免影响后续
+
+// 4.3 累计场数：托管时顶栏统计必须读服务器累计（本地 Battle 计数在托管时不涨）
+C('globalThis.__origIsActive2 = IdleBridge.isActive; globalThis.__origTotal = IdleBridge.getTotalFights;');
+C('IdleBridge.isActive = function(){ return true; }; IdleBridge.getTotalFights = function(){ return 7777; }');
+C('Game.refreshStats()');
+A(C('els["stat-fights"] && els["stat-fights"].textContent')==='7777','托管时顶栏累计场数取服务器值 7777（不再是停滞的本地计数）');
+C('IdleBridge.isActive = globalThis.__origIsActive2; IdleBridge.getTotalFights = globalThis.__origTotal;');
+
 console.log('ALL UI TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

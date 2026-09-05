@@ -266,8 +266,12 @@
     const B = window.Battle;
     if (!enemyData) return;
     const area = B && B.getCurrentArea();
-    const scaled = (B && B.scaleEnemyOf) ? B.scaleEnemyOf(enemyData) : Object.assign({}, enemyData);
+    // 怪等级只能来自剧本（f.enemyLevel）：不传就会退回怪的静态 level，画面与真账错位
+    const lv = (fightEvt && fightEvt.enemyLevel) || enemyData.level || 1;
+    const scaled = (B && B.scaleEnemyOf) ? B.scaleEnemyOf(enemyData, lv) : Object.assign({}, enemyData);
     if (!scaled) return;
+    scaled.raw = enemyData;   // 自检重挂用未缩放的原始数据（否则会被二次缩放）
+    scaled.level = lv;
     showEnemy = scaled;
     const UI = window.UI;
     const pet = Pet.getActivePet();
@@ -371,7 +375,8 @@
     if (img.complete && img.naturalWidth === 0) {
       const src = img.getAttribute('src') || '(无 src)';
       if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 敌方立绘加载失败：' + showEnemy.name + ' ← ' + src);
-      mountShowEnemy(showEnemy.raw || showEnemy, null);
+      // 用 raw（未缩放原始怪）+ 当前剧本等级重挂，避免拿已缩放对象二次缩放
+      mountShowEnemy(showEnemy.raw || showEnemy, { enemyLevel: showEnemy.level });
     }
   }
 
@@ -532,6 +537,9 @@
     isActive: function () { return active; },
     enabled: ENABLED,
     getTotalFights: function () { return totalFights; },
+    // 画面上正在打的怪（演出层唯一事实源）：UI 的敌方 tooltip 读它，
+    // 不然托管模式下 Battle.state.enemy 恒 null，悬停看到的是空/旧怪
+    getShowEnemy: function () { return showEnemy; },
     set onChange(fn) { onChange = fn; },
     get onChange() { return onChange; }
   };

@@ -30,7 +30,12 @@
 
   /* ---------- 累计统计（战斗场数/获得装备数） ---------- */
   function refreshStats() {
-    renderStats(getTotalFights(), getTotalEquipDrops());
+    // 服务器托管挂机：本地战斗循环不跑 → Battle.getTotalFights() 永远停在进托管前的值，
+    // 必须读服务器累计，否则顶栏「累计场数」和状态徽章两个数字各走各的
+    const fights = serverManaged() && IdleBridge.getTotalFights
+      ? IdleBridge.getTotalFights()
+      : getTotalFights();
+    renderStats(fights, getTotalEquipDrops());
   }
 
   /* ---------- 经验 / 等级云端同步 ----------
@@ -635,6 +640,8 @@
     }
   }
 
-  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime };
+  // refreshStats 必须导出：idle-bridge.js 战报到账后会调 window.Game.refreshStats()，
+  // 之前这里漏了 → 那行一直是空调用（有判空所以不报错，但顶栏统计不刷新）
+  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats };
   init();
 })();
