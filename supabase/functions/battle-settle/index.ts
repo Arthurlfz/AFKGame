@@ -142,7 +142,8 @@ Deno.serve(async (req) => {
     seconds: settleSec,
     seed: hashSeed(uid, session.id, session.last_settled_at),
     config: runtimeConfig,
-    enemyList
+    enemyList,
+    bossState: { lastBossFight: (session as any).last_boss_fight ?? null }
   });
 
   // 6) 写库：会话累计 + 结算日志（battle_settle RPC，幂等）
@@ -152,7 +153,9 @@ Deno.serve(async (req) => {
     p_exp: plan.result.totalExp,
     p_detail: JSON.stringify(plan.detail),
     p_now: now,
-    p_expected_last_settled_at: session.last_settled_at
+    p_expected_last_settled_at: session.last_settled_at,
+    p_last_boss_fight: plan.result.bossState && plan.result.bossState.lastBossFight != null
+      ? plan.result.bossState.lastBossFight : null
   });
   if (settleErr) return json({ ok: false, error: 'SETTLE_RPC_FAILED', detail: settleErr.message }, 500);
   if (settleRes && settleRes.error === 'STALE_SETTLE_CURSOR') {

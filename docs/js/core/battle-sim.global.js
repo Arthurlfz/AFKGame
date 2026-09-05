@@ -38,15 +38,36 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-/* ---------- 守关 Boss（2026-09-05 地图系统） ----------
- * 每累计 100 场出现 1 次（跨结算段累计：fightOffset = 本段开始前的会话总场数）。
- * Boss = 该图怪池 level 最高的怪，等级=图段上限，血×5、攻×1.5，名字前缀「霸主·」。
- * 是模拟逻辑不是新数据 → 服务器无需新增 enemy 数据，config-server 零改动。 */
-const BOSS_INTERVAL = 100;
+/* ---------- 守关 Boss（2026-09-05 拍板·随机版） ----------
+ * 每场 1/1600 随机（期望 1600 场 ≈ 图10 挂机 2 小时），连续 2400 场未出必出（保底），
+ * 出后 200 场内不再出（冷却）。跨结算段累计：fightOffset = 会话总场数（全局 fightNo），
+ * bossState.lastBossFight = 上次实际出 Boss 的全局场次（服务器 session.last_boss_fight / 前端 localStorage）。
+ * 独立随机流（seed 盐化）→ 不污染战斗伤害随机序列，旧 seed 的胜负/经验测试不漂移。
+ * Boss = 该图怪池 level 最高的怪，等级=图段上限，血×5、攻×1.5，名字前缀「霸主·」。 */
+const BOSS_CHANCE = 1 / 1600;
+const BOSS_PITY = 2400;
+const BOSS_COOLDOWN = 200;
 function pickBossEnemy(pool) {
   let best = pool[0];
   for (const e of pool) { if ((e.level || 0) > (best.level || 0)) best = e; }
   return best;
+}
+// Boss 判定独立随机流：seed 盐化，避免与战斗内伤害随机（mulberry32(seed)）共用序列
+function bossRand(seed) {
+  return mulberry32(((Number(seed) || 1) >>> 0) ^ 0x9E3779B9);
+}
+// 判定一场是否出 Boss。state = { lastBossFight }（全局 fightNo 坐标），可传空对象（首次=进入随机区）
+function rollBoss(fightNo, state, rand) {
+  const raw = state && state.lastBossFight;
+  const last = (raw != null && Number.isFinite(Number(raw))) ? Number(raw) : (fightNo - BOSS_COOLDOWN);
+  const pity = fightNo - last;
+  let isBoss = false;
+  if (pity >= BOSS_COOLDOWN) {
+    if (pity >= BOSS_PITY) isBoss = true;            // 保底：太久没出，必出
+    else if (rand() < BOSS_CHANCE) isBoss = true;    // 随机命中
+  }
+  if (isBoss) state.lastBossFight = fightNo;
+  return isBoss;
 }
 
 /* ============================================================
@@ -467,8 +488,10 @@ function expFromBattle(enemyLevel, area, config, rnd) {
  * 输入：{ pet, areaId, seconds, seed, config, enemyList, curHp }
  * ============================================================ */
 function simulateSession(input) {
-  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset } = input;
+  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset, bossState } = input;
   const rnd = mulberry32(seed || 1);
+  const bs = bossState || {};      // 保底/冷却跨段状态（全局 fightNo 坐标）
+  const bRand = bossRand(seed);    // Boss 判定独立随机流（每场消耗一次，前后端同 seed 一致）
   const B = config.battle;
   const area = (B.areas || []).find(a => a.id === areaId);
   if (!area) throw new Error('AREA_NOT_FOUND: ' + areaId);
@@ -521,7 +544,7 @@ function simulateSession(input) {
     if (!pool.length) break;
     // 守关 Boss：跨段累计场数（fightOffset + 本段场数）到整百出 Boss
     const fightNo = totalFights + (Number(fightOffset) || 0);
-    const isBossTurn = (fightNo + 1) % BOSS_INTERVAL === 0;
+    const isBossTurn = rollBoss(fightNo, bs, bRand);
     const picked = isBossTurn ? { ...pickBossEnemy(pool), isBoss: true } : pickWeighted(pool, x => x.weight || 1, rnd);
     const fight = simulateFight({
       pet, stats, area, enemyData: picked, config, rnd,
@@ -551,7 +574,7 @@ function simulateSession(input) {
       if (gapLeft > 0) break; // 时间片耗尽，本次结算到此为止
     }
   }
-  return { fights, totalFights, totalExp, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp };
+  return { fights, totalFights, totalExp, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, bossState: bs };
 }
 
 /* ============================================================
@@ -562,8 +585,10 @@ function simulateSession(input) {
  * ⚠️ 本函数只存在于前端副本；改 simulateSession 循环结构时必须同步这里。
  * ============================================================ */
 function simulateSessionScript(input) {
-  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset } = input;
+  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset, bossState } = input;
   const rnd = mulberry32(seed || 1);
+  const bs = bossState || {};      // 与 simulateSession 同结构同消耗序
+  const bRand = bossRand(seed);
   const B = config.battle;
   const area = (B.areas || []).find(a => a.id === areaId);
   if (!area) throw new Error('AREA_NOT_FOUND: ' + areaId);
@@ -601,7 +626,7 @@ function simulateSessionScript(input) {
     }
     if (!pool.length) break;
     const fightNo = events.length + (Number(fightOffset) || 0);
-    const isBossTurn = (fightNo + 1) % BOSS_INTERVAL === 0;
+    const isBossTurn = rollBoss(fightNo, bs, bRand);
     const picked = isBossTurn ? { ...pickBossEnemy(pool), isBoss: true } : pickWeighted(pool, x => x.weight || 1, rnd);
     const hpStart = hp, t0 = tMs;
     const fight = simulateFight({ pet, stats, area, enemyData: picked, config, rnd, curHp: hp, pendingKillBuff });
@@ -626,7 +651,7 @@ function simulateSessionScript(input) {
       if (gapLeft > 0) break;
     }
   }
-  return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0) };
+  return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs };
 }
 
 window.BattleSim = { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState };

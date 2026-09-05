@@ -152,9 +152,14 @@
         config: window.Config,
         enemyList: (window.EnemyData && window.EnemyData.list) || [],
         curHp: startHp,
-        fightOffset: totalFights // 跨段累计场数：Boss 每整百场出现一次（与服务器 settle 的 session.total_fights 同锚）
+        fightOffset: totalFights, // 跨段累计场数（与服务器 settle 的 session.total_fights 同锚）
+        bossState: { lastBossFight: Number(window.localStorage && localStorage.getItem('fos_boss_last')) || null }
       });
       if (!sc || !sc.events || !sc.events.length) { warn('剧本失败：模拟产出 0 场'); return null; }
+      // 保底/冷却状态回存（演出判定与服务器同公式；服务器 session.last_boss_fight 才是权威掉落源）
+      if (sc.bossState && sc.bossState.lastBossFight != null && window.localStorage) {
+        localStorage.setItem('fos_boss_last', String(sc.bossState.lastBossFight));
+      }
       return sc;
     } catch (e) {
       warn('剧本失败：模拟抛错 ' + ((e && e.message) || e));

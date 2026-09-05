@@ -23,6 +23,7 @@ create table if not exists public.idle_sessions (
   total_fights     integer not null default 0,  -- 累计场数
   total_exp        integer not null default 0,  -- 累计经验
   total_drops      jsonb not null default '[]'::jsonb,  -- 累计掉落摘要 [{type,id,qty}]（P2 启用）
+  last_boss_fight  integer,                            -- 守关 Boss 上次出现的全局场次（NULL=未出过，随机版保底/冷却锚点）
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
@@ -75,13 +76,15 @@ create policy "battle_logs_select_own" on public.battle_logs
 --       （p_pet_cur_hp 可选：P1 先由 EF 直接 update pets，此处预留）
 -- ============================================================
 drop function if exists public.battle_settle(uuid, integer, integer, jsonb, timestamptz);
+drop function if exists public.battle_settle(uuid, integer, integer, jsonb, timestamptz, integer);
 create or replace function public.battle_settle(
   p_session_id uuid,
   p_fights     integer,
   p_exp        integer,
   p_detail     jsonb default '[]'::jsonb,
   p_now        timestamptz default now(),
-  p_expected_last_settled_at timestamptz default null
+  p_expected_last_settled_at timestamptz default null,
+  p_last_boss_fight integer default null
 )
 returns jsonb
 language plpgsql
@@ -116,6 +119,7 @@ begin
   set last_settled_at = p_now,
       total_fights    = total_fights + greatest(0, p_fights),
       total_exp       = total_exp + greatest(0, p_exp),
+      last_boss_fight = coalesce(p_last_boss_fight, last_boss_fight),
       updated_at      = p_now
   where id = p_session_id;
 

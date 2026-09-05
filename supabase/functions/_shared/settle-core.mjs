@@ -120,7 +120,7 @@ function rewardForFight(fight, areaId, seed, index) {
 }
 
 // 完整结算计划（纯计算）：输入会话/宠物/装备/时长 → 输出模拟结果 + 落库 patch
-function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyList }) {
+function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyList, bossState }) {
   const byId = new Map((equipItems || []).map(it => [String(it.id), it]));
   const pet = petFromRow(petRow, byId, config);
   const result = simulateSession({
@@ -131,7 +131,8 @@ function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyL
     config,
     enemyList,
     curHp: pet.curHp,
-    fightOffset: session.total_fights || 0 // 跨段累计：Boss 每整百场出现一次
+    fightOffset: session.total_fights || 0, // 跨段累计场数（全局 fightNo 锚点）
+    bossState // 守关 Boss 保底/冷却跨段状态（{ lastBossFight }，全局坐标）
   });
   const g = grantExp(pet.exp, pet.level, result.totalExp, config);
   const offset = Math.max(0, result.fights.length - 50);
@@ -140,7 +141,7 @@ function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyL
     boss: !!f.isBoss, reward: rewardForFight(f, session.area_id, seed, offset + i)
   }));
   return {
-    result, // simulateSession 完整输出
+    result, // simulateSession 完整输出（含 bossState）
     exp: g,
     detail,
     petPatch: {
