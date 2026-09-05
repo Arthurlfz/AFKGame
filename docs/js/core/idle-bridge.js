@@ -42,6 +42,7 @@
   let lastElapsedSec = 0;   // 上次结算窗口的真实秒数（下一段剧本时长估计：服务器按真实时间记账，演出就得按同样长度演）
   let nextScriptTryAt = 0;  // 剧本生成失败后的重试冷却时间戳
   let shownFights = 0;      // 本窗口内演出已结算的击杀数（与服务器 r.fights 对账，补发掉落）
+  let bootstrapping = false; // 首段/续段剧本生成中：生成完前演出循环不另发 settle（防双跑）
 
   // 演出状态
   let showHp = 0;           // 我方演出血量（剧本插值）
@@ -182,11 +183,16 @@
 
     petId = pet.cloudId;
     totalFights = 0;
+    shownFights = 0;
     active = true;
     if (window.UI) window.UI.updateStatus('fighting', 0);
     startShow();
-    // 立即结算一次：拿真值锚点 + 生成首段演出剧本（elapsed≈0，无收益，纯锚点）
-    settleNow().catch(function () { /* 忽略 */ });
+    // 首段剧本直接预演，**不先等一次空转的锚点 settle**：
+    // battle_session(start) 已把会话 last_settled_at 重置为 start 时刻（SQL 逻辑），
+    // 用这个游标当种子 = 服务器第一次 settle 的种子 → 预演与真账一致。
+    // 省掉锚点 settle 后，点击 → 开打的等待 = 一次会话查询 + 本地模拟（毫秒级），
+    // 不再撞上 Edge Function settle 的往返与冷启动延迟（之前点击后要干等 1~4 秒）。
+    bootstrapScript(Pet.getCurHp(pet), SETTLE_MS / 1000, 5000).catch(function () { /* 忽略 */ });
     schedule();
     return { ok: true };
   }
@@ -230,22 +236,35 @@
     shownFights = 0;   // 新剧本重新计数
     // 下一段剧本时长用这次窗口的真实秒数：服务器按真实时间记账，演出按同样长度演
     if (r.elapsedSec > 0) lastElapsedSec = r.elapsedSec;
+    await bootstrapScript(r.endHp, lastElapsedSec || (SETTLE_MS / 1000), SCRIPT_RETRY_MS);
+    notifyChange();
+    return r;
+  }
+
+  /* ---------- 生成并安装下一段演出剧本（start 首段 / settle 续段共用） ----------
+   * curHp：预演起点血量（start=当前血量满血，settle=服务器 endHp 真值）；
+   * seconds：预演时长（首段默认窗口，续段用上次真实结算秒数）；
+   * retryMs：失败重试冷却——首段 5 秒（玩家刚点击，快补），续段 30 秒（防刷屏）。
+   */
+  async function bootstrapScript(curHp, seconds, retryMs) {
+    if (!active) return;
+    bootstrapping = true;
     try {
-      const sc = await buildNextScript(r.endHp, lastElapsedSec || (SETTLE_MS / 1000));
+      const sc = await buildNextScript(curHp, seconds);
       if (sc && sc.events && sc.events.length) {
         script = sc;
         scriptT0 = performance.now();
         scriptIdx = -1; // gaugeTick 取第一个事件
         nextScriptTryAt = 0;
       } else {
-        nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS; // 冷却，防每帧重试打爆服务器
+        nextScriptTryAt = performance.now() + retryMs; // 冷却，防每帧重试打爆服务器
       }
     } catch (e) {
-      nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS;
+      nextScriptTryAt = performance.now() + retryMs;
       if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 剧本生成异常：' + ((e && e.message) || e));
+    } finally {
+      bootstrapping = false;
     }
-    notifyChange();
-    return r;
   }
 
   /* ---------- 场次对账：服务器打了但演出没演到的场次，补发掉落与任务 ----------
@@ -438,9 +457,10 @@
     const C = window.Config;
     const maxHp = Pet.getStats(pet).hp;
 
-    // 剧本播完/未就绪：结算续段（settling 锁防重入 + 冷却，剧本生成失败时不每帧打服务器）
+    // 剧本播完/未就绪：结算续段（settling 锁防重入 + 冷却，剧本生成失败时不每帧打服务器；
+    // bootstrapping 期间剧本正在生成，别另发 settle 双跑）
     if (!script || scriptIdx >= script.events.length) {
-      if (!settling && now >= nextScriptTryAt) settleNow().catch(function () { /* 忽略 */ });
+      if (!settling && !bootstrapping && now >= nextScriptTryAt) settleNow().catch(function () { /* 忽略 */ });
       return;
     }
     const t = now - scriptT0;
@@ -583,7 +603,7 @@
     gauge.pet = 0; gauge.enemy = 0;
     freezeUntil.pet = 0; freezeUntil.enemy = 0;
     waitingHeal = false;
-    lastElapsedSec = 0; nextScriptTryAt = 0; shownFights = 0;
+    lastElapsedSec = 0; nextScriptTryAt = 0; shownFights = 0; bootstrapping = false;
     script = null; scriptIdx = -1;
     lastGaugeTs = performance.now();
     preloadShowEnemies();

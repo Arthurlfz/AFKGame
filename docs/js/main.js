@@ -558,6 +558,7 @@
         }
         if (IdleBridge && IdleBridge.enabled) {
           // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
+          addLog('⏳ 正在连接挂机服务器…');
           const r = await IdleBridge.start(area, getActivePet());
           if (r && r.error) addLog('⚠️ 服务器托管未启用（' + r.error + '），请刷新重试，或在网址加 ?noidle=1 用本地挂机');
         } else {
