@@ -23,8 +23,9 @@
   const FN_URL = 'https://asklogeayzlqpeejuvjj.supabase.co/functions/v1/battle-settle';
   const SETTLE_MS = 30000;      // 剧本时长基准（首次/兜底估计值；有真值后用上次窗口的真实秒数）
   const SAFETY_SETTLE_MS = 120000; // 兜底结算：剧本生成失败/卡死时也要把真账要回来（= 服务器宽限窗口）
-  const RESPAWN_GAP_MS = 2200;  // 场间休息：击杀/战败后换怪前的空场演出
-  const SCRIPT_RETRY_MS = 5000; // 剧本生成失败后的重试冷却（不设会每帧打一次服务器）
+  const SCRIPT_RETRY_MS = 30000; // 剧本失败后的重试冷却 = 正常结算窗口。
+  // 剧本失败（通常=当前在长时间回血，模拟打不出场）时不必高频打服务器：
+  // 每 30 秒 settle 一次，服务器照常算账，差额由补发一次性补齐，不刷屏。
 
   const ENABLED = !/[?&]noidle=1\b/.test(location.search);
 
@@ -39,8 +40,6 @@
   let scriptT0 = 0;         // 剧本时间轴起点（performance.now）
   let scriptIdx = -1;       // 当前事件下标（-1 = 尚未开始）
   let lastElapsedSec = 0;   // 上次结算窗口的真实秒数（下一段剧本时长估计：服务器按真实时间记账，演出就得按同样长度演）
-  let respawnAt = 0;        // 场间休息截止时间戳（>now = 空场等待中，时间轴暂停）
-  let pendingNext = '';     // 空场结束后的动作：heal | fight | none
   let nextScriptTryAt = 0;  // 剧本生成失败后的重试冷却时间戳
   let shownFights = 0;      // 本窗口内演出已结算的击杀数（与服务器 r.fights 对账，补发掉落）
 
@@ -237,7 +236,7 @@
         script = sc;
         scriptT0 = performance.now();
         scriptIdx = -1; // gaugeTick 取第一个事件
-        respawnAt = 0; pendingNext = ''; nextScriptTryAt = 0;
+        nextScriptTryAt = 0;
       } else {
         nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS; // 冷却，防每帧重试打爆服务器
       }
@@ -446,25 +445,6 @@
     }
     const t = now - scriptT0;
 
-    // 场间休息：击杀/战败后的空场演出，时间轴暂停（scriptT0 已后推，见下面击杀分支）
-    if (respawnAt > now) return;
-    if (respawnAt && now >= respawnAt) {
-      respawnAt = 0;
-      const what = pendingNext; pendingNext = '';
-      const ef0 = document.getElementById('enemy-fighter');
-      if (what === 'heal') {
-        enterHealWait(UI);
-      } else if (what === 'fight') {
-        if (ef0) ef0.style.display = '';
-        const f2 = script.events[scriptIdx];
-        if (f2 && f2.type === 'fight') mountShowEnemy(f2.enemy, f2);
-      } else {
-        script = null; // 剧本演完 → 结算续段
-        if (!settling && now >= nextScriptTryAt) settleNow().catch(function () { /* 忽略 */ });
-      }
-      return;
-    }
-
     // 场前回血等待：回满 → 遭遇下一事件的新怪
     if (waitingHeal) {
       showHp = Math.min(maxHp, showHp + maxHp * ((C.regen || {}).hpPerSecRatio || 0.2) * dt / 1000);
@@ -496,21 +476,30 @@
       scriptIdx++;
       const stop2 = ((C.battle || {}).stopHpRatio) || 0.3;
       const needHeal = (!f.win || showHp <= maxHp * stop2);
-      const nxt = script.events[scriptIdx];
       const ef = document.getElementById('enemy-fighter');
       if (ef) ef.style.display = 'none';
-      // 场间休息 2.2 秒（胜利淡出/换怪）。⚠️ 这段空场必须**并进剧本时间轴**：
-      // scriptT0 整体后推 RESPAWN_GAP_MS，后续所有事件的时点跟着一起延后。
-      // 不后推的话，下一只怪一上台就已经"打了一半"（prog 直接跳到中途 → 血条瞬跳、进度错乱）；
-      // 而且这段时间是真实流逝的，服务器会照算进去，前端演出的总长度必须和它一致。
-      scriptT0 += RESPAWN_GAP_MS;
-      respawnAt = now + RESPAWN_GAP_MS;
-      pendingNext = needHeal ? 'heal' : (nxt ? 'fight' : 'none');
+      if (needHeal) { enterHealWait(UI); return; }
+      // 下一只怪的交棒由主循环按剧本时点（f.t0）挂上：击杀淡出刚好落在
+      // 模拟器自带的场间 gap（600ms）里，不额外占用真实时间。
+      // ⚠️ 千万不要在击杀后把时间轴后推 / 暂停来"加长空场"——
+      //    那会让播放总时长 > 预演时长，而 settle 在剧本播完才触发，
+      //    服务器按被拉长的真实时间算账 → 每段都比预演多几场 → 补发刷屏。
       return;
     }
 
-    // 开场首怪上台（剧本事件驱动；此前缺失导致第一场被无声跳过）
-    if (!showEnemy) mountShowEnemy(f.enemy, f);
+    // 上场衔接：场上无怪时按剧本时点挂怪（击杀后的 gap 里保持空场，不进战斗推进）
+    if (!showEnemy) {
+      if (t >= f.t0) {
+        mountShowEnemy(f.enemy, f);
+      } else {
+        if (now - lastBarTs >= 100) {
+          lastBarTs = now;
+          UI.updateAction(0, 0);
+          if (UI.updateBars) UI.updateBars(Math.round(showHp), maxHp, 0, 1);
+        }
+        return;
+      }
+    }
 
     // 战斗中：场内进度（供命中时阶梯扣血；两刀之间血量静止，观感自然）
     const span = Math.max(1, f.t1 - f.t0);
@@ -591,7 +580,6 @@
     gauge.pet = 0; gauge.enemy = 0;
     freezeUntil.pet = 0; freezeUntil.enemy = 0;
     waitingHeal = false;
-    respawnAt = 0; pendingNext = '';
     lastElapsedSec = 0; nextScriptTryAt = 0; shownFights = 0;
     script = null; scriptIdx = -1;
     lastGaugeTs = performance.now();
@@ -602,7 +590,6 @@
   function stopShow() {
     if (gaugeRaf) { cancelAnimationFrame(gaugeRaf); gaugeRaf = null; }
     showEnemy = null;
-    respawnAt = 0; pendingNext = '';
   }
 
   window.IdleBridge = {

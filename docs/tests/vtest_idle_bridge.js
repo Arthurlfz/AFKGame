@@ -166,5 +166,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(C('globalThis.__dropCalls') === 20, 'L1. 补发上限 20 场（50 场只补 20，防止一次性刷垮日志）');
 
-  console.log('\nALL IDLE BRIDGE TESTS PASSED');
+  C('IdleBridge.stop()'); // K/L 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
+
+  console.log('\nALL IDLE BRIDGE TESTS PASSED');process.exit(0);
 })().catch(e => { console.error('FAIL: 未捕获异常 ' + (e && e.stack || e)); process.exit(1) });
