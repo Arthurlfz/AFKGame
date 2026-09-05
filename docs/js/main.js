@@ -100,7 +100,7 @@
    */
   let reportBusy = false;   // 防重入：上一批战报还在结算时，新战报先记账稍后处理
   let reportPending = 0;
-  async function settleReport(fights) {
+  async function settleReport(fights, exp) {
     if (!fights || fights <= 0) return;
     if (reportBusy) { reportPending += fights; return; }
     reportBusy = true;
@@ -126,6 +126,7 @@
         if (i % 8 === 7) await new Promise(function (res) { setTimeout(res, 0); });
       }
       const parts = [];
+      if (exp) parts.push(`经验 +${exp}`);
       if (equip) parts.push(`装备 ×${equip}`);
       if (egg) parts.push(`宠物蛋 ×${egg}`);
       Object.keys(mats).forEach(function (k) { parts.push(`${k} ×${mats[k]}`); });
@@ -572,8 +573,8 @@
 
     // 服务器托管挂机：每次战报回来，按服务器场数结算掉落与任务
     if (IdleBridge) {
-      IdleBridge.onChange = function (fights) {
-        if (fights > 0) settleReport(fights);
+      IdleBridge.onChange = function (fights, exp) {
+        if (fights > 0) settleReport(fights, exp);
       };
     }
 
