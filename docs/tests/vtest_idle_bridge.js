@@ -14,6 +14,7 @@
  *   J. 无 active 会话 → 安静退场不再重试
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
@@ -52,7 +53,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
 
   for (const f of ['../js/vendor/supabase.min.js', 'vstub.js', '../js/core/config.js', '../js/core/supabase.js',
     '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/idle-bridge.js']) {
-    vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+    VTF.load(ctx, f);
   }
   const C = code => vm.runInContext(code, ctx);
   const S = ms => new Promise(r => setTimeout(r, ms));

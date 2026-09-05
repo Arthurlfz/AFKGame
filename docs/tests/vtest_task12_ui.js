@@ -1,5 +1,6 @@
 /* 任务12 UI 渲染验证：宠物卡特质区 + 孵化弹窗 + 合成/涅槃预览 */
 const fs = require('fs'), vm = require('vm');
+const VTF = require('./vtest_files');
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
 function el() { return { dataset: {}, setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false } }, appendChild(c) { this.children.push(c) }, append() {}, addEventListener() {}, querySelector: () => el(), querySelectorAll: () => [], children: [], removeChild() {}, remove() {}, scrollTop: 0, scrollHeight: 0, disabled: false, value: '' } };
 const els = {};
@@ -7,7 +8,7 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, fet
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
-for (const f of require('./vtest_files').FILES) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of VTF.FILES) VTF.load(ctx, f);
 const C = code => vm.runInContext(code, ctx);
 const A = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ': ' + m); if (!c) process.exitCode = 1 };
 const S = ms => new Promise(r => setTimeout(r, ms));

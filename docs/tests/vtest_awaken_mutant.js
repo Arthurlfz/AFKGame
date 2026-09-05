@@ -1,5 +1,6 @@
 /* 验证「·异变」宠也能觉醒传承魂铸 */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
 function el() { return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', dataset: {}, style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false } }, appendChild() {}, append() {}, addEventListener() {}, querySelector: () => el(), querySelectorAll: () => [], children: [], remove() {}, scrollTop: 0, scrollHeight: 0, disabled: false, value: '0', id: '' } };
 const els = {};
@@ -7,7 +8,7 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, fet
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
-for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js']) VTF.load(ctx, f);
 const C = code => vm.runInContext(code, ctx);
 const A = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ': ' + m); if (!c) process.exitCode = 1 };
 

@@ -4,6 +4,7 @@
 //      ⑤ 建筑热区渲染不依赖宠物/装备（空号也安全）
 // 复用 vstub.js 桩；从 tests/ 目录运行（相对路径 ../js/）
 const fs=require('fs'),vm=require('vm');
+const VTF=require('./vtest_files');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 // 扩展 el 桩：appendChild 记录子节点（检测建筑热区渲染），querySelectorAll 按 class 返回子节点
 function el(inner){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector(sel){return this._q&&this._q[sel]||null},querySelectorAll(){return[]},children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0',offsetHeight:0,offsetWidth:0,getBoundingClientRect(){return{left:0,top:0,width:0,height:0}}}}
@@ -22,7 +23,7 @@ const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:globa
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/core/worldmap.js','../js/ui/ui-common.js','../js/ui/ui-console.js','../js/ui/ui-shell.js','../js/ui/ui-worldmap.js','../js/ui/ui-capital.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/core/worldmap.js','../js/ui/ui-common.js','../js/ui/ui-console.js','../js/ui/ui-shell.js','../js/ui/ui-worldmap.js','../js/ui/ui-capital.js'])VTF.load(ctx,f);
 const A=(c,m)=>{if(!c){console.error('FAIL: '+m);process.exit(1)}console.log('PASS: '+m)};
 const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);

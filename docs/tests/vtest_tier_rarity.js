@@ -6,6 +6,7 @@
  *  3. 重铸不许再写死 randInt(1,5)——那个写法不看成色，白装能洗出全 T1
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 function el() {
   return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', dataset: {}, style: { setProperty() {} },
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false } }, appendChild(c) { this.children.push(c) }, append() {},
@@ -15,7 +16,7 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, nav
   localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
   document: { getElementById: () => el(), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [], addEventListener() {}, removeEventListener() {} } };
 ctx.window = ctx; ctx.addEventListener = () => {}; ctx.removeEventListener = () => {}; vm.createContext(ctx);
-for (const f of ['../js/core/config.js', '../js/equipment/equipment.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of ['../js/core/config.js', '../js/equipment/equipment.js']) VTF.load(ctx, f);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 

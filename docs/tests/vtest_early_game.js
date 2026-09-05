@@ -14,6 +14,7 @@
  * 战斗循环与 battle.js tick 同源（100ms 一跳、速度/12、减法伤害、命中/暴击/吸血）
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 function el() {
   return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', dataset: {}, style: { setProperty() {} },
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false } }, appendChild() {}, append() {}, addEventListener() {},
@@ -24,7 +25,7 @@ const ctx = { console, Math, Date, setTimeout, clearTimeout, setInterval, clearI
   document: { getElementById: () => el(), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [], addEventListener() {}, removeEventListener() {} } };
 ctx.window = ctx; ctx.addEventListener = () => {}; ctx.removeEventListener = () => {}; vm.createContext(ctx);
 for (const f of ['../js/core/config.js', '../js/pet/enemy-data.js', '../js/equipment/equipment.js', '../js/pet/pet.js'])
-  vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+  VTF.load(ctx, f);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 

@@ -5,6 +5,7 @@
  *          玩家穿装备看着成功，F5 后全部回背包（2026-08-29 已加列 + 补错误上报）。
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
 function el() {
   return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', dataset: {}, style: { setProperty() {} },
@@ -26,7 +27,7 @@ for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/pet/en
   '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js',
   '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js',
   '../js/ui/ui-console.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js',
-  '../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js', '../js/main.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+  '../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js', '../js/main.js']) VTF.load(ctx, f);
 vm.runInContext('UI.initChat=function(){}', ctx); // 桩不支持 chat 查询链
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const S = ms => new Promise(r => setTimeout(r, ms));

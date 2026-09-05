@@ -9,6 +9,7 @@
  * 运行：node vtest_trade_records_rls.js（须在 tests/ 目录）
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 const mem = (() => { const m = {}; return {
   getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) },
   removeItem: k => { delete m[k] }
@@ -33,7 +34,7 @@ ctx.window = ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
-for (const f of ['../js/core/config.js', '../js/core/supabase.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of ['../js/core/config.js', '../js/core/supabase.js']) VTF.load(ctx, f);
 const S = ms => new Promise(r => setTimeout(r, ms));
 const C = code => vm.runInContext(code, ctx);
 const assert = (cond, msg) => { if (!cond) { console.error('❌ FAIL: ' + msg); process.exit(1); } console.log('✅ ' + msg); };

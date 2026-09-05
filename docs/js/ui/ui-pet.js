@@ -8,8 +8,7 @@
  *   它们在 游戏.html 里后加载，会覆盖同名 UI API —— 本文件不要重复实现，只提供共用的 PetUI 工具。
  * 依赖：pet / equipment / market；通用组件来自 ui-common
  * ============================================================ */
-(function () {
-  'use strict';
+'use strict';
 
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
@@ -636,4 +635,6 @@
   PetUI.traitsHtml = traitsHtml;
   PetUI.traitInheritLine = traitInheritLine;
   UI.traitsHtml = traitsHtml;
-})();
+
+// 导出供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 用 import 引用（ES Module）
+export { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitsHtml, traitInheritLine };

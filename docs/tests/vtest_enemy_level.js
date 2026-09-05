@@ -14,6 +14,7 @@
  *       自己算会遇到"测试与实现各写一套、实现改了测试还绿"的假绿问题。
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
+const VTF=require('./vtest_files');
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
 function el() {
   return { dataset: {}, className: '', textContent: '', innerHTML: '', id: '', value: '', disabled: false,
@@ -35,7 +36,7 @@ vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
 // ⚠️ enemy-data.js 必须加载：battle.js 的 getEnemyPool 读 window.EnemyData.list，
 // 漏了它怪池就是空的 → beginFight 直接 return，挂机"在跑"但一场都打不起来（state.enemy 恒为 null）。
-for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/pet/enemy-data.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js', '../js/main.js']) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
+for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/pet/enemy-data.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js', '../js/main.js']) VTF.load(ctx, f);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 const S = ms => new Promise(r => setTimeout(r, ms));
