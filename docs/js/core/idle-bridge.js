@@ -464,6 +464,23 @@
     const f = script.events[scriptIdx];
     if (!f || f.type !== 'fight') { scriptIdx++; return; }
 
+    // 上场衔接优先：怪没上台绝不判这场结束。
+    // ⚠️ 顺序铁律：必须先 mount 再判 kill——rAF 卡顿 / 切后台回来时 t 会快进，
+    //    若 kill 判定跑在 mount 前面，几场战斗会在怪从未出现过的情况下被
+    //    「空气击杀」（击杀日志连发 + 画面没怪），这就是用户看到的"打空气"。
+    if (!showEnemy) {
+      if (t < f.t0) {
+        // 场间 gap（模拟器自带 600ms）：空场，不进战斗推进
+        if (now - lastBarTs >= 100) {
+          lastBarTs = now;
+          UI.updateAction(0, 0);
+          if (UI.updateBars) UI.updateBars(Math.round(showHp), maxHp, 0, 1);
+        }
+        return;
+      }
+      mountShowEnemy(f.enemy, f);
+    }
+
     // 剧本时间到：本场结束（胜负 + 配额结算 + 场前判定）
     if (t >= f.t1) {
       if (f.win) {
@@ -485,20 +502,6 @@
       //    那会让播放总时长 > 预演时长，而 settle 在剧本播完才触发，
       //    服务器按被拉长的真实时间算账 → 每段都比预演多几场 → 补发刷屏。
       return;
-    }
-
-    // 上场衔接：场上无怪时按剧本时点挂怪（击杀后的 gap 里保持空场，不进战斗推进）
-    if (!showEnemy) {
-      if (t >= f.t0) {
-        mountShowEnemy(f.enemy, f);
-      } else {
-        if (now - lastBarTs >= 100) {
-          lastBarTs = now;
-          UI.updateAction(0, 0);
-          if (UI.updateBars) UI.updateBars(Math.round(showHp), maxHp, 0, 1);
-        }
-        return;
-      }
     }
 
     // 战斗中：场内进度（供命中时阶梯扣血；两刀之间血量静止，观感自然）
