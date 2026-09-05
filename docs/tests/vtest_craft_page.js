@@ -18,11 +18,12 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,80,'腐噜兽');p.level=40;p.growth=12;Pet.addPet(p);Pet.setActive(p.id);const q=Pet.createPet('血狐','🦊',4,100,20,9,50,'血狐');q.level=45;q.growth=15;q.traits=[{id:'战意',tier:1}];Pet.addPet(q);return true})()`);
   // 造一件白装
   C(`(function(){const eq={id:1,name:'测试甲',slot:'护甲',areaTier:1,materialTier:3,tier:3,rarity:{id:'white',label:'白色',color:'#b2aa9c'},base:{type:'hp',label:'生命',value:80},baseStats:{hp:80},affixes:{prefix:[],suffix:[]},cloudId:null,locked:false};Equipment.addToInventory(eq);globalThis.__eq=eq;return true})()`);
-  // 渲染打造面板：不应抛错
+  // 渲染打造面板：不应抛错（openCraftPanel 现重定向到右侧详情面板，不再写旧抽屉 craft-body）
   let threw = null;
   try { C('UI.openCraftPanel(globalThis.__eq)'); } catch (e) { threw = e; }
   A(threw === null, `打造面板渲染无异常${threw ? '（' + threw.message + '）' : ''}`);
-  const html = C(`document.getElementById('craft-body').innerHTML`);
+  // 魂铸区块由 UI.renderCraftInto 直接写入容器，直接测它（不依赖桩的 querySelector 缓存）
+  const html = C(`(function(){const h={innerHTML:'',querySelector:function(){return {innerHTML:''}},querySelectorAll:function(){return []},addEventListener:function(){}};UI.renderCraftInto(h,globalThis.__eq);return h.innerHTML})()`);
   A(html.length > 0, '打造页有输出内容');
   A(html.indexOf('craft-soul') >= 0, '打造页含魂铸区块');
   // 下拉选项应包含出战宠标记
@@ -40,11 +41,9 @@ const S = ms => new Promise(r => setTimeout(r, ms));
 
   // ---- 魂铸词缀显示回归 ----
   // 给装备打上魂铸词缀，验证背包卡 + tooltip 都渲染
-  C(`(function(){const eq=globalThis.__eq;eq.soulAffix={type:'lifesteal',awaken:false,traitId:'嗜血',tier:2,stat:'lifesteal',value:5,source:'soulcast',label:'魂·嗜血 T2'};UI.openCraftPanel(eq);return true})()`);
-  const bodyHtml = C(`document.getElementById('craft-body').innerHTML`);
+  C(`(function(){const eq=globalThis.__eq;eq.soulAffix={type:'lifesteal',awaken:false,traitId:'嗜血',tier:2,stat:'lifesteal',value:5,source:'soulcast',label:'魂·嗜血 T2'};return true})()`);
+  const bodyHtml = C(`(function(){const h={innerHTML:'',querySelector:function(){return {innerHTML:''}},querySelectorAll:function(){return []},addEventListener:function(){}};UI.renderCraftInto(h,globalThis.__eq);return h.innerHTML})()`);
   A(bodyHtml.indexOf('魂·嗜血') >= 0, '打造页已铸入区显示魂铸词缀');
-  const tipHtml = C(`(function(){const eq=globalThis.__eq;const pet=Pet.getActivePet();const t=UI.buildEquipTip?null:null;return document.getElementById('craft-body').innerHTML})()`);
-  A(tipHtml.indexOf('魂·嗜血') >= 0, '打造页已铸入区显示魂铸词缀（重复检查）');
   console.log('\n打造页回归验证完成');
   process.exit(process.exitCode || 0);
 })().catch(e => { console.error('EXC', e && (e.stack || e.message)); process.exit(1) });

@@ -60,20 +60,12 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   // 一件带 hp% 百分比词缀的（验证百分比词缀也走 getStats 换算，不是简单加减）
   mkItem(904, 30, { type: 'hp', label: '生命', tier: 3, value: 10 });
 
-  // 渲染背包，抓详情浮层
-  created.length = 0;
-  C('UI.renderInventory()');
-  const tips = created.filter(e => e.className === 'equip-tip').map(e => e.innerHTML || '');
-  A(tips.length >= 3, `渲染出 ${tips.length} 个装备详情浮层`);
-
-  const tipOf = name => tips.find(h => h.indexOf(name) >= 0) || '';
-  // 只取「对比身上装备」之后的内容再断言：浮层里还有基底/词缀展示行（如「生命 +10%」），
-  // 直接在整段 HTML 上正则会匹配到展示行而不是对比结果。
-  const cmpOf = h => { const i = h.indexOf('对比身上装备'); return i >= 0 ? h.slice(i) : ''; };
-  const strong = cmpOf(tipOf('测试剑902')), same = cmpOf(tipOf('测试剑903')), pctItem = cmpOf(tipOf('测试剑904'));
+  // 对比功能由 buildEquipCompare 渲染（现放右侧详情面板 .eq-detail-compare，不再批量建 equip-tip 浮层）
+  const cmp = name => C(`(function(){const pet=Pet.getActivePet();const eq=Equipment.getInventory().find(e=>e.name==='${name}');return UI.buildEquipCompare(pet,eq)})()`);
+  const strong = cmp('测试剑902'), same = cmp('测试剑903'), pctItem = cmp('测试剑904');
   const grab = (h, label) => (h.match(new RegExp(label + ' [+−]([\\d.]+)')) || [])[1];
 
-  A(strong.indexOf('对比身上装备') >= 0, '详情浮层里有「对比身上装备」分段');
+  A(strong.indexOf('对比身上装备') >= 0, '详情里有「对比身上装备」分段');
   A(strong.indexOf('攻击 +20') >= 0, `强武器对比区显示 攻击 +20（实际：攻击 ${grab(strong, '攻击')}）`);
   A(strong.indexOf('#5fd18b') >= 0, '提升用绿色标记');
 
@@ -85,9 +77,9 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   const expectHp = Math.round(coreHp * 1.1) - coreHp;
   A(pctHpDelta === expectHp, `百分比词缀按底座换算：生命 +${pctHpDelta}（期望 +${expectHp} = 底座 ${coreHp} × 10%，成长增量不放大，而非固定 +10）`);
 
-  A(tips.every(h => h.indexOf('评分') < 0), '对比里不展示评分（评分只用于排序/清理）');
+  A([strong, same, pctItem].every(h => h.indexOf('评分') < 0), '对比里不展示评分（评分只用于排序/清理）');
 
-  // 试穿是只读的：渲染完对比后，宠物身上仍然是最初那件弱武器
+  // 试穿是只读的：buildEquipCompare 走浅拷贝，渲染后宠物身上仍是最初那件弱武器
   const stillWeak = C(`(function(){const eq=Pet.getActivePet().equipment['武器'];return eq&&eq.id})()`);
   A(stillWeak === 901, `试穿只读：身上仍是原装备（id=${stillWeak}），对比没有改状态`);
 

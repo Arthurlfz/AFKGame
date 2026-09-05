@@ -444,6 +444,7 @@
   UI.renderEqDetail = renderEqDetail;
   UI.renderEqDetailInto = renderEqDetailInto;
   UI.renderBagEqDetail = renderBagEqDetail;
+  UI.buildEquipCompare = buildEquipCompare; // 纯函数导出，供换装对比测试直接断言（不依赖浮层渲染）
   UI.hideEqDetail = hideEqDetail;
   UI.openSalvagePanel = openSalvagePanel;
   UI.closeSalvagePanel = closeSalvagePanel;
