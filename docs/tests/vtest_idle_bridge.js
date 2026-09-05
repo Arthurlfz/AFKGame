@@ -62,6 +62,13 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   // 桩：给一个登录态，否则桥接层拿不到 token 会直接 NO_LOGIN
   C('Supabase.getSession = async () => ({ access_token: "tok-1", user: { id: "u1" } })');
 
+  // 桩：让 buildNextScript 在沙箱里能跑通（真实环境靠 idle_sessions 表 + battle.js）
+  // 必须在第一次 settle 之前装好——loadSim 会把首次加载结果缓存，之后再补就晚了
+  C('Supabase.getClient = () => ({ from: () => ({ select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { id: "sess-1", last_settled_at: new Date().toISOString() } }) }) }) }) }) }) });');
+  C('window.Battle = window.Battle || {}; window.Battle.getCurrentArea = () => ({ id: "a1", levelRange: [1, 6] }); window.Battle.pickScaledEnemy = () => ({ name: "测试怪", level: 3 });');
+  C('window.Drop = { rollReward: async () => { globalThis.__dropCalls = (globalThis.__dropCalls || 0) + 1; return { type: "none" }; } };');
+  C('window.BattleSim = { simulateSessionScript: function (input) { globalThis.__simCalls = globalThis.__simCalls || []; globalThis.__simCalls.push(input); return { events: [{ type: "fight", t0: 0, t1: 5000, win: true, enemy: { name: "腐噜兽", level: 3 }, enemyLevel: 3, enemyName: "腐噜兽", exp: 10, hpStart: 100, hpLeft: 80 }], endHp: 80, petMaxHp: 100, totalExp: 10 }; } };');
+
   /* ---------- A. 总开关 ---------- */
   A(C('IdleBridge.enabled') === true, 'A1. 默认开启服务器托管挂机');
   A(C('IdleBridge.isActive()') === false, 'A2. 初始未激活');
@@ -142,6 +149,22 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(C('IdleBridge.isActive()') === false, 'J1. 服务器无会话 → 停止不再重试');
   settleResp = realResp;
+
+  /* ---------- K. 剧本时长 = 真实结算窗口（不再固定 30 秒） ---------- */
+  await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
+  await S(60);
+  C('globalThis.__simCalls = []; globalThis.__dropCalls = 0;');
+  settleResp = { fights: 2, exp: 20, endHp: 500, petMaxHp: 800, level: 5, expLeft: 10, elapsedSec: 45, totalFights: 200, ok: true };
+  await C('IdleBridge.settleNow()');
+  const lastSim = C('globalThis.__simCalls[globalThis.__simCalls.length-1]');
+  A(lastSim && lastSim.seconds === 45, 'K1. 下一段剧本时长用上次窗口真实秒数 45（服务器按真实时间记账，演出必须同长度）');
+  A(C('globalThis.__dropCalls') === 2, 'K2. 服务器打了 2 场、演出 0 场 → 补发 2 次掉落（不掉在空气里）');
+
+  /* ---------- L. 补发上限（切后台很久回来不刷屏） ---------- */
+  C('globalThis.__dropCalls = 0;');
+  settleResp = { fights: 50, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, elapsedSec: 120, totalFights: 250, ok: true };
+  await C('IdleBridge.settleNow()');
+  A(C('globalThis.__dropCalls') === 20, 'L1. 补发上限 20 场（50 场只补 20，防止一次性刷垮日志）');
 
   console.log('\nALL IDLE BRIDGE TESTS PASSED');
 })().catch(e => { console.error('FAIL: 未捕获异常 ' + (e && e.stack || e)); process.exit(1) });

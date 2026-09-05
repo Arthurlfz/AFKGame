@@ -21,12 +21,15 @@
   const Pet = window.Pet;
 
   const FN_URL = 'https://asklogeayzlqpeejuvjj.supabase.co/functions/v1/battle-settle';
-  const SETTLE_MS = 30000;  // 30 秒：远小于服务器 120 秒宽限窗口，在线期全覆盖
+  const SETTLE_MS = 30000;      // 剧本时长基准（首次/兜底估计值；有真值后用上次窗口的真实秒数）
+  const SAFETY_SETTLE_MS = 120000; // 兜底结算：剧本生成失败/卡死时也要把真账要回来（= 服务器宽限窗口）
+  const RESPAWN_GAP_MS = 2200;  // 场间休息：击杀/战败后换怪前的空场演出
+  const SCRIPT_RETRY_MS = 5000; // 剧本生成失败后的重试冷却（不设会每帧打一次服务器）
 
   const ENABLED = !/[?&]noidle=1\b/.test(location.search);
 
   let active = false;
-  let timer = null;         // settle 定时器
+  let timer = null;         // 兜底 settle 定时器
   let petId = null;         // 本次会话绑定的宠物 cloudId
   let totalFights = 0;      // 服务器战报累计场数（展示用）
   let onChange = null;      // 战报到账通知（上层刷新界面）
@@ -35,6 +38,11 @@
   let script = null;        // {events:[{type,t0,t1,win,enemy,enemyLevel,enemyName,exp,hpStart,hpLeft}], endHp, petMaxHp}
   let scriptT0 = 0;         // 剧本时间轴起点（performance.now）
   let scriptIdx = -1;       // 当前事件下标（-1 = 尚未开始）
+  let lastElapsedSec = 0;   // 上次结算窗口的真实秒数（下一段剧本时长估计：服务器按真实时间记账，演出就得按同样长度演）
+  let respawnAt = 0;        // 场间休息截止时间戳（>now = 空场等待中，时间轴暂停）
+  let pendingNext = '';     // 空场结束后的动作：heal | fight | none
+  let nextScriptTryAt = 0;  // 剧本生成失败后的重试冷却时间戳
+  let shownFights = 0;      // 本窗口内演出已结算的击杀数（与服务器 r.fights 对账，补发掉落）
 
   // 演出状态
   let showHp = 0;           // 我方演出血量（剧本插值）
@@ -114,7 +122,10 @@
 
   // 生成下一段演出剧本。⚠️ 必须在 settle 成功后调用：
   // 此时表里的 last_settled_at 刚更新为本次值，与服务器下一次 settle 所用的种子一致。
-  async function buildNextScript(startHp) {
+  // seconds = 这段剧本要演多久。⚠️ 必须与服务器下一次结算窗口的真实长度一致：
+  // 服务器按「真实经过时间」记账，演出若固定演 30 秒而服务器算了 40 秒，
+  // 多出来的 10 秒战斗没有任何演出与掉落，场数/经验/掉落就对不上了。
+  async function buildNextScript(startHp, seconds) {
     const pet = Pet.getActivePet();
     if (!pet) { warn('剧本失败：无出战宠物'); return null; }
     const s = await Supabase.getSession();
@@ -133,7 +144,7 @@
       const sc = m.simulateSessionScript({
         pet: pet,
         areaId: area.id,
-        seconds: SETTLE_MS / 1000,
+        seconds: seconds || (SETTLE_MS / 1000),
         seed: hashSeed([uid, session.id, session.last_settled_at]),
         config: window.Config,
         enemyList: (window.EnemyData && window.EnemyData.list) || [],
@@ -152,7 +163,9 @@
   }
 
   /* ---------- settle 定时 ---------- */
-  function schedule() { clearTimeout(timer); timer = setTimeout(tick, SETTLE_MS); }
+  // 兜底定时：正常结算由「剧本演完」驱动（gaugeTick），这个只是保险——
+  // 剧本生成一直失败、或演出卡住时，至少还能把服务器的真账要回来（窗口上限 120 秒）。
+  function schedule() { clearTimeout(timer); timer = setTimeout(tick, SAFETY_SETTLE_MS); }
   async function tick() {
     if (!active) return;
     await settleNow();
@@ -211,19 +224,53 @@
       return r;
     }
     applyResult(r);
-    // 真值锚点已对齐（endHp）→ 预演下一段 30 秒，生成演出剧本
+    // 掉落/任务对账：服务器这次窗口打了 r.fights 场，演出只结算了 shownFights 场。
+    // 差额（剧本时长估计偏差、切后台节流、剧本生成失败等）也要给玩家东西，
+    // 否则「服务器算进了经验和场数，玩家却没看到掉落」= 掉在空气里。
+    compensateFights((r.fights || 0) - shownFights);
+    shownFights = 0;   // 新剧本重新计数
+    // 下一段剧本时长用这次窗口的真实秒数：服务器按真实时间记账，演出按同样长度演
+    if (r.elapsedSec > 0) lastElapsedSec = r.elapsedSec;
     try {
-      const sc = await buildNextScript(r.endHp);
+      const sc = await buildNextScript(r.endHp, lastElapsedSec || (SETTLE_MS / 1000));
       if (sc && sc.events && sc.events.length) {
         script = sc;
         scriptT0 = performance.now();
-        scriptIdx = -1; // advanceScript 取第一个事件
+        scriptIdx = -1; // gaugeTick 取第一个事件
+        respawnAt = 0; pendingNext = ''; nextScriptTryAt = 0;
+      } else {
+        nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS; // 冷却，防每帧重试打爆服务器
       }
     } catch (e) {
+      nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS;
       if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 剧本生成异常：' + ((e && e.message) || e));
     }
     notifyChange();
     return r;
+  }
+
+  /* ---------- 场次对账：服务器打了但演出没演到的场次，补发掉落与任务 ----------
+   * 只补掉落与任务进度，**不补经验**——经验/等级由服务器写库（applyResult 已覆盖）。
+   * 补发上限 20 场：切后台被节流很久回来时不会一口气刷几十条掉落把日志冲垮。
+   */
+  function compensateFights(missing) {
+    const n = Math.max(0, Math.min(20, Number(missing) || 0));
+    if (n <= 0) return;
+    const area = window.Battle && window.Battle.getCurrentArea ? window.Battle.getCurrentArea() : null;
+    const pet = Pet.getActivePet();
+    for (let i = 0; i < n; i++) {
+      if (window.Quest && window.Quest.reportType) {
+        window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
+      }
+      const foe = (window.Battle && window.Battle.pickScaledEnemy) ? window.Battle.pickScaledEnemy() : null;
+      if (area && foe && window.Drop && window.Drop.rollReward) {
+        window.Drop.rollReward(foe, area).then(function (r2) {
+          if (r2 && window.UI && window.UI.showLoot) window.UI.showLoot(r2);
+        });
+      }
+    }
+    if (window.UI && window.UI.addLog) window.UI.addLog(`⚡ 补发 ${n} 场未演出的掉落（服务器已结算）`);
+    if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
   }
 
   /* ---------- 战报应用（经验/等级/真值血量锚点） ---------- */
@@ -392,12 +439,31 @@
     const C = window.Config;
     const maxHp = Pet.getStats(pet).hp;
 
-    // 剧本播完/未就绪：结算续段（settling 锁防重入，带冷却防刷）
+    // 剧本播完/未就绪：结算续段（settling 锁防重入 + 冷却，剧本生成失败时不每帧打服务器）
     if (!script || scriptIdx >= script.events.length) {
-      if (!settling) settleNow().catch(function () { /* 忽略 */ });
+      if (!settling && now >= nextScriptTryAt) settleNow().catch(function () { /* 忽略 */ });
       return;
     }
     const t = now - scriptT0;
+
+    // 场间休息：击杀/战败后的空场演出，时间轴暂停（scriptT0 已后推，见下面击杀分支）
+    if (respawnAt > now) return;
+    if (respawnAt && now >= respawnAt) {
+      respawnAt = 0;
+      const what = pendingNext; pendingNext = '';
+      const ef0 = document.getElementById('enemy-fighter');
+      if (what === 'heal') {
+        enterHealWait(UI);
+      } else if (what === 'fight') {
+        if (ef0) ef0.style.display = '';
+        const f2 = script.events[scriptIdx];
+        if (f2 && f2.type === 'fight') mountShowEnemy(f2.enemy, f2);
+      } else {
+        script = null; // 剧本演完 → 结算续段
+        if (!settling && now >= nextScriptTryAt) settleNow().catch(function () { /* 忽略 */ });
+      }
+      return;
+    }
 
     // 场前回血等待：回满 → 遭遇下一事件的新怪
     if (waitingHeal) {
@@ -431,13 +497,15 @@
       const stop2 = ((C.battle || {}).stopHpRatio) || 0.3;
       const needHeal = (!f.win || showHp <= maxHp * stop2);
       const nxt = script.events[scriptIdx];
-      // 场间休息：击杀/战败后停 2.2 秒再上下一只（胜利淡出动画含在内）
-      setTimeout(function () {
-        if (!active) return;
-        if (needHeal) enterHealWait(UI);
-        else if (nxt) mountShowEnemy(nxt.enemy, nxt);
-        else { script = null; if (!settling) settleNow().catch(function () { /* 忽略 */ }); }
-      }, 2200);
+      const ef = document.getElementById('enemy-fighter');
+      if (ef) ef.style.display = 'none';
+      // 场间休息 2.2 秒（胜利淡出/换怪）。⚠️ 这段空场必须**并进剧本时间轴**：
+      // scriptT0 整体后推 RESPAWN_GAP_MS，后续所有事件的时点跟着一起延后。
+      // 不后推的话，下一只怪一上台就已经"打了一半"（prog 直接跳到中途 → 血条瞬跳、进度错乱）；
+      // 而且这段时间是真实流逝的，服务器会照算进去，前端演出的总长度必须和它一致。
+      scriptT0 += RESPAWN_GAP_MS;
+      respawnAt = now + RESPAWN_GAP_MS;
+      pendingNext = needHeal ? 'heal' : (nxt ? 'fight' : 'none');
       return;
     }
 
@@ -469,6 +537,7 @@
   function settleKill(f) {
     const area = window.Battle.getCurrentArea();
     const pet = Pet.getActivePet();
+    shownFights++; // 与服务器 r.fights 对账用（差额场次在 settle 时补发掉落）
     if (window.Quest && window.Quest.reportType) {
       window.Quest.reportType('kill', 1, { areaId: area ? area.id : null, petName: pet ? pet.name : null });
     }
@@ -522,6 +591,9 @@
     gauge.pet = 0; gauge.enemy = 0;
     freezeUntil.pet = 0; freezeUntil.enemy = 0;
     waitingHeal = false;
+    respawnAt = 0; pendingNext = '';
+    lastElapsedSec = 0; nextScriptTryAt = 0; shownFights = 0;
+    script = null; scriptIdx = -1;
     lastGaugeTs = performance.now();
     preloadShowEnemies();
     gaugeRaf = requestAnimationFrame(gaugeTick);
@@ -530,6 +602,7 @@
   function stopShow() {
     if (gaugeRaf) { cancelAnimationFrame(gaugeRaf); gaugeRaf = null; }
     showEnemy = null;
+    respawnAt = 0; pendingNext = '';
   }
 
   window.IdleBridge = {
