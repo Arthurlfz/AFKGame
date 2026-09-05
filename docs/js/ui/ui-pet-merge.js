@@ -126,7 +126,7 @@
       <div class="es-preview-row">${iconHtml(sub.name)} ${sub.name}（成长 ${sub.growth.toFixed(1)}）将消失，消耗 ${matAmt} 只${matName}（持有 ${haveMat}）</div>
       ${traitInheritLine(main, sub, 'nirvana')}
       ${M.resetLevel ? '<div class="warn"> 涅槃后等级重置回 1 级，经验清零，属性按 1 级 × 新成长重算</div>': ''}
-      ${!matOk ? `<div class="es-preview-row warn="> 材料不足：需要 ${matAmt} 只${matName}，当前持有 ${haveMat}</div>` : ''}
+      ${!matOk ? `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 只${matName}，当前持有 ${haveMat}</div>` : ''}
       <div class="es-stats">属性变化：</div>
       ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;
     cb.innerHTML = `<button class="btn-mini primary" id="merge-ok"${matOk ? '': 'disabled'}>确认涅槃</button>`;

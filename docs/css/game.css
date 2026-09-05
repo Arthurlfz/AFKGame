@@ -201,6 +201,9 @@ body {
 .es-route small { font-size:var(--fs-xs); color:var(--text-dim); }
 .es-preview { padding:14px; border:1px solid var(--line); background:var(--inset); font-size:var(--fs-md); color:var(--text-dim); }
 .es-preview-row { margin:3px 0; }
+/* 预览区警告文案（材料不足 / 等级不足 / 进化达上限 / 涅槃重置等级）：红字加粗。
+   之前只有 .merge-hint 内部的 .warn 有样式，预览区里的 .warn 是光秃秃的普通字色 —— 统一在这里兜底。 */
+.warn { color:var(--danger-hi); font-weight:700; }
 .es-stats { margin-top:8px; color:var(--text-dim); font-weight:700; }
 .es-confirm { margin-top:10px; }
 .es-confirm .btn-mini.primary { padding:10px 22px; font-size:var(--fs-md); }

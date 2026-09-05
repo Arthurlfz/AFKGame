@@ -112,7 +112,7 @@
       ${mutPct ? `<div class="es-preview-row"> 有 <b>${mutPct}%</b> 概率变异：成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」</div>` : ''}
       <div class="es-preview-row">两只素材（${main.name}、${sub.name}）都将消失，消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）</div>
       ${traitInheritLine(main, sub, 'synth')}
-      ${!matOk ? `<div class="es-preview-row warn="> 材料不足：需要 ${matAmt} 颗${matName}，当前持有 ${haveMat}</div>` : ''}`;
+      ${!matOk ? `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 颗${matName}，当前持有 ${haveMat}</div>` : ''}`;
     cb.innerHTML = `<button class="btn-mini primary" id="synth-ok"${matOk ? '': 'disabled'}>确认合成</button>`;
     cb.querySelector('#synth-ok').onclick = async () => {
       if (!matOk) { showToast('无法合成', '材料不足'); return; }

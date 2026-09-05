@@ -134,10 +134,10 @@
     const matOk = have >= 1;
     const canEvolve = lvOk && matOk;
     let warnRow = '';
-    if (!lvOk) warnRow += `<div class="es-preview-row warn="> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
-    if (!matOk) warnRow += `<div class="es-preview-row warn="> 材料不足：需要 1 个 ${matName}，当前持有 ${have}</div>`;
+    if (!lvOk) warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
+    if (!matOk) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 1 个 ${matName}，当前持有 ${have}</div>`;
     pb.innerHTML = `
-      <div class="es-preview-row">路线：<b>${iconHtml(route.to, true)} ${route.to}</b>（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
+      <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
       <div class="es-preview-row">消耗：<b>${matName} ×1</b>（当前持有 ${have}）</div>
       <div class="hint">等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
       ${warnRow}
