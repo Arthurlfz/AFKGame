@@ -83,7 +83,8 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   const r1 = await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
   A(r1.ok === true, 'C1. start 成功');
   A(C('IdleBridge.isActive()') === true, 'C2. start 后 isActive=true');
-  A(calls.length === 1 && calls[0].action === 'start', 'C3. 发出 start 请求');
+  A(calls.some(c => c.action === 'start'), 'C3. 发出 start 请求');
+  await S(60); // 等 start 内部 fire-and-forget 的锚点结算落地（占住 settling 锁）
 
   /* ---------- D. 覆盖式应用 ---------- */
   // 用宠物真实血上限来构造服务器返回值（setCurHp 会 clamp 到上限，构造值不能超）
@@ -106,14 +107,14 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(pet().exp === 777, 'F1. 满级时 exp 留本地不动（经验池归本地管，服务器是晶石计数）');
 
-  /* ---------- G. 战报场数全量上交（一套账） ---------- */
-  C('globalThis.__reported = -1; IdleBridge.onChange = function(f){ globalThis.__reported = f; }');
+  /* ---------- G. 战报到账通知 + 覆盖式应用（剧本驱动版） ---------- */
+  C('globalThis.__notified = 0; IdleBridge.onChange = function(){ globalThis.__notified++; }');
   C('Pet.getActivePet().level = 5');
-  settleResp = { fights: 10, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, totalFights: 100, ok: true };
+  settleResp = { fights: 10, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, totalFights: 100, detail: [{ win: true, lv: 6, name: '腐噜兽', exp: 23 }], ok: true };
   await C('IdleBridge.settleNow()');
-  A(C('globalThis.__reported') === 10, 'G1. 战报 10 场全量交给上层（本地不算账，无相减）');
+  A(C('globalThis.__notified') >= 1, 'G1. 战报到账通知已发');
   await C('IdleBridge.settleNow()');
-  A(C('globalThis.__reported') === 10, 'G2. 服务器值不变 → 上报值不变（覆盖式幂等）');
+  A(pet().level === 5 && pet().exp === 10, 'G2. 服务器值不变 → 覆盖式应用不产生漂移');
 
   /* ---------- H. 换宠 → 停止不重开 ---------- */
   C(`(function(){
@@ -129,6 +130,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   /* ---------- I. 网络失败不崩 ---------- */
   const r2 = await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
   A(r2.ok === true, 'I0. 重新 start 成功');
+  await S(60); // 等 start 的锚点结算落地（释放 settling 锁）
   failNext = true;
   const r3 = await C('IdleBridge.settleNow()');
   A(r3.error === 'NETWORK', 'I1. 网络失败返回 error 而非抛异常');

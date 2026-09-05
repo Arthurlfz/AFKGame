@@ -1,5 +1,5 @@
-import { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } from './ui-pet.js';
-
+(function () {
+  'use strict';
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
   const Config = window.Config;
@@ -10,6 +10,8 @@ import { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, tr
   const Merge = window.Merge;
   const Evolve = window.Evolve || { canEvolve: () => false, getEvolutionRoutes: () => [], getRouteMaterial: () => null };
   const PetSprites = window.PetSprites;
+  const PetUI = window.PetUI || (window.PetUI = {});
+  const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
 
   let evolveMainId = null;
   let evolvePreview = null;
@@ -171,3 +173,4 @@ import { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, tr
   /* ---------- 对外 API ---------- */
   UI.renderEvolveTab = renderEvolveTab;
   UI.renderEvolveHint = renderEvolveHint;
+})();

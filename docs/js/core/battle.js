@@ -456,5 +456,11 @@
     if (!picked) return null;
     return scaleEnemyStats(picked.enemy, picked.area);
   }
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, state, calcDamage };
+  // 剧本驱动演出：把剧本指定的怪按当前图强度缩放（怪由剧本决定，不能随机）
+  function scaleEnemyOf(enemyData) {
+    const area = getCurrentArea();
+    if (!area || !enemyData) return null;
+    return scaleEnemyStats(Object.assign({ level: enemyData.level || 1 }, enemyData), area);
+  }
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage };
 })();

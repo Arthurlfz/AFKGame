@@ -95,53 +95,9 @@
   }
 
   /* ---------- 战报结算（服务器托管挂机专用） ----------
-   * 服务器真打，本地放电影：战报带来的场数就是真实场数（一套账，无需相减）。
-   * 按战报 roll 掉落 + 上报任务 kill 计数，汇总成一条播报。
+   * 已迁移至 idle-bridge.js settleKill：演出每击杀一只怪即时结算一场（经验/掉落/任务），
+   * 战报只负责补充"配额 + 每场明细"，反馈每场即时、总量由战报精确控制。
    */
-  let reportBusy = false;   // 防重入：上一批战报还在结算时，新战报先记账稍后处理
-  let reportPending = 0;
-  async function settleReport(fights, exp) {
-    if (!fights || fights <= 0) return;
-    if (reportBusy) { reportPending += fights; return; }
-    reportBusy = true;
-    try {
-      const area = window.Battle.getCurrentArea();
-      if (!area || !window.Battle.pickEnemy) return;
-      // 任务：服务器替我们打了几场就报几场 kill（配了 area 的任务只算该图）
-      const pet = getActivePet();
-      if (window.Quest && window.Quest.reportType) {
-        window.Quest.reportType('kill', fights, { areaId: area.id, petName: pet ? pet.name : null });
-      }
-      const mats = {};
-      let equip = 0, egg = 0;
-      for (let i = 0; i < fights; i++) {
-        const picked = window.Battle.pickEnemy();
-        if (!picked) break;
-        const r = await rollReward(picked.enemy, area);
-        if (!r) continue;
-        if (r.type === 'equipment') equip++;
-        else if (r.type === 'egg') egg++;
-        else if (r.type === 'material' && r.material) mats[r.material] = (mats[r.material] || 0) + (r.qty || 1);
-        // 分批让出主线程：批量 roll 时不让画面/输入卡住
-        if (i % 8 === 7) await new Promise(function (res) { setTimeout(res, 0); });
-      }
-      const parts = [];
-      if (exp) parts.push(`经验 +${exp}`);
-      if (equip) parts.push(`装备 ×${equip}`);
-      if (egg) parts.push(`宠物蛋 ×${egg}`);
-      Object.keys(mats).forEach(function (k) { parts.push(`${k} ×${mats[k]}`); });
-      addLog(parts.length
-        ? `🎁 战报 ${fights} 场：${parts.join('、')}`
-        : `🎁 战报 ${fights} 场（这次没掉东西）`);
-      renderAll();
-      refreshStats();
-      syncButton();
-    } finally {
-      reportBusy = false;
-      // 结算期间又到的战报，接着处理
-      if (reportPending > 0) { const p = reportPending; reportPending = 0; settleReport(p); }
-    }
-  }
 
   /* ---------- 开局选宠 ---------- */
   let starterPending = false;
@@ -571,10 +527,12 @@
     if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
     if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
-    // 服务器托管挂机：每次战报回来，按服务器场数结算掉落与任务
+    // 服务器托管挂机：战报到账 → 刷新界面（每场的经验/掉落已由击杀即时结算，见 idle-bridge settleKill）
     if (IdleBridge) {
-      IdleBridge.onChange = function (fights, exp) {
-        if (fights > 0) settleReport(fights, exp);
+      IdleBridge.onChange = function () {
+        renderAll();
+        refreshStats();
+        syncButton();
       };
     }
 

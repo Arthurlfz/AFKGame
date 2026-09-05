@@ -255,8 +255,8 @@
   function updateBars(petHp, petMaxHp, enemyHp, enemyMaxHp) {
     $('pet-hp-bar').style.width = Math.max(0, (petHp / petMaxHp) * 100) + '%';
     $('enemy-hp-bar').style.width = Math.max(0, (enemyHp / enemyMaxHp) * 100) + '%';
-    $('pet-hp-text').textContent = `${Math.max(0, petHp)}/${petMaxHp}`;
-    $('enemy-hp-text').textContent = `${Math.max(0, enemyHp)}/${enemyMaxHp}`;
+    $('pet-hp-text').textContent = `${Math.max(0, Math.round(petHp))}/${petMaxHp}`;
+    $('enemy-hp-text').textContent = `${Math.max(0, Math.round(enemyHp))}/${enemyMaxHp}`;
     const enemy = getBattleEnemy();
     if (enemy) enemy.hp = Math.max(0, enemyHp);
     updateEnemyTipHp(enemy);
@@ -403,7 +403,7 @@
     floatActive.set(host, active + 1);
     const el = document.createElement('div');
     el.className = 'fs-float ' + (type || 'normal') + (opts && opts.side === 'right' ? ' side-right' : '');
-    const label = FLOAT_LABEL[type] || '攻击';
+    const label = (opts && opts.label) || FLOAT_LABEL[type] || '攻击';
     const sign = type === 'lifesteal' ? '+' : type === 'miss' ? '' : '-';
     el.textContent = type === 'miss' ? label : `${label}：${sign}${text}`;
     host.appendChild(el);
@@ -413,9 +413,10 @@
     }, 850);
   }
   // battle.js 结算时调用（伤害/暴击/吸血实际生效那一刻）→ 转飘字；业务计算零改动
-  function showDamage(target, damage, type) {
+  function showDamage(target, damage, type, label) {
     if (type === 'crit') flashStage('stage-shake', 300); // 暴击：舞台震屏
-    showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : null);
+    // label：自定义飘字标签（如主动技能名"腐蚀喷吐：-1500"）；吸血固定右侧错位
+    showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : (label ? { label: label } : null));
   }
 
   /* ---------- 挂机状态徽章（battle.js 调用） ---------- */
