@@ -142,21 +142,25 @@ body {
 .pet-tab-pane { display:none; }
 .pet-tab-pane.active { display:block; }
 
-/* 通用问号 tooltip：.q-tip 问号图标，悬停/点击显示 data-tip 说明 */
+/* 通用问号 tooltip：.q-tip[data-tip] 悬停/点击弹出说明。
+ * 唯一机制 = CSS content:attr(data-tip)——文案写在属性里即可，无需 JS、无需子节点。
+ * （2026-09-06 修复：旧样式只认 .q-pop 子节点，而 HTML 写的是 data-tip 属性，两套约定互相脱节，
+ *  问号悬停/点击都不出气泡；现在统一走 attr，.q-pop 结构废弃。） */
 .q-tip {
   display:inline-flex; align-items:center; justify-content:center;
   width:16px; height:16px; border-radius:50%; cursor:help;
   font-size:var(--fs-2xs); line-height:1; color:var(--accent-hi);
   border:1px solid var(--line); background:var(--panel-2); position:relative; margin-left:4px;
 }
-.q-tip .q-pop {
+.q-tip::after {
+  content: attr(data-tip);
   display:none; position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%);
-  width:max-content; max-width:240px; padding:8px 10px; z-index:60;
+  width:max-content; max-width:240px; padding:8px 10px; z-index:60; text-align:left;
   background-color:var(--panel-2); background-image:var(--tex-grain);
   border:1px solid var(--line-hi); border-radius:var(--radius-sm); box-shadow:var(--shadow-panel);
   font-size:var(--fs-xs); font-weight:400; color:var(--text-dim); line-height:1.6; white-space:normal;
 }
-.q-tip:hover .q-pop, .q-tip.open .q-pop { display:block; }
+.q-tip:hover::after, .q-tip.open::after { display:block; }
 .pet-wrap { display:grid; grid-template-columns:380px 1fr; gap:14px; align-items:stretch; }
 .pcol { display:flex; flex-direction:column; gap:14px; min-width:0; }
 /* 玩法说明面板（合成/涅槃/进化 tab 右列）：填满 + 暗黑风步骤卡 */
@@ -849,6 +853,16 @@ img.pet-avatar-sprite.inline { display:inline-block; vertical-align:-6px; margin
   font-size:0.625rem; letter-spacing:1px;
   color:var(--accent-hi); font-weight:700;
   text-shadow:0 1px 2px rgba(0,0,0,.9);
+}
+/* 神级宠（2026-09-06）：金色描边 + 右上角「神」徽章，一眼区分普通终阶宠 */
+.pet-card--god { border-color:rgb(var(--action-gold-rgb) / .55); }
+.pet-card--god:hover, .pet-card--god.active { border-color:var(--action-gold, #f2b632); box-shadow:0 0 0 1px rgb(var(--action-gold-rgb) / .4) inset, 0 0 14px rgb(var(--action-gold-rgb) / .25); }
+.pet-card--god .icon { border-color:rgb(var(--action-gold-rgb) / .7); box-shadow:inset 0 0 14px rgba(0,0,0,.5), 0 0 10px rgb(var(--action-gold-rgb) / .3); }
+.pet-card-god-badge {
+  position:absolute; right:4px; top:4px; width:18px; height:18px; line-height:18px;
+  font-size:0.75rem; font-weight:700; text-align:center; color:#1a1206;
+  background:var(--action-gold, #f2b632); border-radius:1px;
+  box-shadow:0 1px 3px rgba(0,0,0,.6);
 }
 .pet-card .pname { font-size:1rem; color:var(--text-hi); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:700; }
 .pet-card.active .pname { color:var(--accent-hi); }

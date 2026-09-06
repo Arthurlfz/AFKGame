@@ -63,9 +63,14 @@
     const matAmt = S.material && S.material.amount || 1;
     const haveMat = Materials.getQuantity ? Materials.getQuantity(matName) : 0;
     const mutPct = Math.round((S.mutation && S.mutation.chance || 0) * 100);
+    // 神级宠门槛（手册 2.6）：终阶 + 成长 ≥ minGrowth
+    const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
+    const mainStage = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(main) : 1;
+    const mainGodReady = mainStage >= (S.god && S.god.minStage || 5) && main.growth >= minG;
     mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
       <div><b>${main.name}</b> Lv.${main.level}</div>
-      <div class="hint">成长 ${main.growth.toFixed(1)} · 消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）· 变异 ${mutPct}%</div></div>`;
+      <div class="hint">成长 ${main.growth.toFixed(1)} · 消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）· 变异 ${mutPct}%</div>
+      <div class="hint">${mainStage >= 5 ? (mainGodReady ? '⚡ 终阶 + 成长达标（≥' + minG + '）：满足神级宠条件' : '已终阶，但成长未达 ' + minG + '（神级宠门槛）'): '未终阶（' + mainStage + '/5 阶），与神级宠无缘'}</div></div>`;
     const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id, S) : [];
     if (!subs.length) {
       sb.innerHTML = `<div class="hint">没有可用的副素材（需要另一只 ${S.minLevel} 级、不在出售、没穿装备的宠物）</div>`;
@@ -106,9 +111,16 @@
     const normalGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, false) : null;
     const mutatedGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, true) : null;
     const matOk = haveMat >= matAmt;
+    // 神级宠判定（手册 2.6）：门槛 + 概率（涅槃丹 100%）与实际合成共用 godSynthInfo
+    const gi = Merge.godSynthInfo ? Merge.godSynthInfo(main, sub) : null;
+    const stg = p => (window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1));
+    const godRow = (gi && gi.god)
+      ? `<div class="es-preview-row">⚡ <b>神级宠【${gi.god.name}】</b>：<b style="color:#f2b632">${Math.round(gi.chance * 100)}%</b> 概率出生（成长系数 +50%、可涅槃）${gi.hasPill ? ' · <b>持涅槃丹必出（消耗 1 颗）</b>' : ''}</div>`
+      : `<div class="es-preview-row hint">神级宠门槛：两只都需<b>终阶</b>（5 阶）+ 成长 ≥ ${gi ? gi.minGrowth : 60}（当前：主宠 ${stg(main)}/5 阶·成长 ${main.growth.toFixed(1)}｜副宠 ${stg(sub)}/5 阶·成长 ${sub.growth.toFixed(1)}）</div>`;
     pb.innerHTML = `
-      <div class="es-preview-row">合成结果：一只全新的 <b>${iconHtml(main.name)} ${main.name}${mutPct ? '（·异变）': ''}</b>，等级回 1</div>
+      <div class="es-preview-row">合成结果：一只全新的 <b>${iconHtml(gi && gi.god && gi.ready ? gi.god.name : main.name)} ${gi && gi.god && gi.ready ? gi.god.name : main.name}${mutPct ? '（·异变）': ''}</b>，等级回 1</div>
       <div class="es-preview-row">普通成长：<b>${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</b></div>
+      ${godRow}
       ${mutPct ? `<div class="es-preview-row"> 有 <b>${mutPct}%</b> 概率变异：成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」</div>` : ''}
       <div class="es-preview-row">两只素材（${main.name}、${sub.name}）都将消失，消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）</div>
       ${traitInheritLine(main, sub, 'synth')}
@@ -118,7 +130,11 @@
       if (!matOk) { showToast('无法合成', '材料不足'); return; }
       const res = await Merge.synthesize(main.id, sub.id);
       if (res.error) { showToast('合成失败', res.error); return; }
-      if (res.mutated) {
+      if (res.isGod) {
+        // 神级宠降世（手册 2.6）：金色特殊提示
+        addLog(`⚡ 神级宠降世！${res.mainName}+${res.subName} 合成出【${res.baby.name}】，成长 ${res.newGrowth.toFixed(1)}！${res.usePill ? '（涅槃丹必出）' : ''}`);
+        showToast('⚡ 神级宠降世！', `${iconHtml(res.baby.name)} <b style="color:#f2b632">【${res.baby.name}】</b>（神级宠 · 成长系数+50% · 可涅槃）<br><small>成长值 ${res.newGrowth.toFixed(1)}${res.usePill ? ' · 消耗涅槃丹 ×1' : ''}</small>`);
+      } else if (res.mutated) {
         addLog(`合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
         showToast('合成变异成功！', `${iconHtml(res.baby.name)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);
       } else {

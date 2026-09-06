@@ -27,10 +27,10 @@ const C = code => vm.runInContext(code, ctx);
 
   /* ---------- 数据完整性 ---------- */
   const total = C('Config.drop.quests.length');
-  A(total === 140, '任务总数 140 条（含 10 条地图委托，实际 ' + total + '）');
+  A(total === 112, '任务总数 112 条（2026-09-06 地图精简后：删主线 m41-m68，实际 ' + total + '）');
   const count = cat => C(`Config.drop.quests.filter(q=>q.category==='${cat}').length`);
   A(count('tutorial') === 10, '新手成长 10 条');
-  A(count('main') === 88, '主线 88 条（含 10 条地图委托）');
+  A(count('main') === 60, '主线 60 条（m1-m40 + 10 条地图委托 + 10 条 Boss 首通）');
   A(count('daily') === 12, '日常 12 条');
   A(count('achieve') === 6, '成就 6 条');
   A(count('pet') === 24, '宠物专属 24 条（8 宠 × 3 养成链）');

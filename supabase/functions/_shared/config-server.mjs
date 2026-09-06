@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-05T13:43:30.693Z
+// 生成时间：2026-09-06T08:59:07.628Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -241,8 +241,196 @@ const serverConfig = {
       "min": 3,
       "max": 8
     },
+    "godPets": {
+      "minGrowth": 60,
+      "list": [
+        {
+          "name": "腐界母神",
+          "line": "腐噜兽",
+          "sprite": "腐烂之母",
+          "speed": 80,
+          "baseHp": 165,
+          "baseAtk": 33,
+          "baseDef": 17,
+          "statCoeff": {
+            "hp": 7.35,
+            "atk": 3.57,
+            "def": 1.53
+          }
+        },
+        {
+          "name": "血月神狐",
+          "line": "血狐",
+          "sprite": "血月魔狐",
+          "speed": 96,
+          "baseHp": 128,
+          "baseAtk": 45,
+          "baseDef": 12,
+          "statCoeff": {
+            "hp": 4.83,
+            "atk": 3.33,
+            "def": 1.38
+          }
+        },
+        {
+          "name": "疫神巨像",
+          "line": "瘟熊",
+          "sprite": "瘟疫之主",
+          "speed": 70,
+          "baseHp": 240,
+          "baseAtk": 27,
+          "baseDef": 27,
+          "statCoeff": {
+            "hp": 8.55,
+            "atk": 3.63,
+            "def": 1.68
+          }
+        },
+        {
+          "name": "万刺冥神",
+          "line": "疫毛兽",
+          "sprite": "刺骨魔兽",
+          "speed": 92,
+          "baseHp": 143,
+          "baseAtk": 39,
+          "baseDef": 14,
+          "statCoeff": {
+            "hp": 6,
+            "atk": 3.42,
+            "def": 1.44
+          }
+        },
+        {
+          "name": "骸骨神狼",
+          "line": "骨狼",
+          "sprite": "骸骨君主",
+          "speed": 88,
+          "baseHp": 158,
+          "baseAtk": 38,
+          "baseDef": 15,
+          "statCoeff": {
+            "hp": 6.45,
+            "atk": 3.36,
+            "def": 1.49
+          }
+        },
+        {
+          "name": "毒渊神蟾",
+          "line": "毒沼蛙",
+          "sprite": "剧毒魔神",
+          "speed": 75,
+          "baseHp": 195,
+          "baseAtk": 30,
+          "baseDef": 21,
+          "statCoeff": {
+            "hp": 7.8,
+            "atk": 3.54,
+            "def": 1.62
+          }
+        },
+        {
+          "name": "狱门神犬",
+          "line": "尸犬",
+          "sprite": "尸界狱主",
+          "speed": 84,
+          "baseHp": 180,
+          "baseAtk": 32,
+          "baseDef": 20,
+          "statCoeff": {
+            "hp": 6.9,
+            "atk": 3.38,
+            "def": 1.58
+          }
+        },
+        {
+          "name": "霜月神兔",
+          "line": "幽影兔",
+          "sprite": "影蚀魔君",
+          "speed": 100,
+          "baseHp": 105,
+          "baseAtk": 36,
+          "baseDef": 11,
+          "statCoeff": {
+            "hp": 5.03,
+            "atk": 3.51,
+            "def": 1.35
+          }
+        }
+      ]
+    },
     "evolution": {
-      "maxEvolveTimes": 10,
+      "maxEvolveTimes": 4,
+      "stages": [
+        {
+          "stage": 1,
+          "label": "初始",
+          "minLevel": 1,
+          "material": null,
+          "amount": 0,
+          "growthBoost": [
+            0,
+            0
+          ],
+          "form": false,
+          "desc": "孵化出来的形态"
+        },
+        {
+          "stage": 2,
+          "label": "一阶",
+          "minLevel": 10,
+          "material": "进化素材",
+          "amount": 1,
+          "growthBoost": [
+            0.1,
+            0.2
+          ],
+          "form": true,
+          "desc": "初次蜕变（引导任务 G2）"
+        },
+        {
+          "stage": 3,
+          "label": "二阶",
+          "minLevel": 25,
+          "material": "精粹进化素材",
+          "amount": 1,
+          "growthBoost": [
+            0.1,
+            0.2
+          ],
+          "form": true,
+          "desc": "中期进化"
+        },
+        {
+          "stage": 4,
+          "label": "三阶",
+          "minLevel": 40,
+          "material": "传说进化素材",
+          "amount": 1,
+          "growthBoost": [
+            0.3,
+            0.4
+          ],
+          "form": false,
+          "desc": "淬体：形态不变，成长大幅提升（合成解锁）"
+        },
+        {
+          "stage": 5,
+          "label": "终阶",
+          "minLevel": 60,
+          "material": "传说进化素材",
+          "amount": 1,
+          "growthBoost": [
+            0.1,
+            0.2
+          ],
+          "form": true,
+          "desc": "最终形态：觉醒 + 主动技能",
+          "extra": {
+            "name": "传说进化素材",
+            "amount": 3
+          }
+        }
+      ],
       "tree": {
         "腐噜兽": [
           {
@@ -344,14 +532,14 @@ const serverConfig = {
           {
             "to": "腐沼王",
             "icon": "🐸",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "毒噜兽": [
           {
             "to": "毒沼霸主",
             "icon": "🐹",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "腐沼王": [
@@ -372,14 +560,14 @@ const serverConfig = {
           {
             "to": "血灾领主",
             "icon": "🦷",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "幽火狐": [
           {
             "to": "幽火王",
             "icon": "🔥",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "血灾领主": [
@@ -400,14 +588,14 @@ const serverConfig = {
           {
             "to": "瘟神巨熊",
             "icon": "🛡",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "血瘟熊": [
           {
             "to": "血疫暴君",
             "icon": "🩸",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "瘟神巨熊": [
@@ -428,14 +616,14 @@ const serverConfig = {
           {
             "to": "疫魔刺龙",
             "icon": "🌵",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "冥毛兽": [
           {
             "to": "冥幽兽",
             "icon": "🌑",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "疫魔刺龙": [
@@ -456,14 +644,14 @@ const serverConfig = {
           {
             "to": "骨刃王",
             "icon": "⚔",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "冥霜狼": [
           {
             "to": "霜狼祭司",
             "icon": "🧙",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "骨刃王": [
@@ -484,14 +672,14 @@ const serverConfig = {
           {
             "to": "毒沼魔君",
             "icon": "👑",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "咒沼蛙": [
           {
             "to": "咒毒蛙王",
             "icon": "🌀",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "毒沼魔君": [
@@ -512,14 +700,14 @@ const serverConfig = {
           {
             "to": "尸魔犬王",
             "icon": "🦷",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "幽灵犬": [
           {
             "to": "幽冥猎犬",
             "icon": "👻",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "尸魔犬王": [
@@ -540,14 +728,14 @@ const serverConfig = {
           {
             "to": "影舞者",
             "icon": "🌙",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "霜影兔": [
           {
             "to": "霜影魔兔",
             "icon": "🧊",
-            "minLevel": 35
+            "minLevel": 25
           }
         ],
         "影舞者": [
@@ -910,132 +1098,6 @@ const serverConfig = {
           "wild-bog-king",
           "wild-umbra-rabbit"
         ]
-      },
-      {
-        "id": "rift-fissure",
-        "name": "腐变裂隙",
-        "levelRange": [
-          61,
-          66
-        ],
-        "recommended": "成长 23",
-        "recGrowth": 23,
-        "background": "腐变裂隙",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "black-blood-moor",
-        "name": "黑血沼原",
-        "levelRange": [
-          67,
-          72
-        ],
-        "recommended": "成长 25",
-        "recGrowth": 25,
-        "background": "黑血沼原",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "bone-abyss",
-        "name": "万骨深渊",
-        "levelRange": [
-          73,
-          78
-        ],
-        "recommended": "成长 27",
-        "recGrowth": 27,
-        "background": "万骨深渊",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "plague-heart",
-        "name": "疫潮之心",
-        "levelRange": [
-          79,
-          84
-        ],
-        "recommended": "成长 29",
-        "recGrowth": 29,
-        "background": "疫潮之心",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "soul-nest",
-        "name": "噬魂巢穴",
-        "levelRange": [
-          85,
-          90
-        ],
-        "recommended": "成长 31",
-        "recGrowth": 31,
-        "background": "噬魂巢穴",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "annihilation-hall",
-        "name": "湮灭回廊",
-        "levelRange": [
-          91,
-          96
-        ],
-        "recommended": "成长 33",
-        "recGrowth": 33,
-        "background": "湮灭回廊",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
-      },
-      {
-        "id": "blight-origin",
-        "name": "腐变本源",
-        "levelRange": [
-          97,
-          100
-        ],
-        "recommended": "成长 35",
-        "recGrowth": 35,
-        "background": "腐变本源",
-        "difficulty": 1,
-        "enemyIds": [
-          "wild-bonewolf-mutant",
-          "wild-shadowrabbit-mutant",
-          "wild-plaguebear-mutant",
-          "wild-bloodfox-mutant"
-        ]
       }
     ],
     "areaEnemyStats": {
@@ -1080,49 +1142,14 @@ const serverConfig = {
         "def": 158
       },
       "soul-abyss": {
-        "hp": 1909,
+        "hp": 2185,
         "atk": 369,
         "def": 164
       },
       "blight-heart": {
-        "hp": 2126,
+        "hp": 2520,
         "atk": 411,
         "def": 182
-      },
-      "rift-fissure": {
-        "hp": 2908,
-        "atk": 561,
-        "def": 249
-      },
-      "black-blood-moor": {
-        "hp": 3175,
-        "atk": 612,
-        "def": 272
-      },
-      "bone-abyss": {
-        "hp": 3442,
-        "atk": 663,
-        "def": 295
-      },
-      "plague-heart": {
-        "hp": 3709,
-        "atk": 714,
-        "def": 318
-      },
-      "soul-nest": {
-        "hp": 3976,
-        "atk": 765,
-        "def": 341
-      },
-      "annihilation-hall": {
-        "hp": 4243,
-        "atk": 816,
-        "def": 364
-      },
-      "blight-origin": {
-        "hp": 4510,
-        "atk": 867,
-        "def": 387
       }
     },
     "typeMult": {

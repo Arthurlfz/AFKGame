@@ -132,6 +132,7 @@
   }
 
   /* ---------- 问号 tooltip：.q-tip[data-tip] 悬停显示（CSS）+ 点击切换显示 ---------- */
+  /* 气泡本体由 CSS content:attr(data-tip) 渲染（game.css .q-tip::after），JS 只负责点按切换 */
   function initQuestionTips() {
     if (typeof document === 'undefined' || !document.addEventListener) return;
     document.addEventListener('click', (e) => {

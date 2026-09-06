@@ -322,8 +322,8 @@
         '♻️ 涅槃',
         (NI.minLevel || 0) + ' 级',
         ((NI.material || {}).name || '涅磐兽') + ' ×' + ((NI.material || {}).amount || 1),
-        `主宠吸收副宠成长 ×${NI.absorbRatio}，副宠消失，等级重置为 1`,
-        `成长上限 ${NI.maxGrowth}，达到 ${NI.growthCap} 后吸收减半；穿着装备的宠物不能涅槃`
+        `主宠吸收副宠成长 ×${NI.absorbRatio}（不衰减），副宠消失，等级重置为 1`,
+        `${NI.requireGodPet !== false ? '<b>只有神级宠能涅槃</b>；' : ''}成长上限 ${NI.maxGrowth}；穿着装备的宠物不能涅槃`
       ],
       [
         '⚗️ 合成',
@@ -331,6 +331,13 @@
         ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1),
         `${pct(mu.chance || 0)} 概率出「·异变」宠，新宠成长 = 主 ×${SY.mainW} + 副 ×${SY.subW}，变异再 +${(mu.growthBonus || [0, 0])[0]} 到 +${(mu.growthBonus || [0, 0])[1]}`,
         '两只素材宠都消失，新宠等级回到 1；穿着装备的宠物不能合成'
+      ],
+      [
+        '⚡ 神级宠',
+        '终阶（5 阶）+ Lv.' + (SY.minLevel || 40),
+        ((SY.material || {}).name || '合成之石') + ' ×1（持涅槃丹必出，消耗 1 颗）',
+        `${pct((SY.god && SY.god.chance) || 0.3)} 概率出神级宠（单独的宠物：成长系数 +50%，只有它能涅槃）`,
+        `门槛：主宠与副宠都终阶且成长 ≥ ${(Config.pet.godPets && Config.pet.godPets.minGrowth) || 60}`
       ],
       [
         '🥚 孵化',

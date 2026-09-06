@@ -182,7 +182,17 @@
     // 单池一次抽取：总权重归一化；"材料率"词缀拉高 material 档权重；
     // "掉落数量"词缀（2026-09-04 改法）拉高 material/equipment 档权重（+8% → 权重×1.08），
     // 语义 = "更容易掉东西"而不是"一次掉两个"，还原词缀本意且不抬通胀。
-    const pool = D.pool || {};
+    // 手册 2.3：装备掉落率按阶段（图1-3 2% / 图4-7 2.5% / 图8-10 3%）→ 按图序号选 poolByStage；
+    // 旧全局 pool 兜底（测试/异常场景）
+    let pool = D.pool || {};
+    {
+      const listA = Config.battle.areas || [];
+      const idxA = area && area.id ? listA.findIndex(a => a.id === area.id) : -1;
+      const t0 = idxA >= 0 ? idxA + 1 : 1;
+      const stage = t0 <= 3 ? 1 : (t0 <= 7 ? 2 : 3);
+      const byStage = D.poolByStage && D.poolByStage[stage];
+      if (byStage) pool = byStage;
+    }
     const qtyMul = 1 + ((res.dropQty || 1) - 1);
     const entries = [
       ['none', pool.none || 0],

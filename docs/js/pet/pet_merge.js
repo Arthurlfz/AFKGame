@@ -70,21 +70,18 @@
   // bonusMult：凝魂晶石加成倍率（1 = 不投入）；预览与实际走同一函数，不会算歪
   function calcNirvanaGrowth(main, sub, bonusMult) {
     const M = NV();
-    const minLv = M.minLevel || 40;
+    const minLv = M.minLevel || 60;
+    /* 2026-09-06（手册 2.7）：吸收 50%【不衰减】——
+     * 删掉旧的「副宠成长下限打折」与「60 成长分水岭减半」两重衰减，
+     * 节奏改由涅磐兽消耗（5 只）控制。只保留副宠等级加成（练得高当肥料更值钱，不属于衰减）。 */
     const lvBonus = 1 + Math.max(0, (sub.level || 0) - minLv) * (M.levelBonus || 0); // 等级加成倍数
-    // 副宠成长下限校验：不足则吸收打折
-    const subReq = (main.growth || 0) * (M.subGrowthRatio || 0);
-    const subRatioPenalty = sub.growth < subReq;
-    const ratio = subRatioPenalty ? (M.lowGrowthPenalty || 0.2) : 1;
-    // 60 成长分水岭：主宠成长达标后吸收减半
-    const capApplied = (main.growth || 0) >= (M.growthCap || 60);
-    const capRatio = capApplied ? (M.capRatio || 0.5) : 1;
     // 成长软上限：主宠成长已达 maxGrowth 则不再涨（仅重置等级）
     const maxGrowth = M.maxGrowth || 100;
-    let absorb = sub.growth * M.absorbRatio * lvBonus * ratio * capRatio * (bonusMult || 1);
+    let absorb = (sub.growth || 0) * (M.absorbRatio || 0.5) * lvBonus * (bonusMult || 1);
     if ((main.growth || 0) >= maxGrowth) absorb = 0;
     const growth = Math.round(((main.growth || 0) + absorb) * 10) / 10;
-    return { growth, subRatioPenalty, capApplied };
+    // 字段保留（UI/旧调用在读），恒为 false：不再有衰减
+    return { growth, absorb: Math.round(absorb * 10) / 10, subRatioPenalty: false, capApplied: false };
   }
 
   /* ---------- 合成成长计算（纯函数，synthesize 与 UI 预览共用） ---------- */
@@ -95,6 +92,27 @@
     const base = (main.growth || 0) * (S.mainW || 0.6) + (sub.growth || 0) * (S.subW || 0.4);
     const bonus = mutated && S.mutation ? randInt(S.mutation.growthBonus[0], S.mutation.growthBonus[1]) : 0;
     return Math.round((base + bonus) * 10) / 10;
+  }
+
+  /* ---------- 神级宠合成判定（手册 2.6） ----------
+   * 门槛：主宠与副宠都【终阶】(evolveStage ≥ minStage) 且【成长 ≥ minGrowth】
+   * 概率：30%（Config.synthesize.god.chance）；背包有涅槃丹 → 100%（消耗 1 颗）
+   * 返回 { ready, chance, hasPill, god, minGrowth, minStage }，UI 预览与实际合成共用同一函数。 */
+  function godSynthInfo(main, sub) {
+    const G = SYN().god;
+    const Pet = window.Pet;
+    const empty = { ready: false, chance: 0, hasPill: false, god: null, minGrowth: 60, minStage: 5 };
+    if (!G || !Pet || !main || !sub) return empty;
+    const st = p => (Pet.getEvolveStage ? Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1));
+    const minG = G.minGrowth || 60, minS = G.minStage || 5;
+    const ready = st(main) >= minS && st(sub) >= minS
+      && (main.growth || 0) >= minG && (sub.growth || 0) >= minG;
+    const pill = G.pill || null;
+    const hasPill = pill ? (Materials.getQuantity ? Materials.getQuantity(pill.name) : 0) >= (pill.amount || 1) : false;
+    const chance = ready ? (hasPill ? (pill.chance != null ? pill.chance : 1) : (G.chance || 0.3)) : 0;
+    const god = ready && Config.pet && Config.pet.godPets && Config.pet.godPets.ofLine
+      ? Config.pet.godPets.ofLine(main.lineId || main.name) : null;
+    return { ready, chance, hasPill, god, minGrowth: minG, minStage: minS };
   }
 
   /* ============================================================
@@ -113,8 +131,28 @@
     const sub = getPets().find(p => p.id === subId);
     if (!main || !sub) return { error: '宠物不存在' };
     if (main.id === sub.id) return { error: '不能选择同一只宠物' };
+    /* 2026-09-06（手册 2.7）：只有【神级宠】才能涅槃。
+     * 神级宠 = 主副宠都终阶 + 成长≥minGrowth 时合成，30% 概率出（持涅槃丹 100%）。
+     * 普通宠/终阶普通宠一律拒绝 —— 手册 6.2 明令禁止给普通宠开涅槃。 */
+    if (M.requireGodPet !== false) {
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
+      if (!isGod) {
+        const minG = (Config.pet && Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
+        return { error: `只有神级宠才能涅槃（神级宠：两只终阶宠 + 成长≥${minG} 合成，30% 概率；持涅槃丹必出）` };
+      }
+    }
     if (main.level < M.minLevel || sub.level < M.minLevel) {
       return { error: `两只宠物都必须达到 ${M.minLevel} 级才能涅槃` };
+    }
+    // 服务端权威校验（手册 6.4，migrate_god_pet.sql 的 check_nirvana）：以库里的 is_god_pet 为准。
+    // 旧库没跑迁移（RPC 不存在）时放行 —— 客户端校验已经挡在前面，这里只加一道保险。
+    if (M.requireGodPet !== false && main.cloudId && Supabase.rpc) {
+      try {
+        const chk = await Supabase.rpc('check_nirvana', { p_pet: { cloud_id: main.cloudId } });
+        if (chk && chk.data && chk.data.ok === false) {
+          return { error: '涅槃被服务器拒绝：该宠物不是神级宠（' + (chk.data.code || 'not_god_pet') + '）' };
+        }
+      } catch (e) { /* RPC 不可用：放行 */ }
     }
     const user = await Supabase.getCurrentUser();
     if (!user) return { error: '请先登录账号，涅槃会同步云端存档' };
@@ -149,6 +187,8 @@
 
     // 涅槃 = 突破：重置进化次数 + 累计涅槃/转生次数 + 等级重置
     main.evolveTimes = 0;
+    // 阶段：神级宠保持终阶（它不走进化树，重置成 1 阶会变成无法进化的死宠）；普通宠跟随次数回 1 阶
+    main.evolveStage = (window.Pet && window.Pet.isGodPet && window.Pet.isGodPet(main)) ? 5 : 1;
     main.rebornCount = (main.rebornCount || 0) + 1;
     if (M.resetLevel) { main.level = 1; main.exp = 0; }
     main.curHp = getStats(main).hp;
@@ -159,7 +199,7 @@
     if (delErr) console.warn('云端删除副宠失败：', delErr.message);
 
     // 主宠成长/等级同步云端
-    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits };
+    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits, evolve_stage: main.evolveStage };
     // 等级重置时必须连 exp 一起清零并同步：否则云端留着旧经验，
     // 刷新后会变成「Lv1 + 几千经验」，打一场直接连升几十级
     if (M.resetLevel) { patch.level = main.level; patch.exp = 0; }
@@ -203,12 +243,51 @@
     const spent = await Materials.spend(S.material.name, S.material.amount);
     if (!spent.ok) return { error: spent.error || '材料扣减失败' };
 
+    // 神级宠判定（手册 2.6）：终阶 + 成长达标 → 30% 概率；持涅槃丹 100%（并消耗 1 颗）
+    const gi = godSynthInfo(main, sub);
+    let isGod = false, usePill = false;
+    if (gi.ready && gi.god) {
+      // 服务端权威校验（手册 6.4，migrate_god_pet.sql 的 check_god_synth）：双终阶+成长≥minGrowth。
+      // 旧库无此 RPC（error/data=null）时放行 —— 客户端门槛已挡，这里只加保险。
+      if (Supabase.rpc) {
+        try {
+          const Pet = window.Pet;
+          const st = p => (Pet && Pet.getEvolveStage) ? Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1);
+          const chk = await Supabase.rpc('check_god_synth', {
+            p_main: { evolve_stage: st(main), growth: main.growth },
+            p_sub: { evolve_stage: st(sub), growth: sub.growth }
+          });
+          if (chk && chk.data && chk.data.ok === false) {
+            return { error: '神级宠合成被服务器拒绝：' + (chk.data.code || '门槛不足') };
+          }
+        } catch (e) { /* RPC 不可用：放行 */ }
+      }
+      if (gi.hasPill) {
+        const ps = await Materials.spend(S.god.pill.name, S.god.pill.amount || 1);
+        if (ps.ok) { isGod = true; usePill = true; }
+        else isGod = Math.random() < (S.god.chance || 0.3);   // 丹扣失败 → 退回概率模式
+      } else {
+        isGod = Math.random() < (S.god.chance || 0.3);
+      }
+    }
+
     // 变异判定：概率出全新「·异变」宠
     const mutated = rollMutation(S);
     const newGrowth = calcSynthesizeGrowth(main, sub, mutated);
-    const newName = mutated ? mutatedName(main.name) : main.name;
+    let newName = mutated ? mutatedName(main.name) : main.name;
+    let newIcon = main.icon;
+    let bHp = main.baseHp, bAtk = main.baseAtk, bDef = main.baseDef;
+    let lineId = main.lineId || main.name;
+    if (isGod && gi.god) {
+      // 神级宠是【单独的宠物】：自己的名字、基础值、成长系数（普通宠 ×1.5），生而为终阶
+      newName = gi.god.name;
+      newIcon = gi.god.sprite || main.icon;   // 无专属立绘前复用该线终形态
+      bHp = gi.god.baseHp; bAtk = gi.god.baseAtk; bDef = gi.god.baseDef;
+      lineId = gi.god.name;                   // lineId = 神级宠名 → getStatCoeff 走 godPets 表
+    }
     // 新宠继承主宠形态基础值（图标/基底），等级回 1
-    const baby = createPet(newName, main.icon, newGrowth, main.baseHp, main.baseAtk, main.baseDef, main.baseSpd, main.lineId || main.name);
+    const baby = createPet(newName, newIcon, newGrowth, bHp, bAtk, bDef, main.baseSpd, lineId);
+    if (isGod) { baby.isGodPet = true; baby.evolveStage = 5; }
     baby.level = 1;
     baby.exp = 0;
     baby.traits = inheritSynthTraits(main, sub, mutated);   // 血脉特质继承（合成）
@@ -232,7 +311,7 @@
     // 任务进度上报：所有 type=synth 的任务 +1
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('synth', 1);
 
-    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn };
+    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, usePill };
   }
 
   /* ---------- 血脉特质继承 / 植入（设计 v1） ---------- */
@@ -301,6 +380,8 @@
     merge: nirvana,       // 兼容别名：旧调用 Merge.merge = 涅槃
     getMergeCandidates, canMerge, canSynthesize,
     calcNirvanaGrowth, calcSynthesizeGrowth,
-    inheritSynthTraits, implantNirvanaTraits
+    inheritSynthTraits, implantNirvanaTraits,
+    // 神级宠（手册 2.6）
+    godSynthInfo
   };
 })();

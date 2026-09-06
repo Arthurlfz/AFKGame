@@ -68,10 +68,10 @@ A(r&&r.ok===true&&r.mutated===true&&r.baby.name==='幽影兔·异变','已带「
 A(r&&r.baby&&r.baby.growth===17,'已异变合成成长 = 12+4+1 = 17');
 
 /* ============ 4. 涅槃：主宠吸副宠成长，不变异不改名，突破重置 ============ */
-await C('Materials.gain("涅磐兽",10)');await S(80);
+await C('Materials.gain("涅磐兽",40)');await S(80);
 await mkPet('血狐','🦊',6,'nf');
 await mkPet('骨狼','🐺',8,'nsub');
-await C('(function(){const p=Pet.getPets().find(p=>p.id===globalThis.__nf);p.evolveTimes=5;p.rebornCount=2;Pet.addPet(p)})()');
+await C('(function(){const p=Pet.getPets().find(p=>p.id===globalThis.__nf);p.evolveTimes=5;p.rebornCount=2;p.isGodPet=true;Pet.addPet(p)})()');
 const nfId=C('globalThis.__nf'), nsubId=C('globalThis.__nsub');
 r=await C('Merge.nirvana('+nfId+','+nsubId+')');
 A(r&&r.ok===true,'涅槃：成功');
@@ -88,38 +88,41 @@ A(!C('Pet.getPets().some(p=>p.id==='+nsubId+')'),'涅槃后副宠消失');
 /* ============ 5. 涅槃：副宠等级加成（练得越高肥料越值钱） ============ */
 await mkPet('血狐','🦊',6,'lf');
 await mkPet('骨狼','🐺',8,'lsub');
-await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__lsub);q.level=70;Pet.addPet(q)})()');
+await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__lf);q.isGodPet=true;Pet.addPet(q);const s=Pet.getPets().find(p=>p.id===globalThis.__lsub);s.level=70;Pet.addPet(s)})()');
 r=await C('Merge.nirvana('+C('globalThis.__lf')+','+C('globalThis.__lsub')+')');
 // 吸收 = 8×0.5×(1+(70-60)×0.01) = 8×0.5×1.1 = 4.4 → 10.4（2026-08-31 门槛 40→60，等级加成从门槛起算）
 A(r&&r.ok===true&&r.newGrowth===10.4,'涅槃副宠 Lv70 等级加成：6 + 8×0.5×1.1 = 10.4');
 
-/* ============ 6. 涅槃：副宠成长不足下限 → 吸收打 0.2 折 ============ */
+/* ============ 6. 涅槃：副宠成长低 → 不再打折（衰减机制已删，2026-09-06 手册 2.7） ============ */
 await mkPet('血狐','🦊',20,'pf');
 await mkPet('骨狼','🐺',5,'psub');
+await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__pf);q.isGodPet=true;Pet.addPet(q)})()');
 r=await C('Merge.nirvana('+C('globalThis.__pf')+','+C('globalThis.__psub')+')');
-// 下限 = 20×0.5 = 10，副成长 5 < 10 → 吸收 = 5×0.5×0.2 = 0.5 → 20.5
-A(r&&r.ok===true&&r.newGrowth===20.5,'涅槃副宠成长不足下限：20 + 5×0.5×0.2 = 20.5');
+// 旧规则：副成长 < 主×0.5 打 0.2 折（20.5）；新规则不衰减 → 吸收 = 5×0.5 = 2.5 → 22.5
+A(r&&r.ok===true&&r.newGrowth===22.5,'涅槃副宠成长低也不打折（无衰减）：20 + 5×0.5 = 22.5');
 
-/* ============ 7. 涅槃：60 成长分水岭 → 吸收减半 ============ */
+/* ============ 7. 涅槃：高成长主宠 → 不再减半（growthCap 已删，2026-09-06） ============ */
 await mkPet('血狐','🦊',60,'cf');
 await mkPet('骨狼','🐺',40,'csub');
+await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__cf);q.isGodPet=true;Pet.addPet(q)})()');
 r=await C('Merge.nirvana('+C('globalThis.__cf')+','+C('globalThis.__csub')+')');
-// 主成长 60 ≥ 60 分水岭 → 吸收 = 40×0.5×0.5 = 10 → 70（副成长 40 ≥ 下限 30，不触发打折）
-A(r&&r.ok===true&&r.newGrowth===70,'涅槃 60 分水岭吸收减半：60 + 40×0.5×0.5 = 70');
+// 旧规则：60 分水岭吸收减半（70）；新规则不衰减 → 吸收 = 40×0.5 = 20 → 80
+A(r&&r.ok===true&&r.newGrowth===80,'涅槃 60 分水岭不再减半（无衰减）：60 + 40×0.5 = 80');
 
 /* ============ 8. 涅槃：成长软上限 100 → 不再涨，仅重置等级 ============ */
 await mkPet('血狐','🦊',100,'xf');
 await mkPet('骨狼','🐺',8,'xsub');
+await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__xf);q.isGodPet=true;Pet.addPet(q)})()');
 r=await C('Merge.nirvana('+C('globalThis.__xf')+','+C('globalThis.__xsub')+')');
 const xmain=C('Pet.getPets().find(p=>p.id==='+C('globalThis.__xf')+')');
 A(r&&r.ok===true&&xmain.growth===100,'涅槃达软上限 100：成长不再涨');
 A(xmain.level===1,'软上限涅槃仍重置等级为 1');
 
-/* ============ 9. 兼容别名：Merge.merge = 涅槃（不是旧版变异融合） ============ */
+/* ============ 9. 普通宠（非神级宠）涅槃被拒（2026-09-06 手册 2.7） ============ */
 await mkPet('毒沼蛙','🐸',10,'mf2');
 await mkPet('瘟熊','🐻',10,'msub2');
 r=await C('Merge.merge('+C('globalThis.__mf2')+','+C('globalThis.__msub2')+')');
-A(r&&r.ok===true&&r.mutated===undefined&&r.newGrowth===15,'Merge.merge 别名走涅槃语义：10 + 10×0.5 = 15，无变异');
+A(r&&r.ok!==true&&/神级宠/.test(r.error||''),'Merge.merge 别名走涅槃语义：普通宠被拒并提示需神级宠');
 
 console.log('ALL MUTATION TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

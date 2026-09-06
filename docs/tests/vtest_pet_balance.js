@@ -109,18 +109,17 @@ function evaluate(st, L, G, type) {
   const okMatName = JSON.parse(C('JSON.stringify(Config.drop.areaMaterials)'));
   const okEvo = JSON.parse(C('JSON.stringify(Config.drop.areaEvolutionTiers)'));
   const missing = ids.filter(id => !enemyTable[id] || !okMatName[id] || !okEvo[id]);
-  A(areas.length === 17, `地图数量 17 张（当前 ${areas.length}）`);
+  A(areas.length === 10, `地图数量 10 张（2026-09-06 精简，当前 ${areas.length}）`);
   A(okTier && okMat && okEne && !missing.length,
     `装备图档/底材档/敌人数值/材料/素材档 与 10 图对齐${missing.length ? '，缺：' + missing.join(',') : ''}`);
-  // 每图 6 级、首尾接得上（图 17 为 [97,100] 4 级终图，2026-08-31 拍板）
+  // 每图 6 级、首尾接得上（2026-09-06 精简后 10 图全是 6 级段，图10 = [55,60] 毕业）
   let spanOk = true;
   areas.forEach((a, i) => {
     const [lo, hi] = a.levelRange;
-    const expectedSpan = i === areas.length - 1 ? 3 : 5;
-    if (hi - lo !== expectedSpan) spanOk = false;
+    if (hi - lo !== 5) spanOk = false;
     if (i > 0 && lo !== areas[i - 1].levelRange[1] + 1) spanOk = false;
   });
-  A(spanOk, '每图 6 级（图17 为 4 级）且等级段首尾相接（无空档/重叠）');
+  A(spanOk, '每图 6 级且等级段首尾相接（无空档/重叠）');
   const poolEmpty = areas.filter(a => !poolOf(a).length);
   A(!poolEmpty.length, `每图都有可用野怪（怪池等级段与图重叠）${poolEmpty.length ? '，空池：' + poolEmpty.map(a => a.id) : ''}`);
 }

@@ -35,7 +35,7 @@ A(r.crystal===1&&C('Materials.getQuantity("'+EP.material+'")')===2,'升满时超
 A(C('globalThis.__n.exp')===C('Pet.expNeed('+MAX+')'),'满级后经验条保持封顶');
 
 /* ---- 3. 涅槃投入凝魂晶石：吸收 +30%，石头两样都扣 ---- */
-async function mkPet(tag,growth,level){await C(`(async()=>{const p=Pet.createPet("腐噜兽","x",${growth},100,20,10,8);p.level=${level};Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__${tag}=p})()`);await S(80);return C(`globalThis.__${tag}.id`)}
+async function mkPet(tag,growth,level){await C(`(async()=>{const p=Pet.createPet("腐噜兽","x",${growth},100,20,10,8);p.level=${level};p.isGodPet=true;/* 2026-09-06：只有神级宠能涅槃 */Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__${tag}=p})()`);await S(80);return C(`globalThis.__${tag}.id`)}
 // 材料用 gain 入库（走云端 RPC，spend 才扣得动），断言一律看"本次增减"，不受前面用例存量影响
 const qCrystal=()=>C('Materials.getQuantity("'+EP.material+'")'),qBeast=()=>C('Materials.getQuantity("涅磐兽")');
 const CB_AMT=NV.crystalBonus.amount;
@@ -43,32 +43,32 @@ const CB_AMT=NV.crystalBonus.amount;
 /* ---- 3. 涅槃投入凝魂晶石：吸收 +30%，石头两样都扣 ---- */
 const a=await mkPet('a',10,60),b=await mkPet('b',8,60);
 let c0=qCrystal(),b0=qBeast();
-await C('Materials.gain("'+EP.material+'",'+CB_AMT+')');await C('Materials.gain("涅磐兽",1)');await S(60);
+await C('Materials.gain("'+EP.material+'",'+CB_AMT+')');await C('Materials.gain("涅磐兽",5)');await S(60);
 r=await C(`Merge.nirvana(${a},${b},true)`);
 A(r.ok===true,'投入晶石涅槃成功'+(r.error?'（'+r.error+'）':''));
 A(Math.abs(r.newGrowth-Math.round((10+8*0.5*1.3)*10)/10)<0.05,'晶石加成：10 + 8×0.5×1.3 = '+r.newGrowth);
 A(Math.abs(C('Merge.calcNirvanaGrowth({growth:10},{growth:8,level:60},1.3).growth')-r.newGrowth)<0.05,'预览与实测同源（calcNirvanaGrowth 带加成倍率）');
 A(qCrystal()===c0,'凝魂晶石净扣 '+CB_AMT+' 颗（'+c0+' → '+qCrystal()+'）');
-A(qBeast()===b0,'涅磐兽净扣 1 只（'+b0+' → '+qBeast()+'）');
+A(qBeast()===b0,'涅磐兽净扣 5 只（'+b0+' → '+qCrystal()+'）');
 
 /* ---- 4. 不投晶石走原数值 ---- */
 const c=await mkPet('c',10,60),d=await mkPet('d',8,60);
 c0=qCrystal();b0=qBeast();
-await C('Materials.gain("涅磐兽",1)');await S(60);
+await C('Materials.gain("涅磐兽",5)');await S(60);
 r=await C(`Merge.nirvana(${c},${d},false)`);
 A(r.ok===true&&Math.abs(r.newGrowth-14)<0.05,'不投晶石：10 + 8×0.5 = '+r.newGrowth+(r.error?'（'+r.error+'）':''));
 A(qCrystal()===c0,'不投晶石时晶石一颗不动');
-A(qBeast()===b0,'不投晶石时涅磐兽仍照常扣除 1 只');
+A(qBeast()===b0,'不投晶石时涅磐兽仍照常扣除 5 只');
 
 /* ---- 5. 晶石不足：拒绝涅槃，且不白扣涅磐兽 ---- */
 const e=await mkPet('e',10,60),f=await mkPet('f',8,60);
 // 先把晶石清空再补到「刚好差 1 颗」，否则前面用例攒下的存量会让这次误判为材料充足
 await C('Materials.spend("'+EP.material+'",'+qCrystal()+')');
 c0=qCrystal();b0=qBeast();
-await C('Materials.gain("'+EP.material+'",'+(CB_AMT-1)+')');await C('Materials.gain("涅磐兽",1)');await S(60);
+await C('Materials.gain("'+EP.material+'",'+(CB_AMT-1)+')');await C('Materials.gain("涅磐兽",5)');await S(60);
 r=await C(`Merge.nirvana(${e},${f},true)`);
 A(!!r.error&&/不足/.test(r.error),'晶石不足时涅槃被拒绝：'+(r.error||''));
-A(qBeast()===b0+1,'拒绝时涅磐兽未被扣（不白花稀有材料）');
+A(qBeast()===b0+5,'拒绝时涅磐兽未被扣（不白花稀有材料）');
 A(qCrystal()===c0+CB_AMT-1,'拒绝时晶石保持原样');
 console.log(failures?'EXP POOL TESTS FAILED: '+failures:'ALL EXP POOL TESTS PASSED');process.exit(failures?1:0)
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

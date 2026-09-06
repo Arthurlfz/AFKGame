@@ -71,7 +71,9 @@
   /* ---------- 宠物存档（pets 表） ---------- */
   // 基础列（各版本都有）；附加列（旧库可能缺失：缺哪列自动剔除哪列，宠物本体照常读写）
   const PET_BASE_COLS = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
-  const PET_EXTRA_COLS = ['exp', 'traits', 'awaken_trait', 'source'];
+  // 附加列（旧库可能缺失）：2026-09-06 新增 evolve_stage / is_god_pet（神级宠 + 5 阶进化，
+  // 需先跑 supabase/migrate_god_pet.sql；没跑迁移的库会自动剔除这两列，宠物本体照常读写）
+  const PET_EXTRA_COLS = ['exp', 'traits', 'awaken_trait', 'source', 'evolve_stage', 'is_god_pet'];
   const missingPetCols = new Set();
   const currentPetCols = () => PET_BASE_COLS + ',' + PET_EXTRA_COLS.filter(c => !missingPetCols.has(c)).join(',');
   // 判断错误是否为「缺列」（Postgres 42703 / PostgREST PGRST204）
@@ -111,6 +113,9 @@
       cur_hp: Math.round(pet.curHp)
     };
     if (includeExp) row.exp = Math.max(0, Math.round(pet.exp || 0));
+    // 进化阶段 / 神级宠标记（缺列时由 savePet 剔除，迁移前的旧库不受影响）
+    row.evolve_stage = Math.min(5, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
+    row.is_god_pet = !!pet.isGodPet;
     // 血脉特质 / 觉醒特质 / 来源（缺列时由 savePet 剔除）
     if (Array.isArray(pet.traits) && pet.traits.length) row.traits = pet.traits;
     if (pet.awaken_trait) row.awaken_trait = pet.awaken_trait;
@@ -550,6 +555,8 @@
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
+    // RPC 透传（check_god_synth / check_nirvana 等服务端校验；migrate_god_pet.sql）
+    rpc: (fn, args) => client.rpc(fn, args),
     loadPets, fetchPetById, savePet, deletePet, updatePet, petEquipmentToCloud, loadPetEquipment,
     listPet, fetchMarket, fetchMyListedIds, buyPet, cancelPetListing,
     listItem, fetchItemMarket, fetchMyListedItemIds, buyItem, cancelEquipListing, botBuyEquip, botBuyPet,

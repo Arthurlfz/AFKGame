@@ -33,10 +33,12 @@
     }
     for (const pet of evoPets) {
       const card = document.createElement('div');
-      card.className = 'pet-card'+ (pet.id === evolveMainId ? ' active': '');
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
+      card.className = 'pet-card'+ (pet.id === evolveMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
         <div class="pname">${pet.name}</div>
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>`;
+        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>
+        <div class="meta">${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(pet) : ''} · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>`;
       card.onclick = () => {
         evolveMainId = pet.id;
         evolvePreview = null; // 换主宠 → 旧的方向预览作废
@@ -70,7 +72,7 @@
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
     mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
       <div><b>${main.name}</b> Lv.${main.level}</div>
-      <div class="hint">成长 ${main.growth.toFixed(1)} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div></div>`;
+      <div class="hint">成长 ${main.growth.toFixed(1)} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div></div>`;
 
     if (maxed) {
       tb.innerHTML = `<div class="warn"> 进化已达上限(${maxTimes}次)，需通过<b>涅槃</b>重置进化次数后才能继续</div>`;
@@ -78,7 +80,11 @@
       return;
     }
     if (!routes.length) {
-      tb.innerHTML = '<div class="hint">该形态无法再进化</div>';
+      // 终阶（5 阶走完）：进化链到头，后续变强走合成 → 神级宠 → 涅槃
+      const atFinal = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(main) >= 5 : false;
+      tb.innerHTML = atFinal
+        ? '<div class="warn"> 已登临<b>终阶</b>——进化之路到此为止。想再变强：两只终阶宠 + 成长 60 可在<b>合成</b>里搏一只神级宠。</div>'
+        : '<div class="hint">该形态无法再进化</div>';
       pb.innerHTML = ''; cb.innerHTML = ''; evolvePreview = null;
       return;
     }
@@ -88,7 +94,7 @@
         return `<button class="es-route ${okLevel ? '': 'lv-low'}" data-i="${i}">
           <div class="es-route-icon">${iconHtml(r.to)}</div>
           <div class="es-route-name">${r.to}</div>
-          <small>${r.minLevel ? (okLevel ? '需 Lv.'+ r.minLevel + '✓': '需 Lv.'+ r.minLevel + '（等级不够）') : '可进化'}</small>
+          <small>${r.label ? '→ ' + r.label : ''}${r.minLevel ? (okLevel ? ' · 需 Lv.'+ r.minLevel + '✓': ' · 需 Lv.'+ r.minLevel + '（等级不够）') : ''}</small>
         </button>`;
       }).join('') + '</div>';
     tb.querySelectorAll('.es-route').forEach(btn => {
@@ -120,7 +126,9 @@
     // 1) renderAll 每秒重建面板，数字不会乱跳；
     // 2) 确认时把这个 boost 传给 Evolve.evolve，做到预览多少就是多少。
     if (!evolvePreview || evolvePreview.petId !== pet.id || evolvePreview.routeIndex !== i) {
-      evolvePreview = { petId: pet.id, routeIndex: i, boost: window.Util.randFloat(E.growthBoost[0], E.growthBoost[1]) };
+      // 成长加成按「下一阶」的档位随机（三阶淬体 +0.3~0.4，其它阶 +0.1~0.2）
+      const range = (route && route.stage && E.stages) ? ((E.stages.find(s => s.stage === route.stage) || {}).growthBoost || E.growthBoost) : E.growthBoost;
+      evolvePreview = { petId: pet.id, routeIndex: i, boost: window.Util.randFloat(range[0], range[1]) };
     }
     const boost = evolvePreview.boost;
     const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
@@ -129,16 +137,22 @@
       const cls = b > a ? 'delta-up': '';
       return `<div class="delta-row ${cls}"><span>${label}</span><span>${a} → ${b} ${b > a ? '▲': ''}</span></div>`;
     };
-    const formText = route.keepForm ? '形态不变，成长值提升': `进化后名字变为【${route.to}】`;
+    // 5 阶（2026-09-06）：素材档位/数量/终阶额外素材统一从 stages 读
+    const rm = Evolve.getRouteMaterial ? Evolve.getRouteMaterial(pet, i) : null;
+    const matAmt = rm ? rm.amount : 1;
+    const ex = rm && rm.extra ? rm.extra : null;
+    const stageLabel = (rm && rm.label) || '';
+    const formText = route.keepForm ? `淬体进阶${stageLabel ? '（' + stageLabel + '）': ''}：形态不变，成长值提升`: `进化后名字变为【${route.to}】${stageLabel ? '（' + stageLabel + '）': ''}`;
     const lvOk = pet.level >= (route.minLevel || 1);
-    const matOk = have >= 1;
+    const matOk = rm ? (rm.enough && (!ex || ex.enough)) : have >= 1;
     const canEvolve = lvOk && matOk;
     let warnRow = '';
     if (!lvOk) warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
-    if (!matOk) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 1 个 ${matName}，当前持有 ${have}</div>`;
+    if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 个 ${matName}，当前持有 ${rm.have}</div>`;
+    if (ex && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
     pb.innerHTML = `
-      <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
-      <div class="es-preview-row">消耗：<b>${matName} ×1</b>（当前持有 ${have}）</div>
+      <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>${stageLabel ? '（' + stageLabel + '）': ''}（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
+      <div class="es-preview-row">消耗：<b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>`: ''}（当前持有 ${rm ? rm.have + (ex ? ' / ' + ex.have: ''): have}）</div>
       <div class="hint">等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
       ${warnRow}
       <div class="es-stats">属性变化：</div>
@@ -165,7 +179,7 @@
   function renderEvolveHint() {
     const el = $('evolve-hint-text');
     const E = Config.pet.evolution;
-    if (el && E) el.innerHTML = `进化：消耗 <b>${E.materialName || '进化素材'} ×1</b>走一段进化树（等级不变、成长提升、名字变化），单宠最多进化 <b>${E.maxEvolveTimes || 10} 次</b>，吃满后需<b>融合(转生)</b>重置次数继续`;
+    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1 + 额外×3，觉醒+主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
   }
 
 

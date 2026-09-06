@@ -79,9 +79,8 @@ window.Config = {
       '尸牙犬': 84, '幽灵犬': 84, '影刃兔': 100, '霜影兔': 100
     },
     // 等级上限（到顶后经验条保持满，不再升级）。
-    // 2026-09-03 拍板：上限定为 60（60 级毕业）。图 1-10 覆盖 1-60 级 = 教学/成长主流程
-    //   （前 10 图让玩家快速上手）；图 11-17 为预留毕业图（保留不删）——等级段 61-100 与第二幕
-    //   主线 m41~m68 因上限 60 自然锁死，等毕业设计时整体重做等级段/内容/解锁。
+    // 2026-09-03 拍板：上限定为 60（60 级毕业）。图 1-10 覆盖 1-60 级 = 完整成长主流程
+    //   （2026-09-06 地图精简 17→10：图 10 腐变之源 = 毕业，终形态 + 学技能 + 神级宠之门）。
     // maxLevel 与图的等级段必须同步（改这里必须确认图 10 的上限是 60）。
     // 注意：涅槃要求 ≥ nirvana.minLevel（60），上限 = 门槛，60 级即可涅槃。
     maxLevel: 60,
@@ -94,14 +93,42 @@ window.Config = {
     babyGrowth: { min: 3, max: 8 },
     // 进化系统：通用素材 + 可配置多层分叉树；每段独立配置等级门槛
     evolution: {
-      maxEvolveTimes: 10,
+      /* 5 阶进化（2026-09-06 按《系统重设计·落地执行手册_v1》2.5 重排）
+       * 旧：maxEvolveTimes 10（3 次换形态 10/35/60 + 7 次「继续进化（成长+）」占位）
+       * 新：4 次进化 = 5 个阶段（初始 / 一阶 / 二阶 / 三阶 / 终阶），门槛 Lv10 / 25 / 40 / 60。
+       *   · 一阶 Lv10、二阶 Lv25、终阶 Lv60 = 换形态（形态树里本来就有这三段，零美术成本）
+       *   · 三阶 Lv40 = 淬体阶（keepForm：形态不变，只涨成长 +0.3~0.4，是普通阶的两倍）
+       *     —— 手册要求「每阶外观变化」，但形态树只有 3 层，加一层要 16 个新形态名 + 16 张立绘（美术缺口，见落地方案 R4）
+       *   · 终阶额外消耗 finalExtra = 手册 2.5 的「传说进化素材 + 特殊道具」，特殊道具手册没定义
+       *     → 暂用「传说进化素材 ×3」承载，不新增道具/图标（见落地方案 R3）
+       * evolveStage = 已进化次数 + 1（1=初始 … 5=终阶）；素材档位由「当前阶」决定，不再猜次数。 */
+      maxEvolveTimes: 4,
+      stages: [
+        { stage: 1, label: '初始', minLevel: 1,  material: null,           amount: 0, growthBoost: [0, 0],     form: false, desc: '孵化出来的形态' },
+        { stage: 2, label: '一阶', minLevel: 10, material: '进化素材',     amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '初次蜕变（引导任务 G2）' },
+        { stage: 3, label: '二阶', minLevel: 25, material: '精粹进化素材', amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '中期进化' },
+        { stage: 4, label: '三阶', minLevel: 40, material: '传说进化素材', amount: 1, growthBoost: [0.3, 0.4], form: false, desc: '淬体：形态不变，成长大幅提升（合成解锁）' },
+        { stage: 5, label: '终阶', minLevel: 60, material: '传说进化素材', amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '最终形态：觉醒 + 主动技能', extra: { name: '传说进化素材', amount: 3 } }
+      ],
       materialName: '进化素材',
-      // 进化成长提升压到极小（每次 +0.1~0.2，10次最多 +2）：对齐口袋精灵2「普通进化成长基本不动，
-      // 成长主要靠合成/涅槃(大后期)暴涨」的机制，避免中期进化几次就把成长从 4 叠到 10 导致同等级碾压秒怪。
-      // 进化现在主要价值 = 换形态/小幅变强，成长质变交给融合(合成)与涅槃。
+      // 进化道具（2026-09-06 第二版手册 2.0）：可选增强。进化页下拉框选一颗消耗，
+      // 成长提升 = 基础提升（stage.growthBoost 区间随机）× (1 + 道具boost)。不选/没有则按基础提升，行为与旧版一致。
+      boostItems: ['evo_dan_a', 'evo_dan_b', 'evo_jade'],
+      // 兼容性旧字段（UI/测试引用）：进化成长提升每次 +0.1~0.2（三阶淬体 +0.3~0.4 走 stages）
       growthBoost: [0.1, 0.2],
-      /* 进化节点 2026-08-31 重排：10 / 35 / 60（原 10/25/40）
-       * Lv60 = 终形态 + 学主动技能 + 涅槃解锁（三者同点，第一幕毕业仪式），第二幕靠技能+涅槃撑。 */
+      // 当前阶（1~5）：由已进化次数推导，UI/逻辑统一走这个，别各处自己算
+      stageOf: (pet) => {
+        const max = (window.Config.pet.evolution && window.Config.pet.evolution.maxEvolveTimes) || 4;
+        return Math.min(max + 1, Math.max(1, (pet && (pet.evolveStage != null ? pet.evolveStage : (pet.evolveTimes || 0) + 1)) || 1));
+      },
+      // 下一阶配置（已满阶返回 null）
+      nextStage: (pet) => {
+        const E = window.Config.pet.evolution;
+        const cur = E.stageOf(pet);
+        return (E.stages || []).find(s => s.stage === cur + 1) || null;
+      },
+      /* 2026-09-06 重排：10 / 25 / 40 / 60（原 10/35/60）
+       * Lv60 = 终形态 + 学主动技能 + 觉醒（毕业）；神级宠合成的「终阶」门槛就是这一阶。 */
       // 主动技能：终形态且达到 60 级时解锁；每次施放后按后续我方行动冷却 3 回合。
       activeSkills: {
         '腐烂之母': { id: 'corrosion-spit', name: '腐蚀喷吐', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
@@ -136,38 +163,82 @@ window.Config = {
         '毒沼蛙': [ { to: '毒沼王', icon: '👑', minLevel: 10 }, { to: '咒沼蛙', icon: '🌀', minLevel: 10 } ],
         '尸犬': [ { to: '尸牙犬', icon: '🦷', minLevel: 10 }, { to: '幽灵犬', icon: '👻', minLevel: 10 } ],
         '幽影兔': [ { to: '影刃兔', icon: '🌙', minLevel: 10 }, { to: '霜影兔', icon: '🧊', minLevel: 10 } ],
-        '腐沼兽': [ { to: '腐沼王', icon: '🐸', minLevel: 35 } ],
-        '毒噜兽': [ { to: '毒沼霸主', icon: '🐹', minLevel: 35 } ],
+        '腐沼兽': [ { to: '腐沼王', icon: '🐸', minLevel: 25 } ],
+        '毒噜兽': [ { to: '毒沼霸主', icon: '🐹', minLevel: 25 } ],
         '腐沼王': [ { to: '腐烂之母', icon: '👑', minLevel: 60 } ],
         '毒沼霸主': [ { to: '剧毒魔君', icon: '☠', minLevel: 60 } ],
-        '血牙狐': [ { to: '血灾领主', icon: '🦷', minLevel: 35 } ],
-        '幽火狐': [ { to: '幽火王', icon: '🔥', minLevel: 35 } ],
+        '血牙狐': [ { to: '血灾领主', icon: '🦷', minLevel: 25 } ],
+        '幽火狐': [ { to: '幽火王', icon: '🔥', minLevel: 25 } ],
         '血灾领主': [ { to: '血月魔狐', icon: '🌕', minLevel: 60 } ],
         '幽火王': [ { to: '幽火魔狐', icon: '🌑', minLevel: 60 } ],
-        '瘟甲熊': [ { to: '瘟神巨熊', icon: '🛡', minLevel: 35 } ],
-        '血瘟熊': [ { to: '血疫暴君', icon: '🩸', minLevel: 35 } ],
+        '瘟甲熊': [ { to: '瘟神巨熊', icon: '🛡', minLevel: 25 } ],
+        '血瘟熊': [ { to: '血疫暴君', icon: '🩸', minLevel: 25 } ],
         '瘟神巨熊': [ { to: '瘟疫之主', icon: '☠', minLevel: 60 } ],
         '血疫暴君': [ { to: '血瘟暴君', icon: '🩸', minLevel: 60 } ],
-        '疫刺兽': [ { to: '疫魔刺龙', icon: '🌵', minLevel: 35 } ],
-        '冥毛兽': [ { to: '冥幽兽', icon: '🌑', minLevel: 35 } ],
+        '疫刺兽': [ { to: '疫魔刺龙', icon: '🌵', minLevel: 25 } ],
+        '冥毛兽': [ { to: '冥幽兽', icon: '🌑', minLevel: 25 } ],
         '疫魔刺龙': [ { to: '刺骨魔兽', icon: '🦴', minLevel: 60 } ],
         '冥幽兽': [ { to: '幽冥疫君', icon: '🌒', minLevel: 60 } ],
-        '骨刃狼': [ { to: '骨刃王', icon: '⚔', minLevel: 35 } ],
-        '冥霜狼': [ { to: '霜狼祭司', icon: '🧙', minLevel: 35 } ],
+        '骨刃狼': [ { to: '骨刃王', icon: '⚔', minLevel: 25 } ],
+        '冥霜狼': [ { to: '霜狼祭司', icon: '🧙', minLevel: 25 } ],
         '骨刃王': [ { to: '骸骨君主', icon: '💀', minLevel: 60 } ],
         '霜狼祭司': [ { to: '霜寒领主', icon: '❄', minLevel: 60 } ],
-        '毒沼王': [ { to: '毒沼魔君', icon: '👑', minLevel: 35 } ],
-        '咒沼蛙': [ { to: '咒毒蛙王', icon: '🌀', minLevel: 35 } ],
+        '毒沼王': [ { to: '毒沼魔君', icon: '👑', minLevel: 25 } ],
+        '咒沼蛙': [ { to: '咒毒蛙王', icon: '🌀', minLevel: 25 } ],
         '毒沼魔君': [ { to: '剧毒魔神', icon: '🧪', minLevel: 60 } ],
         '咒毒蛙王': [ { to: '深渊蛙帝', icon: '🕳', minLevel: 60 } ],
-        '尸牙犬': [ { to: '尸魔犬王', icon: '🦷', minLevel: 35 } ],
-        '幽灵犬': [ { to: '幽冥猎犬', icon: '👻', minLevel: 35 } ],
+        '尸牙犬': [ { to: '尸魔犬王', icon: '🦷', minLevel: 25 } ],
+        '幽灵犬': [ { to: '幽冥猎犬', icon: '👻', minLevel: 25 } ],
         '尸魔犬王': [ { to: '尸界狱主', icon: '⚰', minLevel: 60 } ],
         '幽冥猎犬': [ { to: '幽魂犬皇', icon: '👻', minLevel: 60 } ],
-        '影刃兔': [ { to: '影舞者', icon: '🌙', minLevel: 35 } ],
-        '霜影兔': [ { to: '霜影魔兔', icon: '🧊', minLevel: 35 } ],
+        '影刃兔': [ { to: '影舞者', icon: '🌙', minLevel: 25 } ],
+        '霜影兔': [ { to: '霜影魔兔', icon: '🧊', minLevel: 25 } ],
         '影舞者': [ { to: '影蚀魔君', icon: '✨', minLevel: 60 } ],
         '霜影魔兔': [ { to: '霜魂兔皇', icon: '❄', minLevel: 60 } ]
+      }
+    },
+    /* ================= 神级宠（2026-09-06 新增，《系统重设计·落地执行手册_v1》2.6） =================
+     * 神级宠是【单独的宠物】，不是普通宠的进阶形态：有自己的名字、外观、基础属性与成长系数。
+     *  · 获得：合成时主宠与副宠都必须是【终阶】（evolveStage 5）且成长值 ≥ minGrowth →
+     *    30% 概率出神级宠；背包有「涅槃丹」时 100% 出。
+     *  · 强度：statCoeff = 对应普通宠的 1.5 倍（手册 2.6「成长系数 +50%」）。
+     *  · 只有神级宠才能涅槃（见 Config.nirvana.requireGodPet）。
+     *  · 外观：没有专属立绘前，sprite 复用该线终形态的立绘（不回退 emoji）。
+     *  ⚠️ minGrowth=60 是手册原值；它与「只有神级宠能涅槃」合起来会让成长通道变长（落地方案 R1）。
+     *     想调快只改这一个数（建议 30）。 */
+    godPets: {
+      minGrowth: 60,
+      /* 成神规则（2026-09-06 第二版手册 2.2，对齐原版"满神 60cc"）：
+       *  · 出生成长上限 birthGrowthCap：计算成长超过 60 的部分不直接给，折算成 statCoeff 永久加成
+       *    （每超过 1 点 +excessStatCoeffRatio，封顶 excessStatCoeffMax）→ 鼓励用高成长副宠合成，超额不浪费
+       *  · 神级宠涅槃无成长上限（长线叠成长）
+       *  · 合成终阶等级要求 baseLevelRequire：至尊神石可按 supremeStoneLevelReduce 降低 */
+      birthGrowthCap: 60,
+      excessStatCoeffRatio: 0.01,
+      excessStatCoeffMax: 0.2,
+      baseLevelRequire: 60,
+      supremeStoneLevelReduce: 10,
+      // 8 只神级宠（每条基宠线 1 只）；line 用于从普通宠反查它对应的神级形态
+      list: [
+        { name: '腐界母神', line: '腐噜兽', sprite: '腐烂之母', speed: 80,  baseHp: 165, baseAtk: 33, baseDef: 17, statCoeff: { hp: 7.35, atk: 3.57, def: 1.53 } },
+        { name: '血月神狐', line: '血狐',   sprite: '血月魔狐', speed: 96,  baseHp: 128, baseAtk: 45, baseDef: 12, statCoeff: { hp: 4.83, atk: 3.33, def: 1.38 } },
+        { name: '疫神巨像', line: '瘟熊',   sprite: '瘟疫之主', speed: 70,  baseHp: 240, baseAtk: 27, baseDef: 27, statCoeff: { hp: 8.55, atk: 3.63, def: 1.68 } },
+        { name: '万刺冥神', line: '疫毛兽', sprite: '刺骨魔兽', speed: 92,  baseHp: 143, baseAtk: 39, baseDef: 14, statCoeff: { hp: 6.00, atk: 3.42, def: 1.44 } },
+        { name: '骸骨神狼', line: '骨狼',   sprite: '骸骨君主', speed: 88,  baseHp: 158, baseAtk: 38, baseDef: 15, statCoeff: { hp: 6.45, atk: 3.36, def: 1.49 } },
+        { name: '毒渊神蟾', line: '毒沼蛙', sprite: '剧毒魔神', speed: 75,  baseHp: 195, baseAtk: 30, baseDef: 21, statCoeff: { hp: 7.80, atk: 3.54, def: 1.62 } },
+        { name: '狱门神犬', line: '尸犬',   sprite: '尸界狱主', speed: 84,  baseHp: 180, baseAtk: 32, baseDef: 20, statCoeff: { hp: 6.90, atk: 3.38, def: 1.58 } },
+        { name: '霜月神兔', line: '幽影兔', sprite: '影蚀魔君', speed: 100, baseHp: 105, baseAtk: 36, baseDef: 11, statCoeff: { hp: 5.03, atk: 3.51, def: 1.35 } }
+      ],
+      // 按名字取神级宠定义
+      byName: (name) => ((window.Config.pet && window.Config.pet.godPets && window.Config.pet.godPets.list) || [])
+        .find(g => g.name === name) || null,
+      // 按【根源基宠名】（pet.lineId）取该线的神级宠；已是神级宠则返回自身
+      ofLine: (lineId) => {
+        const G = window.Config.pet && window.Config.pet.godPets;
+        if (!G) return null;
+        const self = (G.list || []).find(g => g.name === lineId);
+        if (self) return self;
+        return (G.list || []).find(g => g.line === lineId) || null;
       }
     }
   },
@@ -277,20 +348,12 @@ window.Config = {
       'echo-cliffs':      { hp: 1380, atk: 270, def: 119 },
       'rotfen-bog':       { hp: 1611, atk: 314, def: 139 },
       'ember-hollow':     { hp: 1853, atk: 359, def: 158 },
-      'soul-abyss':       { hp: 1909, atk: 369, def: 164 },
-      'blight-heart':     { hp: 2126, atk: 411, def: 182 },
-      /* ---- 2026-08-31 第二幕 7 图（61-100 级）：按既有等差外推（每图 hp+267/atk+51/def+23）----
-       * 与图 6-10 同一套规则：怪数值=图中点基准 × 等级缩放（clamp 0.25~1.6）× typeMult。
-       * 2026-09-03 拍板 60 级封顶后：本 7 图为【预留毕业图】（保留不删）——等级段 61-100 超上限、
-       * 第二幕主线 m41~m68（unlockLevel 61+）自然锁死；世界地图点位仍在，进图会被"等级不足"拦下。
-       * 待毕业设计时整体重做：等级段压进 60 / 毕业掉落特色 / 解锁方式。当前数值仅作占位，玩家碰不到。 */
-      'rift-fissure':     { hp: 2908, atk: 561, def: 249 },
-      'black-blood-moor': { hp: 3175, atk: 612, def: 272 },
-      'bone-abyss':       { hp: 3442, atk: 663, def: 295 },
-      'plague-heart':     { hp: 3709, atk: 714, def: 318 },
-      'soul-nest':        { hp: 3976, atk: 765, def: 341 },
-      'annihilation-hall':{ hp: 4243, atk: 816, def: 364 },
-      'blight-origin':    { hp: 4510, atk: 867, def: 387 }
+      /* 图9/10（2026-09-06 手册 2.2 校准）：原值穿装仅 2.45 刀 < 2.5（手册 1.1 指出的崩点「图9/10穿装2.42刀」），
+       * 上调 hp 让穿装回到 ~2.9 刀（校准计算见 docs/tests/equipment_simulator.js）：
+       *   图9 魂渊   穿装 944-164=780 伤害/刀 → hp 2185 → 2.8 刀；裸装 2185/(819-164)=3.3 刀 ✓
+       *   图10 腐变  穿装 1051-182=869 伤害/刀 → hp 2520 → 2.9 刀；裸装 2520/(809-182)=4.0 刀 ✓ */
+      'soul-abyss':       { hp: 2185, atk: 369, def: 164 },
+      'blight-heart':     { hp: 2520, atk: 411, def: 182 }
     },
     // 怪类型强度：普通 1.0 / 进化 1.1 / 变异 1.2（变异怪血攻防都更高，压箱底才有挑战）
     typeMult: { normal: 1.0, evolved: 1.1, mutant: 1.2 },
@@ -309,15 +372,12 @@ window.Config = {
       { id: 'ember-hollow', name: '余烬渊', levelRange: [43, 48], recommended: '成长 17', recGrowth: 17, background: '余烬渊', difficulty: 1.0, enemyMult: 1.1, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
       { id: 'soul-abyss', name: '魂渊', levelRange: [49, 54], recommended: '成长 19', recGrowth: 19, background: '魂渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
       { id: 'blight-heart', name: '腐变之源', levelRange: [55, 60], recommended: '成长 21', recGrowth: 21, background: '腐变之源', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant', 'wild-bog-king', 'wild-umbra-rabbit'] },
-      /* ---- 2026-08-31 第二幕 7 图（腐变之源打穿后，污染往更深处扩散）----
-       * enemyIds 只放 4 只变异怪：bog-king/umbra-rabbit 的等级段 [21,35] 在 61+ 图池过滤后永远选不中，不配死条目。 */
-      { id: 'rift-fissure', name: '腐变裂隙', levelRange: [61, 66], recommended: '成长 23', recGrowth: 23, background: '腐变裂隙', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'black-blood-moor', name: '黑血沼原', levelRange: [67, 72], recommended: '成长 25', recGrowth: 25, background: '黑血沼原', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'bone-abyss', name: '万骨深渊', levelRange: [73, 78], recommended: '成长 27', recGrowth: 27, background: '万骨深渊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'plague-heart', name: '疫潮之心', levelRange: [79, 84], recommended: '成长 29', recGrowth: 29, background: '疫潮之心', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'soul-nest', name: '噬魂巢穴', levelRange: [85, 90], recommended: '成长 31', recGrowth: 31, background: '噬魂巢穴', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'annihilation-hall', name: '湮灭回廊', levelRange: [91, 96], recommended: '成长 33', recGrowth: 33, background: '湮灭回廊', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] },
-      { id: 'blight-origin', name: '腐变本源', levelRange: [97, 100], recommended: '成长 35', recGrowth: 35, background: '腐变本源', difficulty: 1.0, enemyIds: ['wild-bonewolf-mutant', 'wild-shadowrabbit-mutant', 'wild-plaguebear-mutant', 'wild-bloodfox-mutant'] }
+      /* ---- 2026-09-06 地图精简 17→10（手册 2.1）----
+       * 原 2026-08-31 的第二幕 7 图（rift-fissure ~ blight-origin，Lv61-100）整体删除：
+       * 它们因 maxLevel=60 早已进不去（预留毕业图），删掉玩家无感；「地狱/通天塔」以后作为
+       * 独立系统另行设计，不占用野图编号。删图连带：主线 m41~m68 / 7 种区域材料 /
+       * areaEvolutionTiers / materialWeightsByTier / rarityWeightsByTier / materialTierWeights /
+       * baseTierMultipliers / areaLevels / worldmap 点位（vtest_worldmap.js 守一致性）。 */
     ],
     // 野怪池改由 enemy-data.js 维护；此处保留空壳，实际读取在 battle.js 延迟获取。
     enemies: [],
@@ -341,7 +401,16 @@ window.Config = {
      *   material 子权重按改造前各材料独立概率等比例设定 → 各材料吞吐≈改造前（不饿死打造/进化/涅槃）。
      *   evo/区域材料的实际名字由 areaEvolutionTiers / areaMaterials 决定；其权重并入下方固定项，不再读 chance。
      */
-    pool: { none: 760, material: 210, equipment: 15, egg: 15 },
+    pool: { none: 700, material: 250, equipment: 25, egg: 20 },
+    /* 掉落率总盘·按阶段（2026-09-06 手册 2.3）：装备掉落率 新手期2% / 成长期2.5% / 毕业期3%，
+     * 空气 70%、材料 25%、蛋 ~2%。drop.js 按「图序号」选阶段池（图1-3→1、图4-7→2、图8-10→3），
+     * 取不到时回退上面的全局 pool。权重为相对值，代码归一化：
+     *   阶段1：装备 20/990≈2.0% / 阶段2：25/995≈2.5% / 阶段3：30/1000=3.0% */
+    poolByStage: {
+      1: { none: 700, material: 250, equipment: 20, egg: 20 },
+      2: { none: 700, material: 250, equipment: 25, egg: 20 },
+      3: { none: 700, material: 250, equipment: 30, egg: 20 }
+    },
     /* 材料子权重·按图档（low→high，2026-08-31 重做）：
      * 旧版是【全图一个全局权重】——图 1 与图 17 掉同一套比例，深处毫无"农场感"。
      * 现在改成【每图档一张表】，权重随图档从低到高爬升，且每种材料有"出现时机"门槛：
@@ -354,24 +423,24 @@ window.Config = {
      *   · 涅磐兽：Lv60（≈图10）才出现（涅槃解锁），从 0 爬到 75——解决旧版"深处最需要的材料掉落最稀"的瓶颈
      * 表中【没有的键 = 该图还不出】（出现时机靠缺省控制，不在表里就不进子池）。
      * 改这里只动材料比例，不碰掉落率总盘（drop.pool）。 */
+    /* 材料子权重·按图档（2026-09-06 手册 2.4 重做：10 档，打造石跟图阶挂钩）
+     * 三阶段设计：图1-3 重铸石为主 / 图4-7 增缀+剥离（合成·神圣解锁）/ 图8-10 神圣+合成+涅磐兽。
+     * 「永远不够用」：前期重铸多但神圣没得洗，后期神圣多但前置材料吃紧。
+     * 鉴定石为现有鉴定玩法必需（手册未提及，保留独立小权重，落地方案 R6）；
+     * 锁定石只随图 16/17 产出，图 11-17 删除后暂无来源（毕业系统一起回补）。
+     * 表中没有的键 = 该图还不出；改这里只动材料比例，不碰掉落率总盘。 */
     materialWeightsByTier: {
-      1:  { '区域材料': 100, '进化素材': 40, '重铸石': 60, '增缀石': 50, '剥离石': 15, '鉴定石': 55 },
-      2:  { '区域材料': 100, '进化素材': 46, '重铸石': 56, '增缀石': 52, '剥离石': 18, '鉴定石': 50 },
-      3:  { '区域材料': 105, '进化素材': 52, '重铸石': 52, '增缀石': 54, '剥离石': 22, '鉴定石': 46 },
-      4:  { '区域材料': 105, '进化素材': 58, '重铸石': 48, '增缀石': 54, '剥离石': 26, '鉴定石': 42 },
-      5:  { '区域材料': 110, '进化素材': 64, '重铸石': 44, '增缀石': 52, '剥离石': 30, '鉴定石': 38 },
-      6:  { '区域材料': 110, '进化素材': 70, '重铸石': 40, '增缀石': 50, '剥离石': 33, '鉴定石': 34 },
-      7:  { '区域材料': 115, '进化素材': 76, '重铸石': 34, '增缀石': 48, '剥离石': 36, '合成之石': 30, '神圣石': 25, '鉴定石': 18 },
-      8:  { '区域材料': 115, '进化素材': 82, '重铸石': 30, '增缀石': 46, '剥离石': 38, '合成之石': 38, '神圣石': 32, '鉴定石': 16 },
-      9:  { '区域材料': 120, '进化素材': 88, '重铸石': 26, '增缀石': 42, '剥离石': 40, '合成之石': 44, '神圣石': 38, '鉴定石': 14 },
-      10: { '区域材料': 125, '进化素材': 94, '增缀石': 38, '剥离石': 40, '合成之石': 50, '神圣石': 44, '涅磐兽': 25, '鉴定石': 12 },
-      11: { '区域材料': 128, '进化素材': 100, '增缀石': 34, '剥离石': 38, '合成之石': 54, '神圣石': 50, '涅磐兽': 35, '鉴定石': 10 },
-      12: { '区域材料': 130, '进化素材': 106, '增缀石': 30, '剥离石': 36, '合成之石': 58, '神圣石': 54, '涅磐兽': 45, '鉴定石': 9 },
-      13: { '区域材料': 132, '进化素材': 112, '增缀石': 26, '剥离石': 34, '合成之石': 60, '神圣石': 58, '涅磐兽': 55, '鉴定石': 8 },
-      14: { '区域材料': 135, '进化素材': 118, '增缀石': 22, '剥离石': 32, '合成之石': 62, '神圣石': 62, '涅磐兽': 62, '鉴定石': 7 },
-      15: { '区域材料': 138, '进化素材': 124, '增缀石': 18, '剥离石': 30, '合成之石': 65, '神圣石': 66, '涅磐兽': 68, '鉴定石': 6 },
-      16: { '区域材料': 140, '进化素材': 128, '增缀石': 16, '剥离石': 28, '合成之石': 67, '神圣石': 68, '涅磐兽': 70, '鉴定石': 5, '锁定石': 2 },
-      17: { '区域材料': 140, '进化素材': 132, '增缀石': 14, '剥离石': 26, '合成之石': 70, '神圣石': 70, '涅磐兽': 75, '鉴定石': 4, '锁定石': 2 }
+      /* 2026-09-06 合成系统道具化：普通道具走掉落（强化丹A 全图 / 涅槃丹 图8+，权重保守起步可调） */
+      1:  { '区域材料': 100, '进化素材': 40, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 55, '强化丹A': 12 },
+      2:  { '区域材料': 100, '进化素材': 44, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 52, '强化丹A': 12 },
+      3:  { '区域材料': 105, '进化素材': 50, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 48, '强化丹A': 12 },
+      4:  { '区域材料': 105, '进化素材': 56, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 42, '强化丹A': 12 },
+      5:  { '区域材料': 110, '进化素材': 62, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 38, '强化丹A': 12 },
+      6:  { '区域材料': 110, '进化素材': 68, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 34, '强化丹A': 12 },
+      7:  { '区域材料': 115, '进化素材': 74, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 30, '强化丹A': 12 },
+      8:  { '区域材料': 115, '进化素材': 80, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 22, '强化丹A': 10, '涅槃丹': 15 },
+      9:  { '区域材料': 120, '进化素材': 87, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 18, '强化丹A': 10, '涅槃丹': 15 },
+      10: { '区域材料': 125, '进化素材': 94, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 14, '强化丹A': 10, '涅槃丹': 15 }
     },
     // 进化素材档位权重（仅在本图 areaEvolutionTiers 允许的档位里生效）：
     // 高档相对权重更高 → 深处"只掉传说"的图传说频率拉满，中段多档图传说也偏多（出现时机的梯度）。
@@ -391,15 +460,8 @@ window.Config = {
       'rotfen-bog':      ['精粹进化素材', '传说进化素材'],
       'ember-hollow':    ['精粹进化素材', '传说进化素材'],
       'soul-abyss':      ['传说进化素材'],
-      'blight-heart':    ['传说进化素材'],
-      /* ---- 2026-08-31 第二幕（图 11-17）：全传说档（不新增档位，克制）---- */
-      'rift-fissure':      ['传说进化素材'],
-      'black-blood-moor':  ['传说进化素材'],
-      'bone-abyss':        ['传说进化素材'],
-      'plague-heart':      ['传说进化素材'],
-      'soul-nest':         ['传说进化素材'],
-      'annihilation-hall': ['传说进化素材'],
-      'blight-origin':     ['传说进化素材']
+      'blight-heart':    ['传说进化素材']
+      /* 2026-09-06：图 11-17 的 7 条目随地图精简删除 */
     },
     // 每图专属材料：key=区域 id，value={ name 材料名 }
     // 掉落率由 materialWeightsByTier 里的'区域材料'键统一承载（改法一后不再读独立 chance，
@@ -415,15 +477,8 @@ window.Config = {
       'echo-cliffs':     { name: '回响之羽' },
       'rotfen-bog':      { name: '腐沼黏液' },
       'ember-hollow':    { name: '余烬残灰' },
-      'soul-abyss':      { name: '魂渊之尘' },
-      /* ---- 图 11-17 专属材料 ---- */
-      'rift-fissure':      { name: '裂隙碎片' },
-      'black-blood-moor':  { name: '黑血凝块' },
-      'bone-abyss':        { name: '深渊骸片' },
-      'plague-heart':      { name: '疫潮胞核' },
-      'soul-nest':         { name: '噬魂丝茧' },
-      'annihilation-hall': { name: '湮灭残响' },
-      'blight-origin':     { name: '本源腐核' }
+      'soul-abyss':      { name: '魂渊之尘' }
+      /* 2026-09-06：图 11-17 的 7 种专属材料（裂隙碎片/黑血凝块/深渊骸片/疫潮胞核/噬魂丝茧/湮灭残响/本源腐核）随地图精简删除 */
     },
     // 任务系统：每图一个收集任务（收集该图专属材料），数量大胆、奖励含少量进化素材（辅助，非主力）。
     // 进化素材奖励控制在低量（1次任务给2个，够几小步进化），避免玩家靠刷任务白嫖进化、失去"刷图掉素材"的意义。
@@ -452,7 +507,9 @@ window.Config = {
       { id: 'g6', category: 'tutorial', type: 'hatch', need: 1, requires: 'g5', name: '孵化新生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, isGuide: true, hint: '在宠物页 <b>宠物蛋</b> 栏孵化 1 颗蛋，得到第二只魂兽', target: '.pet-tab[data-pet-tab="egg"]', npc: '战场不该只容一只孤魂。孵化这颗蛋，让副宠为你并肩而战。', reward: { 合成之石: 1 } },
       { id: 'g7', category: 'tutorial', type: 'synth', need: 1, requires: 'g6', name: '融合之力', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物页 <b>合成</b> 栏：主宠融合副宠（Lv40 已由经验包顶入）', target: '.pet-tab[data-pet-tab="synth"]', npc: '魂兽之间亦有高下。主宠融副宠、继承其特质，向更上一层蜕变。', boostLevel: 40, reward: { 涅磐兽: 1 } },
       { id: 'g8', category: 'tutorial', type: 'list', need: 1, requires: 'g7', name: '初入市集', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备（进任务时已自动在背包放 1 件可上架白装，直接去市集上架它）', target: '.sb-btn[data-page="market"]', npc: '你亲手锻造之物，可换他人之资。市集之上，强者互通有无。', reward: { 重铸石: 2, 增缀石: 2 } },
-      { id: 'g9', category: 'tutorial', type: 'nirvana', need: 1, requires: 'g8', name: '浴火涅槃', guide: { page: 'pet', tab: 'merge', btn: '去涅槃' }, isGuide: true, hint: '在宠物页 <b>涅槃</b> 栏完成涅槃（Lv60 已由经验包顶入，涅磐兽已备）', target: '.pet-tab[data-pet-tab="merge"]', npc: 'Lv60 —— 燃尽旧躯，于灰烬中重塑真形。这是魂兽的毕业之礼，仅此一次。', boostLevel: 60, reward: { 凝魂晶石: 2 } },
+      /* G9 2026-09-06 改：手册 2.7「只有神级宠才能涅槃」→ 引导期玩家只有普通宠，涅槃任务必然卡死（落地方案 R2）。
+       * 引导最后一环改为【登临终阶】（累计进化 4 次 = 走到 5 阶终形态），涅槃降级为长线主线目标（m19/m31）。 */
+      { id: 'g9', category: 'tutorial', type: 'evolve', need: 4, requires: 'g8', name: '登临终阶', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏把魂兽推到 <b>终阶</b>（累计进化 4 次；Lv60 已由经验包顶入，进化素材已备）', target: '.pet-tab[data-pet-tab="evolve"]', npc: 'Lv60 —— 形态的尽头。越过此境，你的魂兽才算真正长成；再往上，唯有神级之路。', boostLevel: 60, reward: { 凝魂晶石: 2 } },
       { id: 'g10', category: 'tutorial', type: 'soulcast', need: 1, requires: 'g9', name: '魂铸传承', guide: { page: 'equip', tab: 'soulcast', btn: '去魂铸' }, hint: '毕业后普通任务：去 <b>打造</b> 页把魂兽特质铸入装备', target: '.sb-btn[data-page="equip"]', npc: '特质可铸入装备，世代相传。毕业之后，仍有可走的更深之路。', reward: { 神圣石: 2 } },
 
       /* ---- 主线 40 条：10 图 × 4 条（击败 / 收集 / 养成 / 装备），按等级解锁。
@@ -499,35 +556,8 @@ window.Config = {
       { id: 'm39', category: 'main', type: 'synth', need: 3, unlockLevel: 55, name: '初次合成', reward: { 合成之石: 4, 传说进化素材: 5 } },
       { id: 'm40', category: 'main', type: 'equipDrop', need: 20, unlockLevel: 56, name: '腐土的尽头', reward: { 神圣石: 6, 增缀石: 6 } },
 
-      /* ---- 2026-08-31 第二幕主线 m41~m68（7 图 × 4 条，unlockLevel 对齐图下限，need/奖励延续递增曲线）---- */
-      { id: 'm41', category: 'main', type: 'kill', area: 'rift-fissure', need: 600, unlockLevel: 61, name: '裂隙巡守', reward: { 传说进化素材: 7, 涅磐兽: 5 } },
-      { id: 'm42', category: 'main', type: 'collect', matName: '裂隙碎片', need: 600, unlockLevel: 61, name: '拾取裂隙碎片', reward: { 传说进化素材: 7 } },
-      { id: 'm43', category: 'main', type: 'synth', need: 3, unlockLevel: 61, name: '裂隙合成', reward: { 合成之石: 4, 传说进化素材: 6 } },
-      { id: 'm44', category: 'main', type: 'equipDrop', need: 22, unlockLevel: 62, name: '裂隙的尽头', reward: { 神圣石: 6, 增缀石: 6 } },
-      { id: 'm45', category: 'main', type: 'kill', area: 'black-blood-moor', need: 650, unlockLevel: 67, name: '黑血猎行', reward: { 传说进化素材: 7, 涅磐兽: 5 } },
-      { id: 'm46', category: 'main', type: 'collect', matName: '黑血凝块', need: 650, unlockLevel: 67, name: '凝取黑血凝块', reward: { 传说进化素材: 8 } },
-      { id: 'm47', category: 'main', type: 'synth', need: 3, unlockLevel: 67, name: '沼原合成', reward: { 合成之石: 4, 传说进化素材: 7 } },
-      { id: 'm48', category: 'main', type: 'equipDrop', need: 24, unlockLevel: 68, name: '沼原的尽头', reward: { 神圣石: 7, 增缀石: 7 } },
-      { id: 'm49', category: 'main', type: 'kill', area: 'bone-abyss', need: 700, unlockLevel: 73, name: '深渊猎骨', reward: { 传说进化素材: 8, 涅磐兽: 6 } },
-      { id: 'm50', category: 'main', type: 'collect', matName: '深渊骸片', need: 700, unlockLevel: 73, name: '拾取深渊骸片', reward: { 传说进化素材: 8 } },
-      { id: 'm51', category: 'main', type: 'synth', need: 4, unlockLevel: 73, name: '深渊合成', reward: { 合成之石: 5, 传说进化素材: 7 } },
-      { id: 'm52', category: 'main', type: 'equipDrop', need: 26, unlockLevel: 74, name: '深渊的尽头', reward: { 神圣石: 7, 增缀石: 7 } },
-      { id: 'm53', category: 'main', type: 'kill', area: 'plague-heart', need: 750, unlockLevel: 79, name: '疫潮讨伐', reward: { 传说进化素材: 8, 涅磐兽: 6 } },
-      { id: 'm54', category: 'main', type: 'collect', matName: '疫潮胞核', need: 750, unlockLevel: 79, name: '摘取疫潮胞核', reward: { 传说进化素材: 9 } },
-      { id: 'm55', category: 'main', type: 'synth', need: 4, unlockLevel: 79, name: '疫潮合成', reward: { 合成之石: 5, 传说进化素材: 8 } },
-      { id: 'm56', category: 'main', type: 'equipDrop', need: 28, unlockLevel: 80, name: '疫潮的尽头', reward: { 神圣石: 8, 增缀石: 8 } },
-      { id: 'm57', category: 'main', type: 'kill', area: 'soul-nest', need: 800, unlockLevel: 85, name: '巢穴清扫', reward: { 传说进化素材: 9, 涅磐兽: 7 } },
-      { id: 'm58', category: 'main', type: 'collect', matName: '噬魂丝茧', need: 800, unlockLevel: 85, name: '收集噬魂丝茧', reward: { 传说进化素材: 9 } },
-      { id: 'm59', category: 'main', type: 'synth', need: 4, unlockLevel: 85, name: '巢穴合成', reward: { 合成之石: 5, 传说进化素材: 8 } },
-      { id: 'm60', category: 'main', type: 'equipDrop', need: 30, unlockLevel: 86, name: '巢穴的尽头', reward: { 神圣石: 8, 增缀石: 8 } },
-      { id: 'm61', category: 'main', type: 'kill', area: 'annihilation-hall', need: 850, unlockLevel: 91, name: '回廊攻坚', reward: { 传说进化素材: 9, 涅磐兽: 7 } },
-      { id: 'm62', category: 'main', type: 'collect', matName: '湮灭残响', need: 850, unlockLevel: 91, name: '收录湮灭残响', reward: { 传说进化素材: 10 } },
-      { id: 'm63', category: 'main', type: 'synth', need: 5, unlockLevel: 91, name: '回廊合成', reward: { 合成之石: 6, 传说进化素材: 9 } },
-      { id: 'm64', category: 'main', type: 'equipDrop', need: 32, unlockLevel: 92, name: '回廊的尽头', reward: { 神圣石: 9, 增缀石: 9 } },
-      { id: 'm65', category: 'main', type: 'kill', area: 'blight-origin', need: 900, unlockLevel: 97, name: '直面本源', reward: { 传说进化素材: 10, 涅磐兽: 8 } },
-      { id: 'm66', category: 'main', type: 'collect', matName: '本源腐核', need: 900, unlockLevel: 97, name: '挖取本源腐核', reward: { 传说进化素材: 10 } },
-      { id: 'm67', category: 'main', type: 'synth', need: 5, unlockLevel: 97, name: '本源合成', reward: { 合成之石: 6, 传说进化素材: 10 } },
-      { id: 'm68', category: 'main', type: 'equipDrop', need: 34, unlockLevel: 98, name: '腐变的源头', reward: { 神圣石: 10, 增缀石: 10 } },
+      /* ---- 2026-09-06：主线 m41~m68（第二幕 28 条）随地图精简 17→10 删除 ---- */
+
 
       /* ---- 2026-09-05 守关 Boss 首通（地图系统 A 项，图1-10）：击败该图 Boss 即首通，一次性奖励 ----
        * 奖励 = 区域材料×20 + 重铸石×3 + 该图档进化素材×3（图1-2 普通 / 图3-4 精粹 / 图5+ 传说）。
@@ -539,9 +569,10 @@ window.Config = {
       { id: 'boss5', category: 'main', type: 'boss', area: 'blood-rift', need: 1, unlockLevel: 25, name: '首通·血潮裂谷', hint: '击败守关 Boss，首通此图', reward: { 血潮凝晶: 20, 重铸石: 3, 传说进化素材: 3 } },
       { id: 'boss6', category: 'main', type: 'boss', area: 'echo-cliffs', need: 1, unlockLevel: 31, name: '首通·回响崖', hint: '击败守关 Boss，首通此图', reward: { 回响之羽: 20, 重铸石: 3, 传说进化素材: 3 } },
       { id: 'boss7', category: 'main', type: 'boss', area: 'rotfen-bog', need: 1, unlockLevel: 37, name: '首通·腐沼泽', hint: '击败守关 Boss，首通此图', reward: { 腐沼黏液: 20, 重铸石: 3, 传说进化素材: 3 } },
-      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3 } },
-      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3 } },
-      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3 } },
+      /* 图 8-10 的守关 Boss 首通额外掉涅槃丹（手册 2.6：涅槃丹来源之一 = BOSS 掉落） */
+      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
+      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
+      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
 
       /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「🐾 宠物」分类。
        * ⚠️ 机制约定（2026-08-31 用户拍板）：
@@ -577,16 +608,18 @@ window.Config = {
 
       /* ---- 日常 12 条：每日 00:00 刷新，可重复 ---- */
       /* ---- 地图委托：收集本图材料，交完立即进入下一轮 ---- */
-      { id: 'loop_corrupted_forest', category: 'main', type: 'collect_loop', area: 'corrupted-forest', matName: '枯荣种荚', need: 50, repeatable: true, name: '枯荣采集委托', reward: { 重铸石: 5 }, expReward: 210 },
-      { id: 'loop_plague_swamp', category: 'main', type: 'collect_loop', area: 'plague-swamp', matName: '泣腐之泪', need: 50, repeatable: true, name: '泣腐采集委托', reward: { 重铸石: 5 }, expReward: 570 },
-      { id: 'loop_shadow_mountains', category: 'main', type: 'collect_loop', area: 'shadow-mountains', matName: '白骨残片', need: 50, repeatable: true, name: '白骨采集委托', reward: { 重铸石: 8 }, expReward: 930 },
-      { id: 'loop_bone_wastes', category: 'main', type: 'collect_loop', area: 'bone-wastes', matName: '幽影魂丝', need: 50, repeatable: true, name: '幽影采集委托', reward: { 重铸石: 8 }, expReward: 1290 },
-      { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 50, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 5 }, expReward: 1650 },
-      { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 增缀石: 5 }, expReward: 2010 },
-      { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 5 }, expReward: 2370 },
-      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 剥离石: 5 }, expReward: 2730 },
-      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 5 }, expReward: 3090 },
-      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 神圣石: 5 }, expReward: 3450 },
+      /* 循环任务奖励跟图阶挂钩（2026-09-06 手册 2.4）：图1-3 重铸石3-5 / 图4-7 增缀·剥离5-8 / 图8-10 神圣·合成5-8 */
+      { id: 'loop_corrupted_forest', category: 'main', type: 'collect_loop', area: 'corrupted-forest', matName: '枯荣种荚', need: 50, repeatable: true, name: '枯荣采集委托', reward: { 重铸石: 3 }, expReward: 210 },
+      { id: 'loop_plague_swamp', category: 'main', type: 'collect_loop', area: 'plague-swamp', matName: '泣腐之泪', need: 50, repeatable: true, name: '泣腐采集委托', reward: { 重铸石: 4 }, expReward: 570 },
+      { id: 'loop_shadow_mountains', category: 'main', type: 'collect_loop', area: 'shadow-mountains', matName: '白骨残片', need: 50, repeatable: true, name: '白骨采集委托', reward: { 重铸石: 5 }, expReward: 930 },
+      { id: 'loop_bone_wastes', category: 'main', type: 'collect_loop', area: 'bone-wastes', matName: '幽影魂丝', need: 50, repeatable: true, name: '幽影采集委托', reward: { 增缀石: 5 }, expReward: 1290 },
+      { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 50, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 6 }, expReward: 1650 },
+      { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 剥离石: 6 }, expReward: 2010 },
+      { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 7 }, expReward: 2370 },
+      /* 图 8-10 的委托额外给涅槃丹（手册 2.6：涅槃丹来源之一 = 循环任务兑换） */
+      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5, 涅槃丹: 1 }, expReward: 2730 },
+      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6, 涅槃丹: 1 }, expReward: 3090 },
+      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8, 涅槃丹: 1 }, expReward: 3450 },
       { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
       { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },
       { id: 'd3', category: 'daily', type: 'collect', matName: '枯荣种荚', need: 20, repeat: true, name: '晨间采集·种荚', reward: { 剥离石: 1 } },
@@ -619,8 +652,9 @@ window.Config = {
       靴子: { spd: 8 }, 腰带: { hp: 60, spd: 5 }, 斗篷: { dodge: 10, hp: 50 },
       饰品: { atk: 12, hit: 5 }, 护符: { lifesteal: 4 }, 徽章: { crit: 3, critDamage: 10 }
     },
-    // 每图档位基底倍数：1~17 图平滑递增（步进 0.25，图17=5.0），与 17 图扩展对齐
-    baseTierMultipliers: [1, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0],
+    // 每图档位基底倍数：10 张图平滑递增（步进 0.25，图10=3.25）
+    // 2026-09-06 地图精简 17→10：原 11-17 档（3.5~5.0）随图删除
+    baseTierMultipliers: [1, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25],
     materialTierMultipliers: { 1: 1.5, 2: 1.3, 3: 1, 4: 0.8, 5: 0.6 },
     speedAffixTiers: [
       { tier: 1, min: 12, max: 16 }, { tier: 2, min: 9, max: 11 }, { tier: 3, min: 6, max: 8 },
@@ -695,7 +729,8 @@ window.Config = {
     affixTierWeights: {
       white: { 4: 60, 5: 40 },
       blue:  { 3: 35, 4: 65 },
-      gold:  { 1: 2,  2: 13, 3: 85 }
+      // 2026-09-06 手册 2.3：金装 T1 2%→5%（降低求而不得门槛），T2 13→15，T3 85→80
+      gold:  { 1: 5,  2: 15, 3: 80 }
     },
     // 词缀 T 阶装备等级门槛（POE 式 ilvl gate）：T 阶要装备等级(ilvl)达到门槛才可能 roll 出。
     // 装备 ilvl = 掉落它的图档怪等级下限（图10 怪 55 级 → ilvl 55 → T1 开放）。
@@ -703,7 +738,7 @@ window.Config = {
     // 打造(重铸/增缀)沿用装备出生时的 ilvl，不会因换图刷高而解锁 —— T1 只在图10+ 的装备上出现。
     affixIlvlGates: { 1: 55, 2: 40, 3: 25, 4: 1, 5: 1 },
     // 图档 → 怪等级下限（兜底换算：老装备没有 ilvl 时按图档近似；与 battle.areas levelRange 对齐）
-    areaLevels: [1, 7, 13, 19, 25, 31, 37, 43, 49, 55, 61, 67, 73, 79, 85, 91, 97],
+    areaLevels: [1, 7, 13, 19, 25, 31, 37, 43, 49, 55],
     // 底材 T 阶分布：每张图一套权重（数字 = 权重，T1 最优 → T5 最差）。
     // 以前是 drop.js 里的线性插值（图6 → T1 占 33%，顶级底材太常见）；改显式表，策划一眼能调。
     // 曲线：图1 几乎摸不到 T1（1%），图6 也才 20% —— T1 底材是"运气好才有的"。
@@ -719,38 +754,25 @@ window.Config = {
       7:  { 1: 25, 2: 26, 3: 27, 4: 16, 5: 6  },
       8:  { 1: 30, 2: 27, 3: 25, 4: 13, 5: 5  },
       9:  { 1: 35, 2: 28, 3: 23, 4: 10, 5: 4  },
-      10: { 1: 42, 2: 28, 3: 20, 4: 8,  5: 4  },
-      /* ---- 2026-08-31 第二幕（图 11-17）：T1 权重延续趋势并收敛（65% 封顶，T5 几乎绝迹）---- */
-      11: { 1: 47, 2: 27, 3: 18, 4: 6,  5: 2  },
-      12: { 1: 51, 2: 26, 3: 16, 4: 5,  5: 2  },
-      13: { 1: 55, 2: 25, 3: 14, 4: 4,  5: 2  },
-      14: { 1: 58, 2: 24, 3: 13, 4: 3,  5: 2  },
-      15: { 1: 61, 2: 23, 3: 11, 4: 3,  5: 2  },
-      16: { 1: 63, 2: 22, 3: 10, 4: 3,  5: 2  },
-      17: { 1: 65, 2: 22, 3: 9,  4: 2,  5: 2  }
+      10: { 1: 42, 2: 28, 3: 20, 4: 8,  5: 4  }
+      /* 2026-09-06：图 11-17 档位随地图精简删除 */
     },
-    // 稀有度（颜色）随图档平滑爬升：17 张图各一组 白/蓝/金 概率（合计 100）。
-    // 取代旧版按怪 lootTier 的 3 档枚举（旧版图3~17 全锁 'high'→必出金，15 张图颜色无差异）。
-    // 设计：白随深度递减、蓝中段达峰后回落、金随深度单调爬升（图1≈2% → 图17≈79%）。
-    // 掉率总盘（drop.pool.equipment≈1.5%）不变，这里只管"出装时是什么颜色"。改这里只动颜色分布。
+    // 稀有度（颜色）按手册 2.3 的 3 阶段（2026-09-06，取代旧 17 档渐变）：
+    //   新手期 图1-3：白78 / 蓝19 / 金3（体验打造快乐，白蓝装为主）
+    //   成长期 图4-7：白25 / 蓝50 / 金25（金装开始出现，适度打造过图）
+    //   毕业期 图8-10：白8 / 蓝27 / 金65（T1 词缀可洗，为神级宠做准备）
+    // 同阶段内各图相同（手册只给了 3 档值）。掉率总盘（drop.poolByStage）不变，这里只管"出装时是什么颜色"。
     rarityWeightsByTier: {
-      1:  { white: 80, blue: 18, gold: 2 },
-      2:  { white: 70, blue: 27, gold: 3 },
-      3:  { white: 58, blue: 37, gold: 5 },
-      4:  { white: 47, blue: 45, gold: 8 },
-      5:  { white: 38, blue: 50, gold: 12 },
-      6:  { white: 30, blue: 52, gold: 18 },
-      7:  { white: 24, blue: 52, gold: 24 },
-      8:  { white: 19, blue: 50, gold: 31 },
-      9:  { white: 15, blue: 47, gold: 38 },
-      10: { white: 11, blue: 44, gold: 45 },
-      11: { white: 8,  blue: 40, gold: 52 },
-      12: { white: 6,  blue: 36, gold: 58 },
-      13: { white: 4,  blue: 32, gold: 64 },
-      14: { white: 3,  blue: 28, gold: 69 },
-      15: { white: 2,  blue: 25, gold: 73 },
-      16: { white: 2,  blue: 22, gold: 76 },
-      17: { white: 1,  blue: 20, gold: 79 }
+      1:  { white: 78, blue: 19, gold: 3 },
+      2:  { white: 78, blue: 19, gold: 3 },
+      3:  { white: 78, blue: 19, gold: 3 },
+      4:  { white: 25, blue: 50, gold: 25 },
+      5:  { white: 25, blue: 50, gold: 25 },
+      6:  { white: 25, blue: 50, gold: 25 },
+      7:  { white: 25, blue: 50, gold: 25 },
+      8:  { white: 8,  blue: 27, gold: 65 },
+      9:  { white: 8,  blue: 27, gold: 65 },
+      10: { white: 8,  blue: 27, gold: 65 }
     },
     /* 装备评分：把「部位 / 图档 / 底材T / 稀有度 / 词缀类型 × T阶 × 数值」这 7 个维度
      * 压成一个整数，让玩家能一眼比较、排序、按阈值批量清理 —— 装备"又多又乱"的根治手段。
@@ -843,7 +865,10 @@ window.Config = {
       // 凝魂晶石：满级宠物把溢出经验凝出来的产物（见 Config.pet.expPool），只在第二幕产出
       { id: 'soulcrystal', name: '凝魂晶石', icon: '🔷', category: 'soul' },
       // 鉴定石：消耗品，鉴定未鉴定装备用（拖到装备上 / 点「鉴定」）。前期好掉、后期稀缺
-      { id: 'identify', name: '鉴定石', icon: '🔍', category: 'stone' }
+      { id: 'identify', name: '鉴定石', icon: '🔍', category: 'stone' },
+      // 涅槃丹（2026-09-06 新增，手册 2.6）：合成神级宠的保底道具（持有 1 颗 = 100% 出神级宠）。
+      // 来源：图 8-10 的守关 Boss 首通 / 图 8-10 的地图委托 / 成就「涅槃行者」
+      { id: 'nirvanapill', name: '涅槃丹', icon: '💊', category: 'stone' }
     ],
     // 交易税：每满 taxPer 收 taxAmount（默认每满 8 收 1）
     taxPer: 8,
@@ -881,7 +906,8 @@ window.Config = {
      *   替代旧逻辑 generateEquipment 默认 areaTier=1 → 所有装备都是图1档。
      * priceGradient：定价梯度 = 图档基数(每高1档×1.5) × 稀有度乘数 × 材料系数，
      *   让"图17金装"明显贵于"图1白装"，市场有价差、能识货。 */
-    areaWeight: { 1: 2, 3: 3, 5: 4, 7: 5, 9: 5, 11: 5, 13: 4, 15: 3, 17: 2 },
+    // 2026-09-06 地图精简 10 张：图档权重 1~10（新手/中坚/毕业 AI 分布相应前移）
+    areaWeight: { 1: 3, 3: 4, 5: 5, 7: 6, 9: 5, 10: 3 },
     priceGradient: {
       basePerTier: 1.5,
       rarityMult: { white: 1, blue: 2, gold: 4 },
@@ -922,9 +948,9 @@ window.Config = {
     personas: {
       count: 20,
       levelTiers: [
-        { tier: '新手', pct: 40, areaMin: 1, areaMax: 4 },
-        { tier: '中坚', pct: 45, areaMin: 5, areaMax: 10 },
-        { tier: '毕业', pct: 15, areaMin: 11, areaMax: 17 }
+        { tier: '新手', pct: 40, areaMin: 1, areaMax: 3 },
+        { tier: '中坚', pct: 45, areaMin: 4, areaMax: 7 },
+        { tier: '毕业', pct: 15, areaMin: 8, areaMax: 10 }
       ],
       playstyles: [
         { id: 'dps', label: '输出', pct: 55, bloodlineBias: ['血狐', '疫毛兽', '骨狼', '幽影兔'], statPriorities: ['atk', 'crit', 'critDamage'] },
@@ -1056,39 +1082,84 @@ window.Config = {
     },
     maxSoulAffixes: 1,  // 每件装备最多 1 条魂铸词缀
   },
+  /* ================= 道具（合成 / 进化 / 涅槃三系，2026-09-06 对齐原版手册 2.0） =================
+   * 唯一定义处：UI 下拉框、预览、扣料全部从这里读，禁止在界面里硬编码。
+   * 字段：id/name/icon/rarity/category(synth|evolve|nirvana)/effect/description
+   *       合成道具：boost（提升乘区）、godChance（神级宠概率）、levelRequireReduce（降低终阶等级要求）
+   *       进化道具：boost（进化成长提升乘区）
+   *       涅槃道具：absorbRatio + type(add 加成 / replace 替换)、requireSubHigher（C3 限定） */
+  items: [
+    /* ---- 合成（3）---- */
+    { id: 'synth_stone',   name: '合成之石', icon: '💎', rarity: '普通', category: 'synth',   boost: 0.1, godChance: 0.3, levelRequireReduce: 0,
+      effect: '提升 +10%，神级宠概率 30%', description: '最常用的合路石。稳，但仅此而已。' },
+    { id: 'synth_shift',   name: '百变魔石', icon: '🔮', rarity: '稀有', category: 'synth',   boost: 0.2, godChance: 0.6, levelRequireReduce: 0,
+      effect: '提升 +20%，神级宠概率 60%', description: '石心难测，六成天意。' },
+    { id: 'synth_supreme', name: '至尊神石', icon: '👑', rarity: '稀有', category: 'synth',   boost: 0.3, godChance: 1.0, levelRequireReduce: 10,
+      effect: '必定出神级宠；终阶等级要求降到 Lv50', description: '一石定乾坤，神位唾手可得。' },
+    /* ---- 进化（3）---- */
+    { id: 'evo_dan_a',     name: '强化丹A', icon: '💊', rarity: '普通', category: 'evolve',  boost: 0.1,
+      effect: '进化成长提升 +10%', description: '温和的火候，慢慢来。' },
+    { id: 'evo_dan_b',     name: '强化丹B', icon: '💊', rarity: '稀有', category: 'evolve',  boost: 0.2,
+      effect: '进化成长提升 +20%', description: '比 A 猛，也更稀罕。' },
+    { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', rarity: '稀有', category: 'evolve',  boost: 0.3,
+      effect: '进化成长提升 +30%，终阶亦可使用', description: '一滴玉露，脱胎换骨。' },
+    /* ---- 涅槃（3）---- */
+    { id: 'nir_pill',      name: '涅槃丹',   icon: '🔥', rarity: '普通', category: 'nirvana', absorbRatio: 0.5,  type: 'add',
+      effect: '吸收副宠成长的 50%', description: '常规涅槃。火候适中，稳稳当当。' },
+    { id: 'nir_c3',        name: '涅槃兽C3', icon: '🐉', rarity: '稀有', category: 'nirvana', absorbRatio: 0.95, type: 'replace', requireSubHigher: true,
+      effect: '以副宠成长的 95%【替换】主宠成长（副宠根骨必须高于主宠）', description: '宁折不变的换法——副宠够强一步登天，不够强不如不用。' },
+    { id: 'nir_t4',        name: '涅槃兽T4', icon: '🐲', rarity: '稀有', category: 'nirvana', absorbRatio: 1.0,  type: 'add',
+      effect: '副宠成长 100% 加到主宠身上', description: '全额吞纳，一步到位。' }
+  ],
+  // 按 id / 类别取道具（UI 与逻辑统一走这两个，别自己 find）
+  itemOf: (id) => (window.Config.items || []).find(i => i.id === id) || null,
+  itemsOf: (category) => (window.Config.items || []).filter(i => i.category === category),
+
   synthesize: {
     minLevel: 40,           // 两只素材必须达到的等级
-    material: { name: '合成之石', amount: 1 },  // 合成消耗（新增通货）
-    mainW: 0.6,             // 新宠成长中主宠占比
-    subW: 0.4,              // 新宠成长中副宠占比
-    // 变异（稀有）：概率出全新「·异变」宠
+    /* ===== 加法公式（2026-09-06 第二版手册 2.1，废弃加权平均）=====
+     * 新宠成长 = 主宠成长 + 总提升，【永远不掉】（保底：总提升至少 +1）。
+     * 总提升 = 基础提升 × (1 + 等级加成 + 道具加成) + 随机加成
+     *   基础提升 = 副宠成长 × baseBoostRatio
+     *   等级加成 = (主宠等级+副宠等级)/200，封顶 levelBoostMax
+     *   道具加成 = 选中合成道具的 boost（合成之石0.1 / 百变魔石0.2 / 至尊神石0.3，见 Config.items）
+     *   随机加成 = randomBoost 区间
+     * 神级宠概率 / 等级要求降低 → 由选中道具的 godChance / levelRequireReduce 决定（见 god 段注释） */
+    growthFormula: 'additive',
+    baseBoostRatio: 0.25,   // 基础提升 = 副宠成长 × 0.25
+    levelBoostMax: 0.5,     // 等级加成上限 +0.5
+    randomBoost: [1, 3],    // 随机加成区间
+    normalGrowthCap: 100,   // 普通宠（非神级）成长软上限：超过部分减半
+    defaultItem: 'synth_stone',  // 默认合成道具（下拉框兜底）
+    // 变异（稀有）：概率出全新「·异变」宠（保持现有）
     mutation: {
       chance: 0.5,          // 变异概率
       growthBonus: [1, 3]   // 变异宠成长比普通合成结果再 +1~3（稀有加成，不膨胀）
+    },
+    /* 神级宠合成（成神）门槛：主副宠都【终阶】+ 成长≥minGrowth + 等级≥baseLevelRequire。
+     * 概率看选中的合成道具：合成之石 30% / 百变魔石 60% / 至尊神石 100%（必定出神，
+     * 且终阶等级要求按其 levelRequireReduce 降低 —— 对齐原版"至尊神石降低等级要求"）。 */
+    god: {
+      minStage: 5,          // 终阶（evolveStage === 5）
+      minGrowth: 60         // ⚠️ 手册原值，落地方案 R1：调快改这里（建议 30）
     }
   },
   /* ================= 涅槃（主宠涨成长 + 突破上限） =================
-   * 主宠保留，吸副宠成长 + 重置等级 + 突破成长上限。
-   *  - 成长吸收 = 副宠成长 × absorbRatio × 等级加成，副宠消失
-   *  - 主宠等级重置为 1（重新练级），可反复涅槃持续涨成长（无成长上限）
-   *  - 消耗涅磐兽 */
+   * 只有神级宠能涅槃；主宠等级重置为 1，副宠消失，可反复涅槃持续叠成长（无上限）。
+   * 2026-09-06 第二版手册 2.4：消耗改【道具化】——选中的涅槃道具（涅槃丹/涅槃兽C3/涅槃兽T4，
+   * 见 Config.items），吸收方式由道具 type 决定：
+   *   add     → 主宠成长 += 副宠成长 × absorbRatio（涅槃丹 0.5 / T4 1.0）
+   *   replace → 主宠成长 = 副宠成长 × absorbRatio（C3 0.95，要求副宠成长 > 主宠成长，UI 置灰拦截）
+   * ⚠️ 与上一版手册的差异（以本手册为准）：涅槃丹从「合成保底道具」改为「涅槃消耗品」，
+   *    合成保底改由至尊神石（godChance 1.0）承担；涅磐兽不再作为涅槃消耗（保留掉落与交易）。 */
   nirvana: {
-    minLevel: 60,           // 主宠与副宠必须达到的等级（2026-08-31：40→60，第二幕开涅槃，与终形态/学技能同点毕业）
-    absorbRatio: 0.5,       // 主宠吸收副宠成长的比例（0.5 = 吸一半）
-    // 副宠等级加成：吸收 × (1 + (副宠等级 - 门槛) × levelBonus)，练得越高当肥料越值钱
-    levelBonus: 0.01,
-    /* 合成限制（防成长膨胀，对齐口袋精灵2）：
-     *  1. 副宠成长下限：副宠成长 < 主宠 × subGrowthRatio 则吸收打折（防垃圾副宠无限叠）
-     *  2. 60 成长分水岭：主宠成长 ≥ growthCap 后吸收减半（后期提升变慢） */
-    subGrowthRatio: 0.5,
-    lowGrowthPenalty: 0.2,  // 副宠成长不足下限时，吸收打折到该倍
-    growthCap: 60,          // 成长分水岭：达到后吸收减半
-    capRatio: 0.5,          // 分水岭后的吸收乘数
-    material: { name: '涅磐兽', amount: 1 },
-    // 可选加成：额外投入凝魂晶石，本次吸收 ×(1 + absorbBonus)。不投则走原数值，玩家自选。
-    crystalBonus: { material: '凝魂晶石', amount: 10, absorbBonus: 0.3 },
-    resetLevel: true,       // 涅槃后主宠等级重置为 1（重新练级）
-    maxGrowth: 100          // 成长软上限（可配；达上限后涅槃不再涨成长，仅重置等级）
+    minLevel: 60,           // 主宠与副宠必须达到的等级
+    requireGodPet: true,    // 只有神级宠才能涅槃
+    defaultItem: 'nir_pill',    // 默认涅槃道具
+    levelBonus: 0.01,       // 副宠等级加成：吸收 × (1 + (副宠等级-门槛)×levelBonus)，仅 add 型生效
+    // 可选加成：额外投入凝魂晶石，本次吸收 ×(1 + absorbBonus)。仅 add 型道具可用（替换型语义冲突）。
+    crystalBonus: { material: '凝魂晶石', amount: 10, absorbBonus: 0.3, onlyType: 'add' },
+    resetLevel: true        // 涅槃后主宠等级重置为 1（重新练级）；神级宠成长无软上限，可无限叠
   },
 
   /* ================= 魔石 + 商店（自测阶段，不对外收费） =================
@@ -1202,8 +1273,9 @@ window.Config = {
       { taskId: 'g7', type: 'petCount', baseName: '腐噜兽', min: 3 },
       // G8 上架：一件未穿戴装备
       { taskId: 'g8', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
-      // G9 涅槃：涅磐兽（主副宠等级由经验包顶入 Lv60）
-      { taskId: 'g9', type: 'mat', name: '涅磐兽', qty: 1 }
+      // G9 登临终阶：进化素材全额兜底（G9 不再是涅槃，见上；终阶共需 精粹1 + 传说5）
+      { taskId: 'g9', type: 'mat', name: '精粹进化素材', qty: 1 },
+      { taskId: 'g9', type: 'mat', name: '传说进化素材', qty: 5 }
     ]
   },
 

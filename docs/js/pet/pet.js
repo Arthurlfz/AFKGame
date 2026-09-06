@@ -34,6 +34,11 @@
     return {
       id: uid++, name, icon, level: 1, exp: 0, growth,
       evolveTimes: 0,
+      // 进化阶段 1~5（1=初始 … 5=终阶），与 Config.pet.evolution.stages 对齐；
+      // 旧存档没有该字段时由 petFromRow/逻辑层按 evolveTimes+1 兜底
+      evolveStage: 1,
+      // 神级宠标记（手册 2.6）：只有神级宠能涅槃，且其 statCoeff 是普通宠的 1.5 倍
+      isGodPet: false,
       rebornCount: 0,
       lineId: lineId || name, // 来源基宠名，决定成长系数（进化/变异/融合继承）
       baseHp, baseAtk, baseDef, baseSpd,
@@ -117,11 +122,57 @@
     return true;
   }
 
+  /* ---------- 神级宠 + 进化阶段（2026-09-06，手册 2.5 / 2.6） ---------- */
+  // 取神级宠定义：优先按名字（已是神级宠），否则按根源基宠线匹配
+  function godInfoOf(pet) {
+    const G = Config.pet && Config.pet.godPets;
+    if (!G || !pet) return null;
+    const byName = G.byName ? G.byName(pet.name) : null;
+    if (byName) return byName;
+    if (pet.isGodPet && G.ofLine) return G.ofLine(pet.lineId || pet.name);
+    return null;
+  }
+  // 查 profile / 血统被动用的「定位名」：神级宠用它的根源基宠名（否则血统被动、暴击/命中等
+  // 定位档全查不到，会静默退化成默认档）
+  function statNameOf(pet) {
+    const god = godInfoOf(pet);
+    if (god) return god.line || pet.lineId || pet.name;
+    return (pet && pet.lineId) || (pet && pet.name);
+  }
+  // 是否神级宠（字段优先，名字兜底：老存档没字段但名字是神级宠名）
+  function isGodPet(pet) {
+    if (!pet) return false;
+    if (pet.isGodPet) return true;
+    const G = Config.pet && Config.pet.godPets;
+    return !!(G && G.byName && G.byName(pet.name));
+  }
+  // 神级宠在没专属立绘前复用该线终形态立绘（sprite）；普通宠返回自己的名字
+  function spriteNameOf(pet) {
+    if (!pet) return '';
+    const god = isGodPet(pet) ? godInfoOf(pet) : null;
+    return (god && god.sprite) || pet.name;
+  }
+  // 当前进化阶段 1~5（1=初始 … 5=终阶）；旧存档无 evolveStage 时按 evolveTimes+1 兜底
+  function getEvolveStage(pet) {
+    const E = Config.pet && Config.pet.evolution;
+    if (E && E.stageOf) return E.stageOf(pet);
+    return Math.min(5, Math.max(1, ((pet && pet.evolveTimes) || 0) + 1));
+  }
+  // 阶段标签（初始/一阶/二阶/三阶/终阶）
+  function stageLabel(pet) {
+    const E = Config.pet && Config.pet.evolution;
+    const s = (E && E.stages || []).find(x => x.stage === getEvolveStage(pet));
+    return s ? s.label : ('第' + getEvolveStage(pet) + '阶');
+  }
+
   /* ---------- 属性计算 ---------- */
   // 基础速度（新速度规则）：成长值/等级不参与。
   // 优先按来源基宠（lineId）查 speeds 表——进化/变异/融合不改变速度定位，
   // 幽影兔线所有形态都应继承 110；查不到（老存档/未知）再按名字查，最后兜底 40。
   function getBaseSpeed(pet) {
+    // 神级宠：速度直接取 godPets 配置（名字不在 speeds 表里，避免走兜底 40）
+    const god = godInfoOf(pet);
+    if (god && typeof god.speed === 'number' && god.speed > 0) return god.speed;
     const lineId = (pet && pet.lineId) || pet.name;
     const raw = Config.pet.speeds[lineId];
     if (typeof raw === 'number' && raw > 0) return raw;
@@ -144,6 +195,9 @@
   // 系数按"来源基宠"（pet.lineId）差异化：进化体/变异宠/融合宠继承基宠的 statCoeff，保证一条线风格统一；
   // lineId 查不到（老存档/未知）时用全局 Config.pet.statCoeff 兜底。
   function getStatCoeff(pet) {
+    // 神级宠：成长系数 = 普通宠 × 1.5（手册 2.6），直接读 godPets 表，不跟 starters 混
+    const god = godInfoOf(pet);
+    if (god && god.statCoeff) return god.statCoeff;
     const lineId = (pet && pet.lineId) || (pet && pet.name);
     const st = (Config.pet.starters || []).find(s => s.name === lineId);
     return (st && st.statCoeff) || Config.pet.statCoeff || { hp: 5, atk: 2, def: 1 };
@@ -166,7 +220,7 @@
   // 支持·异变后缀剥离、进化体通过 lineId 回溯根源基宠
   function getBloodline(pet) {
     if (!pet || !Config.bloodlinePassive) return null;
-    const baseName = pet.lineId || resolveLineId(pet.name) || pet.name;
+    const baseName = statNameOf(pet) || resolveLineId(pet.name) || pet.name;
     return Config.bloodlinePassive[baseName] || null;
   }
 
@@ -176,7 +230,9 @@
     if (!pet || Number(pet.level) < 60) return null;
     const skills = (Config.pet && Config.pet.evolution && Config.pet.evolution.activeSkills) || {};
     // 变异宠（名字带 ·异变）继承本体主动技能：剥离后缀查找
-    const baseName = String(pet.name || '').replace(/·异变$/, '');
+    // 神级宠继承该线终形态的主动技能（用 sprite 名查表）
+    let baseName = String(pet.name || '').replace(/·异变$/, '');
+    if (isGodPet(pet)) baseName = spriteNameOf(pet);
     const skill = skills[baseName];
     if (!skill) return null;
     const line = pet.lineId || pet.name;
@@ -282,7 +338,8 @@
     const flat = Object.assign({}, eq.flat);   // 本地拷贝，避免污染装备加成对象
     const pct = Object.assign({}, eq.pct);
     addTraitStat(pet, flat, pct);              // 血脉特质 + 觉醒特质结算
-    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
+    // 神级宠用根源基宠的定位档（血统/暴击/命中/闪避/吸血）
+    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[statNameOf(pet)]) || Config.pet.defaultPetProfile || {};
     const baseHit = prof.hit != null ? Number(prof.hit) : 90;     // 基础命中（固定数值）
     const baseDodge = prof.dodge != null ? Number(prof.dodge) : 0; // 基础闪避（固定数值）
     const baseCrit = (prof.critRate != null ? Number(prof.critRate) : 5) / 100;
@@ -326,7 +383,7 @@
     if (diff('def')) parts.push('防御+' + diff('def'));
     if (diff('spd')) parts.push('速度+' + diff('spd'));
     // 机制属性（命中/闪避为固定数值，暴击/暴伤/吸血为百分比）：对比 profile 基础值
-    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile || {};
+    const prof = (Config.pet.petProfiles && Config.pet.petProfiles[statNameOf(pet)]) || Config.pet.defaultPetProfile || {};
     const bHit = prof.hit != null ? Number(prof.hit) : 90;
     const bDodge = prof.dodge != null ? Number(prof.dodge) : 0;
     const bCrit = (prof.critRate != null ? Number(prof.critRate) : 5) / 100;
@@ -439,6 +496,9 @@
   // 实现：从每只基宠出发递归标记所有后代形态都归属该基宠（避免只返回直接父级导致终极形态反查错）。
   function resolveLineId(name) {
     if (!name) return null;
+    // 神级宠：根源基宠直接写在 godPets 的 line 字段（血统被动/定位按基宠线继承）
+    const GOD_LIST = (Config.pet && Config.pet.godPets && Config.pet.godPets.list) || [];
+    for (const g of GOD_LIST) if (g.name === name) return g.line || name;
     // 变异宠名字带「·异变」后缀，进化树里没有该节点：先去后缀再反查根源基宠（继承速度/系数）
     if (name.endsWith('·异变')) return resolveLineId(name.slice(0, -3));
     const tree = (Config.pet.evolution && Config.pet.evolution.tree) || {};
@@ -467,6 +527,10 @@
     pet.level = num(row.level) || 1;
     pet.exp = num(row.exp); // 云端经验（旧库缺 exp 列时为 0，等于刷新后重攒，不会算成 NaN）
     pet.evolveTimes = Math.max(0, Math.floor(num(row.evolve_times)));
+    // 进化阶段：云端有 evolve_stage 列则用之，没有（旧库/迁移前）按 evolveTimes+1 兜底
+    const stageRaw = num(row.evolve_stage);
+    pet.evolveStage = stageRaw > 0 ? Math.min(5, Math.floor(stageRaw)) : Math.min(5, pet.evolveTimes + 1);
+    pet.isGodPet = !!row.is_god_pet;
     pet.rebornCount = Math.max(0, Math.floor(num(row.reborn_count)));
     pet.curHp = num(row.cur_hp);
     pet.isActive = !!row.is_active; // 出战标记（DB 权威，刷新后据此还原出战宠物）
@@ -525,6 +589,8 @@
     createPet, addPet, getPets, getActivePet, setActive, removePet, petFromRow, clearPets,
     baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, expFromBattle, expRange, createBaby, setCloudPets,
     getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment, addExpPool, getBloodline,
-    rollPetTraits, getAwakenState, statParts
+    rollPetTraits, getAwakenState, statParts,
+    // 神级宠 + 进化阶段（手册 2.5 / 2.6）
+    isGodPet, godInfoOf, spriteNameOf, getEvolveStage, stageLabel
   };
 })();

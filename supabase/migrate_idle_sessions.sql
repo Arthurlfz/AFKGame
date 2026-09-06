@@ -28,6 +28,10 @@ create table if not exists public.idle_sessions (
   updated_at       timestamptz not null default now()
 );
 
+-- 老库补列（2026-09-06）：create table if not exists 对已存在的表不生效，
+-- 后加的列必须用 alter 幂等补齐，否则 battle_settle RPC 报 42703 列不存在。
+alter table public.idle_sessions add column if not exists last_boss_fight integer;
+
 -- 索引：查玩家当前活动会话（登录/恢复时用）
 create index if not exists idle_sessions_active_idx
   on public.idle_sessions (user_id) where status <> 'stopped';

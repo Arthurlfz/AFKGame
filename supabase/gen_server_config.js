@@ -39,8 +39,14 @@ const serverConfig = {
     maxLevel: C.pet.maxLevel,
     expPool: C.pet.expPool,
     babyGrowth: C.pet.babyGrowth,
+    // 神级宠（2026-09-06 手册 2.6）：battle-sim 需要按名字/线取 ×1.5 成长系数与速度
+    godPets: {
+      minGrowth: C.pet.godPets.minGrowth,
+      list: C.pet.godPets.list
+    },
     evolution: {
       maxEvolveTimes: C.pet.evolution.maxEvolveTimes,
+      stages: C.pet.evolution.stages,
       tree: C.pet.evolution.tree,
       activeSkills: C.pet.evolution.activeSkills,
       skillTierScale: C.pet.evolution.skillTierScale

@@ -14,11 +14,24 @@ const C=code=>vm.runInContext(code,ctx), S=ms=>new Promise(r=>setTimeout(r,ms));
  A(C('Supabase.loadPets&&Pet.petFromRow'),'云端宠物读写接口存在');
  await C('(async()=>{const p=Pet.createPet("腐噜兽","x",5,100,20,10,55);p.level=60;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__p=p.id})()');await S(40);
  const id=C('__p');
- for(let i=0;i<10;i++){const tier=i<3?'进化素材':i<6?'精粹进化素材':'传说进化素材';const before=C(`Pet.getPets().find(p=>p.id===${id}).growth`);await C(`Materials.gain("${tier}",1)`);const r=await C(`Evolve.evolve(${id},0)`);const after=C(`Pet.getPets().find(p=>p.id===${id}).growth`);const delta=Math.round((after-before)*10)/10;A(r.ok===true,`连续进化第${i+1}次成功`);A(delta>=0.1&&delta<=0.2,`第${i+1}次成长增加0.1~0.2`)}
- A(C(`Pet.getPets().find(p=>p.id===${id}).evolveTimes===10`),'连续进化10次后次数为10');
- const r11=await C(`Evolve.evolve(${id},0)`);A(r11.ok!==true&&/上限/.test(r11.error),'第11次进化被拒');
- A(C(`petsTable.find(x=>x.id===Pet.getPets().find(p=>p.id===${id}).cloudId).evolve_times===10`),'进化次数同步云端');
- await C('(async()=>{const p=Pet.createPet("血狐","x",10,100,20,10,95);p.level=60;p.evolveTimes=7;p.rebornCount=3;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__m=p.id;const q=Pet.createPet("骨狼","x",10,100,20,10,75);q.level=60;Pet.addPet(q);const t=await Supabase.savePet(q);q.cloudId=t.data.id;globalThis.__s=q.id})()');await S(40);await C('Materials.gain("涅磐兽",1)');await S(40);C('const __old=Math.random;Math.random=()=>0.999');const mr=await C('Merge.merge(__m,__s)');C('Math.random=__old');
+ // 5 阶（2026-09-06）：4 次进化到终阶；素材按阶（普通/精粹/传说/传说+额外3）；三阶淬体成长 +0.3~0.4
+ for(let i=0;i<4;i++){
+  const tier=i===0?'进化素材':i===1?'精粹进化素材':'传说进化素材';
+  if(i===3){await C(`Materials.gain("传说进化素材",3)`)} // 终阶额外素材 ×3
+  const before=C(`Pet.getPets().find(p=>p.id===${id}).growth`);
+  await C(`Materials.gain("${tier}",1)`);
+  const r=await C(`Evolve.evolve(${id},0)`);
+  const after=C(`Pet.getPets().find(p=>p.id===${id}).growth`);
+  const delta=Math.round((after-before)*10)/10;
+  A(r.ok===true,`连续进化第${i+1}次成功`);
+  const lo=i===2?0.3:0.1, hi=i===2?0.4:0.2;
+  A(delta>=lo&&delta<=hi,`第${i+1}次成长增加 ${lo}~${hi}`);
+ }
+ A(C(`Pet.getPets().find(p=>p.id===${id}).evolveTimes===4`),'连续进化4次后次数为4（5阶走到终阶）');
+ const r11=await C(`Evolve.evolve(${id},0)`);A(r11.ok!==true&&/终阶|上限/.test(r11.error),'第5次进化被拒（已终阶）');
+ A(C(`petsTable.find(x=>x.id===Pet.getPets().find(p=>p.id===${id}).cloudId).evolve_times===4`),'进化次数同步云端');
+ // 涅槃（2026-09-06 手册 2.7）：主宠置为神级宠后才允许；消耗涅磐兽 ×5
+ await C('(async()=>{const p=Pet.createPet("血狐","x",10,100,20,10,95);p.level=60;p.evolveTimes=4;p.rebornCount=3;p.isGodPet=true;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__m=p.id;const q=Pet.createPet("骨狼","x",10,100,20,10,75);q.level=60;Pet.addPet(q);const t=await Supabase.savePet(q);q.cloudId=t.data.id;globalThis.__s=q.id})()');await S(40);await C('Materials.gain("涅磐兽",5)');await S(40);C('const __old=Math.random;Math.random=()=>0.999');const mr=await C('Merge.nirvana(__m,__s)');C('Math.random=__old');
  A(mr.ok===true,'融合成功');A(C('Pet.getPets().find(p=>p.id===__m).evolveTimes===0&&Pet.getPets().find(p=>p.id===__m).rebornCount===4'),'融合后次数清零且转生+1');A(C('(()=>{const x=petsTable.find(x=>x.id===Pet.getPets().find(p=>p.id===__m).cloudId);return x.evolve_times===0&&x.reborn_count===4})()'),'融合后 evolve_times/reborn_count 同步云端');
  A(C('(()=>{const s=String(Supabase.loadPets);return true})()'),'PET_COLUMNS 包含阶段二字段（源码静态项另核对）');
  console.log(failures?`STAGE2 TESTS FAILED: ${failures}`:'ALL STAGE2 TESTS PASSED');process.exit(failures?1:0)

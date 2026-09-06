@@ -24,7 +24,12 @@
   // inline=true → 行内小头像（跟文字齐平，用于「路线：<头像> 名字」这类文案里）；
   // 不传 → 块级，尺寸由所在容器的 CSS 决定（img.pet-avatar-sprite 有兜底尺寸，不会按原图炸开）。
   function iconHtml(name, emoji, inline) {
-    const p = PetSprites && PetSprites.avatarOf(name);
+    let p = PetSprites && PetSprites.avatarOf(name);
+    // 神级宠：名字不在立绘表里 → 用 godPets.sprite（该线终形态立绘）兜底，绝不回退 emoji
+    if (!p && window.Pet && window.Pet.godInfoOf) {
+      const g = window.Pet.godInfoOf({ name: name });
+      if (g && g.sprite && PetSprites) p = PetSprites.avatarOf(g.sprite);
+    }
     return p ? `<img class="pet-avatar-sprite${inline ? ' inline' : ''}" src="${p}" alt="">` : emoji;
   }
 
@@ -280,12 +285,14 @@
       const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length; // 已穿装备数
       const card = document.createElement('div');
       const isActive = pet.id === activeId;
-      card.className = 'pet-card' + (isActive ? ' active' : '');
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
+      card.className = 'pet-card' + (isActive ? ' active' : '') + (isGod ? ' pet-card--god' : '');
       card.innerHTML = `${isActive ? '<div class="pet-card-badge">出战</div>' : ''}
+        ${isGod ? '<div class="pet-card-god-badge">神</div>' : ''}
         <div class="icon">${iconHtml(pet.name, pet.icon)}</div>
         <div class="pname">${pet.name}</div>
         ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">'+bl.icon+' '+bl.name+'</div>':'';})()}
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>
+        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${window.Pet&&window.Pet.stageLabel?' · '+window.Pet.stageLabel(pet):''}</div>
         <div class="meta">装备${equipCount}/3</div>`;
       card.onclick = () => {
         if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {

@@ -36,10 +36,11 @@
     }
     for (const pet of cands) {
       const card = document.createElement('div');
-      card.className = 'pet-card'+ (pet.id === mergeMainId ? ' active': '');
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
+      card.className = 'pet-card'+ (pet.id === mergeMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
         <div class="pname">${pet.name}</div>
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>${UI.traitsHtml(pet)}`;
+        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${isGod ? ' · 神级宠': ' · <span style="opacity:.7">需神级宠</span>'}</div>${UI.traitsHtml(pet)}`;
       card.onclick = () => {
         mergeMainId = pet.id;
         mergeSubId = null; // 换主宠重置副宠
@@ -57,21 +58,30 @@
     const M = Config.nirvana || Config.merge || {};
     if (!main) {
       // 空态（无选中主宠）：显示玩法说明，避免「未选择主宠 / ＋ / 空目标」的占位感（2026-09-03）
-      const matName2 = M.material && M.material.name || '涅槃兽';
+      const matName2 = M.material && M.material.name || '涅磐兽';
       const matAmt2 = M.material && M.material.amount || 1;
       const haveMat2 = Materials.getQuantity ? Materials.getQuantity(matName2) : 0;
       mb.innerHTML = '<div class="es-tip">🦚 涅槃是什么</div>';
-      sb.innerHTML = '<div class="es-tip">主宠吸收副宠的成长值，等级重置回 <b>Lv.1</b>，突破成长上限继续养成。</div>';
-      pb.innerHTML = '<div class="es-tip">条件：主宠 <b>Lv.' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；消耗 <b>' + matAmt2 + ' 只' + matName2 + '</b>（当前持有 ' + haveMat2 + '）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
+      sb.innerHTML = '<div class="es-tip"><b>只有神级宠才能涅槃</b>（手册 2.7）。主宠吸收副宠 50% 的成长值（不衰减），等级重置回 <b>Lv.1</b>，继续叠成长。</div>';
+      pb.innerHTML = '<div class="es-tip">条件：主宠必须是<b>神级宠</b>且 Lv.<b>' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；消耗 <b>' + matAmt2 + ' 只' + matName2 + '</b>（当前持有 ' + haveMat2 + '）。<br>神级宠：两只<b>终阶</b>宠 + 成长 ≥ ' + ((Config.pet.godPets && Config.pet.godPets.minGrowth) || 60) + ' 在<b>合成</b>里搏出（30% 概率，持涅槃丹必出）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
       cb.innerHTML = '';
       return;
     }
+    // 主宠不是神级宠：整体置灰并给出去向提示（手册阶段2-UI：普通宠涅槃按钮置灰）
+    const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
     const matName = M.material && M.material.name || '涅槃兽';
     const matAmt = M.material && M.material.amount || 1;
     const haveMat = Materials.getQuantity ? Materials.getQuantity(matName) : 0;
     mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
       <div><b>${main.name}</b> Lv.${main.level}</div>
       <div class="hint">成长 ${main.growth.toFixed(1)} · 消耗 ${matAmt} 只${matName}（持有 ${haveMat}）</div></div>`;
+    // 主宠不是神级宠 → 不提供涅槃流程（手册 2.7：只有神级宠才能涅槃）
+    if (!mainIsGod) {
+      const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
+      sb.innerHTML = '<div class="warn">🚫 只有<b>神级宠</b>才能涅槃——' + main.name + ' 是普通宠。先把两只<b>终阶</b>宠（成长 ≥ ' + minG + '）拿去<b>合成</b>，30% 概率搏出神级宠（持涅槃丹必出）。</div>';
+      pb.innerHTML = ''; cb.innerHTML = '';
+      return;
+    }
     // 副宠候选
     const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id) : [];
     if (!subs.length) {
@@ -120,8 +130,9 @@
       return `<div class="delta-row ${cls}"><span>${label}</span><span>${a} → ${b} ${b > a ? '▲': b < a ? '▼': ''}</span></div>`;
     };
     const matOk = haveMat >= matAmt;
+    const absorbTxt = calc && calc.absorb != null ? `（吸收副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}% = +${calc.absorb}，不衰减）`: '';
     pb.innerHTML = `
-      <div class="es-preview-row">成长值：<b>${main.growth.toFixed(1)} → ${newGrowth.toFixed(1)}</b></div>
+      <div class="es-preview-row">成长值：<b>${main.growth.toFixed(1)} → ${newGrowth.toFixed(1)}</b> ${absorbTxt}</div>
       <div class="es-preview-row">等级：Lv.${main.level} → ${M.resetLevel ? '<b>Lv.1（重置）</b>': '不变'}</div>
       <div class="es-preview-row">${iconHtml(sub.name)} ${sub.name}（成长 ${sub.growth.toFixed(1)}）将消失，消耗 ${matAmt} 只${matName}（持有 ${haveMat}）</div>
       ${traitInheritLine(main, sub, 'nirvana')}
@@ -145,7 +156,8 @@
   function renderMergeHint() {
     const el = $('merge-hint-text');
     const M = Config.nirvana || Config.merge || {};
-    if (el && M.minLevel) el.innerHTML = `涅槃：主宠吸副宠成长 + 重置等级。条件：两只 <b>${M.minLevel} 级</b>宠物 + 消耗 <b>${M.material.amount} 只${M.material.name}</b>`;
+    const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
+    if (el && M.minLevel) el.innerHTML = `涅槃：<b>只有神级宠</b>能涅槃。主宠吸副宠 <b>${Math.round((M.absorbRatio || 0.5) * 100)}%</b> 成长（不衰减）+ 重置等级。条件：神级宠 Lv.<b>${M.minLevel}</b> + 消耗 <b>${M.material.amount} 只${M.material.name}</b>。神级宠 = 两只终阶宠（成长 ≥ ${minG}）合成，30% 概率 / 涅槃丹必出。`;
   }
 
 

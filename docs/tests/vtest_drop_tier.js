@@ -75,17 +75,15 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   const keys = Object.keys(mw).map(Number).sort((a, b) => a - b);
   A(keys.length === areas.length, `materialWeightsByTier 覆盖 ${keys[0]}~${keys[keys.length - 1]}（${keys.length} 档，与地图一致）`);
   const has = (t, k) => !!(mw[t] && mw[t][k] > 0);
-  // 出现时机：涅磐兽只在图10+（Lv60 涅槃解锁）；合成之石/神圣石只在图7+（Lv40 合成）
-  A([1, 2, 3, 4, 5, 6, 7, 8, 9].every(t => !has(t, '涅磐兽')), '涅磐兽 图1-9 不出现（Lv60 才解锁）');
-  A([10, 11, 12, 13, 14, 15, 16, 17].every(t => has(t, '涅磐兽')), '涅磐兽 图10-17 都出现');
-  A([1, 2, 3, 4, 5, 6].every(t => !has(t, '合成之石') && !has(t, '神圣石')), '合成之石/神圣石 图1-6 不出现（Lv40 才解锁）');
-  A([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].every(t => has(t, '合成之石') && has(t, '神圣石')), '合成之石/神圣石 图7-17 都出现');
-  // low→high：涅磐兽权重随图单调爬升
-  let mono = true;
-  for (let t = 11; t <= 17; t++) if (mw[t]['涅磐兽'] < mw[t - 1]['涅磐兽']) mono = false;
-  A(mono, '涅磐兽权重 图10→17 单调爬升（low→high）');
-  // 早期打造石深处淡出：重铸石 图1 有、图17 无
-  A(has(1, '重铸石') && !has(17, '重铸石'), '重铸石 早期有、深处淡出');
+  // 出现时机（2026-09-06 手册 2.4：打造石跟图阶挂钩）：涅磐兽 图8-10；合成之石/神圣石 图4-7 解锁
+  A([1, 2, 3, 4, 5, 6, 7].every(t => !has(t, '涅磐兽')), '涅磐兽 图1-7 不出现（毕业期 图8 起出现）');
+  A([8, 9, 10].every(t => has(t, '涅磐兽')), '涅磐兽 图8-10 都出现');
+  A([1, 2, 3].every(t => !has(t, '合成之石') && !has(t, '神圣石')), '合成之石/神圣石 图1-3 不出现（成长期 图4 才解锁）');
+  A([4, 5, 6, 7, 8, 9, 10].every(t => has(t, '合成之石') && has(t, '神圣石')), '合成之石/神圣石 图4-10 都出现');
+  // 手册 2.4 三阶段打造石权重：图1-3 重铸主导、图8-10 神圣/合成主导
+  A(mw[1]['重铸石'] > (mw[1]['神圣石'] || 0) && mw[10]['神圣石'] > mw[10]['重铸石'], '重铸石前期主导 / 神圣石后期主导');
+  // 早期打造石深处淡出：重铸石 图1 有、图10 权重最低
+  A(has(1, '重铸石') && mw[10]['重铸石'] < mw[1]['重铸石'], '重铸石 早期多、深处淡出');
   // 静态防回归：drop.js 必须读 materialWeightsByTier，不能再读旧全局 materialWeights
   const src = fs.readFileSync('../js/core/drop.js', 'utf8');
   A(/materialWeightsByTier/.test(src) && !/D\.materialWeights\b/.test(src), 'drop.js 已改用 materialWeightsByTier（旧全局 materialWeights 已弃用）');

@@ -20,18 +20,36 @@
 
   const E = () => Config.pet.evolution;
 
-  // 取某宠可用的进化路线（当前形态在 tree 有下一形态则返回真实形态；
-  // 形态到头但次数未满时，返回一个「继续进化涨成长、形态不变」的占位路线，保证能进化满 maxEvolveTimes 次）
+  /* ---------- 5 阶进化（2026-09-06，手册 2.5） ----------
+   * 阶段 1~5：初始 / 一阶 Lv10 / 二阶 Lv25 / 三阶 Lv40（淬体·形态不变） / 终阶 Lv60。
+   * 「下一阶」由 Config.pet.evolution.stages 唯一决定 —— 素材档位、等级门槛、成长加成都从它读，
+   * 不再按 evolveTimes 猜档（旧代码用 3/6 切档，与 5 阶对不上）。 */
+  const Pet = window.Pet;
+  const stageOf = pet => (Pet && Pet.getEvolveStage) ? Pet.getEvolveStage(pet) : Math.min(5, ((pet && pet.evolveTimes) || 0) + 1);
+  function nextStageOf(pet) {
+    const cfg = E();
+    if (!cfg || !pet) return null;
+    return (cfg.stages || []).find(s => s.stage === stageOf(pet) + 1) || null;
+  }
+  // 取某宠下一阶的进化路线：
+  //  · 换形态阶（form:true）→ 走进化树，形态名/图标来自 tree，等级门槛用 stages 的（覆盖 tree 旧值）
+  //  · 淬体阶（form:false，三阶 Lv40）→ 占位路线：形态不变，只涨成长
   function getEvolutionRoutes(pet) {
     const cfg = E();
     if (!cfg || !pet) return [];
-    const routes = cfg.tree && cfg.tree[pet.name];
-    if (routes && routes.length) return routes.slice();
-    // 形态到头：若次数还没满，给一个占位「强化进化」（名字/图标不变，只涨成长）
-    if ((pet.evolveTimes || 0) < (cfg.maxEvolveTimes || 10)) {
-      return [{ to: pet.name, icon: pet.icon, minLevel: 0, keepForm: true, label: '继续进化（成长+）' }];
+    const next = nextStageOf(pet);
+    if (!next) return [];   // 已到终阶，没有下一阶
+    if (!next.form) {
+      return [{ to: pet.name, icon: pet.icon, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
     }
-    return [];
+    const routes = (cfg.tree && cfg.tree[pet.name]) || [];
+    if (routes.length) {
+      return routes.map(r => Object.assign({}, r, {
+        minLevel: next.minLevel, stage: next.stage, label: next.label, desc: next.desc, keepForm: false
+      }));
+    }
+    // 形态树到头（终形态被重复进化等异常）：降级成淬体，保证阶段链能走完
+    return [{ to: pet.name, icon: pet.icon, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
   }
   // 当前形态是否有进化路线（不管等级/次数，用于显示进化入口）
   function hasRoute(pet) {
@@ -41,27 +59,33 @@
   function canEvolve(pet) {
     const cfg = E();
     if (!cfg || !pet) return false;
-    if ((pet.evolveTimes || 0) >= (cfg.maxEvolveTimes || 10)) return false;
+    if ((pet.evolveTimes || 0) >= (cfg.maxEvolveTimes || 4)) return false;
     const routes = getEvolutionRoutes(pet);
     if (!routes.length) return false;
     return routes.some(r => pet.level >= (r.minLevel || 1));
   }
-  // 按已进化次数决定当前用哪档进化素材：1~3次=进化素材，4~6次=精粹进化素材，7~10次=传说进化素材
-  // （与设计稿"1~3阶/4~6阶/7~10阶"对齐；次数不足无法用更高档）
+  // 当前阶 → 下一阶所需素材名（由 stages 决定：普通 / 精粹 / 传说）
   function getEvoTier(pet) {
-    const t = pet.evolveTimes || 0;
-    if (t >= 6) return '传说进化素材';
-    if (t >= 3) return '精粹进化素材';
-    return '进化素材';
+    const next = nextStageOf(pet);
+    return (next && next.material) || (E() && E().materialName) || '进化素材';
   }
-  // 取某条路线所需素材信息：{ name, amount, have, enough }
+  // 取某条路线所需素材信息：{ name, amount, have, enough, extra?, stage, label }
+  // extra = 终阶的额外消耗（手册 2.5「传说进化素材 + 特殊道具」）
   function getRouteMaterial(pet, routeIndex) {
     const route = getEvolutionRoutes(pet)[routeIndex];
     if (!route) return null;
-    const amount = 1;
-    const matName = getEvoTier(pet);
-    const have = Materials.getQuantity(matName);
-    return { name: matName, amount, have, enough: have >= amount };
+    const next = nextStageOf(pet);
+    const name = (next && next.material) || E().materialName || '进化素材';
+    const amount = (next && next.amount) || 1;
+    const have = Materials.getQuantity(name);
+    const ex = (next && next.extra) || null;
+    const haveExtra = ex ? Materials.getQuantity(ex.name) : 0;
+    return {
+      name, amount, have, enough: have >= amount,
+      extra: ex ? { name: ex.name, amount: ex.amount, have: haveExtra, enough: haveExtra >= ex.amount } : null,
+      stage: next ? next.stage : null,
+      label: (next && next.label) || ''
+    };
   }
 
   /* ---------- 执行进化 ---------- */
@@ -75,20 +99,23 @@
     const pet = getPets().find(p => p.id === petId);
     if (!pet) return { error: '宠物不存在' };
 
-    const materialName = getEvoTier(pet); // 按已进化次数用对应档素材
-    const maxTimes = cfg.maxEvolveTimes || 10;
-
-    // 条件：进化次数未满（吃满后需融合=转生重置）
+    const maxTimes = cfg.maxEvolveTimes || 4;
+    const next = nextStageOf(pet);
+    // 条件：还有下一阶（终阶后不能再进化；想继续变强走合成/神级宠/涅槃）
+    if (!next) return { error: '已是终阶，无法继续进化（想再变强请走合成 → 神级宠）' };
+    // 条件：进化次数未满（吃满后需涅槃/转生重置）
     if ((pet.evolveTimes || 0) >= maxTimes) {
-      return { error: `进化已达上限(${maxTimes}次)，需通过融合(转生)重置次数后才能继续进化` };
+      return { error: `进化已达上限(${maxTimes}次)，需通过涅槃(转生)重置次数后才能继续进化` };
     }
 
     const routes = getEvolutionRoutes(pet);
     const route = routes[routeIndex];
     if (!route) return { error: '该形态无法再进化' };
-    // 条件：等级门槛（形态到头时的占位路线 minLevel=0，不卡等级）
+    const rm = getRouteMaterial(pet, routeIndex) || { name: getEvoTier(pet), amount: 1, have: 0, enough: false };
+    const materialName = rm.name;
+    // 条件：等级门槛（下一阶的门槛等级，如 Lv10/25/40/60）
     if (pet.level < (route.minLevel || 1)) {
-      return { error: `需要达到 Lv.${route.minLevel} 才能进化（当前 Lv.${pet.level}）` };
+      return { error: `需要达到 Lv.${route.minLevel} 才能进化到${next.label}（当前 Lv.${pet.level}）` };
     }
     // 条件：已登录（素材要云端扣、进化后名字/成长要云端存）
     const user = await Supabase.getCurrentUser();
@@ -97,32 +124,45 @@
     if (!pet.cloudId) return { error: '宠物未同步云端，刷新页面后再试' };
     // 条件：在售中的宠物不能进化（挂单快照会失效）
     if (Market.isListed(pet.cloudId)) return { error: `${pet.name} 正在市场出售，先取回再进化` };
-    // 条件：通用进化素材足够
-    if (Materials.getQuantity(materialName) < 1) {
-      return { error: `需要 1 个${materialName}，去挂机刷材料吧` };
+    // 条件：进化素材足够（终阶还要额外素材）
+    if (rm.have < rm.amount) {
+      return { error: `需要 ${rm.amount} 个${materialName}，去挂机刷材料吧` };
+    }
+    if (rm.extra && rm.extra.have < rm.extra.amount) {
+      return { error: `${next.label}还需要 ${rm.extra.amount} 个${rm.extra.name}` };
     }
 
     // ---- 执行：先扣素材（云端原子扣，成功才继续） ----
-    const spent = await Materials.spend(materialName, 1);
+    const spent = await Materials.spend(materialName, rm.amount);
     if (!spent.ok) return { error: spent.error || '素材扣减失败' };
+    // 终阶额外素材：扣失败则把主素材退回去，不让玩家白亏
+    if (rm.extra) {
+      const ex = await Materials.spend(rm.extra.name, rm.extra.amount);
+      if (!ex.ok) {
+        await Materials.gain(materialName, rm.amount);
+        return { error: ex.error || '素材扣减失败' };
+      }
+    }
 
     // ---- 计算结果；先不改本地，等云端更新成功后再提交 ----
     const oldGrowth = pet.growth;
+    const range = (next.growthBoost && next.growthBoost.length === 2) ? next.growthBoost : (cfg.growthBoost || [0.1, 0.2]);
     const boost = Number.isFinite(boostOverride)
       ? boostOverride
-      : randFloat(cfg.growthBoost[0], cfg.growthBoost[1]);
+      : randFloat(range[0], range[1]);
     const newGrowth = Math.round((oldGrowth + boost) * 10) / 10;
     const keepForm = !!route.keepForm;
     const nextName = keepForm ? pet.name : route.to;
     const nextIcon = keepForm ? pet.icon : route.icon;
     const nextEvolveTimes = (pet.evolveTimes || 0) + 1;
 
-    // ---- 同步云端；失败则退还素材，不提交本地进化 ----
+    // ---- 同步云端（含新阶段 evolve_stage，旧库缺列时 Supabase 层自动剔除）；失败则退还素材 ----
     const { error: updErr } = await Supabase.updatePet(pet.cloudId, {
-      name: nextName, growth: newGrowth, evolve_times: nextEvolveTimes
+      name: nextName, growth: newGrowth, evolve_times: nextEvolveTimes, evolve_stage: next.stage
     });
     if (updErr) {
-      await Materials.gain(materialName, 1);
+      await Materials.gain(materialName, rm.amount);
+      if (rm.extra) await Materials.gain(rm.extra.name, rm.extra.amount);
       return { error: `云端存档失败：${updErr.message || '请稍后重试'}` };
     }
 
@@ -131,14 +171,15 @@
     pet.name = nextName;
     pet.icon = nextIcon;
     pet.evolveTimes = nextEvolveTimes;
+    pet.evolveStage = next.stage;
     pet.curHp = getStats(pet).hp;
 
     // 任务进度上报：所有 type=evolve 的任务进度 +1（petName 供宠物专属任务区分）
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('evolve', 1, { petName: pet ? pet.name : null });
 
-    return { ok: true, pet, oldGrowth, newGrowth, result: pet.name, material: materialName, keepForm };
+    return { ok: true, pet, oldGrowth, newGrowth, result: pet.name, material: materialName, keepForm, stage: next.stage, stageLabel: next.label };
   }
 
   /* ---------- 对外 API ---------- */
-  window.Evolve = { evolve, getEvolutionRoutes, hasRoute, canEvolve, getRouteMaterial };
+  window.Evolve = { evolve, getEvolutionRoutes, hasRoute, canEvolve, getRouteMaterial, getEvoTier, nextStageOf, getEvoStage: stageOf };
 })();

@@ -61,31 +61,14 @@
     // 魂渊：右侧深渊
     { id: 'p-soul', areaId: 'soul-abyss', name: '魂渊', type: 'wild',
       x: 90, y: 40, recommended: '成长 19', matKey: 'soul-abyss' },
-    // 腐变之源：右下深暗死地（第一幕终章：Lv60 毕业 —— 终形态 + 学技能 + 涅槃解锁）
+    // 腐变之源：右下深暗死地（Lv60 毕业 —— 终形态 + 学技能 + 神级宠之门）
     { id: 'p-blight', areaId: 'blight-heart', name: '腐变之源', type: 'wild',
-      x: 78, y: 78, recommended: '成长 21', matKey: 'blight-heart' },
-    /* ---- 2026-08-31 第二幕 7 图（61-100 级）：节点挂现有世界地图，不画新大地图 ---- */
-    // 腐变裂隙：腐变之源向右侧延伸的裂缝
-    { id: 'p-rift', areaId: 'rift-fissure', name: '腐变裂隙', type: 'wild',
-      x: 90, y: 70, recommended: '成长 23', matKey: 'rift-fissure' },
-    // 黑血沼原：中部偏右下的黑色血沼
-    { id: 'p-bbmoor', areaId: 'black-blood-moor', name: '黑血沼原', type: 'wild',
-      x: 60, y: 72, recommended: '成长 25', matKey: 'black-blood-moor' },
-    // 万骨深渊：北部山脉深处的白骨坑
-    { id: 'p-boneabyss', areaId: 'bone-abyss', name: '万骨深渊', type: 'wild',
-      x: 44, y: 36, recommended: '成长 27', matKey: 'bone-abyss' },
-    // 疫潮之心：左上角的瘟疫心脏
-    { id: 'p-plagueheart', areaId: 'plague-heart', name: '疫潮之心', type: 'wild',
-      x: 26, y: 14, recommended: '成长 29', matKey: 'plague-heart' },
-    // 噬魂巢穴：最左侧的巢穴
-    { id: 'p-soulnest', areaId: 'soul-nest', name: '噬魂巢穴', type: 'wild',
-      x: 6, y: 52, recommended: '成长 31', matKey: 'soul-nest' },
-    // 湮灭回廊：右下角的终末回廊
-    { id: 'p-annih', areaId: 'annihilation-hall', name: '湮灭回廊', type: 'wild',
-      x: 94, y: 90, recommended: '成长 33', matKey: 'annihilation-hall' },
-    // 腐变本源：右上角的最终地图（100 级）
-    { id: 'p-origin', areaId: 'blight-origin', name: '腐变本源', type: 'wild',
-      x: 72, y: 24, recommended: '成长 35', matKey: 'blight-origin' }
+      x: 78, y: 78, recommended: '成长 21', matKey: 'blight-heart' }
+    /* ---- 2026-09-06 地图精简 17→10（手册 2.1）----
+     * 删除第二幕 7 个点位（rift-fissure / black-blood-moor / bone-abyss / plague-heart /
+     * soul-nest / annihilation-hall / blight-origin）：那些图因 maxLevel=60 早已进不去；
+     * 「地狱/通天塔」以后作为独立系统另行设计。点位必须与 Config.battle.areas 一一对应
+     * （vtest_worldmap.js 守一致性）。 */
   ];
 
   /* ---------- 掉落预览（从 Config 推导，纯展示） ---------- */

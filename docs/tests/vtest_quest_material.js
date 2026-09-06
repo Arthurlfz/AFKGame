@@ -35,6 +35,7 @@ ctx.window.Items = {};
 // 注意：drop.js 已改用 materialWeightsByTier（按图档），旧全局 materialWeights 已弃用——
 // 子池必须 mock 到 ByTier，否则 corrupted-forest(tier 3) 的真实子池含进化素材，会随机抽到而失败。
 ctx.Config.drop.pool = { none: 0, material: 1, equipment: 0, egg: 0 };
+ctx.Config.drop.poolByStage = { 1: { none: 0, material: 1, equipment: 0, egg: 0 } }; // 2026-09-06：按阶段池优先于全局 pool，mock 必须覆盖 stage1（图1）
 ctx.Config.drop.materialWeights = { '区域材料': 1 }; // 兼容留旧键
 ctx.Config.drop.materialWeightsByTier = { 1: { '区域材料': 1 } }; // corrupted-forest = areas[0] → tier 1，子池只留区域材料
 vm.runInContext(fs.readFileSync('../js/core/drop.js', 'utf8'), ctx);
