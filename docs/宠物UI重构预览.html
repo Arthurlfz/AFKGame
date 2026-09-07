@@ -4,26 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魂炉祭坛 · 宠物UI重构预览</title>
+<link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <link rel="stylesheet" href="css/game.css">
 <style>
   /* ---- 预览页外层（仅预览用，非游戏内样式） ---- */
-  html, body { margin: 0; padding: 0; background: #07090e; }
+  html, body { margin: 0; padding: 0; background: var(--bg-deep); }
   .preview-shell { max-width: 1200px; margin: 0 auto; padding: 24px 16px 60px; }
   .preview-head { text-align: center; margin-bottom: 20px; }
   .preview-head h1 {
-    font-family: var(--font-title); color: #f2b632; letter-spacing: 8px; font-size: 1.6rem; margin: 0;
-    text-shadow: 0 0 18px rgba(242,182,50,.4);
+    font-family: var(--font-title); color: var(--accent-hi); letter-spacing: 8px; font-size: 1.6rem; margin: 0;
+    text-shadow: 0 0 18px rgb(var(--action-gold-rgb) / .4);
   }
-  .preview-head p { color: rgba(200,200,210,.5); font-size: .8rem; letter-spacing: 2px; margin: 6px 0 0; }
+  .preview-head p { color: var(--text-faint); font-size: .8rem; letter-spacing: 2px; margin: 6px 0 0; }
   .preview-sec { margin: 26px 0 8px; display: flex; align-items: center; gap: 12px; }
   .preview-sec .tag {
-    font-family: var(--font-title); font-size: .85rem; letter-spacing: 3px; color: #c4b5fd;
-    background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.3);
+    font-family: var(--font-title); font-size: .85rem; letter-spacing: 3px; color: var(--r-purple);
+    background: rgb(var(--r-purple-rgb) / .12); border: 1px solid rgb(var(--r-purple-rgb) / .3);
     padding: 4px 14px; border-radius: 20px;
   }
-  .preview-sec .line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(242,182,50,.25), transparent); }
+  .preview-sec .line { flex: 1; height: 1px; background: linear-gradient(90deg, rgb(var(--action-gold-rgb) / .25), transparent); }
   /* 模拟游戏内宠物面板容器 */
-  .pet-panel-box { background: linear-gradient(180deg,#12141c,#0c0e15); border:1px solid rgba(120,130,160,.2); border-radius:14px; padding:18px; margin-bottom: 18px; }
+  .pet-panel-box { background: linear-gradient(180deg, var(--panel), var(--ink)); background-image: var(--ui-paper-texture); border:1px solid var(--line); border-radius:var(--radius-md); padding:18px; margin-bottom: 18px; }
   .pet-panel-box .pet-tabs { margin-bottom: 14px; }
 </style>
 </head>
