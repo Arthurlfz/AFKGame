@@ -14,7 +14,7 @@
 </head>
 <body>
 <div class="page-title">宠物面板 v2 · 接入验证（真实 game.css + 真实 ui-pet-*.js + mock 数据）</div>
-<div class="pane-name">⓪ 资料 · 出战宠物（列表在左·拉宽440px）</div>
+<div class="pane-name">⓪ 资料 · 出战宠物（列表在左·拉宽440px·次级属性折叠）</div>
 <div class="pet-tab-pane" data-pet-pane="profile">
           <div class="pet-wrap">
 <div class="pcol">
@@ -68,17 +68,20 @@
                     <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="pet-def">10</span></div>
                     <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="pet-spd">8</span></div>
                   </div>
-                  <div class="pet-stats-sub">
-                    <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
-                    <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
-                    <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
-                    <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
-                    <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
-                    <div class="pstat pstat-bonus bonus-tip">
-                      <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
-                      <div class="bonus-pop" id="pet-bonus-pop"></div>
+                  <details class="pet-more-stats">
+                    <summary><span class="more-label">次级属性</span><span class="more-arrow">▾</span></summary>
+                    <div class="pet-stats-sub">
+                      <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
+                      <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
+                      <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
+                      <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
+                      <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
+                      <div class="pstat pstat-bonus bonus-tip">
+                        <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
+                        <div class="bonus-pop" id="pet-bonus-pop"></div>
+                      </div>
                     </div>
-                  </div>
+                  </details>
                 </div>
               </div>
             </div>
