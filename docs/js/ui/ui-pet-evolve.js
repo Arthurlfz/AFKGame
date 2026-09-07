@@ -12,6 +12,7 @@
   const PetSprites = window.PetSprites;
   const PetUI = window.PetUI || (window.PetUI = {});
   const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
+  const routeIcon = (nm) => iconHtml(nm, ((getPets().find(p => p.name === nm) || {}).icon) || '🐾');
 
   let evolveMainId = null;
   let evolvePreview = null;
@@ -41,7 +42,7 @@
       card.className = 'pet-card'+ (pet.id === evolveMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
       const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
       const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
-      card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
+      card.innerHTML = `<div class="icon">${iconHtml(pet.name, pet.icon)}</div>
         <div class="card-info">
           <div class="pname">${pet.name}</div>
           <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶 · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>
@@ -84,7 +85,7 @@
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
     const cur = getStats(main);
     mb.innerHTML = `<div class="evo-card">
-      <div class="avatar">${iconHtml(main.name)}</div>
+      <div class="avatar">${iconHtml(main.name, main.icon)}</div>
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
       <div class="pmeta">Lv.${main.level} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div>
       <div class="evostats">${evoStatRows(cur)}</div>
@@ -117,7 +118,7 @@
       pb.innerHTML = `<div class="alt-routes">${routes.map((r, i) => {
         const okLevel = main.level >= (r.minLevel || 1);
         return `<div class="alt-route" data-i="${i}">
-          <span class="ic">${iconHtml(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+          <span class="ic">${routeIcon(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
         </div>`;
       }).join('')}</div>`;
       pb.querySelectorAll('.alt-route').forEach(btn => {
@@ -175,7 +176,7 @@
     if (selectedItem && !itemOk) warnRow += `<div class="es-preview-row warn"> ${selectedItem.name}不足：需要 1 个，当前持有 ${Materials.getQuantity(selectedItem.name)}</div>`;
     // 目标形态卡
     tb.innerHTML = `<div class="evo-card next">
-      <div class="avatar">${iconHtml(route.to)}</div>
+      <div class="avatar">${routeIcon(route.to)}</div>
       <div class="pname">${route.to}</div>
       <div class="pmeta">${stageLabel || '进化后'} · Lv.${pet.level}（不变）· 成长 ${nextGrowth.toFixed(1)}${route.minLevel ? ' · 需 Lv.' + route.minLevel : ''}</div>
       <div class="evostats">${evoStatRows(next)}</div>
@@ -186,7 +187,7 @@
         const okLevel = pet.level >= (r.minLevel || 1);
         const on = j === i ? ' on': '';
         return `<div class="alt-route${on}" data-i="${j}">
-          <span class="ic">${iconHtml(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+          <span class="ic">${routeIcon(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
         </div>`;
       }).join('')}</div>
       <table class="cmp-table"><tr><th>属性</th><th>当前</th><th>进化后</th></tr>
