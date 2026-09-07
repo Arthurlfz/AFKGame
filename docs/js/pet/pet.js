@@ -196,8 +196,15 @@
   // lineId 查不到（老存档/未知）时用全局 Config.pet.statCoeff 兜底。
   function getStatCoeff(pet) {
     // 神级宠：成长系数 = 普通宠 × 1.5（手册 2.6），直接读 godPets 表，不跟 starters 混
+    // 第二版手册 2.2：神级宠出生超过60的部分折算成 statCoeffBonus，永久加成
     const god = godInfoOf(pet);
-    if (god && god.statCoeff) return god.statCoeff;
+    if (god && god.statCoeff) {
+      const bonus = (pet && pet.statCoeffBonus) || 0;
+      if (bonus > 0) {
+        return { hp: god.statCoeff.hp * (1 + bonus), atk: god.statCoeff.atk * (1 + bonus), def: god.statCoeff.def * (1 + bonus) };
+      }
+      return god.statCoeff;
+    }
     const lineId = (pet && pet.lineId) || (pet && pet.name);
     const st = (Config.pet.starters || []).find(s => s.name === lineId);
     return (st && st.statCoeff) || Config.pet.statCoeff || { hp: 5, atk: 2, def: 1 };

@@ -130,7 +130,9 @@
       const range = (route && route.stage && E.stages) ? ((E.stages.find(s => s.stage === route.stage) || {}).growthBoost || E.growthBoost) : E.growthBoost;
       evolvePreview = { petId: pet.id, routeIndex: i, boost: window.Util.randFloat(range[0], range[1]) };
     }
-    const boost = evolvePreview.boost;
+    const boostItems = (E.boostItems || []).map(id => Config.itemOf(id)).filter(item => item && item.category === 'evolve');
+    const selectedItem = evolvePreview.boostItemId ? Config.itemOf(evolvePreview.boostItemId) : null;
+    const boost = Math.round(evolvePreview.boost * (1 + (selectedItem ? selectedItem.boost || 0 : 0)) * 100) / 100;
     const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
     const next = getStats({ ...pet, growth: nextGrowth });
     const row = (label, a, b) => {
@@ -145,18 +147,28 @@
     const formText = route.keepForm ? `淬体进阶${stageLabel ? '（' + stageLabel + '）': ''}：形态不变，成长值提升`: `进化后名字变为【${route.to}】${stageLabel ? '（' + stageLabel + '）': ''}`;
     const lvOk = pet.level >= (route.minLevel || 1);
     const matOk = rm ? (rm.enough && (!ex || ex.enough)) : have >= 1;
-    const canEvolve = lvOk && matOk;
+    const itemOk = !selectedItem || Materials.getQuantity(selectedItem.name) >= 1;
+    const canEvolve = lvOk && matOk && itemOk;
+    const boostOptions = ['<option value="">不用强化道具</option>'].concat(boostItems.map(item =>
+      `<option value="${item.id}"${selectedItem && selectedItem.id === item.id ? ' selected' : ''}>${item.icon} ${item.name}｜${item.effect}（持有 ${Materials.getQuantity(item.name)}）</option>`
+    )).join('');
     let warnRow = '';
     if (!lvOk) warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
     if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 个 ${matName}，当前持有 ${rm.have}</div>`;
     if (ex && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
+    if (selectedItem && !itemOk) warnRow += `<div class="es-preview-row warn"> ${selectedItem.name}不足：需要 1 个，当前持有 ${Materials.getQuantity(selectedItem.name)}</div>`;
     pb.innerHTML = `
       <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>${stageLabel ? '（' + stageLabel + '）': ''}（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
       <div class="es-preview-row">消耗：<b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>`: ''}（当前持有 ${rm ? rm.have + (ex ? ' / ' + ex.have: ''): have}）</div>
-      <div class="hint">等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
+      <label class="es-boost-select">强化道具 <select class="sell-input" id="evolve-boost-item">${boostOptions}</select></label>
+      <div class="hint">基础成长 +${evolvePreview.boost.toFixed(2)}${selectedItem ? ` → 使用${selectedItem.name}后 +${boost.toFixed(2)}` : ''}；等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
       ${warnRow}
       <div class="es-stats">属性变化：</div>
       ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;
+    pb.querySelector('#evolve-boost-item').onchange = event => {
+      evolvePreview.boostItemId = event.target.value || null;
+      renderEvolvePreview(pet, i, matName, have);
+    };
     cb.innerHTML = `<button class="btn-mini primary" id="evolve-ok"${canEvolve ? '': 'disabled'}>确认进化</button>`;
     cb.querySelector('#evolve-ok').onclick = async () => {
       if (!canEvolve) {
@@ -165,11 +177,12 @@
       }
       const origName = pet.name;
       const origGrowth = pet.growth;
-      const res = await Evolve.evolve(pet.id, i, boost); // 用预览定好的 boost，所见即所得
+      const res = await Evolve.evolve(pet.id, i, evolvePreview.boost, evolvePreview.boostItemId);
       if (res.error) { showToast('进化失败', res.error); return; }
       const changed = res.keepForm ? '（形态不变）': '';
-      addLog(`进化成功！${origName} 成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${changed}`);
-      showToast('进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}</small>`);
+      const itemText = res.boostItem ? `（消耗 ${res.boostItem.name}）` : '';
+      addLog(`进化成功！${origName} 成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${changed}${itemText}`);
+      showToast('进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${itemText}</small>`);
       evolveMainId = res.pet ? res.pet.id : pet.id;
       evolvePreview = null; // 已进化：旧预览（形态/成长都变了）作废
       UI.renderAll();

@@ -430,17 +430,17 @@ window.Config = {
      * 锁定石只随图 16/17 产出，图 11-17 删除后暂无来源（毕业系统一起回补）。
      * 表中没有的键 = 该图还不出；改这里只动材料比例，不碰掉落率总盘。 */
     materialWeightsByTier: {
-      /* 2026-09-06 合成系统道具化：普通道具走掉落（强化丹A 全图 / 涅槃丹 图8+，权重保守起步可调） */
+      /* 进化增强道具：A 全图常见，B 从图 4 起掉落，玉露从图 8 起掉落。 */
       1:  { '区域材料': 100, '进化素材': 40, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 55, '强化丹A': 12 },
       2:  { '区域材料': 100, '进化素材': 44, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 52, '强化丹A': 12 },
       3:  { '区域材料': 105, '进化素材': 50, '重铸石': 50, '增缀石': 40, '剥离石': 10, '鉴定石': 48, '强化丹A': 12 },
-      4:  { '区域材料': 105, '进化素材': 56, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 42, '强化丹A': 12 },
-      5:  { '区域材料': 110, '进化素材': 62, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 38, '强化丹A': 12 },
-      6:  { '区域材料': 110, '进化素材': 68, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 34, '强化丹A': 12 },
-      7:  { '区域材料': 115, '进化素材': 74, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 30, '强化丹A': 12 },
-      8:  { '区域材料': 115, '进化素材': 80, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 22, '强化丹A': 10, '涅槃丹': 15 },
-      9:  { '区域材料': 120, '进化素材': 87, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 18, '强化丹A': 10, '涅槃丹': 15 },
-      10: { '区域材料': 125, '进化素材': 94, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 14, '强化丹A': 10, '涅槃丹': 15 }
+      4:  { '区域材料': 105, '进化素材': 56, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 42, '强化丹A': 12, '强化丹B': 6, '越龙之石': 8 },
+      5:  { '区域材料': 110, '进化素材': 62, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 38, '强化丹A': 12, '强化丹B': 6, '越龙之石': 8 },
+      6:  { '区域材料': 110, '进化素材': 68, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 34, '强化丹A': 12, '强化丹B': 7, '越龙之石': 8 },
+      7:  { '区域材料': 115, '进化素材': 74, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 30, '强化丹A': 12, '强化丹B': 7, '越龙之石': 8 },
+      8:  { '区域材料': 115, '进化素材': 80, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 22, '强化丹A': 10, '强化丹B': 7, '天仙玉露': 4, '涅槃丹': 15, '越龙之石': 15 },
+      9:  { '区域材料': 120, '进化素材': 87, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 18, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 5, '涅槃丹': 15, '越龙之石': 15 },
+      10: { '区域材料': 125, '进化素材': 94, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 14, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 6, '涅槃丹': 15, '越龙之石': 15 }
     },
     // 进化素材档位权重（仅在本图 areaEvolutionTiers 允许的档位里生效）：
     // 高档相对权重更高 → 深处"只掉传说"的图传说频率拉满，中段多档图传说也偏多（出现时机的梯度）。
@@ -570,9 +570,9 @@ window.Config = {
       { id: 'boss6', category: 'main', type: 'boss', area: 'echo-cliffs', need: 1, unlockLevel: 31, name: '首通·回响崖', hint: '击败守关 Boss，首通此图', reward: { 回响之羽: 20, 重铸石: 3, 传说进化素材: 3 } },
       { id: 'boss7', category: 'main', type: 'boss', area: 'rotfen-bog', need: 1, unlockLevel: 37, name: '首通·腐沼泽', hint: '击败守关 Boss，首通此图', reward: { 腐沼黏液: 20, 重铸石: 3, 传说进化素材: 3 } },
       /* 图 8-10 的守关 Boss 首通额外掉涅槃丹（手册 2.6：涅槃丹来源之一 = BOSS 掉落） */
-      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
-      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
-      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1 } },
+      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
+      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
+      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
 
       /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「🐾 宠物」分类。
        * ⚠️ 机制约定（2026-08-31 用户拍板）：
@@ -617,9 +617,9 @@ window.Config = {
       { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 剥离石: 6 }, expReward: 2010 },
       { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 7 }, expReward: 2370 },
       /* 图 8-10 的委托额外给涅槃丹（手册 2.6：涅槃丹来源之一 = 循环任务兑换） */
-      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5, 涅槃丹: 1 }, expReward: 2730 },
-      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6, 涅槃丹: 1 }, expReward: 3090 },
-      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8, 涅槃丹: 1 }, expReward: 3450 },
+      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5, 涅槃丹: 1, 百变魔石: 1 }, expReward: 2730 },
+      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6, 涅槃丹: 1, 百变魔石: 1 }, expReward: 3090 },
+      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8, 涅槃丹: 1, 百变魔石: 1 }, expReward: 3450 },
       { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
       { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },
       { id: 'd3', category: 'daily', type: 'collect', matName: '枯荣种荚', need: 20, repeat: true, name: '晨间采集·种荚', reward: { 剥离石: 1 } },
@@ -1090,7 +1090,7 @@ window.Config = {
    *       涅槃道具：absorbRatio + type(add 加成 / replace 替换)、requireSubHigher（C3 限定） */
   items: [
     /* ---- 合成（3）---- */
-    { id: 'synth_stone',   name: '合成之石', icon: '💎', rarity: '普通', category: 'synth',   boost: 0.1, godChance: 0.3, levelRequireReduce: 0,
+    { id: 'synth_stone',   name: '越龙之石', icon: '💎', rarity: '普通', category: 'synth',   boost: 0.1, godChance: 0.3, levelRequireReduce: 0,
       effect: '提升 +10%，神级宠概率 30%', description: '最常用的合路石。稳，但仅此而已。' },
     { id: 'synth_shift',   name: '百变魔石', icon: '🔮', rarity: '稀有', category: 'synth',   boost: 0.2, godChance: 0.6, levelRequireReduce: 0,
       effect: '提升 +20%，神级宠概率 60%', description: '石心难测，六成天意。' },
@@ -1103,13 +1103,9 @@ window.Config = {
       effect: '进化成长提升 +20%', description: '比 A 猛，也更稀罕。' },
     { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', rarity: '稀有', category: 'evolve',  boost: 0.3,
       effect: '进化成长提升 +30%，终阶亦可使用', description: '一滴玉露，脱胎换骨。' },
-    /* ---- 涅槃（3）---- */
-    { id: 'nir_pill',      name: '涅槃丹',   icon: '🔥', rarity: '普通', category: 'nirvana', absorbRatio: 0.5,  type: 'add',
-      effect: '吸收副宠成长的 50%', description: '常规涅槃。火候适中，稳稳当当。' },
-    { id: 'nir_c3',        name: '涅槃兽C3', icon: '🐉', rarity: '稀有', category: 'nirvana', absorbRatio: 0.95, type: 'replace', requireSubHigher: true,
-      effect: '以副宠成长的 95%【替换】主宠成长（副宠根骨必须高于主宠）', description: '宁折不变的换法——副宠够强一步登天，不够强不如不用。' },
-    { id: 'nir_t4',        name: '涅槃兽T4', icon: '🐲', rarity: '稀有', category: 'nirvana', absorbRatio: 1.0,  type: 'add',
-      effect: '副宠成长 100% 加到主宠身上', description: '全额吞纳，一步到位。' }
+    /* ---- 涅槃（1）---- */
+    { id: 'nir_pill',      name: '涅槃丹',   icon: '🔥', rarity: '普通', category: 'nirvana', boostMult: 1.2,
+      effect: '涅槃吸收 ×1.2（20%额外加乘）', description: '常规涅槃加成丹。火候更猛，吸收更足。' }
   ],
   // 按 id / 类别取道具（UI 与逻辑统一走这两个，别自己 find）
   itemOf: (id) => (window.Config.items || []).find(i => i.id === id) || null,
@@ -1117,6 +1113,7 @@ window.Config = {
 
   synthesize: {
     minLevel: 40,           // 两只素材必须达到的等级
+    material: { name: '合成之石', amount: 1 },  // 基础合成材料（与道具分开计算）
     /* ===== 加法公式（2026-09-06 第二版手册 2.1，废弃加权平均）=====
      * 新宠成长 = 主宠成长 + 总提升，【永远不掉】（保底：总提升至少 +1）。
      * 总提升 = 基础提升 × (1 + 等级加成 + 道具加成) + 随机加成

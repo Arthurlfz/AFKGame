@@ -34,6 +34,7 @@ const content = C('document.getElementById("codex-content").innerHTML');
 A((nav.match(/codex-nav-btn/g) || []).length === 8, '目录渲染出 8 个板块按钮');
 A((content.match(/codex-card/g) || []).length === 8, '内容区渲染出 8 个词条卡片');
 A(C('UI.codexEntries.length') === 8, '词条清单共 8 个板块');
+A(content.indexOf('该板块暂时无法显示') === -1, '所有板块均构建成功（没有渲染异常兜底）');
 
 /* ---------- 数值与 Config 一致（防写死第二份数值） ---------- */
 const maxLv = C('Config.pet.maxLevel');
@@ -53,7 +54,18 @@ A(content.indexOf('装备共 ' + slotCount + ' 个部位') !== -1, '装备板块
 const areaCount = C('Config.battle.areas.length');
 A((content.match(/<tr><td class="codex-key">/g) || []).length > areaCount, '表格行数覆盖全部地图条目（地图共 ' + areaCount + ' 张）');
 const nirLv = C('Config.nirvana.minLevel');
-A(content.indexOf(nirLv + ' 级') !== -1, '变强板块显示涅槃门槛（读 Config，当前 ' + nirLv + ' 级）');
+A(content.indexOf('Lv.' + nirLv) !== -1, '变强板块显示涅槃门槛（读 Config，当前 Lv.' + nirLv + '）');
+
+/* ---------- 与最新系统配置一致（5 阶进化 / 神级宠 / 特质 / 魂铸） ---------- */
+const stageGates = C('Config.pet.evolution.stages.filter(s=>s.minLevel>1).map(s=>s.minLevel).join("/")');
+A(stageGates.split('/').every(lv => content.indexOf('Lv.' + lv) !== -1), '宠物/变强板块覆盖全部 5 阶门槛（读 Config：' + stageGates + '）');
+const godName = C('Config.pet.godPets.list[0].name');
+A(content.indexOf(godName) !== -1, '宠物板块列出神级宠（读 Config，首只 ' + godName + '）');
+A(content.indexOf('T1 ' + C('Config.traitHatch.tierRoll[1]') + '%') !== -1, '孵化特质概率表可见（死代码 return 已修）');
+const evoItem = C('Config.itemsOf("evolve")[0].name');
+A(content.indexOf(evoItem) !== -1, '材料/宠物板块列出进化道具（读 Config，首件 ' + evoItem + '）');
+A(content.indexOf('魂铸') !== -1 && content.indexOf(C('Config.soulCast.material')) !== -1, '装备/变强板块覆盖魂铸（读 Config）');
+
 
 /* ---------- 内容定性：百科不是攻略 ---------- */
 A(!/流浪商人/.test(content), '百科不含市场假人（流浪商人）内容');

@@ -211,6 +211,8 @@ body {
 .es-stats { margin-top:8px; color:var(--text-dim); font-weight:700; }
 .es-confirm { margin-top:10px; }
 .es-confirm .btn-mini.primary { padding:10px 22px; font-size:var(--fs-md); }
+.es-boost-select { display:flex; align-items:center; gap:8px; margin-top:8px; color:var(--text-dim); font-size:var(--fs-sm); }
+.es-boost-select .sell-input { flex:1; width:auto; margin:0; }
 
 /* ---------- 按钮 ---------- */
 .btn {

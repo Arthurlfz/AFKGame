@@ -6,7 +6,9 @@
  *       - 变异失败：出一只普通新宠（继承主宠形态），成长 = 加权和
  *       - 两只素材宠都消失；新宠等级回 1；消耗「合成之石」
  *  2. 涅槃 nirvana（= 原融合 merge）：主宠吸副宠成长 + 重置等级 + 突破成长上限
- *       - 主宠保留，吸副宠成长；副宠消失；等级重置回 1；消耗「涅磐兽」
+ *       - 主宠保留，吸副宠成长；副宠消失；等级重置回 1
+ *       - 2026-09-06 第二版手册 2.4：消耗【道具化】= 选中的涅槃道具（默认涅槃丹，吸收 ×1.2）；
+ *         涅磐兽不再作为涅槃消耗品（保留掉落与交易）。可选再投入凝魂晶石加乘。
  * 兼容：Merge.merge 保留为 nirvana 的别名（旧测试/旧调用仍可用）
  * 规则（config.synthesize / config.nirvana）
  * 依赖：pet.js / materials.js / supabase.js / market.js（在售检查）
@@ -84,48 +86,68 @@
     return { growth, absorb: Math.round(absorb * 10) / 10, subRatioPenalty: false, capApplied: false };
   }
 
-  /* ---------- 合成成长计算（纯函数，synthesize 与 UI 预览共用） ---------- */
-  // calcSynthesizeGrowth(main, sub, mutated) → 合成后新宠成长
-  //   加权和 = 主×mainW + 副×subW；变异成功再 +随机加成
-  function calcSynthesizeGrowth(main, sub, mutated) {
+  /* ---------- 合成成长计算（纯函数，synthesize 与 UI 预览共用） ----------
+   * 2026-09-06 第二版手册 2.1：加法公式（废弃加权平均）。
+   * 新宠成长 = 主宠成长 + 总提升，【永远不掉】（保底：总提升至少 +1）。 */
+  function calcSynthesizeGrowth(main, sub, mutated, itemId) {
     const S = SYN();
-    const base = (main.growth || 0) * (S.mainW || 0.6) + (sub.growth || 0) * (S.subW || 0.4);
-    const bonus = mutated && S.mutation ? randInt(S.mutation.growthBonus[0], S.mutation.growthBonus[1]) : 0;
-    return Math.round((base + bonus) * 10) / 10;
+    const baseBoost = (sub.growth || 0) * (S.baseBoostRatio || 0.25);
+    const levelBoost = Math.min(((main.level || 1) + (sub.level || 1)) / 200, S.levelBoostMax || 0.5);
+    const item = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
+    const itemBoost = (item && item.boost) || 0;
+    const randomRange = S.randomBoost || [1, 3];
+    const randomBoost = randInt(randomRange[0], randomRange[1]);
+    let totalBoost = baseBoost * (1 + levelBoost + itemBoost) + randomBoost;
+    totalBoost = Math.max(1, Math.round(totalBoost));
+    let growth = (main.growth || 0) + totalBoost;
+    if (mutated && S.mutation) {
+      growth += randInt(S.mutation.growthBonus[0], S.mutation.growthBonus[1]);
+    }
+    const cap = S.normalGrowthCap || 100;
+    if (growth > cap) {
+      growth = cap + (growth - cap) / 2;
+    }
+    return Math.round(growth * 10) / 10;
   }
 
-  /* ---------- 神级宠合成判定（手册 2.6） ----------
+  /* ---------- 神级宠合成判定（第二版手册 2.2，道具化） ----------
    * 门槛：主宠与副宠都【终阶】(evolveStage ≥ minStage) 且【成长 ≥ minGrowth】
-   * 概率：30%（Config.synthesize.god.chance）；背包有涅槃丹 → 100%（消耗 1 颗）
-   * 返回 { ready, chance, hasPill, god, minGrowth, minStage }，UI 预览与实际合成共用同一函数。 */
-  function godSynthInfo(main, sub) {
-    const G = SYN().god;
+   *   且等级 ≥ baseLevelRequire（至尊神石可按 levelRequireReduce 降低）。
+   * 概率：由选中合成道具的 godChance 决定（合成之石 30% / 百变魔石 60% / 至尊神石 100%）。
+   * 返回 { ready, chance, god, minGrowth, minStage, levelRequire, item }，UI 预览与实际合成共用。 */
+  function godSynthInfo(main, sub, itemId) {
+    const S = SYN();
+    const G = S.god;
     const Pet = window.Pet;
-    const empty = { ready: false, chance: 0, hasPill: false, god: null, minGrowth: 60, minStage: 5 };
+    const empty = { ready: false, chance: 0, god: null, minGrowth: 60, minStage: 5, levelRequire: 60, item: null };
     if (!G || !Pet || !main || !sub) return empty;
+    const item = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
     const st = p => (Pet.getEvolveStage ? Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1));
     const minG = G.minGrowth || 60, minS = G.minStage || 5;
+    const GP = Config.pet && Config.pet.godPets;
+    const baseLevel = (GP && GP.baseLevelRequire) || 60;
+    const levelReduce = (item && item.levelRequireReduce) || 0;
+    const levelRequire = Math.max(1, baseLevel - levelReduce);
     const ready = st(main) >= minS && st(sub) >= minS
-      && (main.growth || 0) >= minG && (sub.growth || 0) >= minG;
-    const pill = G.pill || null;
-    const hasPill = pill ? (Materials.getQuantity ? Materials.getQuantity(pill.name) : 0) >= (pill.amount || 1) : false;
-    const chance = ready ? (hasPill ? (pill.chance != null ? pill.chance : 1) : (G.chance || 0.3)) : 0;
-    const god = ready && Config.pet && Config.pet.godPets && Config.pet.godPets.ofLine
-      ? Config.pet.godPets.ofLine(main.lineId || main.name) : null;
-    return { ready, chance, hasPill, god, minGrowth: minG, minStage: minS };
+      && (main.growth || 0) >= minG && (sub.growth || 0) >= minG
+      && (main.level || 1) >= levelRequire && (sub.level || 1) >= levelRequire;
+    const chance = ready ? ((item && item.godChance != null) ? item.godChance : 0.3) : 0;
+    const god = ready && GP && GP.ofLine
+      ? GP.ofLine(main.lineId || main.name) : null;
+    return { ready, chance, god, minGrowth: minG, minStage: minS, levelRequire, item };
   }
 
   /* ============================================================
    * 涅槃 nirvana（= 原融合 merge）：主宠吸副宠成长 + 重置等级
    * ============================================================ */
-  async function nirvana(mainId, subId, useCrystal) {
+  async function nirvana(mainId, subId, useCrystal, useNirvanaPill) {
     const k = 'nir:' + mainId + ':' + subId;
     if (inFlight.has(k)) return { error: '涅槃进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await nirvanaInner(mainId, subId, useCrystal); }
+    try { return await nirvanaInner(mainId, subId, useCrystal, useNirvanaPill); }
     finally { inFlight.delete(k); }
   }
-  async function nirvanaInner(mainId, subId, useCrystal) {
+  async function nirvanaInner(mainId, subId, useCrystal, useNirvanaPill) {
     const M = NV();
     const main = getPets().find(p => p.id === mainId);
     const sub = getPets().find(p => p.id === subId);
@@ -159,23 +181,33 @@
     if (!main.cloudId || !sub.cloudId) return { error: '有宠物未同步云端，刷新页面后再试' };
     if (Market.isListed(main.cloudId)) return { error: `${main.name} 正在市场出售，先取回再涅槃` };
     if (Market.isListed(sub.cloudId)) return { error: `${sub.name} 正在市场出售，先取回再涅槃` };
-    if (Materials.getQuantity(M.material.name) < M.material.amount) {
-      return { error: `需要 ${M.material.amount} 只${M.material.name}，去挂机刷材料吧` };
-    }
-    // 凝魂晶石加成（可选）：数量先校验（涅磐兽还没扣，此时退出不损失任何东西）
+    /* 凝魂晶石加成（可选）：投入 crystalBonus.amount 颗，本次吸收 ×(1 + absorbBonus)。
+     * 只加成型道具可用（替换型语义冲突），当前涅槃道具都是 add 型。 */
     const CB = M.crystalBonus;
-    const bonusMult = (useCrystal && CB) ? 1 + CB.absorbBonus : 1;
+    let bonusMult = (useCrystal && CB) ? 1 + CB.absorbBonus : 1;
     if (bonusMult > 1 && Materials.getQuantity(CB.material) < CB.amount) {
       return { error: `${CB.material}不足，需要 ${CB.amount} 颗` };
     }
+    /* 涅槃消耗【道具化】（2026-09-06 第二版手册 2.4）：
+     * 消耗的是选中的涅槃道具（Config.items 里 category=nirvana，默认 defaultItem），
+     * 涅磐兽已不再是涅槃消耗品（保留掉落与交易）。当前唯一道具 = 涅槃丹（吸收 ×1.2）。
+     * 不用道具也能涅槃，只是拿不到加乘。 */
+    const nirPill = useNirvanaPill ? (Config.itemOf ? Config.itemOf(M.defaultItem || 'nir_pill') : null) : null;
+    if (nirPill && Materials.getQuantity(nirPill.name) < 1) {
+      return { error: `${nirPill.name}不足` };
+    }
+    if (nirPill && nirPill.boostMult) bonusMult *= nirPill.boostMult;
 
-    const spent = await Materials.spend(M.material.name, M.material.amount);
-    if (!spent.ok) return { error: spent.error || '材料扣减失败' };
-
-    if (bonusMult > 1) {
+    if (useCrystal && bonusMult > 1) {
       const cs = await Materials.spend(CB.material, CB.amount);
-      // 晶石扣失败：把刚扣掉的涅磐兽退回去，不让玩家赔掉稀有材料
-      if (!cs.ok) { Materials.gain(M.material.name, M.material.amount); return { error: cs.error || '材料扣减失败' }; }
+      if (!cs.ok) return { error: cs.error || '材料扣减失败' };
+    }
+    if (nirPill) {
+      const ps = await Materials.spend(nirPill.name, 1);
+      if (!ps.ok) {
+        if (useCrystal && bonusMult > 1) Materials.gain(CB.material, CB.amount);
+        return { error: ps.error || `${nirPill.name}扣减失败` };
+      }
     }
 
     const oldGrowth = main.growth;
@@ -215,14 +247,14 @@
   /* ============================================================
    * 合成 synthesize：两只宠物 → 概率合成一只全新「·异变」宠
    * ============================================================ */
-  async function synthesize(mainId, subId) {
+  async function synthesize(mainId, subId, itemId) {
     const k = 'syn:' + mainId + ':' + subId;
     if (inFlight.has(k)) return { error: '合成进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await synthesizeInner(mainId, subId); }
+    try { return await synthesizeInner(mainId, subId, itemId); }
     finally { inFlight.delete(k); }
   }
-  async function synthesizeInner(mainId, subId) {
+  async function synthesizeInner(mainId, subId, itemId) {
     const S = SYN();
     const main = getPets().find(p => p.id === mainId);
     const sub = getPets().find(p => p.id === subId);
@@ -243,12 +275,21 @@
     const spent = await Materials.spend(S.material.name, S.material.amount);
     if (!spent.ok) return { error: spent.error || '材料扣减失败' };
 
-    // 神级宠判定（手册 2.6）：终阶 + 成长达标 → 30% 概率；持涅槃丹 100%（并消耗 1 颗）
-    const gi = godSynthInfo(main, sub);
-    let isGod = false, usePill = false;
+    // 选中合成道具校验+消耗（第二版手册 2.2：道具化）
+    // 校验失败必须【退回已扣的合成之石】：道具不足/类别不对时玩家不该白亏基础材料
+    const synthItem = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
+    if (synthItem) {
+      if (synthItem.category !== 'synth') { Materials.gain(S.material.name, S.material.amount); return { error: '所选道具不是合成道具' }; }
+      if (Materials.getQuantity(synthItem.name) < 1) { Materials.gain(S.material.name, S.material.amount); return { error: synthItem.name + '不足' }; }
+      const is = await Materials.spend(synthItem.name, 1);
+      if (!is.ok) { Materials.gain(S.material.name, S.material.amount); return { error: is.error || '道具扣减失败' }; }
+    }
+
+    // 神级宠判定（第二版手册 2.2：道具化）：终阶 + 成长达标 + 等级达标 → 概率由选中道具 godChance 决定
+    const gi = godSynthInfo(main, sub, itemId);
+    let isGod = false;
     if (gi.ready && gi.god) {
       // 服务端权威校验（手册 6.4，migrate_god_pet.sql 的 check_god_synth）：双终阶+成长≥minGrowth。
-      // 旧库无此 RPC（error/data=null）时放行 —— 客户端门槛已挡，这里只加保险。
       if (Supabase.rpc) {
         try {
           const Pet = window.Pet;
@@ -262,32 +303,37 @@
           }
         } catch (e) { /* RPC 不可用：放行 */ }
       }
-      if (gi.hasPill) {
-        const ps = await Materials.spend(S.god.pill.name, S.god.pill.amount || 1);
-        if (ps.ok) { isGod = true; usePill = true; }
-        else isGod = Math.random() < (S.god.chance || 0.3);   // 丹扣失败 → 退回概率模式
-      } else {
-        isGod = Math.random() < (S.god.chance || 0.3);
-      }
+      isGod = Math.random() < gi.chance;
     }
 
     // 变异判定：概率出全新「·异变」宠
     const mutated = rollMutation(S);
-    const newGrowth = calcSynthesizeGrowth(main, sub, mutated);
+    let newGrowth = calcSynthesizeGrowth(main, sub, mutated, itemId);
     let newName = mutated ? mutatedName(main.name) : main.name;
     let newIcon = main.icon;
     let bHp = main.baseHp, bAtk = main.baseAtk, bDef = main.baseDef;
     let lineId = main.lineId || main.name;
+    let godStatCoeffBonus = 0;
     if (isGod && gi.god) {
       // 神级宠是【单独的宠物】：自己的名字、基础值、成长系数（普通宠 ×1.5），生而为终阶
       newName = gi.god.name;
-      newIcon = gi.god.sprite || main.icon;   // 无专属立绘前复用该线终形态
+      newIcon = gi.god.sprite || main.icon;
       bHp = gi.god.baseHp; bAtk = gi.god.baseAtk; bDef = gi.god.baseDef;
-      lineId = gi.god.name;                   // lineId = 神级宠名 → getStatCoeff 走 godPets 表
+      lineId = gi.god.name;
+      // 第二版手册 2.2：神级宠出生上限 birthGrowthCap（满神60），超过部分折算 statCoeff 永久加成
+      const GP = Config.pet && Config.pet.godPets;
+      const cap = (GP && GP.birthGrowthCap) || 60;
+      const excessRatio = (GP && GP.excessStatCoeffRatio) || 0.01;
+      const excessMax = (GP && GP.excessStatCoeffMax) || 0.2;
+      if (newGrowth > cap) {
+        const excess = newGrowth - cap;
+        godStatCoeffBonus = Math.min(excess * excessRatio, excessMax);
+        newGrowth = cap;
+      }
     }
     // 新宠继承主宠形态基础值（图标/基底），等级回 1
     const baby = createPet(newName, newIcon, newGrowth, bHp, bAtk, bDef, main.baseSpd, lineId);
-    if (isGod) { baby.isGodPet = true; baby.evolveStage = 5; }
+    if (isGod) { baby.isGodPet = true; baby.evolveStage = 5; baby.statCoeffBonus = godStatCoeffBonus; }
     baby.level = 1;
     baby.exp = 0;
     baby.traits = inheritSynthTraits(main, sub, mutated);   // 血脉特质继承（合成）
@@ -311,7 +357,7 @@
     // 任务进度上报：所有 type=synth 的任务 +1
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('synth', 1);
 
-    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, usePill };
+    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, synthItem, godStatCoeffBonus };
   }
 
   /* ---------- 血脉特质继承 / 植入（设计 v1） ---------- */

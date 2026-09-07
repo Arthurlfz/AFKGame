@@ -33,6 +33,8 @@ A(C('(()=>{const t=Config.pet.evolution.tree,s=Config.pet.starters;return s.ever
 A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().some(r=>r.minLevel===25)&&Object.values(t).flat().some(r=>r.minLevel===60)})()'),'进化树包含 Lv.25 / Lv.60 后续门槛（2026-09-06：35→25）');
 A(C('Evolve.getEvolutionRoutes({name:"腐噜兽"})[0].to')==='腐沼兽'&&C('Evolve.getEvolutionRoutes({name:"腐沼兽"})[0].to')==='腐沼王'&&C('Evolve.getEvolutionRoutes({name:"腐沼王"})[0].to')==='腐烂之母','腐噜兽可沿链进化至第3阶终点');
 A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().every(r=>!t[r.to]||t[r.to].length===0||t[r.to].every(x=>[25,60].includes(x.minLevel)))})()'),'所有后续路线门槛为 Lv.25 或 Lv.60');
+A(C('Config.pet.evolution.boostItems.every(id=>{const i=Config.itemOf(id);return i&&i.category==="evolve"&&i.boost>0})'),'三个进化强化道具均有有效定义');
+A(C('Object.values(Config.drop.materialWeightsByTier).some(w=>w["强化丹B"])&&Object.values(Config.drop.materialWeightsByTier).some(w=>w["天仙玉露"])'),'强化丹B与天仙玉露均有掉落来源');
 
 /* ============ 2. 进化体速度继承 ============ */
 // 期望值不写死：从 Config.pet.speeds 的基宠取，速度带调整后不必改测试
@@ -64,6 +66,21 @@ A(C('Pet.getPets().find(p=>p.id==='+evId+').curHp')===C('Pet.getStats(Pet.getPet
 A(C('Materials.getQuantity("进化素材")')===0,'进化后 进化素材 正确扣除（余 0）');
 const cloud=C('petsTable.find(p=>p.id==="'+C('Pet.getPets().find(p=>p.id==='+evId+').cloudId')+'")');
 A(cloud.name==='血牙狐'&&cloud.growth>10,'云端同步：name=血牙狐 / growth 提升');
+
+/* ============ 4a. 进化强化道具：倍率结算、消耗与库存校验 ============ */
+await mkPet('腐噜兽','🐹',10,'boosted',10);
+const boostedId=C('globalThis.__boosted');
+await C('Materials.gain("进化素材",1)');await C('Materials.gain("强化丹A",1)');await S(80);
+const boosted=await C('Evolve.evolve('+boostedId+',0,0.2,"evo_dan_a")');
+A(boosted.ok===true&&boosted.boost===0.22&&boosted.boostItem.id==='evo_dan_a','强化丹A将基础成长 +0.20 放大为 +0.22');
+A(C('Materials.getQuantity("强化丹A")')===0,'强化丹A随进化成功正确扣除');
+await mkPet('瘟熊','🐻',10,'boostMissing',10);
+const boostMissingId=C('globalThis.__boostMissing');
+await C('Materials.gain("进化素材",1)');await S(80);
+const boostMissing=await C('Evolve.evolve('+boostMissingId+',0,0.2,"evo_dan_b")');
+A(boostMissing.ok!==true&&/强化丹B/.test(boostMissing.error),'未持有强化丹B时拒绝进化且提示缺少道具');
+A(C('Materials.getQuantity("进化素材")')===1,'强化道具不足时不扣阶段进化素材');
+C('Materials.spendLocal("进化素材",1)'); // 清理本段特意保留的素材，避免影响后续不足素材用例
 
 /* ============ 4b. 5 阶进化链实际执行（2026-09-06）：
  *   Lv10 一阶（进化素材）→ Lv25 二阶（精粹）→ Lv40 三阶·淬体（传说，形态不变）

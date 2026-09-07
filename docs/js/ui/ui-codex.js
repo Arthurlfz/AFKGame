@@ -89,20 +89,6 @@
       ];
     });
 
-    return table(['宠物', '定位', '生命', '攻击', '防御', '成长', '速度'], rows1)
-      + note('属性公式（成长系数每只宠不同，进化后沿用来源基宠的系数）：')
-      + rules([
-        `生命 = 基础生命 + 等级 × 成长值 × ${coeff.hp}`,
-        `攻击 = 基础攻击 + 等级 × 成长值 × ${coeff.atk}`,
-        `防御 = 基础防御 + 等级 × 成长值 × ${coeff.def}`,
-        '速度 = 该宠固定基础速度 + 装备加成，等级与成长值不影响速度',
-        `等级上限 ${P.maxLevel} 级`
-      ])
-      + note('每只宠的隐藏底子（上表系数之外的固定值）：')
-      + table(['宠物', '暴击', '暴击伤害', '命中', '闪避', '吸血'], rows2)
-      + note('终形态主动技能（终形态达到对应等级后，可在战斗中手动释放）：')
-      + table(['终形态', '主动技能', '解锁', '冷却', '效果'], skillRows);
-
     // ===== 血脉特质图鉴（8 条 × T1~T3） + 孵化概率 + 流动规则 + 觉醒表 =====
     const TRAITS = Config.petTraits || {};
     const traitRows = Object.keys(TRAITS).map(id => {
@@ -132,6 +118,41 @@
       const bv = b[bKey];
       return [escapeHtml(line), bKey + ' +' + bv + (['spd'].indexOf(bKey) >= 0 ? '' : '%')];
     });
+
+    // ===== 5 阶进化：门槛与素材按「当前阶」走，共 4 次进化（初始 → 终阶）=====
+    const stageRows = (EV.stages || []).map(s => {
+      const gb = s.growthBoost || [0, 0];
+      const mat = s.material
+        ? `${escapeHtml(s.material)} ×${s.amount}${s.extra ? ' + ' + escapeHtml(s.extra.name) + ' ×' + s.extra.amount : ''}`
+        : '无';
+      return [
+        escapeHtml(s.label || ('第' + s.stage + '阶')),
+        'Lv.' + s.minLevel,
+        mat,
+        gb[0] === gb[1] ? '+' + gb[0] : `+${gb[0]} 到 +${gb[1]}`,
+        s.form === false ? '形态不变' : '换形态',
+        escapeHtml(s.desc || '')
+      ];
+    });
+    // ===== 进化强化道具：可选消耗，按倍率放大本次成长提升 =====
+    const evoItemRows = (Config.itemsOf ? Config.itemsOf('evolve') : []).map(it => [
+      it.icon + ' ' + escapeHtml(it.name),
+      '成长提升 ×' + (1 + (it.boost || 0)).toFixed(2).replace(/0$/, ''),
+      escapeHtml(it.effect || ''),
+      escapeHtml(it.rarity || '')
+    ]);
+    // ===== 血统被动：每只基宠天生一条，战斗中生效，不可继承、不可更换 =====
+    const passiveRows = Object.keys(Config.bloodlinePassive || {}).map(n => {
+      const b = Config.bloodlinePassive[n] || {};
+      return [`${escapeHtml(b.icon || '')} ${escapeHtml(n)}`, escapeHtml(b.name || ''), escapeHtml(b.desc || '')];
+    });
+    // ===== 神级宠：单独的宠物（不是普通宠的进阶形态），只有它能涅槃 =====
+    const G = P.godPets || {};
+    const godRows = (G.list || []).map(g => {
+      const c = g.statCoeff || {};
+      return [escapeHtml(g.name), escapeHtml(g.line || ''), g.speed, g.baseHp, g.baseAtk, g.baseDef, `${c.hp} / ${c.atk} / ${c.def}`];
+    });
+
     return table(['宠物', '定位', '生命', '攻击', '防御', '成长', '速度'], rows1)
       + note('属性公式（成长系数每只宠不同，进化后沿用来源基宠的系数）：')
       + rules([
@@ -145,6 +166,14 @@
       + table(['宠物', '暴击', '暴击伤害', '命中', '闪避', '吸血'], rows2)
       + note('终形态主动技能（终形态达到对应等级后，可在战斗中手动释放）：')
       + table(['终形态', '主动技能', '解锁', '冷却', '效果'], skillRows)
+      + note(`5 阶进化：共 ${EV.maxEvolveTimes} 次进化（初始 → 终阶），素材与成长提升由「当前阶」决定：`)
+      + table(['阶段', '门槛', '消耗素材', '成长提升', '形态', '说明'], stageRows)
+      + (evoItemRows.length
+          ? note('进化强化道具（进化时可选用 1 个，按倍率放大本次成长提升；不用则按基础值结算）：')
+            + table(['道具', '倍率', '效果', '稀有度'], evoItemRows)
+          : '')
+      + note('血统被动（每只基宠天生一条，战斗中生效，不可继承、不可更换）：')
+      + table(['基宠', '被动', '效果'], passiveRows)
       + note('血脉特质（8 条 × T1~T3，T1 最强最稀有；特质一律不含攻击%，只叠加机制 / 生存属性）：')
       + table(['特质', 'T1', 'T2', 'T3', '说明'], traitRows)
       + note('孵化特质概率（变异宠保底 1 条，T 阶整体抬升）：')
@@ -154,8 +183,13 @@
         `合成：主宠特质每条保留 ${Math.round((inh.synthKeep != null ? inh.synthKeep : 0.7) * 100)}%、副宠每条继承 ${Math.round((inh.synthGive != null ? inh.synthGive : 0.4) * 100)}%；继承时 ${Math.round((inh.up != null ? inh.up : 0.2) * 100)}% 升一阶（封顶 T1）、${Math.round((inh.down != null ? inh.down : 0.1) * 100)}% 降一阶（最低 T3）；变异成功额外追 1 条；总上限 ${inh.cap != null ? inh.cap : 3} 条`,
         `涅槃：主宠特质全保留；副宠每条 ${Math.round((nir.implantChance != null ? nir.implantChance : 0.3) * 100)}% 概率植入（同类型取高 T，不叠加）`
       ])
-      + note('觉醒特质（Lv60 终形态解锁 = 对应主动技能伤害 +20% + 血统定位加成）：')
-      + table(['血统线', '觉醒定位加成'], awRows);
+      + note(`觉醒特质（Lv60 终形态解锁 = 对应主动技能伤害 +${Math.round((Config.awakenSkillDamage || 0.2) * 100)}% + 血统定位加成）：`)
+      + table(['血统线', '觉醒定位加成'], awRows)
+      + note(`神级宠（${(G.list || []).length} 只，每条血统线 1 只；独立宠物而非进阶形态，成长系数约为普通宠的 1.5 倍，只有它能涅槃）：`)
+      + table(['神级宠', '血统线', '速度', '生命', '攻击', '防御', '成长系数 血/攻/防'], godRows)
+      + (G.minGrowth != null
+          ? note(`成神门槛：主副宠都终阶且成长 ≥ ${G.minGrowth}；出生成长上限 ${G.birthGrowthCap}，超出部分折算为成长系数加成（每点 +${Math.round((G.excessStatCoeffRatio || 0) * 100)}%，封顶 +${Math.round((G.excessStatCoeffMax || 0) * 100)}%）。`)
+          : '');
   }
 
   /* ---------- 2. 战斗 ---------- */
@@ -170,6 +204,11 @@
     const stopPct = pct(B.stopHpRatio || 0);
     const regenPct = pct((Config.regen && Config.regen.hpPerSecRatio) || 0);
 
+    const tm = B.typeMult || {};
+    const clampCfg = B.levelScaleClamp || [0, 1];
+    const sk = (Config.pet && Config.pet.evolution && Config.pet.evolution.activeSkills) || {};
+    const skillLv = Object.keys(sk).reduce((m, k) => Math.max(m, sk[k].minLevel || 0), 0);
+    const cd = Object.keys(sk).reduce((m, k) => Math.max(m, sk[k].cooldownTurns || 0), 0);
     return note('战斗全自动进行，出手快慢由速度决定，命中、暴击、吸血各自独立结算。')
       + rules([
         `出手：进度条满 100 打一次，每 100 毫秒累加 速度 ÷ ${scale}。速度 ${fast} 约 ${secOf(fast)} 秒出手一次，速度 ${slow} 约 ${secOf(slow)} 秒一次`,
@@ -178,13 +217,30 @@
         '暴击：按暴击率触发，触发后伤害 × 暴击伤害倍率',
         '吸血：命中后按 伤害 × 吸血率 回血，回血不超过生命上限',
         `回血：血量低于 ${stopPct} 自动停止挂机，每秒恢复最大生命的 ${regenPct}`,
-        '战败：自动等待回血，回满后继续下一场'
+        '战败：自动等待回血，回满后继续下一场',
+        `怪类型强度：普通 ×${tm.normal != null ? tm.normal : 1} / 进化 ×${tm.evolved != null ? tm.evolved : 1} / 变异 ×${tm.mutant != null ? tm.mutant : 1}`,
+        `怪数值按等级缩放，倍率钳制在 ${clampCfg[0]} 到 ${clampCfg[1]} 之间`,
+        '守关 Boss：每场 1/1600 概率出现（连续 2400 场未出必出，出后 200 场内不再出）；它是该图怪池里等级最高的怪，等级取图段上限，血 ×5、攻 ×1.5，名字带「霸主·」前缀',
+        `主动技能：终形态达到 Lv.${skillLv} 后可在战斗中手动释放，释放后冷却 ${cd} 回合`,
+        '血统被动：每只基宠天生一条，战斗中自动生效（见宠物板块）'
       ]);
   }
 
   /* ---------- 3. 装备 ---------- */
   function buildEquip() {
     const E = Config.equipment || {};
+    const SC = Config.soulCast || {};
+    const scRows = Object.keys(SC.tiers || {}).map(k => {
+      const t = SC.tiers[k] || {};
+      return [
+        escapeHtml(t.label || k),
+        'Lv.' + t.minLevel,
+        '成长 ≥ ' + t.minGrowth,
+        t.source === 'awaken' ? '觉醒特质' : '血脉特质',
+        t.tierShift ? 'T 阶 +' + t.tierShift : 'T 阶不变',
+        t.needFinal ? '需终形态' : '无'
+      ];
+    });
     const rarities = E.rarities || [];
     const slots = (Equipment && Equipment.SLOTS) || [];
     const pool = (Equipment && Equipment.AFFIX_POOL) || [];
@@ -227,14 +283,16 @@
         '攻击 / 生命 / 防御 = 宠物裸属性 ×（1 + 百分比词缀总和）+ 装备底材固定值',
         '暴击 / 暴击伤害 / 吸血 / 命中 / 闪避 / 速度 = 宠物底子 + 装备底材 + 词缀',
         '穿透 = 无视 X 点防御（只削防御不成负数）；伤害加成 = 最终伤害 +X%；受伤减免 = 受到伤害 -X%（最低承伤 10%）'
-      ]);
+      ])
+      + note(`魂铸：把宠物的特质铸进装备，消耗 ${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}，每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀。`)
+      + table(['魂铸档', '宠物等级', '宠物成长', '特质来源', 'T 阶', '额外条件'], scRows);
   }
 
   /* ---------- 4. 打造 ---------- */
   function buildCraft() {
     const C = Config.craft || {};
     const S = Config.salvage || {};
-    const stoneRows = ['reforge', 'strip', 'holy', 'augment'].filter(k => C[k]).map(k => {
+    const stoneRows = ['reforge', 'strip', 'holy', 'augment', 'lock'].filter(k => C[k]).map(k => {
       const s = C[k];
       return [s.icon + ' ' + escapeHtml(s.name), '×' + s.amount, escapeHtml(s.effect), escapeHtml(s.rule)];
     });
@@ -250,6 +308,7 @@
 
     return note('打造消耗对应的石头，直接改变装备的词缀。')
       + table(['石头', '消耗', '效果', '限制'], stoneRows)
+      + note(`锁定：每条已锁定的词缀在重铸 / 神圣时额外消耗 1 颗${C.lock ? C.lock.name : '锁定石'}，最多锁 ${C.lock ? C.lock.maxLocked : 0} 条。`)
       + note('分解装备的产出：')
       + table(['品质', '分解产出'], salvageRows);
   }
@@ -259,21 +318,39 @@
     const mats = (Config.trade && Config.trade.materials) || [];
     const C = Config.craft || {};
     const useOf = name => {
-      for (const k of ['reforge', 'strip', 'holy', 'augment']) {
+      const it = (Config.items || []).find(i => i.name === name);
+      if (it) return it.effect;
+      for (const k of ['reforge', 'strip', 'holy', 'augment', 'lock']) {
         if (C[k] && C[k].name === name) return '打造：' + C[k].effect;
       }
       if (Config.synthesize && Config.synthesize.material && Config.synthesize.material.name === name) return '宠物合成消耗';
-      if (Config.nirvana && Config.nirvana.material && Config.nirvana.material.name === name) return '宠物涅槃消耗';
       const evo = (Config.pet && Config.pet.evolution && Config.pet.evolution.materialName) || '进化素材';
       if (name.indexOf(evo) !== -1) return '宠物进化消耗';
       if (name === '宠物蛋') return '孵化出一只基础宠';
-      if (name === ((Config.pet && Config.pet.expPool && Config.pet.expPool.material) || '凝魂晶石')) { const EP = Config.pet.expPool; return `满级(${Config.pet.maxLevel}级)后每 ${EP.perCrystal} 点溢出经验凝出 1 颗；涅槃时可投入强化吸收`; }
+      if (name === '鉴定石') return '鉴定未鉴定的装备';
+      if (name === '涅磐兽') return '可交易材料（涅槃消耗已改为道具化，见下方道具表）';
+      const crystal = (Config.pet && Config.pet.expPool && Config.pet.expPool.material) || '凝魂晶石';
+      if (name === crystal) {
+        const EP = Config.pet.expPool || {};
+        const cb = (Config.nirvana && Config.nirvana.crystalBonus) || {};
+        return `满级（${Config.pet.maxLevel} 级）后每 ${EP.perCrystal} 点溢出经验凝出 1 颗；魂铸消耗，涅槃时投入 ${cb.amount || 10} 颗可让本次吸收 ×${(1 + (cb.absorbBonus || 0)).toFixed(1)}`;
+      }
       return '市场交易计价';
     };
     const rows = mats.map(m => [m.icon + ' ' + escapeHtml(m.name), escapeHtml(useOf(m.name))]);
+    const catLabel = { synth: '合成', evolve: '进化', nirvana: '涅槃' };
+    const itemRows = (Config.items || []).map(it => [
+      it.icon + ' ' + escapeHtml(it.name),
+      escapeHtml(catLabel[it.category] || it.category || ''),
+      escapeHtml(it.rarity || ''),
+      escapeHtml(it.effect || ''),
+      escapeHtml(it.description || '')
+    ]);
 
     return note('材料用于打造、进化、涅槃与合成，也是市场交易的计价单位。')
-      + table(['材料', '用途'], rows);
+      + table(['材料', '用途'], rows)
+      + note('道具（合成 / 进化 / 涅槃三系，在对应界面选用；唯一定义处是 Config.items）：')
+      + table(['道具', '类别', '稀有度', '效果', '说明'], itemRows);
   }
 
   /* ---------- 6. 地图 ---------- */
@@ -300,44 +377,53 @@
     const EV = (Config.pet && Config.pet.evolution) || {};
     const NI = Config.nirvana || {};
     const SY = Config.synthesize || {};
+    const SC = Config.soulCast || {};
     const baby = (Config.pet && Config.pet.babyGrowth) || {};
-    // 进化门槛：从进化树里收集所有 minLevel，去重排序
-    const levels = [];
-    Object.keys(EV.tree || {}).forEach(k => (EV.tree[k] || []).forEach(n => {
-      if (n.minLevel != null && levels.indexOf(n.minLevel) === -1) levels.push(n.minLevel);
-    }));
-    levels.sort((a, b) => a - b);
-    const gb = EV.growthBoost || [0, 0];
+    const G = (Config.pet && Config.pet.godPets) || {};
+    const stages = EV.stages || [];
+    const gated = stages.filter(s => (s.minLevel || 1) > 1);
+    const gates = gated.map(s => 'Lv.' + s.minLevel);
     const mu = (SY.mutation || {});
+    const rb = SY.randomBoost || [0, 0];
+    const synthItems = Config.itemsOf ? Config.itemsOf('synth') : [];
+    const nirItems = Config.itemsOf ? Config.itemsOf('nirvana') : [];
+    const cb = NI.crystalBonus || {};
+    const godMin = (SY.god && SY.god.minGrowth) || G.minGrowth || 0;
+    const godLv = G.baseLevelRequire || SY.minLevel || 60;
+    const matList = gated.map(s => `${escapeHtml(s.label)}：${escapeHtml(s.material)} ×${s.amount}${s.extra ? ' + ' + escapeHtml(s.extra.name) + ' ×' + s.extra.amount : ''}`);
+    const keepStage = stages.filter(s => s.form === false && (s.growthBoost || [0, 0])[0] > 0)[0];
+    const keepText = keepStage
+      ? `${escapeHtml(keepStage.label)}（Lv.${keepStage.minLevel}）形态不变、成长 +${keepStage.growthBoost[0]} 到 +${keepStage.growthBoost[1]}`
+      : '';
 
     const rows = [
       [
         '🌟 进化',
-        levels.length ? levels.join(' / ') + ' 级' : '不限',
-        (EV.materialName || '进化素材') + ' ×1',
-        `换形态，成长 +${gb[0]} 到 +${gb[1]}`,
-        `单宠最多 ${EV.maxEvolveTimes} 次`
+        gates.length ? gates.join(' → ') : '不限',
+        matList.join('；') || (EV.materialName || '进化素材'),
+        `共 ${EV.maxEvolveTimes} 次（初始 → 一阶 → 二阶 → 三阶 → 终阶）。${keepText}；其余阶段换形态`,
+        '素材与成长提升按「当前阶」决定；可选消耗 1 个进化道具放大倍率'
       ],
       [
         '♻️ 涅槃',
-        (NI.minLevel || 0) + ' 级',
-        ((NI.material || {}).name || '涅磐兽') + ' ×' + ((NI.material || {}).amount || 1),
-        `主宠吸收副宠成长 ×${NI.absorbRatio}（不衰减），副宠消失，等级重置为 1`,
-        `${NI.requireGodPet !== false ? '<b>只有神级宠能涅槃</b>；' : ''}成长上限 ${NI.maxGrowth}；穿着装备的宠物不能涅槃`
+        'Lv.' + (NI.minLevel || 0) + '（主宠与副宠都要到）',
+        nirItems.length ? '可选消耗 ' + nirItems.map(i => escapeHtml(i.name)).join(' / ') + ' ×1' : '无（不再消耗涅磐兽）',
+        `主宠成长 += 副宠成长 × 吸收比例（${nirItems.map(i => escapeHtml(i.name) + '：' + escapeHtml(i.effect || '')).join('；')}）；副宠消失，主宠等级重置为 1`,
+        `${NI.requireGodPet !== false ? '只有神级宠能涅槃；' : ''}可反复涅槃叠加成长${cb.amount ? `；额外投入 ${escapeHtml(cb.material)} ×${cb.amount} 可让本次吸收 ×${(1 + (cb.absorbBonus || 0)).toFixed(1)}` : ''}；穿着装备的宠物不能涅槃`
       ],
       [
         '⚗️ 合成',
-        (SY.minLevel || 0) + ' 级',
-        ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1),
-        `${pct(mu.chance || 0)} 概率出「·异变」宠，新宠成长 = 主 ×${SY.mainW} + 副 ×${SY.subW}，变异再 +${(mu.growthBonus || [0, 0])[0]} 到 +${(mu.growthBonus || [0, 0])[1]}`,
-        '两只素材宠都消失，新宠等级回到 1；穿着装备的宠物不能合成'
+        'Lv.' + (SY.minLevel || 0) + '（两只都要到）',
+        ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1) + ' + 合成道具 ×1',
+        `新宠成长 = 主宠成长 + 副宠成长 × ${SY.baseBoostRatio} ×（1 + 等级加成 + 道具加成）+ 随机 +${rb[0]} 到 +${rb[1]}，成长只涨不跌；${pct(mu.chance || 0)} 概率出「·异变」宠`,
+        `两只素材宠都消失，新宠等级回 1；普通宠成长软上限 ${SY.normalGrowthCap}；穿着装备的宠物不能合成`
       ],
       [
         '⚡ 神级宠',
-        '终阶（5 阶）+ Lv.' + (SY.minLevel || 40),
-        ((SY.material || {}).name || '合成之石') + ' ×1（持涅槃丹必出，消耗 1 颗）',
-        `${pct((SY.god && SY.god.chance) || 0.3)} 概率出神级宠（单独的宠物：成长系数 +50%，只有它能涅槃）`,
-        `门槛：主宠与副宠都终阶且成长 ≥ ${(Config.pet.godPets && Config.pet.godPets.minGrowth) || 60}`
+        `终阶（第 ${(SY.god && SY.god.minStage) || 5} 阶）+ Lv.${godLv}`,
+        '合成道具 ×1（决定出神概率）',
+        synthItems.map(i => `${escapeHtml(i.name)} ${Math.round((i.godChance || 0) * 100)}%`).join(' / ') + ' 概率出神级宠',
+        `门槛：主宠与副宠都终阶且成长 ≥ ${godMin}；${synthItems.filter(i => i.levelRequireReduce).map(i => `${escapeHtml(i.name)}把等级要求降到 Lv.${godLv - i.levelRequireReduce}`).join('；') || '无降门槛道具'}`
       ],
       [
         '🥚 孵化',
@@ -345,10 +431,17 @@
         '宠物蛋 ×1',
         `孵出一只基础宠，成长 ${baby.min} 到 ${baby.max} 随机`,
         '孵出的是基础形态，高阶形态靠进化'
+      ],
+      [
+        '🔥 魂铸',
+        '宠物 Lv.40 起（传承档 Lv.60）',
+        `${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}`,
+        '把宠物的血脉 / 觉醒特质铸进装备，让特质跨世代传承',
+        `每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀；传承档需终形态、成长 ≥ ${((SC.tiers || {}).legend || {}).minGrowth || 60}`
       ]
     ];
 
-    return note('宠物可以通过进化、涅槃、合成、孵化四种方式变更形态或提升成长值。')
+    return note('宠物可以通过进化、涅槃、合成、神级合成、孵化变强，魂铸则把特质传承到装备上。')
       + table(['方式', '等级门槛', '消耗', '效果', '限制'], rows);
   }
 
@@ -368,11 +461,11 @@
   const ENTRIES = [
     { id: 'pet', icon: '🐾', title: '宠物', intro: '属性由基础值、等级、成长值和成长系数共同决定，速度是固定值。', build: buildPet },
     { id: 'battle', icon: '⚔️', title: '战斗', intro: '战斗全自动，出手快慢由速度决定，命中、暴击、吸血各自独立结算。', build: buildBattle },
-    { id: 'equip', icon: '🛡️', title: '装备', intro: '装备分 12 个部位，品质由词缀条数决定，属性由底材固定值和词缀共同提供。', build: buildEquip },
+    { id: 'equip', icon: '🛡️', title: '装备', intro: '装备分多个部位，品质由词缀条数决定，属性由底材固定值和词缀共同提供。', build: buildEquip },
     { id: 'craft', icon: '🛠️', title: '打造', intro: '打造消耗对应的石头，直接改变装备的词缀。', build: buildCraft },
     { id: 'material', icon: '💠', title: '材料', intro: '材料用于打造、进化、涅槃与合成，也是市场交易的计价单位。', build: buildMaterial },
     { id: 'area', icon: '🗺️', title: '地图', intro: '每张图对应一个等级段，并掉落该图的专属材料。', build: buildArea },
-    { id: 'growth', icon: '📈', title: '变强 4 条路', intro: '宠物可以通过进化、涅槃、合成、孵化四种方式变更形态或提升成长值。', build: buildGrowth },
+    { id: 'growth', icon: '📈', title: '变强路线', intro: '宠物通过进化、涅槃、合成、神级合成、孵化变强，魂铸把特质传承到装备。', build: buildGrowth },
     { id: 'market', icon: '💰', title: '市场', intro: '交易用材料计价，不用金币；挂单期间商品被锁定。', build: buildMarket }
   ];
 

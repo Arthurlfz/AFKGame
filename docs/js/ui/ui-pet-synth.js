@@ -13,7 +13,7 @@
   const PetUI = window.PetUI || (window.PetUI = {});
   const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
 
-  let synthMainId = null, synthSubId = null;
+  let synthMainId = null, synthSubId = null, synthItemId = '';  // '' = 不使用道具，也能合成（只消耗基础合成之石）
 
   function renderSynthTab() {
     const list = $('synth-pet-list');
@@ -108,32 +108,48 @@
     const S = Config.synthesize || {};
     const sub = getPets().find(p => p.id === synthSubId);
     if (!sub) return;
-    const normalGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, false) : null;
-    const mutatedGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, true) : null;
+    const normalGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, false, synthItemId) : null;
+    const mutatedGrowth = Merge.calcSynthesizeGrowth ? Merge.calcSynthesizeGrowth(main, sub, true, synthItemId) : null;
     const matOk = haveMat >= matAmt;
-    // 神级宠判定（手册 2.6）：门槛 + 概率（涅槃丹 100%）与实际合成共用 godSynthInfo
-    const gi = Merge.godSynthInfo ? Merge.godSynthInfo(main, sub) : null;
+    // 道具下拉框（第二版手册 2.2：合成道具化）
+    const synthItems = (Config.itemsOf ? Config.itemsOf('synth') : []).filter(i => i.category === 'synth');
+    const curItem = synthItemId ? (Config.itemOf ? Config.itemOf(synthItemId) : null) : null;
+    const itemOk = !synthItemId || !curItem || (Materials.getQuantity ? Materials.getQuantity(curItem.name) : 0) >= 1;
+    const itemSelectHtml = `<div class="es-preview-row">合成道具：<select id="synth-item-select" style="margin-left:6px;">
+      <option value="" ${!synthItemId ? 'selected' : ''}>不使用道具（无加成）</option>
+      ${synthItems.map(i => {
+        const have = Materials.getQuantity ? Materials.getQuantity(i.name) : 0;
+        return `<option value="${i.id}" ${i.id === synthItemId ? 'selected' : ''} ${have < 1 ? 'disabled' : ''}>${i.icon} ${i.name}（${i.effect}）×${have}</option>`;
+      }).join('')}
+    </select></div>`;
+    // 神级宠判定（第二版手册 2.2：道具化）：门槛 + 概率由选中道具 godChance 决定
+    const gi = Merge.godSynthInfo ? Merge.godSynthInfo(main, sub, synthItemId) : null;
     const stg = p => (window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1));
     const godRow = (gi && gi.god)
-      ? `<div class="es-preview-row">⚡ <b>神级宠【${gi.god.name}】</b>：<b style="color:#f2b632">${Math.round(gi.chance * 100)}%</b> 概率出生（成长系数 +50%、可涅槃）${gi.hasPill ? ' · <b>持涅槃丹必出（消耗 1 颗）</b>' : ''}</div>`
+      ? `<div class="es-preview-row">⚡ <b>神级宠【${gi.god.name}】</b>：<b style="color:#f2b632">${Math.round(gi.chance * 100)}%</b> 概率出生（成长系数 +50%、可涅槃）</div>`
       : `<div class="es-preview-row hint">神级宠门槛：两只都需<b>终阶</b>（5 阶）+ 成长 ≥ ${gi ? gi.minGrowth : 60}（当前：主宠 ${stg(main)}/5 阶·成长 ${main.growth.toFixed(1)}｜副宠 ${stg(sub)}/5 阶·成长 ${sub.growth.toFixed(1)}）</div>`;
     pb.innerHTML = `
       <div class="es-preview-row">合成结果：一只全新的 <b>${iconHtml(gi && gi.god && gi.ready ? gi.god.name : main.name)} ${gi && gi.god && gi.ready ? gi.god.name : main.name}${mutPct ? '（·异变）': ''}</b>，等级回 1</div>
       <div class="es-preview-row">普通成长：<b>${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</b></div>
+      ${itemSelectHtml}
       ${godRow}
       ${mutPct ? `<div class="es-preview-row"> 有 <b>${mutPct}%</b> 概率变异：成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」</div>` : ''}
       <div class="es-preview-row">两只素材（${main.name}、${sub.name}）都将消失，消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）</div>
       ${traitInheritLine(main, sub, 'synth')}
       ${!matOk ? `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 颗${matName}，当前持有 ${haveMat}</div>` : ''}`;
-    cb.innerHTML = `<button class="btn-mini primary" id="synth-ok"${matOk ? '': 'disabled'}>确认合成</button>`;
+    cb.innerHTML = `<button class="btn-mini primary" id="synth-ok"${matOk && itemOk ? '': 'disabled'}>确认合成</button>`;
+    const itemSel = document.getElementById('synth-item-select');
+    if (itemSel) {
+      itemSel.onchange = () => { synthItemId = itemSel.value; renderSynthPreview(main, matName, matAmt, haveMat, mutPct); };
+    }
     cb.querySelector('#synth-ok').onclick = async () => {
-      if (!matOk) { showToast('无法合成', '材料不足'); return; }
-      const res = await Merge.synthesize(main.id, sub.id);
+      if (!matOk || !itemOk) { showToast('无法合成', synthItemId ? '材料或道具不足' : '材料不足'); return; }
+      const res = await Merge.synthesize(main.id, sub.id, synthItemId);
       if (res.error) { showToast('合成失败', res.error); return; }
       if (res.isGod) {
         // 神级宠降世（手册 2.6）：金色特殊提示
-        addLog(`⚡ 神级宠降世！${res.mainName}+${res.subName} 合成出【${res.baby.name}】，成长 ${res.newGrowth.toFixed(1)}！${res.usePill ? '（涅槃丹必出）' : ''}`);
-        showToast('⚡ 神级宠降世！', `${iconHtml(res.baby.name)} <b style="color:#f2b632">【${res.baby.name}】</b>（神级宠 · 成长系数+50% · 可涅槃）<br><small>成长值 ${res.newGrowth.toFixed(1)}${res.usePill ? ' · 消耗涅槃丹 ×1' : ''}</small>`);
+        addLog(`⚡ 神级宠降世！${res.mainName}+${res.subName} 合成出【${res.baby.name}】，成长 ${res.newGrowth.toFixed(1)}！`);
+        showToast('⚡ 神级宠降世！', `${iconHtml(res.baby.name)} <b style="color:#f2b632">【${res.baby.name}】</b>（神级宠 · 成长系数+50% · 可涅槃）<br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);
       } else if (res.mutated) {
         addLog(`合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
         showToast('合成变异成功！', `${iconHtml(res.baby.name)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);

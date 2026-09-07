@@ -174,7 +174,11 @@
         totalEquipDrops++;
         if (window.Quest && window.Quest.reportType) window.Quest.reportType('equipDrop', 1);
         const { error } = await Items.saveItem(eq);
-        return { type: 'boss', eq, material: mat, saveError: error || null };
+        // 稀有合成道具（2026-09-07）：百变魔石 10% / 至尊神石 5%，独立于金装必掉
+        const bossItems = [];
+        if (Math.random() < 0.10) { await Materials.gain('百变魔石', 1); bossItems.push({ name: '百变魔石', qty: 1 }); }
+        if (Math.random() < 0.05) { await Materials.gain('至尊神石', 1); bossItems.push({ name: '至尊神石', qty: 1 }); }
+        return { type: 'boss', eq, material: mat, bossItems, saveError: error || null };
       }
       return { type: 'boss', eq, material: mat, dry: true };
     }

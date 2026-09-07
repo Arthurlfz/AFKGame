@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-06T08:59:07.628Z
+// 生成时间：2026-09-07T09:35:39.757Z
 const serverConfig = {
   "pet": {
     "starters": [

@@ -51,10 +51,12 @@ async function mkPet(name, growth, tag, stage, level) {
     '神级宠 statCoeff = 对应普通宠 ×1.5（手册 2.6）');
   A(C('(Config.pet.godPets.list||[]).every(g=>!!g.sprite)'), '每只神级宠都有 sprite（复用终形态立绘，不回退 emoji）');
   A(C('Config.pet.godPets.minGrowth') === 60, '神级宠成长门槛 = 60（手册原值，落地方案 R1）');
-  A(C('Config.synthesize.god.chance') === 0.3, '神级宠合成概率 = 30%');
+  A(C(`(()=>{const s=Config.itemsOf('synth');const g=id=>{const i=s.find(x=>x.id===id);return i?i.godChance:null};return g('synth_stone')===0.3&&g('synth_shift')===0.6&&g('synth_supreme')===1})()`),
+    '神级宠概率由合成道具决定：合成之石 30% / 百变魔石 60% / 至尊神石 100%');
   A(C('Config.nirvana.requireGodPet') === true, '涅槃要求神级宠（requireGodPet = true）');
-  A(C('Config.nirvana.material.amount') === 5, '涅槃消耗涅磐兽 ×5（手册 2.7：5~10）');
-  A(C('Config.nirvana.absorbRatio') === 0.5, '涅槃吸收比例 = 50%');
+  A(C('Config.nirvana.defaultItem') === 'nir_pill' && C("Config.itemOf('nir_pill').category") === 'nirvana',
+    '涅槃消耗已道具化（默认道具 = 涅槃丹，不再消耗涅磐兽）');
+  A(C("Config.itemOf('nir_pill').boostMult") === 1.2, '涅槃丹加乘 = 吸收 ×1.2');
   A(C('Config.nirvana.growthCap===undefined && Config.nirvana.capRatio===undefined && Config.nirvana.subGrowthRatio===undefined'),
     '涅槃衰减机制已移除（无 growthCap / capRatio / subGrowthRatio）');
 
@@ -78,10 +80,13 @@ async function mkPet(name, growth, tag, stage, level) {
   A(info3.ready === false && info3.chance === 0, '副宠非终阶（4 阶）：不满足神级宠条件');
   C(`Pet.getPets().find(p=>p.id===${b}).evolveStage=5`);
 
-  // 持涅槃丹 → 100%
-  await C('Materials.gain("涅槃丹",1)'); await S(80);
-  const info4 = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}))`);
-  A(info4.hasPill === true && info4.chance === 1, '持有涅槃丹 → 100% 出神级宠');
+  /* 100% 出神：第二版手册 2.2 起由【至尊神石】承担（涅槃丹已改为涅槃消耗品） */
+  const info4 = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}),'synth_supreme')`);
+  A(info4.chance === 1, '至尊神石 → 100% 出神级宠');
+  const info5 = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}),'synth_stone')`);
+  A(info5.chance === 0.3, '合成之石 → 30% 出神级宠');
+  const info6 = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}))`);
+  A(info6.chance === 0.3, '未选合成道具时按默认 30%（兜底）');
 
   /* ============ 3. 合成出神级宠（概率命中） ============ */
   await C('Materials.gain("合成之石",5)'); await S(80);
@@ -96,10 +101,16 @@ async function mkPet(name, growth, tag, stage, level) {
   A(syn.baby && syn.baby.evolveStage === 5, '神级宠生而为终阶（evolveStage = 5）');
   A(syn.baby && syn.baby.lineId === '血月神狐', '神级宠 lineId 指向自己（成长系数走 godPets 表）');
   A(C('Pet.isGodPet(Pet.getPets().find(p=>p.id===' + godId + '))') === true, 'Pet.isGodPet 识别神级宠');
-  // 成长系数：神级宠 = 普通宠 ×1.5
+  /* 成长系数：神级宠 = 普通宠 ×1.5，出生成长超过 birthGrowthCap 的部分再按
+   * excessStatCoeffRatio 折算成系数加成（封顶 excessStatCoeffMax）。 */
   const gc = C(`Pet.getStatCoeff(Pet.getPets().find(p=>p.id===${godId}))`);
   const sc = C('Config.pet.starters.find(s=>s.name==="血狐").statCoeff');
-  A(Math.abs(gc.atk - sc.atk * 1.5) < 0.02, `神级宠成长系数生效（atk ${gc.atk} = ${sc.atk}×1.5）`);
+  const godDef = C('Config.pet.godPets.byName("血月神狐")');
+  const G = C('Config.pet.godPets');
+  A(Math.abs(godDef.statCoeff.atk - sc.atk * 1.5) < 0.02, `神级宠定义系数 = 普通宠 ×1.5（${godDef.statCoeff.atk} = ${sc.atk}×1.5）`);
+  A(syn.baby.growth === G.birthGrowthCap, `神级宠出生成长压到上限 ${G.birthGrowthCap}（超出部分折算成系数）`);
+  A(gc.atk >= godDef.statCoeff.atk && gc.atk <= godDef.statCoeff.atk * (1 + G.excessStatCoeffMax) + 0.02,
+    `神级宠成长系数含超额折算（atk ${gc.atk}，在 ${godDef.statCoeff.atk} ~ ${(godDef.statCoeff.atk * (1 + G.excessStatCoeffMax)).toFixed(2)} 之间）`);
   A(C('Pet.getBaseSpeed(Pet.getPets().find(p=>p.id===' + godId + '))') === C('Config.pet.speeds["血狐"]'),
     '神级宠速度沿用该线基宠速度');
   A(C('Pet.resolveLineId?1:1') && C('Pet.getBloodline(Pet.getPets().find(p=>p.id===' + godId + '))') !== null,
@@ -122,24 +133,24 @@ async function mkPet(name, growth, tag, stage, level) {
   // 神级宠标记（mkPet 建的是普通宠，这里手动置为神级宠）
   C(`(()=>{const p=Pet.getPets().find(p=>p.id===${nv1});p.name="毒渊神蟾";p.lineId="毒渊神蟾";p.isGodPet=true})()`);
   A(C('Pet.isGodPet(Pet.getPets().find(p=>p.id===' + nv1 + '))') === true, '主宠已置为神级宠');
-  await C('Materials.gain("涅磐兽",10)'); await S(80);
-  const before = C('Materials.getQuantity("涅磐兽")');
-  const nv = await C(`Merge.nirvana(${nv1},${nv2})`);
+  await C('Materials.gain("涅槃丹",3)'); await S(80);
+  const before = C('Materials.getQuantity("涅槃丹")');
+  const nv = await C(`Merge.nirvana(${nv1},${nv2},false,true)`);   // 用涅槃丹
   A(nv.ok === true, '神级宠涅槃成功');
-  A(nv.newGrowth === 80, `吸收 50% 且不衰减（70 + 20×0.5 = ${nv.newGrowth}，旧逻辑会因 70>60 减半）`);
+  A(nv.newGrowth === 82, `吸收 50% 且不衰减、用丹再 ×1.2（70 + 20×0.5×1.2 = ${nv.newGrowth}，旧逻辑会因 70>60 减半）`);
   A(C('Pet.getPets().find(p=>p.id===' + nv1 + ').level') === 1, '涅槃后等级重置回 Lv.1');
   A(C('Pet.getPets().find(p=>p.id===' + nv1 + ').evolveStage') === 5, '神级宠涅槃后仍保持终阶（不会变成无法进化的死宠）');
-  A(before - C('Materials.getQuantity("涅磐兽")') === 5, '涅磐兽消耗 5 只（1 → 5）');
+  A(before - C('Materials.getQuantity("涅槃丹")') === 1, '涅槃消耗涅槃丹 ×1');
   A(C('Pet.getPets().find(p=>p.id===' + nv1 + ').rebornCount') === 1, '转生次数 +1');
 
   /* ============ 6. 普通宠涅槃被拒 ============ */
   await mkPet('瘟熊', 60, 'nv3', 5, 60);
   await mkPet('疫毛兽', 60, 'nv4', 5, 60);
   const nv3 = C('globalThis.__nv3'), nv4 = C('globalThis.__nv4');
-  const before2 = C('Materials.getQuantity("涅磐兽")');
-  const nvRej = await C(`Merge.nirvana(${nv3},${nv4})`);
+  const before2 = C('Materials.getQuantity("涅槃丹")');
+  const nvRej = await C(`Merge.nirvana(${nv3},${nv4},false,true)`);
   A(nvRej.ok !== true && /神级宠/.test(nvRej.error), '普通宠（终阶也不行）涅槃被拒并给出提示');
-  A(C('Materials.getQuantity("涅磐兽")') === before2, '被拒时不扣涅磐兽');
+  A(C('Materials.getQuantity("涅槃丹")') === before2, '被拒时不扣涅槃丹');
 
   console.log(failures ? 'GOD PET TESTS FAILED: ' + failures : 'ALL GOD PET TESTS PASSED');
   process.exit(failures ? 1 : 0);

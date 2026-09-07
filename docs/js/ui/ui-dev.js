@@ -277,17 +277,44 @@
   }
 
   /* ============ Tab 2：资源发放 ============ */
+  /* 材料/道具清单：全部从 Config 汇总并分组，新增道具或新材料自动出现在下拉里，不用改这里。
+   * 排除：'区域材料'（掉落表占位键，不是真材料）、'宠物蛋'（有专门的发蛋入口，走 pet_egg 表）。 */
+  const MATERIAL_SKIP = { '区域材料': 1, '宠物蛋': 1 };
+  function collectMaterialGroups() {
+    const groups = [], seen = {};
+    const push = (label, rawNames) => {
+      const list = [];
+      (rawNames || []).forEach(n => {
+        if (!n || seen[n] || MATERIAL_SKIP[n] || list.indexOf(n) >= 0) return;
+        seen[n] = 1; list.push(n);
+      });
+      if (list.length) groups.push({ label: label, names: list });
+    };
+    const C = Config.craft || {}, D = Config.drop || {};
+    // 三系道具（Config.items 是唯一定义处）
+    const byCat = cat => (Config.itemsOf ? Config.itemsOf(cat) : []).map(i => i.name);
+    push('合成道具', byCat('synth'));
+    push('进化道具', byCat('evolve'));
+    push('涅槃道具', byCat('nirvana'));
+    push('打造石', Object.keys(C).map(k => C[k] && C[k].name));
+    push('进化素材', Object.keys(D.evoMaterialWeights || {}));
+    push('区域材料', Object.keys(D.areaMaterials || {}).map(k => D.areaMaterials[k] && D.areaMaterials[k].name));
+    // 其余：可作价材料 + 掉落表里出现的任何新材料 + 涅磐兽 / 合成之石 / 凝魂晶石
+    const rest = [];
+    const addRest = n => {
+      if (!n || seen[n] || MATERIAL_SKIP[n] || rest.indexOf(n) >= 0) return;
+      rest.push(n);
+    };
+    ((Config.trade && Config.trade.materials) || []).forEach(m => addRest(m.name));
+    Object.keys(D.materialWeightsByTier || {}).forEach(t => Object.keys(D.materialWeightsByTier[t] || {}).forEach(addRest));
+    addRest(D.phoenixName);
+    addRest(D.synthesizeName);
+    if (Config.pet && Config.pet.expPool) addRest(Config.pet.expPool.material);
+    push('其他材料', rest);
+    return groups;
+  }
   function collectMaterialNames() {
-    const names = [], seen = {};
-    const add = n => { if (n && !seen[n]) { seen[n] = 1; names.push(n); } };
-    const craft = Config.craft || {};
-    Object.keys(craft).forEach(k => { if (craft[k] && craft[k].name) add(craft[k].name); });
-    const evo = Config.drop && Config.drop.evoMaterialWeights; if (evo) Object.keys(evo).forEach(add);
-    if (Config.drop && Config.drop.phoenixName) add(Config.drop.phoenixName);
-    if (Config.drop && Config.drop.synthesizeName) add(Config.drop.synthesizeName);
-    const am = Config.drop && Config.drop.areaMaterials; if (am) Object.keys(am).forEach(k => { if (am[k] && am[k].name) add(am[k].name); });
-    if (Config.pet && Config.pet.expPool && Config.pet.expPool.material) add(Config.pet.expPool.material);
-    return names;
+    return collectMaterialGroups().reduce((all, g) => all.concat(g.names), []);
   }
   function collectEggSpecies() {
     const sp = (Config.pet && Config.pet.starters) || [];
@@ -300,7 +327,10 @@
       ' · 成长 ' + (typeof p.growth === 'number' ? p.growth.toFixed(1) : '?') + '</div>';
   }
   function renderResourcePanel() {
-    const matOpts = collectMaterialNames().map(n => '<option value="' + n + '">' + n + '</option>').join('');
+    const matOpts = collectMaterialGroups().map(g =>
+      '<optgroup label="' + g.label + '">' +
+      g.names.map(n => '<option value="' + n + '">' + n + '</option>').join('') +
+      '</optgroup>').join('');
     const rarOpts = (Config.equipment.rarities || []).map(r => '<option value="' + r.id + '">' + (r.label || r.id) + '</option>').join('');
     const eggOpts = collectEggSpecies().map(n => '<option value="' + n + '">' + n + '</option>').join('');
     let html = '';
@@ -312,7 +342,7 @@
           '<input class="dev-input" id="res-mat-amt" type="number" min="1" value="10" style="width:90px">' +
           '<button class="btn-mini primary" id="res-mat-go">发放</button>' +
         '</div>' +
-        '<div class="dev-note">走 Materials.gain，已登录自动同步云端</div>' +
+        '<div class="dev-note">走 Materials.gain，已登录自动同步云端；清单按 Config 自动分组（合成 / 进化 / 涅槃道具、打造石、进化素材、区域材料、其他）</div>' +
       '</div>');
     // 发魔石
     html += groupHtml('发魔石',
