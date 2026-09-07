@@ -14,6 +14,78 @@
 </head>
 <body>
 <div class="page-title">宠物面板 v2 · 接入验证（真实 game.css + 真实 ui-pet-*.js + mock 数据）</div>
+<div class="pane-name">⓪ 资料 · 出战宠物（列表在左·拉宽440px）</div>
+<div class="pet-tab-pane" data-pet-pane="profile">
+          <div class="pet-wrap">
+<div class="pcol">
+              <div class="panel">
+                <div class="panel-title">宠物列表<span class="hint">点击切换出战 · 悬停看属性</span></div>
+                                <div class="pet-list" id="pet-list">
+                  <div class="pet-card active"><div class="pet-card-badge">出战</div><div class="icon">🐉</div><div class="pname">赤霄神龙</div><div class="meta">Lv.60 · 成长66.0 · 终阶 · 神级</div><div class="meta">装备2/3</div></div>
+                  <div class="pet-card pet-card--god"><div class="pet-card-god-badge">神</div><div class="icon">🦊</div><div class="pname">幽火狐</div><div class="meta">Lv.60 · 成长62.0 · 终阶</div><div class="meta">装备0/3</div></div>
+                  <div class="pet-card"><div class="icon">🐺</div><div class="pname">冥霜狼</div><div class="meta">Lv.60 · 成长63.5 · 终阶</div><div class="meta">装备0/3</div></div>
+                  <div class="pet-card"><div class="icon">🦊</div><div class="pname">血牙狐</div><div class="meta">Lv.40 · 成长55.3 · 三阶</div><div class="meta">装备1/3</div></div>
+                  <div class="pet-card"><div class="pet-eq-tag">👔 有装备</div><div class="icon">🦊</div><div class="pname">血狐</div><div class="meta">Lv.24 · 成长42.5 · 二阶</div><div class="meta">装备3/3</div></div>
+                </div>
+              </div>
+            </div><div class="pcol">
+              <div class="panel pet-hero-panel">
+                <div class="pet-active-corner">当前出战</div>
+                <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
+                <!-- 立绘主视觉：居中大立绘 + 金色光晕 + 名字/等级/转生徽章 -->
+                <div class="pet-hero">
+                  <div class="pet-hero-art">
+                    <div class="pet-avatar" id="pet-avatar">❔</div>
+                  </div>
+                  <div class="pet-hero-title">
+                    <div class="pet-name-row">
+                      <span class="pet-name" id="pet-name">我的宠物</span>
+                      <span class="pet-level-badge" id="pet-level">Lv.1</span>
+                      <span class="pet-reborn-badge" id="pet-reborn">转生 0 次</span>
+                    </div>
+                    <div class="exp-block">
+                      <div class="exp-bar-wrap"><div class="exp-bar" id="exp-bar" style="width:0%"></div></div>
+                      <div class="exp-text" id="exp-text">0/15</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 徽章行：血统 / 特质 / 觉醒 胶囊行 + 技能条 + 经验池 -->
+                <div class="pet-badges">
+                  <div class="pet-badge-row">
+                    <div class="pet-bloodline" id="pet-bloodline"></div>
+                    <div class="pet-traits" id="pet-traits"></div>
+                    <div class="pet-awaken" id="pet-awaken" style="display:none"></div>
+                  </div>
+                  <div class="pet-active-skill-info" id="pet-active-skill-info">主动技能：终形态 Lv.60 解锁</div>
+                  <div class="pet-exp-pool" id="pet-exp-pool" style="display:none"></div>
+                </div>
+                <!-- 属性矩阵：主属性大卡（成长/生命/攻击/防御/速度） + 次级属性小卡 -->
+                <div class="pet-stats">
+                  <div class="pet-stats-main">
+                    <div class="pstat pstat-growth"><span class="pstat-label">成长</span><span class="pstat-value" id="pet-growth">5.0</span></div>
+                    <div class="pstat pstat-hp"><span class="pstat-label">生命</span><span class="pstat-value" id="pet-hp">100</span></div>
+                    <div class="pstat pstat-atk"><span class="pstat-label">攻击</span><span class="pstat-value" id="pet-atk">20</span></div>
+                    <div class="pstat pstat-def"><span class="pstat-label">防御</span><span class="pstat-value" id="pet-def">10</span></div>
+                    <div class="pstat pstat-spd"><span class="pstat-label">速度</span><span class="pstat-value" id="pet-spd">8</span></div>
+                  </div>
+                  <div class="pet-stats-sub">
+                    <div class="pstat pstat-crit"><span class="pstat-label">暴击</span><span class="pstat-value" id="pet-crit">10%</span></div>
+                    <div class="pstat pstat-critdmg"><span class="pstat-label">暴击伤害</span><span class="pstat-value" id="pet-critdmg">150%</span></div>
+                    <div class="pstat pstat-hit"><span class="pstat-label">命中</span><span class="pstat-value" id="pet-hit">90%</span></div>
+                    <div class="pstat pstat-dodge"><span class="pstat-label">闪避</span><span class="pstat-value" id="pet-dodge">5%</span></div>
+                    <div class="pstat pstat-ls"><span class="pstat-label">吸血</span><span class="pstat-value" id="pet-ls">0%</span></div>
+                    <div class="pstat pstat-bonus bonus-tip">
+                      <span class="pstat-label">装备加成</span><span class="pstat-value" id="pet-bonus">无</span>
+                      <div class="bonus-pop" id="pet-bonus-pop"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+
 <div class="pane-name">① 合成 · 融魂</div>
 data-pet-pane="synth">
           <div class="pet-wrap pet-wrap--altar">

@@ -3160,7 +3160,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .lv-tag.no { color: var(--danger-hi); border: 1px solid rgb(var(--hp-hi-rgb) / .4); background: rgb(var(--hp-hi-rgb) / .12); }
 
 /* ---------- 资料页（出战宠物详情）覆盖 ---------- */
-.pet-tab-pane[data-pet-pane="profile"] .pet-wrap { grid-template-columns: 1fr 340px; gap: var(--gap-lg); }
+.pet-tab-pane[data-pet-pane="profile"] .pet-wrap { grid-template-columns: 440px 1fr; gap: var(--gap-lg); }
 .pet-tab-pane[data-pet-pane="profile"] .pcol .panel {
   background: linear-gradient(180deg, var(--panel), var(--ink));
   background-image: var(--ui-paper-texture);
