@@ -3347,3 +3347,22 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   border-color: rgb(var(--action-gold-rgb) / .35);
 }
 .pet-tab-pane[data-pet-pane="profile"] .pet-more-stats .pet-stats-sub { margin-top: 8px; }
+
+/* 进化页 · 头像放大 + 框内垂直居中 */
+.pet-wrap--altar .evolve-stage .es-main,
+.pet-wrap--altar .evolve-stage .es-target {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  min-height: 430px;
+}
+.pet-wrap--altar .evo-card {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px;
+}
+.pet-wrap--altar .evo-card .avatar {
+  width: 180px !important; height: 180px !important;
+  margin: 0 auto !important;
+  font-size: 4.6rem !important;
+}
+.pet-wrap--altar .evo-card .pname { font-size: var(--fs-lg); }
+.pet-wrap--altar .evo-card .pmeta { padding-bottom: 4px; }

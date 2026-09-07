@@ -83,12 +83,10 @@
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
-    const cur = getStats(main);
     mb.innerHTML = `<div class="evo-card">
       <div class="avatar">${iconHtml(main.name, main.icon)}</div>
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
       <div class="pmeta">Lv.${main.level} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div>
-      <div class="evostats">${evoStatRows(cur)}</div>
     </div>`;
 
     if (maxed) {
@@ -179,7 +177,6 @@
       <div class="avatar">${routeIcon(route.to)}</div>
       <div class="pname">${route.to}</div>
       <div class="pmeta">${stageLabel || '进化后'} · Lv.${pet.level}（不变）· 成长 ${nextGrowth.toFixed(1)}${route.minLevel ? ' · 需 Lv.' + route.minLevel : ''}</div>
-      <div class="evostats">${evoStatRows(next)}</div>
     </div>`;
     // 方向卡（选中态）+ 对照表 + 消耗 + 警告
     pb.innerHTML = `
