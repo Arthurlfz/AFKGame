@@ -16,6 +16,10 @@
   let evolveMainId = null;
   let evolvePreview = null;
 
+  function evoStatRows(s) {
+    return `<div><span>生命</span><b>${s.hp}</b></div><div><span>攻击</span><b>${s.atk}</b></div><div><span>防御</span><b>${s.def}</b></div><div><span>速度</span><b>${s.spd}</b></div>`;
+  }
+
   function renderEvolveTab() {
     const list = $('evolve-pet-list');
     if (!list) return;
@@ -54,7 +58,7 @@
     renderEvolveStage(main);
   }
 
-  // 右侧：主宠卡 + 进化方向列表 + 预览 + 确认（口袋精灵2 三段式）
+  // 进化 v2 面板化：当前形态 ｜ → ｜ 目标形态 + 属性对照表 + 方向卡 + 消耗 + 确认
   function renderEvolveStage(main) {
     const mb = $('evolve-main-box');
     const tb = $('evolve-target-box');
@@ -62,11 +66,14 @@
     const cb = $('evolve-confirm');
     if (!mb || !tb || !pb || !cb) return;
     const E = Config.pet.evolution || {};
+    const arrow = $('evolve-arrow');
     if (!main) {
       mb.innerHTML = '<div class="hint">← 先在左侧选一只主宠</div>';
       tb.innerHTML = ''; pb.innerHTML = ''; cb.innerHTML = '';
+      if (arrow) arrow.innerHTML = '';
       return;
     }
+    if (arrow) arrow.innerHTML = '<div class="evo-arrow">→</div>';
     const routes = Evolve.getEvolutionRoutes(main);
     const maxTimes = E.maxEvolveTimes || 10;
     const times = main.evolveTimes || 0;
@@ -75,11 +82,13 @@
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
-    mb.innerHTML = `<div class="es-pet${mainIsGod ? ' es-pet--god': ''}">
-      <span class="es-icon">${iconHtml(main.name)}</span>
-      <div><b>${main.name}</b></div>
-      <span class="lv-badge">Lv.${main.level}${mainIsGod ? ' · 神级' : ''}</span>
-      <div class="hint">成长 ${main.growth.toFixed(1)} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div></div>`;
+    const cur = getStats(main);
+    mb.innerHTML = `<div class="evo-card">
+      <div class="avatar">${iconHtml(main.name)}</div>
+      <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
+      <div class="pmeta">Lv.${main.level} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div>
+      <div class="evostats">${evoStatRows(cur)}</div>
+    </div>`;
 
     if (maxed) {
       tb.innerHTML = `<div class="warn"> 进化已达上限(${maxTimes}次)，需通过<b>涅槃</b>重置进化次数后才能继续</div>`;
@@ -95,28 +104,25 @@
       pb.innerHTML = ''; cb.innerHTML = ''; evolvePreview = null;
       return;
     }
-    tb.innerHTML = '<div class="es-tip">选择进化方向（等级不变、成长+、换形态）：</div><div class="es-route-grid">'+
-      routes.map((r, i) => {
-        const okLevel = main.level >= (r.minLevel || 1);
-        return `<button class="es-route ${okLevel ? '': 'lv-low'}" data-i="${i}">
-          ${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok': ''}">Lv.${r.minLevel}${okLevel ? ' ✓' : ''}</span>` : ''}
-          <div class="es-route-icon">${iconHtml(r.to)}</div>
-          <div class="es-route-name">${r.to}</div>
-          <small>${r.label ? '→ ' + r.label : ''}</small>
-        </button>`;
-      }).join('') + '</div>';
-    tb.querySelectorAll('.es-route').forEach(btn => {
-      btn.onclick = () => {
-        // 不再因等级 disabled —— 仍可点击预览，预览里会提示等级不够不能进化
-        renderEvolvePreview(main, Number(btn.dataset.i), matName, have);
-      };
-    });
     // 重建后按 state 恢复预览（否则玩家刚点的方向被 renderAll 冲掉）
     if (evolvePreview && evolvePreview.petId === main.id && routes[evolvePreview.routeIndex]) {
       renderEvolvePreview(main, evolvePreview.routeIndex, matName, have);
     } else {
       evolvePreview = null;
-      pb.innerHTML = '<div class="hint">← 选择一个进化方向查看预览</div>';
+      tb.innerHTML = `<div class="evo-card">
+        <div class="avatar" style="opacity:.28;filter:grayscale(.7)">?</div>
+        <div class="pname" style="color:var(--text-faint)">未选方向</div>
+        <div class="pmeta">在下方选择进化方向后，这里会显示目标形态</div>
+      </div>`;
+      pb.innerHTML = `<div class="alt-routes">${routes.map((r, i) => {
+        const okLevel = main.level >= (r.minLevel || 1);
+        return `<div class="alt-route" data-i="${i}">
+          <span class="ic">${iconHtml(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+        </div>`;
+      }).join('')}</div>`;
+      pb.querySelectorAll('.alt-route').forEach(btn => {
+        btn.onclick = () => { renderEvolvePreview(main, Number(btn.dataset.i), matName, have); };
+      });
       cb.innerHTML = '';
     }
   }
@@ -125,7 +131,8 @@
     const E = Config.pet.evolution || {};
     const pb = $('evolve-preview');
     const cb = $('evolve-confirm');
-    if (!pb || !cb) return;
+    const tb = $('evolve-target-box');
+    if (!pb || !cb || !tb) return;
     const routes = Evolve.getEvolutionRoutes(pet);
     const route = routes[i];
     if (!route) return;
@@ -144,8 +151,9 @@
     const nextGrowth = Math.round((pet.growth + boost) * 10) / 10;
     const next = getStats({ ...pet, growth: nextGrowth });
     const row = (label, a, b) => {
-      const cls = b > a ? 'delta-up': '';
-      return `<div class="delta-row ${cls}"><span>${label}</span><span>${a} → ${b} ${b > a ? '▲': ''}</span></div>`;
+      const cls = b > a ? 'up': b < a ? 'down': '';
+      const arrowTxt = b > a ? '▲' : b < a ? '▼' : '—';
+      return `<tr><td>${label}</td><td>${a}</td><td class="${cls}">${b} ${arrowTxt}</td></tr>`;
     };
     // 5 阶（2026-09-06）：素材档位/数量/终阶额外素材统一从 stages 读
     const rm = Evolve.getRouteMaterial ? Evolve.getRouteMaterial(pet, i) : null;
@@ -165,19 +173,39 @@
     if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 个 ${matName}，当前持有 ${rm.have}</div>`;
     if (ex && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
     if (selectedItem && !itemOk) warnRow += `<div class="es-preview-row warn"> ${selectedItem.name}不足：需要 1 个，当前持有 ${Materials.getQuantity(selectedItem.name)}</div>`;
+    // 目标形态卡
+    tb.innerHTML = `<div class="evo-card next">
+      <div class="avatar">${iconHtml(route.to)}</div>
+      <div class="pname">${route.to}</div>
+      <div class="pmeta">${stageLabel || '进化后'} · Lv.${pet.level}（不变）· 成长 ${nextGrowth.toFixed(1)}${route.minLevel ? ' · 需 Lv.' + route.minLevel : ''}</div>
+      <div class="evostats">${evoStatRows(next)}</div>
+    </div>`;
+    // 方向卡（选中态）+ 对照表 + 消耗 + 警告
     pb.innerHTML = `
-      <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>${stageLabel ? '（' + stageLabel + '）': ''}（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
-      <div class="es-preview-row">消耗：<b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>`: ''}（当前持有 ${rm ? rm.have + (ex ? ' / ' + ex.have: ''): have}）</div>
-      <label class="es-boost-select">强化道具 <select class="sell-input" id="evolve-boost-item">${boostOptions}</select></label>
-      <div class="hint">成长 <span class="grow-big" style="font-size:1rem">+${evolvePreview.boost.toFixed(2)}${selectedItem ? ' → +' + boost.toFixed(2) : ''}</span>；等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
-      ${warnRow}
-      <div class="es-stats">属性变化：</div>
-      ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;
+      <div class="alt-routes">${routes.map((r, j) => {
+        const okLevel = pet.level >= (r.minLevel || 1);
+        const on = j === i ? ' on': '';
+        return `<div class="alt-route${on}" data-i="${j}">
+          <span class="ic">${iconHtml(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+        </div>`;
+      }).join('')}</div>
+      <table class="cmp-table"><tr><th>属性</th><th>当前</th><th>进化后</th></tr>
+        ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}
+      </table>
+      <div class="req-row">
+        <span>消耗 <b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>` : ''}（持有 ${rm ? rm.have + (ex ? ' / ' + ex.have : '') : have}）</span>
+        <span>强化道具 <select id="evolve-boost-item">${boostOptions}</select></span>
+        <span>成长 <b>+${evolvePreview.boost.toFixed(2)}${selectedItem ? ' → +' + boost.toFixed(2) : ''}</b> · ${formText} · 进化 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</span>
+      </div>
+      ${warnRow}`;
+    pb.querySelectorAll('.alt-route').forEach(btn => {
+      btn.onclick = () => { renderEvolvePreview(pet, Number(btn.dataset.i), matName, have); };
+    });
     pb.querySelector('#evolve-boost-item').onchange = event => {
       evolvePreview.boostItemId = event.target.value || null;
       renderEvolvePreview(pet, i, matName, have);
     };
-    cb.innerHTML = `<button class="btn-mini primary" id="evolve-ok"${canEvolve ? '': 'disabled'}>确认进化</button>`;
+    cb.innerHTML = `<button class="confirm-btn" id="evolve-ok"${canEvolve ? '': 'disabled'}>确认进化</button>`;
     cb.querySelector('#evolve-ok').onclick = async () => {
       if (!canEvolve) {
         showToast('无法进化', !lvOk ? '等级不够': '材料不足');

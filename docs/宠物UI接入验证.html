@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>宠物UI接入验证</title>
+<link rel="stylesheet" href="css/design-tokens.css">
+<link rel="stylesheet" href="css/game.css">
+<style>
+  body { background: var(--bg); color: var(--text); margin: 0; padding: 24px; font-family: var(--font-body); }
+  .page-title { font-family: var(--font-title); color: var(--accent-hi); letter-spacing: 6px; margin: 8px 0 20px; font-size: 20px; }
+  .pet-tab-pane { display: block !important; margin-bottom: 48px; border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .3); padding-bottom: 24px; }
+  .pane-name { font-family: var(--font-title); color: var(--text-dim); letter-spacing: 4px; margin: 12px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="page-title">宠物面板 v2 · 接入验证（真实 game.css + 真实 ui-pet-*.js + mock 数据）</div>
+<div class="pane-name">① 合成 · 融魂</div>
+data-pet-pane="synth">
+          <div class="pet-wrap pet-wrap--altar">
+            <div class="pcol">
+              <div class="panel pet-vault">
+                <div class="panel-title">魂兽名录<span class="hint">点选主素材</span></div>
+                <div class="pet-list" id="synth-pet-list"></div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel pet-altar evolve-stage-panel">
+                <div class="altar-head">
+                  <span class="altar-title">合成 · 融魂</span>
+                  <span class="altar-sub">选主 → 选副 → 确认</span>
+                </div>
+                <div class="evolve-stage altar-stage">
+                  <div class="es-main" id="synth-main-box">未选择主素材</div>
+                  <div class="es-arrow" id="synth-arrow"></div>
+                  <div class="es-target" id="synth-sub-box">
+                    <div class="es-sub-list" id="synth-sub-list"></div>
+                  </div>
+                  <div class="forge-bar">
+                    <div class="es-preview" id="synth-preview"></div>
+                    <div class="es-confirm" id="synth-confirm"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+<div class="pet-tab-pane" 
+data-pet-pane="evolve">
+          <div class="pet-wrap pet-wrap--altar">
+            <!-- 左：主宠选择 -->
+            <div class="pcol">
+              <div class="panel pet-vault">
+                <div class="panel-title">魂兽名录<span class="hint">点选主宠</span></div>
+                <div class="pet-list" id="evolve-pet-list"></div>
+              </div>
+            </div>
+            <!-- 右：目标形态 + 预览 + 确认 -->
+            <div class="pcol">
+              <div class="panel pet-altar evolve-stage-panel">
+                <div class="altar-head">
+                  <span class="altar-title">进化 · 蜕变</span>
+                  <span class="altar-sub">选主宠 → 选方向 → 确认</span>
+                </div>
+                <div class="evolve-stage altar-stage">
+                  <div class="es-main" id="evolve-main-box">未选择主宠</div>
+                  <div class="es-arrow" id="evolve-arrow"></div>
+                  <div class="es-target" id="evolve-target-box">
+                    <div class="es-route-list" id="evolve-route-list"></div>
+                  </div>
+                  <div class="forge-bar">
+                    <div class="es-preview" id="evolve-preview"></div>
+                    <div class="es-confirm" id="evolve-confirm"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 装备 tab：12 槽装备界面在「背包窗口 · 装备」子页（顶栏背包 / B 键），这里给一个直达入口 -->
+        <div class="pet-tab-pane" 
+data-pet-pane="merge">
+          <div class="pet-wrap pet-wrap--altar">
+            <div class="pcol">
+              <div class="panel pet-vault">
+                <div class="panel-title">魂兽名录<span class="hint">点选主宠</span></div>
+                <div class="pet-list" id="merge-pet-list"></div>
+              </div>
+            </div>
+            <div class="pcol">
+              <div class="panel pet-altar evolve-stage-panel" data-theme="fire">
+                <div class="altar-head">
+                  <span class="altar-title">涅槃 · 业火</span>
+                  <span class="altar-sub">选主宠 → 选副宠 → 确认</span>
+                </div>
+                <div class="evolve-stage altar-stage">
+                  <div class="es-main" id="merge-main-box">未选择主宠</div>
+                  <div class="es-arrow" id="merge-arrow"></div>
+                  <div class="es-target" id="merge-sub-box">
+                    <div class="es-sub-list" id="merge-sub-list"></div>
+                  </div>
+                  <div class="forge-bar">
+                    <div class="es-preview" id="merge-preview"></div>
+                    <div class="es-confirm" id="merge-confirm"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+<div class="pet-tab-pane" 
+<script>
+  window.renderSynthTab = undefined; // 防污染
+</script>
+<script src="js/ui/_mock_bootstrap.js"></script>
+<script src="js/ui/ui-pet-synth.js"></script>
+<script src="js/ui/ui-pet-evolve.js"></script>
+<script src="js/ui/ui-pet-merge.js"></script>
+<script>
+  window.UI.renderAll();
+  // 合成页选中 幽火狐（第3张卡）
+  document.querySelector('#synth-pet-list .pet-card:nth-child(3)').click();
+  // 进化页选中 血狐（第1张卡）并点方向卡
+  document.querySelector('#evolve-pet-list .pet-card:nth-child(1)').click();
+  setTimeout(() => {
+    const rt = document.querySelector('#evolve-preview .alt-route');
+    if (rt) rt.click();
+  }, 50);
+  // 涅槃页选中 赤霄神龙（神级宠，第1张卡）
+  document.querySelector('#merge-pet-list .pet-card:nth-child(1)').click();
+  setTimeout(() => {
+    const ck = {
+      synthBar: !!document.querySelector('#synth-preview .preview-bar'),
+      synthGod: !!document.querySelector('#synth-main-box .pet-card2.main'),
+      evolveTarget: !!document.querySelector('#evolve-target-box .evo-card.next'),
+      evolveTable: !!document.querySelector('#evolve-preview .cmp-table'),
+      evolveRoutes: document.querySelectorAll('#evolve-preview .alt-route').length,
+      mergeGod: !!document.querySelector('#merge-main-box .pet-card2.god'),
+      mergeBar: !!document.querySelector('#merge-preview .preview-bar'),
+      mergeTable: !!document.querySelector('#merge-preview .cmp-table'),
+      mergeArrow: !!document.querySelector('#merge-arrow .cauldron.fire')
+    };
+    window.__VCHECK__ = JSON.stringify(ck);
+    console.log('VCHECK', window.__VCHECK__);
+  }, 300);
+</script>
+</body>
+</html>

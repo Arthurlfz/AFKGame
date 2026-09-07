@@ -15,6 +15,11 @@
 
   let mergeMainId = null, mergeSubId = null, useNirvanaPill = false;
 
+  function statRows(pet) {
+    const s = getStats(pet);
+    return `<div><span>生命</span><b>${s.hp}</b></div><div><span>攻击</span><b>${s.atk}</b></div><div><span>防御</span><b>${s.def}</b></div><div><span>速度</span><b>${s.spd}</b></div>`;
+  }
+
   function renderMergeTab() {
     const list = $('merge-pet-list');
     if (!list) return;
@@ -56,14 +61,14 @@
     renderMergeStage(mainPet);
   }
 
-  // 涅槃右侧三段式：主宠卡 + 副宠选择 + 预览 + 确认（口袋精灵2）
+  // 涅槃 v2 面板化：神级主宠 ｜ 业火炉 ｜ 副宠（将被吸收）+备选条 ｜ 结果预览条 + 确认
   function renderMergeStage(main) {
     const mb = $('merge-main-box'), sb = $('merge-sub-box'), pb = $('merge-preview'), cb = $('merge-confirm');
     if (!mb || !sb || !pb || !cb) return;
     const M = Config.nirvana || Config.merge || {};
+    const arrow = $('merge-arrow');
     if (!main) {
-      // 空态（无选中主宠）：显示玩法说明，避免「未选择主宠 / ＋ / 空目标」的占位感（2026-09-03）
-      // 涅槃消耗已道具化（手册 2.4）：不再消耗涅磐兽，只有可选的涅槃道具
+      // 空态（无选中主宠）：显示玩法说明
       const pill2 = Config.itemOf ? Config.itemOf(M.defaultItem || 'nir_pill') : null;
       const matName2 = pill2 ? pill2.name : '涅槃丹';
       const matAmt2 = 1;
@@ -72,27 +77,39 @@
       sb.innerHTML = '<div class="es-tip"><b>只有神级宠才能涅槃</b>（手册 2.7）。主宠吸收副宠 50% 的成长值（不衰减），等级重置回 <b>Lv.1</b>，继续叠成长。</div>';
       pb.innerHTML = '<div class="es-tip">条件：主宠必须是<b>神级宠</b>且 Lv.<b>' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；可选消耗 <b>' + matName2 + ' ×1</b>（吸收 ×1.2，当前持有 ' + haveMat2 + '）。<br>神级宠：两只<b>终阶</b>宠 + 成长 ≥ ' + ((Config.pet.godPets && Config.pet.godPets.minGrowth) || 60) + ' 在<b>合成</b>里搏出（30% 概率，持涅槃丹必出）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
       cb.innerHTML = '';
+      if (arrow) arrow.innerHTML = '';
       return;
     }
-    // 主宠不是神级宠：整体置灰并给出去向提示（手册阶段2-UI：普通宠涅槃按钮置灰）
+    // 主宠不是神级宠：整体置灰并给出去向提示
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
-    // 涅槃消耗道具化：默认道具（当前唯一 = 涅槃丹），不用也能涅槃，只是没有 ×1.2 加乘
     const pillDef = Config.itemOf ? Config.itemOf(M.defaultItem || 'nir_pill') : null;
     const matName = pillDef ? pillDef.name : '涅槃丹';
     const matAmt = 1;
     const haveMat = pillDef && Materials.getQuantity ? Materials.getQuantity(pillDef.name) : 0;
-    mb.innerHTML = `<div class="es-pet es-pet--god">
-      <span class="es-icon">${iconHtml(main.name)}</span>
-      <div><b>${main.name}</b></div>
-      <span class="lv-badge">Lv.${main.level} · 神级</span>
-      <div class="hint">成长 ${main.growth.toFixed(1)} · 可选消耗 ${matName} ×1（持有 ${haveMat}）</div></div>`;
-    // 主宠不是神级宠 → 不提供涅槃流程（手册 2.7：只有神级宠才能涅槃）
+    const gbar = Math.max(4, Math.min(100, Math.round((main.growth || 0))));
     if (!mainIsGod) {
       const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
+      mb.innerHTML = `<div class="pet-card2">
+        <div class="pname">${main.name}</div>
+        <div class="pmeta">Lv.${main.level} · 普通宠 · 不可涅槃</div>
+        <div class="avatar">${iconHtml(main.name)}</div>
+        <div class="growline"><b>${main.growth.toFixed(1)}</b><span class="gbar"><i style="width:${gbar}%"></i></span></div>
+        <div class="stats">${statRows(main)}</div>
+      </div>`;
+      if (arrow) arrow.innerHTML = '';
       sb.innerHTML = '<div class="warn">🚫 只有<b>神级宠</b>才能涅槃——' + main.name + ' 是普通宠。先把两只<b>终阶</b>宠（成长 ≥ ' + minG + '）拿去<b>合成</b>，30% 概率搏出神级宠（持涅槃丹必出）。</div>';
       pb.innerHTML = ''; cb.innerHTML = '';
       return;
     }
+    // 神级主宠
+    mb.innerHTML = `<div class="pet-card2 god">
+      <div class="pname">${main.name} · 神级</div>
+      <div class="pmeta">Lv.${main.level} · 可涅槃 · 可选消耗 ${matName} ×1（持有 ${haveMat}）</div>
+      <div class="avatar">${iconHtml(main.name)}</div>
+      <div class="growline"><b>${main.growth.toFixed(1)}</b><span class="gbar"><i style="width:${gbar}%"></i></span></div>
+      <div class="stats">${statRows(main)}</div>
+    </div>`;
+    if (arrow) arrow.innerHTML = '<div class="forge-core"><div class="cauldron fire">焰</div><div class="cauldron-tip">业火炉<br>副宠将被吸收</div></div>';
     // 副宠候选
     const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id) : [];
     if (!subs.length) {
@@ -100,30 +117,30 @@
       pb.innerHTML = ''; cb.innerHTML = '';
       return;
     }
-    sb.innerHTML = '<div class="es-tip">选择副宠（融合后消失，主宠吸收其成长）：</div><div class="es-sub-grid">'+
-      subs.map(s => {
-        const sel = s.id === mergeSubId ? ' selected': '';
-        return `<button class="es-route${sel}" data-sub="${s.id}">
-          <div class="es-route-icon">${iconHtml(s.name)}</div>
-          <div class="es-route-name">${s.name}</div>
-          <small>成长 ${s.growth.toFixed(1)}</small>
-        </button>`;
-      }).join('') + '</div>';
-    sb.querySelectorAll('.es-route').forEach(btn => {
+    let sub = mergeSubId ? getPets().find(p => p.id === mergeSubId) : null;
+    if (!sub) { mergeSubId = subs[0].id; sub = subs[0]; }
+    const s2 = getStats(sub);
+    const sgbar = Math.max(4, Math.min(100, Math.round((sub.growth || 0))));
+    const sstg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(sub) : 1;
+    sb.innerHTML = `<div class="pet-card2 sub-card">
+      <div class="pname">${sub.name}</div>
+      <div class="pmeta">副宠（将被吸收）· Lv.${sub.level} · ${sstg}/5阶</div>
+      <div class="avatar">${iconHtml(sub.name)}</div>
+      <div class="growline"><b>${sub.growth.toFixed(1)}</b><span class="gbar"><i style="width:${sgbar}%"></i></span></div>
+      <div class="stats">${statRows(sub)}</div>
+    </div>
+    <div class="sub-options">${subs.map(s => {
+      const sel = s.id === mergeSubId ? ' on': '';
+      return `<div class="sub-opt${sel}" data-sub="${s.id}"><span class="ic">${iconHtml(s.name)}</span><span>${s.name}<small>Lv.${s.level} · 成长 ${s.growth.toFixed(1)}</small></span></div>`;
+    }).join('')}</div>`;
+    sb.querySelectorAll('.sub-opt').forEach(btn => {
       btn.onclick = () => {
         mergeSubId = Number(btn.dataset.sub);
         renderMergePreview(main, matName, matAmt, haveMat);
         UI.renderAll();
       };
     });
-    // 已有选中副宠则显示预览
-    if (mergeSubId) {
-      const sub = getPets().find(p => p.id === mergeSubId);
-      if (sub) renderMergePreview(main, matName, matAmt, haveMat);
-    } else {
-      pb.innerHTML = '<div class="hint">← 选择一个副宠查看预览</div>';
-      cb.innerHTML = '';
-    }
+    renderMergePreview(main, matName, matAmt, haveMat);
   }
 
   function renderMergePreview(main, matName, matAmt, haveMat) {
@@ -136,31 +153,40 @@
     const newGrowth = calc ? calc.growth : Math.round((main.growth + sub.growth * M.absorbRatio) * 10) / 10;
     const cur = getStats(main);
     const next = M.resetLevel ? getStats({ ...main, level: 1, growth: newGrowth }) : getStats({ ...main, growth: newGrowth });
-    const row = (label, a, b) => {
-      const cls = b > a ? 'delta-up': b < a ? 'delta-down': '';
-      return `<div class="delta-row ${cls}"><span>${label}</span><span>${a} → ${b} ${b > a ? '▲': b < a ? '▼': ''}</span></div>`;
-    };
     // 涅槃丹加乘（第二版手册 2.4：吸收 ×1.2）
     const nirPill = Config.itemOf ? Config.itemOf('nir_pill') : null;
     const pillHave = nirPill ? (Materials.getQuantity ? Materials.getQuantity(nirPill.name) : 0) : 0;
     const pillOk = pillHave >= 1;
     const pillMult = useNirvanaPill && nirPill ? (nirPill.boostMult || 1.2) : 1;
-    // 重新计算带涅槃丹的成长预览
     const calcPill = window.Merge && window.Merge.calcNirvanaGrowth ? window.Merge.calcNirvanaGrowth(main, sub, pillMult) : null;
     const newGrowthPill = calcPill ? calcPill.growth : newGrowth;
-    const absorbTxt = calcPill && calcPill.absorb != null ? `（吸收副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} = +${calcPill.absorb}，不衰减）`: '';
-    pb.innerHTML = `
-      <div class="es-preview-row">成长值：<span class="grow-big">${main.growth.toFixed(1)} <span class="arrow">→</span> ${newGrowth.toFixed(1)}</span> ${absorbTxt}</div>
-      <div class="es-preview-row">等级：Lv.${main.level} → ${M.resetLevel ? '<b>Lv.1（重置）</b>': '不变'}</div>
-      <div class="es-preview-row">${iconHtml(sub.name)} ${sub.name}（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? `，消耗 ${matName} ×1（持有 ${haveMat}）` : ''}</div>
-      <div class="es-preview-row"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> 使用涅槃丹（吸收 ×${nirPill ? (nirPill.boostMult || 1.2) : 1.2}，持有 ${pillHave}）</label>${useNirvanaPill ? ` 成长：<b>${newGrowth.toFixed(1)} → ${newGrowthPill.toFixed(1)}</b>` : ''}</div>
-      ${traitInheritLine(main, sub, 'nirvana')}
-      ${M.resetLevel ? '<div class="warn"> 涅槃后等级重置回 1 级，经验清零，属性按 1 级 × 新成长重算</div>': ''}
-      ${useNirvanaPill && !pillOk ? `<div class="es-preview-row warn"> ${matName}不足：需要 1 个，当前持有 ${pillHave}</div>` : ''}
-      <div class="es-stats">属性变化：</div>
-      ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;
+    const finalGrowth = useNirvanaPill ? newGrowthPill : newGrowth;
+    const absorb = calcPill && calcPill.absorb != null ? calcPill.absorb : (Math.round(sub.growth * (M.absorbRatio || 0.5) * pillMult * 10) / 10);
+    const pillMultTxt = `（吸收副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} = +${absorb.toFixed(1)}，不衰减）`;
+    const row = (label, a, b) => {
+      const cls = b > a ? 'up': b < a ? 'down': '';
+      const arrowTxt = b > a ? '▲' : b < a ? '▼' : '—';
+      return `<tr><td>${label}</td><td>${a}</td><td class="${cls}">${b} ${arrowTxt}</td></tr>`;
+    };
     const canMerge = !useNirvanaPill || pillOk;
-    cb.innerHTML = `<button class="btn-mini primary" id="merge-ok"${canMerge ? '': 'disabled'}>确认涅槃</button>`;
+    const footWarns = [];
+    if (useNirvanaPill && !pillOk) footWarns.push(`<span class="warn">${matName}不足：需要 1 个，当前持有 ${pillHave}</span>`);
+    pb.innerHTML = `
+      <div class="preview-bar">
+        <div class="pv"><div class="k">吸收成长</div><div class="v">+${absorb.toFixed(1)}<small>副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} · 不衰减</small></div></div>
+        <div class="pv"><div class="k">涅槃后成长</div><div class="v">${finalGrowth.toFixed(1)}<small>主宠 ${main.growth.toFixed(1)} → ${finalGrowth.toFixed(1)}</small></div></div>
+        <div class="pv"><div class="k">等级</div><div class="v">Lv.${main.level} → ${M.resetLevel ? 'Lv.1' : '不变'}<small>${M.resetLevel ? '重置 · 经验清零' : ''}</small></div></div>
+        <div class="pv"><div class="k">涅槃丹</div><div class="v"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> ×${pillMult}（持有 ${pillHave}）</label></div></div>
+      </div>
+      <div class="preview-foot">
+        <b>${sub.name}</b>（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
+        ${traitInheritLine(main, sub, 'nirvana')}
+        ${footWarns.join('')}
+      </div>
+      <table class="cmp-table"><tr><th>属性</th><th>当前</th><th>涅槃后</th></tr>
+        ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}
+      </table>`;
+    cb.innerHTML = `<button class="confirm-btn fire" id="merge-ok"${canMerge ? '': 'disabled'}>确认涅槃</button>`;
     const pillCheck = document.getElementById('nir-pill-check');
     if (pillCheck) {
       pillCheck.onchange = () => { useNirvanaPill = pillCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
