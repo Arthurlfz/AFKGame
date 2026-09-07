@@ -35,10 +35,14 @@
       const card = document.createElement('div');
       const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
       card.className = 'pet-card'+ (pet.id === evolveMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
+      const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
+      const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
-        <div class="pname">${pet.name}</div>
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>
-        <div class="meta">${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(pet) : ''} · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>`;
+        <div class="card-info">
+          <div class="pname">${pet.name}</div>
+          <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶 · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>
+          <div class="growth-bar"><i style="width:${gbar}%"></i></div>
+        </div>`;
       card.onclick = () => {
         evolveMainId = pet.id;
         evolvePreview = null; // 换主宠 → 旧的方向预览作废
@@ -70,8 +74,11 @@
     const rm = (routes.length && Evolve.getRouteMaterial(main, 0)) || null;
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
-    mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
-      <div><b>${main.name}</b> Lv.${main.level}</div>
+    const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
+    mb.innerHTML = `<div class="es-pet${mainIsGod ? ' es-pet--god': ''}">
+      <span class="es-icon">${iconHtml(main.name)}</span>
+      <div><b>${main.name}</b></div>
+      <span class="lv-badge">Lv.${main.level}${mainIsGod ? ' · 神级' : ''}</span>
       <div class="hint">成长 ${main.growth.toFixed(1)} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div></div>`;
 
     if (maxed) {
@@ -92,9 +99,10 @@
       routes.map((r, i) => {
         const okLevel = main.level >= (r.minLevel || 1);
         return `<button class="es-route ${okLevel ? '': 'lv-low'}" data-i="${i}">
+          ${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok': ''}">Lv.${r.minLevel}${okLevel ? ' ✓' : ''}</span>` : ''}
           <div class="es-route-icon">${iconHtml(r.to)}</div>
           <div class="es-route-name">${r.to}</div>
-          <small>${r.label ? '→ ' + r.label : ''}${r.minLevel ? (okLevel ? ' · 需 Lv.'+ r.minLevel + '✓': ' · 需 Lv.'+ r.minLevel + '（等级不够）') : ''}</small>
+          <small>${r.label ? '→ ' + r.label : ''}</small>
         </button>`;
       }).join('') + '</div>';
     tb.querySelectorAll('.es-route').forEach(btn => {
@@ -161,7 +169,7 @@
       <div class="es-preview-row">路线：<b>${iconHtml(route.to, '', true)} ${route.to}</b>${stageLabel ? '（' + stageLabel + '）': ''}（${route.minLevel ? '需 Lv.'+ route.minLevel : '无等级要求'}）</div>
       <div class="es-preview-row">消耗：<b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>`: ''}（当前持有 ${rm ? rm.have + (ex ? ' / ' + ex.have: ''): have}）</div>
       <label class="es-boost-select">强化道具 <select class="sell-input" id="evolve-boost-item">${boostOptions}</select></label>
-      <div class="hint">基础成长 +${evolvePreview.boost.toFixed(2)}${selectedItem ? ` → 使用${selectedItem.name}后 +${boost.toFixed(2)}` : ''}；等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
+      <div class="hint">成长 <span class="grow-big" style="font-size:1rem">+${evolvePreview.boost.toFixed(2)}${selectedItem ? ' → +' + boost.toFixed(2) : ''}</span>；等级不变（Lv.${pet.level}）；${formText}；进化次数 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</div>
       ${warnRow}
       <div class="es-stats">属性变化：</div>
       ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}`;

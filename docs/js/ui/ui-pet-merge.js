@@ -38,9 +38,14 @@
       const card = document.createElement('div');
       const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
       card.className = 'pet-card'+ (pet.id === mergeMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
+      const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
+      const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
-        <div class="pname">${pet.name}</div>
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${isGod ? ' · 神级宠': ' · <span style="opacity:.7">需神级宠</span>'}</div>${UI.traitsHtml(pet)}`;
+        <div class="card-info">
+          <div class="pname">${pet.name}</div>
+          <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶${isGod ? ' · 神级' : ''}</div>
+          <div class="growth-bar"><i style="width:${gbar}%"></i></div>
+        </div>`;
       card.onclick = () => {
         mergeMainId = pet.id;
         mergeSubId = null; // 换主宠重置副宠
@@ -76,8 +81,10 @@
     const matName = pillDef ? pillDef.name : '涅槃丹';
     const matAmt = 1;
     const haveMat = pillDef && Materials.getQuantity ? Materials.getQuantity(pillDef.name) : 0;
-    mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
-      <div><b>${main.name}</b> Lv.${main.level}</div>
+    mb.innerHTML = `<div class="es-pet es-pet--god">
+      <span class="es-icon">${iconHtml(main.name)}</span>
+      <div><b>${main.name}</b></div>
+      <span class="lv-badge">Lv.${main.level} · 神级</span>
       <div class="hint">成长 ${main.growth.toFixed(1)} · 可选消耗 ${matName} ×1（持有 ${haveMat}）</div></div>`;
     // 主宠不是神级宠 → 不提供涅槃流程（手册 2.7：只有神级宠才能涅槃）
     if (!mainIsGod) {
@@ -143,7 +150,7 @@
     const newGrowthPill = calcPill ? calcPill.growth : newGrowth;
     const absorbTxt = calcPill && calcPill.absorb != null ? `（吸收副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} = +${calcPill.absorb}，不衰减）`: '';
     pb.innerHTML = `
-      <div class="es-preview-row">成长值：<b>${main.growth.toFixed(1)} → ${newGrowth.toFixed(1)}</b> ${absorbTxt}</div>
+      <div class="es-preview-row">成长值：<span class="grow-big">${main.growth.toFixed(1)} <span class="arrow">→</span> ${newGrowth.toFixed(1)}</span> ${absorbTxt}</div>
       <div class="es-preview-row">等级：Lv.${main.level} → ${M.resetLevel ? '<b>Lv.1（重置）</b>': '不变'}</div>
       <div class="es-preview-row">${iconHtml(sub.name)} ${sub.name}（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? `，消耗 ${matName} ×1（持有 ${haveMat}）` : ''}</div>
       <div class="es-preview-row"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> 使用涅槃丹（吸收 ×${nirPill ? (nirPill.boostMult || 1.2) : 1.2}，持有 ${pillHave}）</label>${useNirvanaPill ? ` 成长：<b>${newGrowth.toFixed(1)} → ${newGrowthPill.toFixed(1)}</b>` : ''}</div>

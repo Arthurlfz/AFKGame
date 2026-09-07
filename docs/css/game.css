@@ -2763,3 +2763,647 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .craft-lock-note { display: none !important; }
 .equip-workbench .craft-eq { padding: 2px 6px !important; }
 .equip-workbench .craft-affix-group { margin-top: 0 !important; }
+
+
+/* ============================================================
+   PET ALTAR REDESIGN —— 魂炉祭坛（进化 / 合成 / 涅槃 颠覆式重构）
+   作用域：.pet-wrap--altar 内；不影响其它页面
+   设计语言：暗黑祭坛 · 金紫符文 · 法阵仪式
+   ============================================================ */
+
+/* ---------- 布局：左兽栏 + 右祭坛 ---------- */
+.pet-wrap--altar {
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background:
+    radial-gradient(1000px 420px at 78% -10%, rgba(139, 92, 246, .10), transparent 60%),
+    radial-gradient(900px 380px at 8% 110%, rgba(242, 182, 50, .07), transparent 55%),
+    linear-gradient(180deg, rgba(13, 16, 24, .55), rgba(10, 12, 18, .75));
+  border: 1px solid rgba(242, 182, 50, .14);
+}
+
+/* ---------- 左翼：魂兽名录（兽栏） ---------- */
+.pet-wrap--altar .pet-vault {
+  background: rgba(14, 17, 26, .86);
+  border: 1px solid rgba(242, 182, 50, .22);
+  border-radius: 10px;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, .45);
+  padding: 12px;
+}
+.pet-wrap--altar .pet-vault .panel-title {
+  font-family: var(--font-title);
+  font-size: 1rem;
+  letter-spacing: 4px;
+  color: var(--accent-hi, #f2b632);
+  border-bottom: 1px solid rgba(242, 182, 50, .28);
+  text-shadow: 0 0 10px rgba(242, 182, 50, .3);
+}
+.pet-wrap--altar .pet-vault .panel-title .hint {
+  letter-spacing: 0;
+  color: rgba(200, 200, 210, .55);
+  font-size: .75rem;
+}
+.pet-wrap--altar .pet-vault .pet-list {
+  margin-top: 8px;
+  max-height: 640px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* ---------- 兽栏铭牌卡（颠覆方块：横排 + 八角形头像 + 发光选中） ---------- */
+.pet-wrap--altar .pet-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  text-align: left;
+  background: linear-gradient(180deg, rgba(24, 28, 40, .9), rgba(16, 19, 29, .9));
+  border: 1px solid rgba(140, 150, 175, .16);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.pet-wrap--altar .pet-card:hover {
+  border-color: rgba(242, 182, 50, .5);
+  transform: translateY(-1px);
+}
+.pet-wrap--altar .pet-card.active {
+  border-color: #f2b632;
+  box-shadow:
+    0 0 0 1px rgba(242, 182, 50, .55) inset,
+    0 0 16px rgba(242, 182, 50, .22);
+  background: linear-gradient(180deg, rgba(44, 38, 24, .95), rgba(26, 22, 14, .95));
+}
+.pet-wrap--altar .pet-card--god {
+  border-color: rgba(167, 139, 250, .55);
+  background: linear-gradient(180deg, rgba(34, 26, 52, .95), rgba(20, 16, 34, .95));
+}
+.pet-wrap--altar .pet-card--god.active,
+.pet-wrap--altar .pet-card--god:hover {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, .5) inset, 0 0 16px rgba(167, 139, 250, .3);
+}
+
+/* 八角形头像底（宠物有立绘才显示图，无立绘回退 emoji） */
+.pet-wrap--altar .pet-card .icon {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  margin: 0;
+  font-size: 1.8rem;
+  line-height: 52px;
+  text-align: center;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(242, 182, 50, .22), transparent 60%),
+    linear-gradient(145deg, #232836, #141821);
+  border: 1px solid rgba(242, 182, 50, .3);
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+.pet-wrap--altar .pet-card.active .icon {
+  border-color: #f2b632;
+  box-shadow: 0 0 12px rgba(242, 182, 50, .35);
+}
+.pet-wrap--altar .pet-card--god .icon {
+  border-color: rgba(167, 139, 250, .7);
+  background: radial-gradient(circle at 32% 28%, rgba(167, 139, 250, .3), transparent 60%), linear-gradient(145deg, #2a2150, #1a1530);
+}
+.pet-wrap--altar .pet-card .icon img.pet-avatar-sprite,
+.pet-wrap--altar .pet-card .icon img.pet-sprite {
+  width: 44px;
+  height: 44px;
+  margin: 4px auto 0;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .6));
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+.pet-wrap--altar .pet-card .card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pet-wrap--altar .pet-card .pname {
+  font-size: .95rem;
+  font-weight: 700;
+  color: #e8e6df;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pet-wrap--altar .pet-card.active .pname { color: #f2b632; }
+.pet-wrap--altar .pet-card--god .pname { color: #c4b5fd; }
+.pet-wrap--altar .pet-card .meta {
+  font-size: .72rem;
+  color: rgba(200, 200, 210, .62);
+  margin: 0;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pet-wrap--altar .pet-card .pet-card-badge {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  left: auto;
+  bottom: auto;
+  font-size: .6rem;
+  letter-spacing: 1px;
+  color: rgba(242, 182, 50, .85);
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+}
+.pet-wrap--altar .pet-card .pet-card-god-badge {
+  right: 8px;
+  top: 8px;
+  left: auto;
+  bottom: auto;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: .72rem;
+  background: linear-gradient(180deg, #e6c86a, #b98a1e);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(242, 182, 50, .5);
+}
+/* 成长条（卡片底部小进度） */
+.pet-wrap--altar .pet-card .growth-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .08);
+  margin-top: 3px;
+  overflow: hidden;
+}
+.pet-wrap--altar .pet-card .growth-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #8b5cf6, #f2b632);
+}
+
+/* ---------- 右翼：祭坛面板 ---------- */
+.pet-wrap--altar .pet-altar {
+  position: relative;
+  background:
+    radial-gradient(700px 300px at 50% -20%, rgba(242, 182, 50, .08), transparent 60%),
+    linear-gradient(180deg, rgba(18, 21, 32, .95), rgba(12, 14, 22, .97));
+  border: 1px solid rgba(242, 182, 50, .3);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 0 40px rgba(0, 0, 0, .5),
+    0 0 24px rgba(242, 182, 50, .06);
+  padding: 14px 16px 18px;
+  overflow: hidden;
+}
+
+/* 仪式标题带 */
+.pet-wrap--altar .altar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 4px 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(242, 182, 50, .22);
+  position: relative;
+}
+.pet-wrap--altar .altar-head::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: -1px;
+  width: 96px;
+  height: 2px;
+  background: linear-gradient(90deg, #f2b632, transparent);
+}
+.pet-wrap--altar .altar-title {
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #f2b632;
+  text-shadow: 0 0 14px rgba(242, 182, 50, .45), 0 2px 0 rgba(0, 0, 0, .6);
+}
+.pet-wrap--altar .altar-sub {
+  font-size: .75rem;
+  letter-spacing: 2px;
+  color: rgba(200, 200, 210, .5);
+}
+.pet-wrap--altar .pet-altar[data-theme="fire"] .altar-title { color: #f87171; text-shadow: 0 0 14px rgba(248, 113, 113, .5), 0 2px 0 rgba(0, 0, 0, .6); }
+.pet-wrap--altar .pet-altar[data-theme="fire"] .altar-head::after { background: linear-gradient(90deg, #f87171, transparent); }
+
+/* ---------- 祭坛流程区 ---------- */
+.pet-wrap--altar .altar-stage {
+  gap: 12px;
+  padding: 2px;
+}
+
+/* 主宠展示台：法阵 + 光晕 */
+.pet-wrap--altar .es-main {
+  position: relative;
+  border-radius: 10px;
+  padding: 4px;
+  background: rgba(0, 0, 0, .22);
+}
+.pet-wrap--altar .es-main > .hint,
+.pet-wrap--altar .es-main > .es-tip {
+  text-align: center;
+  padding: 22px 10px;
+  color: rgba(200, 200, 210, .5);
+  font-size: .85rem;
+  letter-spacing: 1px;
+}
+.pet-wrap--altar .es-pet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 26px 16px 14px;
+}
+/* 法阵外环（旋转符文） */
+.pet-wrap--altar .es-pet::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 158px;
+  height: 158px;
+  border-radius: 50%;
+  border: 1px dashed rgba(242, 182, 50, .4);
+  background: radial-gradient(circle, rgba(242, 182, 50, .16) 0%, rgba(242, 182, 50, .05) 48%, transparent 66%);
+  box-shadow: inset 0 0 34px rgba(242, 182, 50, .12);
+  animation: altar-spin 28s linear infinite;
+  pointer-events: none;
+}
+/* 法阵内环 */
+.pet-wrap--altar .es-pet::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  border: 1px solid rgba(242, 182, 50, .2);
+  box-shadow: 0 0 22px rgba(242, 182, 50, .12);
+  pointer-events: none;
+}
+/* 神级宠：法阵转紫金 */
+.pet-wrap--altar .es-pet.es-pet--god::before {
+  border-color: rgba(167, 139, 250, .55);
+  background: radial-gradient(circle, rgba(167, 139, 250, .22) 0%, rgba(167, 139, 250, .06) 48%, transparent 66%);
+  box-shadow: inset 0 0 34px rgba(167, 139, 250, .18);
+}
+.pet-wrap--altar .es-pet.es-pet--god::after {
+  border-color: rgba(167, 139, 250, .35);
+  box-shadow: 0 0 26px rgba(167, 139, 250, .25);
+}
+.pet-wrap--altar .es-pet .es-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 108px;
+  height: 108px;
+  font-size: 4.4rem;
+  line-height: 108px;
+}
+.pet-wrap--altar .es-pet .es-icon img.pet-avatar-sprite,
+.pet-wrap--altar .es-pet .es-icon img.pet-sprite {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, .7)) drop-shadow(0 0 14px rgba(242, 182, 50, .28));
+}
+.pet-wrap--altar .es-pet.es-pet--god .es-icon img.pet-avatar-sprite,
+.pet-wrap--altar .es-pet.es-pet--god .es-icon img.pet-sprite {
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, .7)) drop-shadow(0 0 18px rgba(167, 139, 250, .45));
+}
+.pet-wrap--altar .es-pet b {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #f2b632;
+  letter-spacing: 2px;
+  text-shadow: 0 0 12px rgba(242, 182, 50, .35);
+}
+.pet-wrap--altar .es-pet.es-pet--god b { color: #c4b5fd; text-shadow: 0 0 12px rgba(167, 139, 250, .45); }
+.pet-wrap--altar .es-pet .hint {
+  position: relative;
+  z-index: 1;
+  color: rgba(200, 200, 210, .62);
+  font-size: .75rem;
+  line-height: 1.7;
+  text-align: center;
+}
+/* 等级徽章（主宠展示台） */
+.pet-wrap--altar .es-pet .lv-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(242, 182, 50, .2), rgba(242, 182, 50, .08));
+  border: 1px solid rgba(242, 182, 50, .35);
+  color: #f2b632;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* 仪式符号（大 ＋ / →） */
+.pet-wrap--altar .altar-plus {
+  position: relative;
+  padding: 2px 0;
+  font-size: 1.6rem;
+  line-height: 40px;
+  color: #f2b632;
+  text-shadow: 0 0 14px rgba(242, 182, 50, .6);
+  text-align: center;
+}
+.pet-wrap--altar .altar-plus::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(242, 182, 50, .3);
+  box-shadow: 0 0 12px rgba(242, 182, 50, .12);
+}
+
+/* ---------- 目标/路线选择卡（八角形大卡） ---------- */
+.pet-wrap--altar .es-tip {
+  text-align: center;
+  color: rgba(200, 200, 210, .55);
+  font-size: .78rem;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.pet-wrap--altar .es-route-grid,
+.pet-wrap--altar .es-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  max-width: 460px;
+  margin: 0 auto;
+}
+.pet-wrap--altar .es-route {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 10px;
+  background: linear-gradient(180deg, rgba(26, 30, 44, .95), rgba(17, 20, 30, .95));
+  border: 1px solid rgba(140, 150, 175, .18);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+  color: #e8e6df;
+  font-size: .85rem;
+}
+.pet-wrap--altar .es-route:hover {
+  border-color: rgba(242, 182, 50, .5);
+  transform: translateY(-1px);
+}
+.pet-wrap--altar .es-route.selected {
+  border-color: #f2b632;
+  box-shadow: 0 0 0 1px rgba(242, 182, 50, .5) inset, 0 0 14px rgba(242, 182, 50, .22);
+}
+.pet-wrap--altar .es-route.lv-low { opacity: .75; }
+.pet-wrap--altar .es-route .es-route-icon {
+  width: 76px;
+  height: 76px;
+  font-size: 2.4rem;
+  line-height: 76px;
+  text-align: center;
+  background: radial-gradient(circle at 32% 28%, rgba(242, 182, 50, .18), transparent 62%), linear-gradient(145deg, #232836, #141821);
+  border: 1px solid rgba(242, 182, 50, .22);
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+.pet-wrap--altar .es-route .es-route-icon img.pet-avatar-sprite,
+.pet-wrap--altar .es-route .es-route-icon img.pet-sprite {
+  width: 66px;
+  height: 66px;
+  margin: 5px auto 0;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .6));
+}
+.pet-wrap--altar .es-route .es-route-name {
+  font-weight: 700;
+  font-size: .88rem;
+  color: #e8e6df;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.pet-wrap--altar .es-route.selected .es-route-name { color: #f2b632; }
+.pet-wrap--altar .es-route small {
+  font-size: .68rem;
+  color: rgba(200, 200, 210, .55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+/* 等级不足徽章 */
+.pet-wrap--altar .es-route .lv-tag {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  font-size: .6rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(220, 70, 70, .18);
+  border: 1px solid rgba(220, 70, 70, .4);
+  color: #f87171;
+}
+.pet-wrap--altar .es-route .lv-tag.ok {
+  background: rgba(82, 196, 26, .14);
+  border-color: rgba(82, 196, 26, .35);
+  color: #a3e635;
+}
+
+/* ---------- 碑文预览 ---------- */
+.pet-wrap--altar .es-preview {
+  border: 1px solid rgba(242, 182, 50, .28);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(30, 28, 20, .9), rgba(20, 19, 14, .92));
+  padding: 12px 14px;
+  font-size: .8rem;
+  color: rgba(220, 220, 215, .85);
+  line-height: 1.8;
+}
+.pet-wrap--altar .es-preview .es-preview-row { margin: 2px 0; }
+.pet-wrap--altar .es-preview b { color: #f2b632; }
+.pet-wrap--altar .es-preview .warn,
+.pet-wrap--altar .es-preview-row.warn { color: #f87171; }
+.pet-wrap--altar .es-preview .hint { color: rgba(200, 200, 210, .55); font-size: .75rem; }
+/* 成长结果大数字 */
+.pet-wrap--altar .es-preview .grow-big {
+  font-family: var(--font-title);
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #f2b632;
+  text-shadow: 0 0 14px rgba(242, 182, 50, .4);
+  letter-spacing: 1px;
+}
+.pet-wrap--altar .es-preview .grow-big .arrow { color: rgba(242, 182, 50, .7); margin: 0 6px; }
+/* 属性增减行 */
+.pet-wrap--altar .es-preview .es-stats {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(242, 182, 50, .18);
+  color: rgba(200, 200, 210, .6);
+  font-weight: 700;
+  font-size: .72rem;
+  letter-spacing: 2px;
+}
+.pet-wrap--altar .es-preview .delta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: .78rem;
+  color: rgba(210, 210, 205, .8);
+  padding: 1px 0;
+}
+.pet-wrap--altar .es-preview .delta-row.delta-up { color: #f2b632; }
+.pet-wrap--altar .es-preview .delta-row.delta-down { color: #f87171; }
+/* 道具下拉框 / 勾选（祭坛内） */
+.pet-wrap--altar .es-preview select,
+.pet-wrap--altar .es-preview input[type="checkbox"] {
+  font-size: .78rem;
+  color: #e8e6df;
+  background: rgba(14, 17, 26, .95);
+  border: 1px solid rgba(242, 182, 50, .3);
+  border-radius: 6px;
+  padding: 3px 8px;
+  accent-color: #f2b632;
+}
+.pet-wrap--altar .es-preview select option {
+  background: #141821;
+  color: #e8e6df;
+}
+.pet-wrap--altar .es-preview label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* ---------- 确认封印（大按钮） ---------- */
+.pet-wrap--altar .es-confirm {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+.pet-wrap--altar .es-confirm .btn-mini.primary,
+.pet-wrap--altar .es-confirm .btn-mini {
+  min-width: 220px;
+  min-height: 46px;
+  padding: 10px 26px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(242, 182, 50, .22), rgba(180, 130, 30, .12));
+  border: 1px solid rgba(242, 182, 50, .6);
+  color: #f2b632;
+  box-shadow: 0 0 16px rgba(242, 182, 50, .18), inset 0 0 12px rgba(242, 182, 50, .1);
+  transition: all .15s ease;
+}
+.pet-wrap--altar .es-confirm .btn-mini.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(242, 182, 50, .4), rgba(200, 145, 35, .2));
+  color: #ffe9a8;
+  box-shadow: 0 0 24px rgba(242, 182, 50, .4), inset 0 0 16px rgba(242, 182, 50, .2);
+}
+.pet-wrap--altar .es-confirm .btn-mini.primary:disabled {
+  opacity: .4;
+  filter: grayscale(.5);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+/* 涅槃页红色调确认 */
+.pet-wrap--altar .pet-altar[data-theme="fire"] .es-confirm .btn-mini.primary {
+  background: linear-gradient(180deg, rgba(248, 113, 113, .2), rgba(160, 50, 50, .12));
+  border-color: rgba(248, 113, 113, .55);
+  color: #fca5a5;
+  box-shadow: 0 0 16px rgba(248, 113, 113, .18), inset 0 0 12px rgba(248, 113, 113, .1);
+}
+.pet-wrap--altar .pet-altar[data-theme="fire"] .es-confirm .btn-mini.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(248, 113, 113, .38), rgba(180, 60, 60, .2));
+  color: #ffe4e4;
+  box-shadow: 0 0 24px rgba(248, 113, 113, .4), inset 0 0 16px rgba(248, 113, 113, .2);
+}
+
+/* 空态/提示 */
+.pet-wrap--altar .es-target > .hint,
+.pet-wrap--altar .es-target > .warn,
+.pet-wrap--altar .es-preview > .hint,
+.pet-wrap--altar .es-preview > .warn,
+.pet-wrap--altar .es-main > .warn {
+  text-align: center;
+  padding: 14px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .25);
+  border: 1px dashed rgba(140, 150, 175, .18);
+  color: rgba(200, 200, 210, .6);
+  font-size: .8rem;
+  line-height: 1.9;
+}
+.pet-wrap--altar .es-target > .warn,
+.pet-wrap--altar .es-preview > .warn,
+.pet-wrap--altar .es-main > .warn { color: #f87171; border-color: rgba(248, 113, 113, .3); }
+.pet-wrap--altar .quick-empty {
+  color: rgba(200, 200, 210, .4);
+  font-size: .8rem;
+  padding: 14px 0;
+  text-align: center;
+}
+
+/* ---------- 法阵旋转动效 ---------- */
+@keyframes altar-spin {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to   { transform: translateX(-50%) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-wrap--altar .es-pet::before { animation: none; }
+}
+
+/* ---------- 宠物页顶部符文标签 ---------- */
+.pet-tabs {
+  border-radius: 10px;
+  border-color: rgba(242, 182, 50, .4);
+  background: linear-gradient(180deg, #231d12, #161210);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, .55), 0 0 14px rgba(242, 182, 50, .08);
+  padding: 5px;
+}
+.pet-tab {
+  border-radius: 8px !important;
+  letter-spacing: 3px;
+  transition: all .15s ease;
+}
+.pet-tab.active {
+  background: linear-gradient(180deg, rgba(242, 182, 50, .3), rgba(180, 130, 30, .15)) !important;
+  color: #ffe9a8 !important;
+  box-shadow: inset 0 0 12px rgba(242, 182, 50, .18), 0 0 10px rgba(242, 182, 50, .12);
+}

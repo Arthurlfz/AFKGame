@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>魂炉祭坛 · 宠物UI重构预览</title>
+<link rel="stylesheet" href="css/game.css">
+<style>
+  /* ---- 预览页外层（仅预览用，非游戏内样式） ---- */
+  html, body { margin: 0; padding: 0; background: #07090e; }
+  .preview-shell { max-width: 1200px; margin: 0 auto; padding: 24px 16px 60px; }
+  .preview-head { text-align: center; margin-bottom: 20px; }
+  .preview-head h1 {
+    font-family: var(--font-title); color: #f2b632; letter-spacing: 8px; font-size: 1.6rem; margin: 0;
+    text-shadow: 0 0 18px rgba(242,182,50,.4);
+  }
+  .preview-head p { color: rgba(200,200,210,.5); font-size: .8rem; letter-spacing: 2px; margin: 6px 0 0; }
+  .preview-sec { margin: 26px 0 8px; display: flex; align-items: center; gap: 12px; }
+  .preview-sec .tag {
+    font-family: var(--font-title); font-size: .85rem; letter-spacing: 3px; color: #c4b5fd;
+    background: rgba(139,92,246,.12); border: 1px solid rgba(139,92,246,.3);
+    padding: 4px 14px; border-radius: 20px;
+  }
+  .preview-sec .line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(242,182,50,.25), transparent); }
+  /* 模拟游戏内宠物面板容器 */
+  .pet-panel-box { background: linear-gradient(180deg,#12141c,#0c0e15); border:1px solid rgba(120,130,160,.2); border-radius:14px; padding:18px; margin-bottom: 18px; }
+  .pet-panel-box .pet-tabs { margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="preview-shell">
+
+  <div class="preview-head">
+    <h1>魂 炉 祭 坛</h1>
+    <p>进化 · 合成 · 涅槃 —— 宠物界面颠覆式重构预览</p>
+  </div>
+
+  <!-- 宠物页顶部标签（游戏内同款） -->
+  <div class="pet-panel-box">
+    <div class="pet-tabs">
+      <button class="pet-tab">资料</button>
+      <button class="pet-tab">进化</button>
+      <button class="pet-tab active">合成</button>
+      <button class="pet-tab">涅槃</button>
+    </div>
+    <div class="pet-wrap pet-wrap--altar">
+      <!-- 左：魂兽名录 -->
+      <div class="pcol">
+        <div class="panel pet-vault">
+          <div class="panel-title">魂兽名录<span class="hint">点选主素材</span></div>
+          <div class="pet-list" id="synth-pet-list" style="max-height:none">
+            <div class="pet-card active">
+              <div class="icon">🦊</div>
+              <div class="card-info">
+                <div class="pname">幽火狐</div>
+                <div class="meta">Lv.62 · 成长78.4 · 5/5阶</div>
+                <div class="growth-bar"><i style="width:78%"></i></div>
+              </div>
+            </div>
+            <div class="pet-card pet-card--god">
+              <div class="icon">🐉</div>
+              <div class="card-info">
+                <div class="pname">赤霄神龙</div>
+                <div class="meta">Lv.60 · 成长60.0 · 5/5阶 · 神级</div>
+                <div class="growth-bar"><i style="width:60%"></i></div>
+              </div>
+            </div>
+            <div class="pet-card">
+              <div class="icon">🐺</div>
+              <div class="card-info">
+                <div class="pname">冥霜狼</div>
+                <div class="meta">Lv.41 · 成长35.2 · 3/5阶</div>
+                <div class="growth-bar"><i style="width:35%"></i></div>
+              </div>
+            </div>
+            <div class="pet-card">
+              <div class="icon">🐍</div>
+              <div class="card-info">
+                <div class="pname">毒沼王</div>
+                <div class="meta">Lv.20 · 成长18.7 · 1/5阶</div>
+                <div class="growth-bar"><i style="width:19%"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 右：祭坛 -->
+      <div class="pcol">
+        <div class="panel pet-altar evolve-stage-panel">
+          <div class="altar-head">
+            <span class="altar-title">合成 · 融魂</span>
+            <span class="altar-sub">选主 → 选副 → 确认</span>
+          </div>
+          <div class="evolve-stage altar-stage">
+            <div class="es-main" id="synth-main-box">
+              <div class="es-pet es-pet--god">
+                <span class="es-icon">🐉</span>
+                <div><b>赤霄神龙</b></div>
+                <span class="lv-badge">Lv.60 · 神级</span>
+                <div class="hint">成长 60.0 · 消耗 1 颗合成之石（持有 32）· 变异 50%</div>
+                <div class="hint">⚡ 终阶 + 成长达标（≥60）：满足神级宠条件</div>
+              </div>
+            </div>
+            <div class="es-arrow altar-plus">＋</div>
+            <div class="es-target" id="synth-sub-box">
+              <div class="es-tip">选择副素材（两只素材宠都会消失，合成一只新宠）：</div>
+              <div class="es-sub-grid">
+                <button class="es-route selected">
+                  <div class="es-route-icon">🦊</div>
+                  <div class="es-route-name">幽火狐</div>
+                  <small>成长 78.4</small>
+                </button>
+                <button class="es-route">
+                  <div class="es-route-icon">🐺</div>
+                  <div class="es-route-name">冥霜狼</div>
+                  <small>成长 35.2</small>
+                </button>
+              </div>
+            </div>
+            <div class="es-preview" id="synth-preview">
+              <div class="es-preview-row">合成结果：一只全新的 <b>🐉 赤霄神龙</b>（·异变），等级回 1</div>
+              <div class="es-preview-row">普通成长：<span class="grow-big">72.4</span></div>
+              <div class="es-preview-row">合成道具：<select id="synth-item-select" style="margin-left:6px">
+                <option value="" selected>不使用道具（无加成）</option>
+                <option value="1">💎 越龙之石（合成加成 +10%，神级概率 +30%）×5</option>
+                <option value="2">🔮 百变魔石（合成加成 +20%，神级概率 +60%）×2</option>
+              </select></div>
+              <div class="es-preview-row">⚡ <b>神级宠【赤霄神龙】</b>：<b style="color:#f2b632">30%</b> 概率出生（成长系数 +50%、可涅槃）</div>
+              <div class="es-preview-row">有 <b>50%</b> 概率变异：成长额外 +1~3（如 75.4），名字带「·异变」</div>
+              <div class="es-preview-row">两只素材（赤霄神龙、幽火狐）都将消失，消耗 1 颗合成之石（持有 32）</div>
+              <div class="es-stats">属性变化：</div>
+              <div class="delta-row delta-up"><span>生命</span><span>4821 → 5620 ▲</span></div>
+              <div class="delta-row delta-up"><span>攻击</span><span>621 → 748 ▲</span></div>
+              <div class="delta-row delta-up"><span>防御</span><span>310 → 382 ▲</span></div>
+              <div class="delta-row delta-up"><span>速度</span><span>88 → 97 ▲</span></div>
+            </div>
+            <div class="es-confirm" id="synth-confirm">
+              <button class="btn-mini primary" id="synth-ok">确认合成</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-sec"><span class="tag">进化 · 蜕变</span><div class="line"></div></div>
+  <div class="pet-panel-box">
+    <div class="pet-wrap pet-wrap--altar">
+      <div class="pcol">
+        <div class="panel pet-vault">
+          <div class="panel-title">魂兽名录<span class="hint">点选主宠</span></div>
+          <div class="pet-list" style="max-height:none">
+            <div class="pet-card active">
+              <div class="icon">🦊</div>
+              <div class="card-info">
+                <div class="pname">血狐</div>
+                <div class="meta">Lv.42 · 成长21.3 · 2/5阶 · 进化2/10</div>
+                <div class="growth-bar"><i style="width:21%"></i></div>
+              </div>
+            </div>
+            <div class="pet-card">
+              <div class="icon">🦊</div>
+              <div class="card-info">
+                <div class="pname">幽火狐</div>
+                <div class="meta">Lv.62 · 成长78.4 · 5/5阶 · 进化5/10</div>
+                <div class="growth-bar"><i style="width:78%"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pcol">
+        <div class="panel pet-altar evolve-stage-panel">
+          <div class="altar-head">
+            <span class="altar-title">进化 · 蜕变</span>
+            <span class="altar-sub">选主宠 → 选方向 → 确认</span>
+          </div>
+          <div class="evolve-stage altar-stage">
+            <div class="es-main" id="evolve-main-box">
+              <div class="es-pet">
+                <span class="es-icon">🦊</span>
+                <div><b>血狐</b></div>
+                <span class="lv-badge">Lv.42</span>
+                <div class="hint">成长 21.3 · 二阶 · 进化 2/10 · 转生 0</div>
+              </div>
+            </div>
+            <div class="es-arrow altar-plus">→</div>
+            <div class="es-target" id="evolve-target-box">
+              <div class="es-tip">选择进化方向（等级不变、成长+、换形态）：</div>
+              <div class="es-route-grid">
+                <button class="es-route">
+                  <span class="lv-tag ok">Lv.25 ✓</span>
+                  <div class="es-route-icon">🦊</div>
+                  <div class="es-route-name">血牙狐</div>
+                  <small>→ 二阶</small>
+                </button>
+                <button class="es-route lv-low">
+                  <span class="lv-tag">Lv.40</span>
+                  <div class="es-route-icon">🦊</div>
+                  <div class="es-route-name">九尾狐</div>
+                  <small>→ 三阶 · 淬体</small>
+                </button>
+              </div>
+            </div>
+            <div class="es-preview" id="evolve-preview">
+              <div class="es-preview-row">路线：<b>🦊 血牙狐</b>（二阶）（需 Lv.25）</div>
+              <div class="es-preview-row">消耗：<b>精粹 ×1</b>（当前持有 8）</div>
+              <div class="es-preview-row"><label class="es-boost-select">强化道具 <select id="evolve-boost-item" style="margin-left:6px">
+                <option value="" selected>不用强化道具</option>
+                <option value="1">💊 强化丹A｜进化成长 +10%（持有 12）</option>
+              </select></label></div>
+              <div class="hint">成长 <span class="grow-big" style="font-size:1rem">+0.32</span>；等级不变（Lv.42）；进化后名字变为【血牙狐】（二阶）；进化次数 2→3</div>
+              <div class="es-stats">属性变化：</div>
+              <div class="delta-row delta-up"><span>生命</span><span>1830 → 1992 ▲</span></div>
+              <div class="delta-row delta-up"><span>攻击</span><span>245 → 268 ▲</span></div>
+              <div class="delta-row delta-up"><span>防御</span><span>121 → 134 ▲</span></div>
+              <div class="delta-row delta-up"><span>速度</span><span>55 → 58 ▲</span></div>
+            </div>
+            <div class="es-confirm" id="evolve-confirm">
+              <button class="btn-mini primary" id="evolve-ok">确认进化</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-sec"><span class="tag">涅槃 · 业火</span><div class="line"></div></div>
+  <div class="pet-panel-box">
+    <div class="pet-wrap pet-wrap--altar">
+      <div class="pcol">
+        <div class="panel pet-vault">
+          <div class="panel-title">魂兽名录<span class="hint">点选主宠</span></div>
+          <div class="pet-list" style="max-height:none">
+            <div class="pet-card active pet-card--god">
+              <div class="icon">🐉</div>
+              <div class="card-info">
+                <div class="pname">赤霄神龙</div>
+                <div class="meta">Lv.60 · 成长60.0 · 5/5阶 · 神级</div>
+                <div class="growth-bar"><i style="width:60%"></i></div>
+              </div>
+            </div>
+            <div class="pet-card">
+              <div class="icon">🦊</div>
+              <div class="card-info">
+                <div class="pname">幽火狐</div>
+                <div class="meta">Lv.62 · 成长78.4 · 5/5阶 · 需神级宠</div>
+                <div class="growth-bar"><i style="width:78%"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pcol">
+        <div class="panel pet-altar evolve-stage-panel" data-theme="fire">
+          <div class="altar-head">
+            <span class="altar-title">涅槃 · 业火</span>
+            <span class="altar-sub">选主宠 → 选副宠 → 确认</span>
+          </div>
+          <div class="evolve-stage altar-stage">
+            <div class="es-main" id="merge-main-box">
+              <div class="es-pet es-pet--god">
+                <span class="es-icon">🐉</span>
+                <div><b>赤霄神龙</b></div>
+                <span class="lv-badge">Lv.60 · 神级</span>
+                <div class="hint">成长 60.0 · 可选消耗 涅槃丹 ×1（持有 3）</div>
+              </div>
+            </div>
+            <div class="es-arrow altar-plus">＋</div>
+            <div class="es-target" id="merge-sub-box">
+              <div class="es-tip">选择副宠（融合后消失，主宠吸收其成长）：</div>
+              <div class="es-sub-grid">
+                <button class="es-route selected">
+                  <div class="es-route-icon">🦊</div>
+                  <div class="es-route-name">幽火狐</div>
+                  <small>成长 78.4</small>
+                </button>
+                <button class="es-route">
+                  <div class="es-route-icon">🐺</div>
+                  <div class="es-route-name">冥霜狼</div>
+                  <small>成长 35.2</small>
+                </button>
+              </div>
+            </div>
+            <div class="es-preview" id="merge-preview">
+              <div class="es-preview-row">成长值：<span class="grow-big">60.0 <span class="arrow">→</span> 99.2</span>（吸收副宠 78.4 × 50% = +39.2，不衰减）</div>
+              <div class="es-preview-row">等级：Lv.60 → <b>Lv.1（重置）</b></div>
+              <div class="es-preview-row">🦊 幽火狐（成长 78.4）将消失</div>
+              <div class="es-preview-row"><label><input type="checkbox" id="nir-pill-check" checked> 使用涅槃丹（吸收 ×1.2，持有 3）</label> 成长：<b>99.2 → 106.2</b></div>
+              <div class="warn">涅槃后等级重置回 1 级，经验清零，属性按 1 级 × 新成长重算</div>
+              <div class="es-stats">属性变化：</div>
+              <div class="delta-row delta-down"><span>生命</span><span>4821 → 3280 ▼</span></div>
+              <div class="delta-row delta-down"><span>攻击</span><span>621 → 452 ▼</span></div>
+              <div class="delta-row delta-up"><span>防御</span><span>310 → 362 ▲</span></div>
+              <div class="delta-row delta-up"><span>速度</span><span>88 → 94 ▲</span></div>
+            </div>
+            <div class="es-confirm" id="merge-confirm">
+              <button class="btn-mini primary" id="merge-ok">确认涅槃</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

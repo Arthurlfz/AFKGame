@@ -36,9 +36,14 @@
     for (const pet of cands) {
       const card = document.createElement('div');
       card.className = 'pet-card'+ (pet.id === synthMainId ? ' active': '');
+      const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
+      const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
-        <div class="pname">${pet.name}</div>
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}</div>${UI.traitsHtml(pet)}`;
+        <div class="card-info">
+          <div class="pname">${pet.name}</div>
+          <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶</div>
+          <div class="growth-bar"><i style="width:${gbar}%"></i></div>
+        </div>`;
       card.onclick = () => {
         synthMainId = pet.id;
         synthSubId = null;
@@ -67,8 +72,11 @@
     const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
     const mainStage = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(main) : 1;
     const mainGodReady = mainStage >= (S.god && S.god.minStage || 5) && main.growth >= minG;
-    mb.innerHTML = `<div class="es-pet"><span class="es-icon">${iconHtml(main.name)}</span>
-      <div><b>${main.name}</b> Lv.${main.level}</div>
+    const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
+    mb.innerHTML = `<div class="es-pet${mainIsGod ? ' es-pet--god': ''}">
+      <span class="es-icon">${iconHtml(main.name)}</span>
+      <div><b>${main.name}</b></div>
+      <span class="lv-badge">Lv.${main.level}${mainIsGod ? ' · 神级' : ''}</span>
       <div class="hint">成长 ${main.growth.toFixed(1)} · 消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）· 变异 ${mutPct}%</div>
       <div class="hint">${mainStage >= 5 ? (mainGodReady ? '⚡ 终阶 + 成长达标（≥' + minG + '）：满足神级宠条件' : '已终阶，但成长未达 ' + minG + '（神级宠门槛）'): '未终阶（' + mainStage + '/5 阶），与神级宠无缘'}</div></div>`;
     const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id, S) : [];
@@ -130,7 +138,7 @@
       : `<div class="es-preview-row hint">神级宠门槛：两只都需<b>终阶</b>（5 阶）+ 成长 ≥ ${gi ? gi.minGrowth : 60}（当前：主宠 ${stg(main)}/5 阶·成长 ${main.growth.toFixed(1)}｜副宠 ${stg(sub)}/5 阶·成长 ${sub.growth.toFixed(1)}）</div>`;
     pb.innerHTML = `
       <div class="es-preview-row">合成结果：一只全新的 <b>${iconHtml(gi && gi.god && gi.ready ? gi.god.name : main.name)} ${gi && gi.god && gi.ready ? gi.god.name : main.name}${mutPct ? '（·异变）': ''}</b>，等级回 1</div>
-      <div class="es-preview-row">普通成长：<b>${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</b></div>
+      <div class="es-preview-row">普通成长：<span class="grow-big">${normalGrowth !== null ? normalGrowth.toFixed(1) : '?'}</span></div>
       ${itemSelectHtml}
       ${godRow}
       ${mutPct ? `<div class="es-preview-row"> 有 <b>${mutPct}%</b> 概率变异：成长额外 +${(S.mutation && S.mutation.growthBonus[0])}~${(S.mutation && S.mutation.growthBonus[1])}（如 ${mutatedGrowth !== null ? mutatedGrowth.toFixed(1) : '?'}），名字带「·异变」</div>` : ''}
