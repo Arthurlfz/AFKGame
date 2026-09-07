@@ -116,7 +116,9 @@
       pb.innerHTML = `<div class="alt-routes">${routes.map((r, i) => {
         const okLevel = main.level >= (r.minLevel || 1);
         return `<div class="alt-route" data-i="${i}">
-          <span class="ic">${routeIcon(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+          <span class="ic">${routeIcon(r.to)}</span>
+          <span class="rt-name">${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}</span>
+          <small>${r.label ? '→ ' + r.label : ''}</small>
         </div>`;
       }).join('')}</div>`;
       pb.querySelectorAll('.alt-route').forEach(btn => {
@@ -184,7 +186,9 @@
         const okLevel = pet.level >= (r.minLevel || 1);
         const on = j === i ? ' on': '';
         return `<div class="alt-route${on}" data-i="${j}">
-          <span class="ic">${routeIcon(r.to)}</span>${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}<small>${r.label ? '→ ' + r.label : ''}</small>
+          <span class="ic">${routeIcon(r.to)}</span>
+          <span class="rt-name">${r.to}${r.minLevel ? `<span class="lv-tag ${okLevel ? 'ok' : 'no'}">Lv.${r.minLevel}</span>` : ''}</span>
+          <small>${r.label ? '→ ' + r.label : ''}</small>
         </div>`;
       }).join('')}</div>
       <table class="cmp-table"><tr><th>属性</th><th>当前</th><th>进化后</th></tr>

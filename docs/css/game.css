@@ -3154,16 +3154,28 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   border: 1px solid rgb(var(--action-gold-rgb) / .3); border-radius: var(--radius-xs); padding: 3px 8px;
 }
 .req-row select option { background: var(--inset); color: var(--text); }
-.alt-routes { display: flex; gap: 8px; margin-top: 12px; }
+.alt-routes { display: flex; gap: 10px; margin-top: 12px; }
 .alt-route {
-  flex: 1; padding: 10px; text-align: center;
+  flex: 1; padding: 12px 8px 10px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   background: rgb(0 0 0 / .22); border: 1px solid var(--line); border-radius: var(--radius-sm);
   font-size: var(--fs-xs); color: var(--text); cursor: pointer;
 }
 .alt-route:hover { border-color: rgb(var(--action-gold-rgb) / .5); }
 .alt-route.on { border-color: var(--accent-hi); box-shadow: 0 0 0 1px rgb(var(--action-gold-rgb) / .3) inset; }
-.alt-route .ic { font-size: 1.4rem; display: block; margin-bottom: 4px; }
-.alt-route small { color: var(--text-faint); display: block; margin-top: 2px; }
+.alt-route .ic {
+  width: 64px; height: 64px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.4rem; line-height: 1;
+  background: radial-gradient(circle at 35% 30%, rgb(var(--action-gold-rgb) / .14), transparent 60%), rgb(0 0 0 / .25);
+  border: 1px solid rgb(var(--action-gold-rgb) / .25); border-radius: 50%;
+}
+.alt-route .ic img.pet-avatar-sprite,
+.alt-route .ic img.pet-sprite {
+  width: 52px; height: 52px; object-fit: contain; border-radius: 50%;
+}
+.alt-route .rt-name { font-size: var(--fs-sm); color: var(--text); line-height: 1.5; }
+.alt-route small { color: var(--text-faint); font-size: var(--fs-2xs); }
 .lv-tag { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: var(--fs-2xs); font-weight: 700; margin-left: 6px; }
 .lv-tag.ok { color: #7fae7f; border: 1px solid rgb(127 175 127 / .35); background: rgb(127 175 127 / .12); }
 .lv-tag.no { color: var(--danger-hi); border: 1px solid rgb(var(--hp-hi-rgb) / .4); background: rgb(var(--hp-hi-rgb) / .12); }
