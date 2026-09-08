@@ -111,6 +111,34 @@
   function clearPendingSave() {
     if (throttleTimer) { clearTimeout(throttleTimer); throttleTimer = null; }
   }
+  /* 严格写：专供「发放路径」（tutorial_mode 的账本/礼包/补给）。
+   * 与 saveProgress 唯一区别：失败要 reject 出去，调用方据此决定「不发货」——
+   * 账没记上就发货，等于白送。普通路径继续用 saveProgress（吞错保流畅）。
+   * 公共队列不能被 strict 的失败污染（否则后续所有保存连锁失败），所以
+   * 对外抛的是 write，塞回队列的是吞错后的链。 */
+  function saveProgressStrict() {
+    const Supabase = window.Supabase;
+    if (!Supabase || !Supabase.saveQuestProgress) return Promise.reject(new Error('云端进度通道不可用'));
+    if (!cloudLoaded) return Promise.reject(new Error('云端进度尚未加载，不能记账'));
+    clearPendingSave();
+    lastSaveAt = Date.now();
+    const data = progressSnapshot();
+    const write = saveQueue
+      .then(() => Supabase.saveQuestProgress(data))
+      .then(res => {
+        if (res && res.error) {
+          const e = new Error((res.error.message) || String(res.error));
+          e.cloudError = res.error;
+          throw e;
+        }
+        return res;
+      });
+    saveQueue = write.catch(err => { console.warn('[quest] 严格保存失败', err); });
+    return write;
+  }
+  // 门闩：云端历史是否已拉取。引导驱动在放行任何发放前必须先过这一关，
+  // 否则拿空状态判定「没发过」→ 发货 → 云端随后覆盖内存，发放记录凭空丢失。
+  function isCloudLoaded() { return cloudLoaded; }
   /* 节流写：给击杀上报用。
    * 挂机一场一写会把队列撑爆，交任务这种关键写入只能排在后面干等——实测等过 7 秒多。
    * 任务进度晚几秒落盘玩家无感（最坏丢几场进度），交任务必须立刻生效，所以两者分开走：
@@ -411,8 +439,17 @@
 
   // 重置引导链（开发者「清除引导标记」配套）：把 tutorial 段全部标回未完成/零进度，
   // 云端一并落盘 —— 否则只清本地标记，云端 completed 还在，引导永远走不回 G1。
-  // ⚠️ 只该在开发者面板/测试用：已发的任务奖励不会回收，等于可以重复体验引导但不重复给奖励。
+  // ⚠️ 鉴权（2026-09-08）：这是纯客户端函数，控制台就能调；不设门槛等于公开的重刷开关。
+  // 只放行 Config.dev.adminEmails（与 grant_gems 同一套管理员名单）。
+  // 已发的任务奖励不会回收，等于可以重复体验引导但不重复给奖励。
   function resetGuideChain() {
+    const admins = (Config.dev && Config.dev.adminEmails) || [];
+    const user = window.UI && window.UI.getAuthUser ? window.UI.getAuthUser() : null;
+    const email = user ? String(user.email || '') : '';
+    if (!email || admins.indexOf(email) < 0) {
+      console.warn('[quest] 重置引导链被拒绝：仅开发者账号可用');
+      return { error: '重置引导链仅开发者账号可用' };
+    }
     (Config.drop.quests || []).forEach(q => {
       if (q.category !== 'tutorial') return;
       delete completed[q.id];
@@ -447,6 +484,7 @@
     getQuests, getReadyLoop, getGuideQuest, acceptQuest, completeQuest,
     reportType, skipGuide, abandonQuest, toggleTrack, getTracked, loadCloudProgress, reset,
     getExtra, setExtra, resetGuideChain,
+    saveProgressStrict, isCloudLoaded,
     isFinished, isUnlocked, isAreaCleared,
     questExpOf, QUEST_EXP_FIXED
   };

@@ -901,9 +901,15 @@
         } catch (e) { /* 忽略 */ }
       }
       // 引导链任务完成记录也重置（不清的话云端 completed 还在，G1 起不来）
+      // 2026-09-08 起有管理员鉴权：非 adminEmails 账号会拿到 { error }，这里要提示而不是照常庆祝
+      let chainErr = null;
       if (window.Quest && window.Quest.resetGuideChain) {
-        try { window.Quest.resetGuideChain(); } catch (e) { console.warn('[dev] 重置引导链失败', e); }
+        try {
+          const r = window.Quest.resetGuideChain();
+          if (r && r.error) chainErr = r.error;
+        } catch (e) { console.warn('[dev] 重置引导链失败', e); chainErr = (e && e.message) || '重置失败'; }
       }
+      if (chainErr) { toast('❌ ' + chainErr, '引导标记已清 ' + n + ' 条，但引导链未重置'); return; }
       toast('已清除 ' + n + ' 条引导标记（含云端）并重置引导链', '刷新页面后从 G1 重走（已发过的奖励不回收）');
     };
     // 清理重复教学副宠：配置 grants 里 type=pet 的名字，同名多只只留最早（云端 loadPets 按 created_at 升序，先到的在前）

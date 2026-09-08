@@ -42,12 +42,26 @@
   const qx = () => (window.Quest && window.Quest.getExtra && window.Quest.setExtra) ? window.Quest : null;
   function lsGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   function lsSet(key, val) { try { localStorage.setItem(key, val); } catch (e) { /* 忽略 */ } }
+  /* 标记读取：云端优先（2026-09-08 纠正）。
+   * 原实现本地优先，注释却写"云端唯一真相"——实际云端只是"本地丢了才查的备份"。
+   * 现在反过来：云端已加载且查到值 → 以云端为准（顺手回写本地缓存）；
+   * 云端没查到 / 还没加载 → 退回本地兜底（本地可能刚写完还没落盘）。
+   * 注意：云端没有 ≠ 标记没发过（云端写可能失败），真正的防重复由 grantOnce 账本把守，
+   * readFlag 只负责"已领/已跳过/已开始"这类体验型标记的正确读取。 */
   function readFlag(key, cloudKey) {
+    const q = qx();
+    if (q && window.Quest && window.Quest.isCloudLoaded && window.Quest.isCloudLoaded()) {
+      try {
+        const v = q.getExtra(cloudKey);
+        if (v != null) {
+          const s = String(v);
+          try { if (lsGet(key) !== s) lsSet(key, s); } catch (e) { /* 忽略 */ }
+          return s;
+        }
+      } catch (e) { /* 云端读取异常 → 落到本地兜底 */ }
+    }
     const local = lsGet(key);
-    if (local != null) return local;
-    const q = qx(); if (!q) return null;
-    const v = q.getExtra(cloudKey);
-    return v == null ? null : String(v);
+    return local != null && local !== '' ? local : null;
   }
   function writeFlag(key, cloudKey, val) {
     lsSet(key, val);
