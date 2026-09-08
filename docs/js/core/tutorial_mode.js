@@ -118,6 +118,59 @@
     try { return writeFlag(packKey(), 'packClaimed', '1'); } catch (e) { return Promise.resolve(); }
   }
 
+  /* ============================================================
+   * 发放账本（2026-09-08 根治"重登重复领取"）
+   * 血泪：以前"发没发过"靠库存差量反推（玩家消耗钥匙即误判）或靠
+   * localStorage 标记（清缓存即丢、云端写失败被吞）。现在统一记账：
+   *   存 quest_progress.extra.grantLedger = { [keyId]: { count, at } }
+   *   （复用 extra 通道，不加表不加列）
+   * grantOnce 三步：① 查账本（有记录 → 拒）② 记账（strict 落云端，
+   * 失败 → 不发货）③ 发货（不回滚：货可能已部分到手，回滚=可再领）。
+   * 失败语义与项目铁律一致：宁可少拿，不可重发。
+   * ============================================================ */
+  const granting = new Set();   // keyId 级防重入（并发第二道闸）
+  function ledgerOf() {
+    const q = qx(); if (!q) return {};
+    const v = q.getExtra('grantLedger');
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  }
+  // 记一条账（count+1）。必须 strict：账没落盘成功就抛错，调用方不发货。
+  async function ledgerRecord(keyId) {
+    const Q = window.Quest;
+    const q = qx();
+    if (!q || !Q || !Q.saveProgressStrict) throw new Error('云端进度通道不可用，不能记账');
+    const ledger = ledgerOf();
+    ledger[keyId] = { count: ((ledger[keyId] && ledger[keyId].count) || 0) + 1, at: Date.now() };
+    // 先进内存（extra），再 strict 落盘；落盘失败 → 抛错（内存里的记录会在下次
+    // 同会话查重时挡住重发，跨会话以云端为准可自愈）
+    q.setExtra('grantLedger', ledger);
+    await Q.saveProgressStrict();
+  }
+  // 老档兼容：旧标记体系（packClaimed/blessingGiven）发过的东西补进账本，防账本缺失导致重发
+  async function ledgerBackfill(keyId) {
+    if (ledgerOf()[keyId]) return;
+    try { await ledgerRecord(keyId); } catch (e) { console.warn('[guide] 账本补记失败', keyId, e); }
+  }
+  // 统一发放入口。opts.max：同一 keyId 允许发放的总次数（补发钥匙用，默认 1）
+  async function grantOnce(keyId, grantFn, opts) {
+    if (!keyId || typeof grantFn !== 'function') return { ok: false, error: '参数缺失' };
+    if (granting.has(keyId)) return { ok: false, error: '该发放正在进行中，请稍候' };
+    const max = Math.max(1, Number(opts && opts.max) || 1);
+    const rec = ledgerOf()[keyId];
+    if (rec && (rec.count || 0) >= max) return { ok: false, error: '已发放过（账本记录）' };
+    granting.add(keyId);
+    try {
+      await ledgerRecord(keyId);   // 记账先行：失败抛错 → 不发货
+      await grantFn();
+      return { ok: true };
+    } catch (e) {
+      console.warn('[guide] 发放被拦', keyId, e);
+      return { ok: false, error: (e && e.message) || '发放失败' };
+    } finally {
+      granting.delete(keyId);
+    }
+  }
+
   /* ---------- 当前该做的引导任务 ----------
    * 新手链里第一个「未完成 && isGuide」的任务（引导段 t1~t10）。
    * t13 魂铸已转主线（2026-09-02 拍板：只教到涅槃），不参与加速引导。 */
@@ -197,18 +250,19 @@
     if (window.UI && window.UI.addLog) window.UI.addLog(`使用「${blessingName()}」：加速已生效（${blessingDurationMin()} 分钟，经验×${TM().expRate || 6}）`);
     return { ok: true };
   }
-  // 开局发 1 个引导祝福（账号幂等，云端唯一真相）+ 明确提示用途与绑定属性
+  // 开局发 1 个引导祝福（账号幂等，走发放账本）+ 明确提示用途与绑定属性
   async function grantInitialBlessing() {
     const M = window.Materials;
     if (!M || !M.gain) return;
-    try { if (readFlag(blessingGivenKey(), 'blessingGiven') === '1') return; } catch (e) { /* 忽略 */ }
-    // 先落「已送」标记（本地+云端），再发货：清缓存/换设备也不会再送第二个
-    try { await writeFlag(blessingGivenKey(), 'blessingGiven', '1'); } catch (e) { console.warn('[guide] 祝福标记云端落盘失败', e); }
-    await M.gain(blessingName(), 1);
-    if (M.flushMaterials) await M.flushMaterials();
-    if (window.UI && window.UI.addLog) {
-      window.UI.addLog(`获得绑定道具「${blessingName()}」×1：使用后 ${blessingDurationMin()} 分钟加速（经验×${TM().expRate || 6}）。不可交易/上架。`);
-    }
+    // 老档兼容：旧 blessingGiven 标记发过的 → 只补账不发货，防账本缺失导致重送
+    try { if (readFlag(blessingGivenKey(), 'blessingGiven') === '1') { await ledgerBackfill('blessing'); return; } } catch (e) { /* 忽略 */ }
+    await grantOnce('blessing', async () => {
+      await M.gain(blessingName(), 1);
+      if (M.flushMaterials) await M.flushMaterials();
+      if (window.UI && window.UI.addLog) {
+        window.UI.addLog(`获得绑定道具「${blessingName()}」×1：使用后 ${blessingDurationMin()} 分钟加速（经验×${TM().expRate || 6}）。不可交易/上架。`);
+      }
+    });
   }
 
   /* ============================================================
@@ -450,9 +504,29 @@
   /* ---------- 引导驱动核心：登录后 / 定时调用 ----------
    * 1) 有未完成的引导任务 → 发教学补给 + 按任务 boostLevel 顶出战宠等级（引导经验包）
    * 2) 已激活的 buff 超时 → 自动退出（兜底；加速只由道具「引导祝福」触发）
-   * 3) 引导段全部完成 → 退加速 + 发毕业礼包（仅一次，跳过的账号不发） */
+   * 3) 引导段全部完成 → 退加速 + 发毕业礼包（仅一次，跳过的账号不发）
+   * 外壳（2026-09-08）：门闩 + 并发单飞。真正的驱动逻辑在 checkGuideInner。
+   * 门闩：云端任务进度没拉完 → 什么都不做。拿空状态判定"没发过"→ 发货 →
+   * 云端随后覆盖内存，发放记录凭空丢失，下次登录再来一遍——重复领取的成因之一。
+   * 单飞：completeQuest 后是 fire-and-forget 触发本函数，连点快交会并发跑
+   * 同一段发放逻辑（读-改-写无原子性）。进行中直接跳过，结束后尾部补跑一次。 */
+  let guiding = false;
+  let guideQueued = false;
   async function checkGuide() {
     if (!TM().enabled) return;
+    if (window.Quest && window.Quest.isCloudLoaded && !window.Quest.isCloudLoaded()) return;
+    if (guiding) { guideQueued = true; return; }
+    guiding = true;
+    try {
+      await checkGuideInner();
+    } catch (e) {
+      console.warn('[guide] 引导驱动异常', e);
+    } finally {
+      guiding = false;
+      if (guideQueued) { guideQueued = false; Promise.resolve().then(() => checkGuide()).catch(() => {}); }
+    }
+  }
+  async function checkGuideInner() {
     // 未登录不驱动（绑定账号状态 / 发礼包都要账号）
     const user = window.UI && window.UI.getAuthUser ? window.UI.getAuthUser() : null;
     if (!user) return;
@@ -480,15 +554,11 @@
     // 引导段全完成
     if (active) exit();
     // 只有"真正走过引导"的账号才发礼包（Q6 修复：老账号自动完成新手链 → 不再白拿）
-    if (readStarted() && !hasClaimedPack()) {
-      // 只对"完整走完引导"的账号发：跳过引导时 Quest.skipGuide 会把引导段全标完成，
-      // 这里会误判成"完成"。所以跳过的账号要打标记（见 markSkipped）。
-      const sk = readSkipped();
-      if (!sk) {
-        // 记账先行：先把「已领」落到本地 + 云端，再发货。中途断网 → 最多少拿一次，绝不重复拿。
-        try { await markClaimedPack(); } catch (e) { console.warn('[guide] 礼包已领标记云端落盘失败', e); }
-        await grantStarterPack();
-      }
+    if (readStarted() && !readSkipped()) {
+      // 老档兼容：旧 packClaimed 标记领过的 → 只补账不发货，防账本缺失导致重发
+      if (hasClaimedPack()) { await ledgerBackfill('graduatePack'); return; }
+      // 账本守门：graduatePack 记账成功才发货（strict 落盘失败 → 不发，宁可少拿）
+      await grantOnce('graduatePack', grantStarterPack);
     }
   }
 
@@ -563,6 +633,8 @@
     hasClaimedPack, markClaimedPack, checkGuide, applyGrantsFor, grantStarterPack, markSkipped,
     hasBlessing, useBlessing, blessingActive, blessingRemainSec, grantInitialBlessing,
     startGuideRoutine,
-    boostGuidePetToLevel   // 引导经验包：把出战宠顶到指定等级（教学期等级门槛专用）
+    boostGuidePetToLevel,  // 引导经验包：把出战宠顶到指定等级（教学期等级门槛专用）
+    // 发放账本（2026-09-08）：经济类发放统一走这里；补发钥匙用 grantOnce(keyId, fn, {max})
+    grantOnce, ledgerOf, ledgerBackfill
   };
 })();
