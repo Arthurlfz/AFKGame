@@ -456,6 +456,46 @@
     return { ok: true, level: lv };
   }
 
+  /* ---------- 分档经验包（2026-09-08）：真实道具版 ----------
+   * expPackFor(cap)：按等级门槛找对应档位配置。
+   * grantExpPack(pack)：发货（Materials.gain + 提示），由 grantOnce 账本守门调用。
+   * useExpPack(name)：通用使用入口（背包点卡片）——教学三档走 cap 锁死（全宠顶到 cap，
+   *   不超）；未来非绑定经验包可扩展 exp 字段（给定宠加经验），走同一入口零新增机制。 */
+  function expPackFor(boostLevel) {
+    const lv = Number(boostLevel) || 0;
+    if (!lv) return null;
+    return ((TM().expPacks) || []).find(p => Number(p.cap) === lv) || null;
+  }
+  async function grantExpPack(pack) {
+    const M = window.Materials;
+    if (!M || !M.gain) return;
+    await M.gain(pack.name, 1);
+    if (M.flushMaterials) { try { await M.flushMaterials(); } catch (e) { /* 忽略 */ } }
+    if (window.UI && window.UI.addLog) window.UI.addLog(`获得「${pack.name}」×1（绑定）：去背包·消耗品使用，魂兽直升 Lv${pack.cap}`);
+    if (window.UI && window.UI.showToast) {
+      try { window.UI.showToast('经验包已发放', `${pack.name} ×1 —— 背包 · 消耗品里点击使用（直升 Lv${pack.cap}）`); } catch (e) { /* 忽略 */ }
+    }
+  }
+  async function useExpPack(name) {
+    const M = window.Materials;
+    if (!M || !M.spend) return { ok: false, error: '材料系统未就绪' };
+    const pack = ((TM().expPacks) || []).find(p => p.name === name);
+    if (!pack) return { ok: false, error: '未知经验包' };
+    if ((M.getQuantity(name) || 0) <= 0) return { ok: false, error: '没有' + name };
+    // 档位锁死的前置检查：全部已达标 → 用了也白用，省着
+    const Pet = window.Pet;
+    const pets = (Pet && Pet.getPets) ? (Pet.getPets() || []) : [];
+    if (!pets.length) return { ok: false, error: '名下没有魂兽' };
+    if (pets.every(p => (Number(p.level) || 1) >= pack.cap)) {
+      return { ok: false, error: '名下魂兽都已 ≥ Lv' + pack.cap + '，别浪费' };
+    }
+    const spent = await M.spend(name, 1);
+    if (!spent.ok) return { ok: false, error: spent.error || '使用失败' };
+    const r = await boostGuidePetToLevel(pack.cap);
+    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
+    return { ok: true, level: pack.cap };
+  }
+
   /* ---------- 引导驱动核心：登录后 / 定时调用 ----------
    * 1) 有未完成的引导任务 → 发教学补给 + 按任务 boostLevel 顶出战宠等级（引导经验包）
    * 2) 已激活的 buff 超时 → 自动退出（兜底；加速只由道具「引导祝福」触发）
@@ -505,9 +545,14 @@
       }
       // buff 已激活且超时 → 自动关（玩家用完 30 分钟恢复正式节奏）
       if (active && buffExpired()) exit();
-      // 引导经验包：把名下所有宠顶到本任务的等级门槛
-      // （进化 Lv10 / 合成 Lv40 两只都要 / 涅槃 Lv60 两只都要 —— 只顶出战宠会卡在融合）
-      if (task.boostLevel) await boostGuidePetToLevel(task.boostLevel);
+      // 分档经验包（2026-09-08）：不再隐式顶等级，改为发真实道具（背包可见、玩家手动使用）。
+      // 账本按 'expPack:{cap}' 记账 —— G1/G2 同为 Lv10 共享初阶一份，同档关卡不重复发。
+      if (task.boostLevel) {
+        const pack = expPackFor(task.boostLevel);
+        if (pack && !ledgerOf()['expPack:' + pack.cap]) {
+          await grantOnce('expPack:' + pack.cap, () => grantExpPack(pack));
+        }
+      }
       return;
     }
     // 引导段全完成
@@ -596,6 +641,8 @@
     // 发放账本（2026-09-08）：经济类发放统一走这里；补发钥匙用 grantOnce(keyId, fn, {max})
     grantOnce, ledgerOf, ledgerBackfill,
     // 新手补给箱（2026-09-08）：missingKeysFor 只读检测 + reissueKeys 手动补发（每关每种限1次）
-    missingKeysFor, reissueKeys, openSupplyBox
+    missingKeysFor, reissueKeys, openSupplyBox,
+    // 分档经验包（2026-09-08）：useExpPack 是通用使用入口（背包消耗品点击调用）
+    useExpPack, expPackFor
   };
 })();

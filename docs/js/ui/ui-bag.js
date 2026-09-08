@@ -159,8 +159,10 @@
 
     const equipList = getInventory();
     const localMats = Materials.getLocal ? Materials.getLocal() : {};
+    // 引导经验包（2026-09-08）单独走"消耗品"栏，别在素材里重复出现
+    const EXP_PACK_NAMES = ((Config.tutorialMode && Config.tutorialMode.expPacks) || []).map(p => p.name);
     const matEntries = Object.entries(localMats).sort((a, b) => a[0].localeCompare(b[0]))
-      .filter(([name]) => !CONSUMABLES.some(c => c.name === name))
+      .filter(([name]) => !CONSUMABLES.some(c => c.name === name) && !EXP_PACK_NAMES.includes(name))
       .map(([name, qty]) => ({ name, qty }));
     const consEntries = CONSUMABLES.map(c => ({ ...c, qty: Materials.getQuantity(c.name) })).filter(x => x.qty > 0);
     const eggCount = getEggCount();
@@ -310,6 +312,33 @@
         card.innerHTML = '<div class="ico">' + c.icon + '</div><div class="nm">' + escapeHtml(c.name) + '</div><div class="corner">×' + c.qty + '</div>';
         const tip = '<div class="tip-name">' + c.icon + ' ' + escapeHtml(c.name) + '</div><div class="tip-line"><span>' + c.desc + '</span><b>×' + c.qty + '</b></div><div class="tip-line hint">用于装备改造</div>';
         bindTip(card, tip);
+        bagItems.push(card);
+      }
+      // 引导经验包（2026-09-08）：分档锁死的真实道具，点卡片使用（直升到档位上限，不超）
+      const packs = ((Config.tutorialMode && Config.tutorialMode.expPacks) || []);
+      for (const p of packs) {
+        const qty = Materials.getQuantity(p.name) || 0;
+        if (qty <= 0) continue;
+        if (bagSearch && !p.name.toLowerCase().includes(bagSearch)) continue;
+        const card = document.createElement('div');
+        card.className = 'poe-item q-cons';
+        card.innerHTML = '<div class="ico">' + (p.icon || '📘') + '</div><div class="nm">' + escapeHtml(p.name) + '</div><div class="corner">×' + qty + '</div>';
+        const tip = '<div class="tip-name">' + (p.icon || '') + ' ' + escapeHtml(p.name) + '</div>'
+          + '<div class="tip-line"><span>' + escapeHtml(p.desc || '使用后魂兽直升') + '</span><b>×' + qty + '</b></div>'
+          + '<div class="tip-line hint">点击使用 · 绑定道具，不可交易</div>';
+        bindTip(card, tip);
+        card.style.cursor = 'pointer';
+        card.onclick = async () => {
+          const T = window.TutorialMode;
+          if (!T || !T.useExpPack) return;
+          if (card.__busy) return;
+          card.__busy = true;
+          let r;
+          try { r = await T.useExpPack(p.name); }
+          finally { card.__busy = false; }
+          if (!r || !r.ok) { if (showToast) showToast('使用失败', (r && r.error) || '未知错误'); return; }
+          if (showToast) showToast('经验包已使用', '魂兽直升 Lv' + r.level + '（教学期门槛，无需刷怪）');
+        };
         bagItems.push(card);
       }
     }
