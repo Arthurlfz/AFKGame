@@ -571,6 +571,8 @@
         p.classList.toggle('active', p.dataset.petPane === name));
       // 装备：切到这一栏就把装备界面带出来（不用玩家再找背包入口）
       if (name === 'equip') openEquipWindow();
+      // 其余 tab：收起背包浮窗（它带全屏遮罩，开着会盖住宠物页——孵化 tab 被"层级压住"的根因就是它没关）
+      else if (window.UI && UI.closeBagWindow) UI.closeBagWindow();
       // 宠物蛋：孵化面板按需渲染（切到才渲染，避免宠物页首屏多跑一遍）
       if (name === 'egg') renderEggPanel();
     });

@@ -479,7 +479,9 @@
     marketTip.className = 'equip-tip';
     const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
     const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
-    marketTip.innerHTML = `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}${detailLine(detailAffixes.suffix, 'tip-suffix')}${l.item_soul ? `<div class="tip-section">魂铸</div><div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : ''}`;
+    const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
+    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + color + '"><span class="emoji">' + (ICONS[l.item_slot] || '🛡') + '</span></span></div>';
+    marketTip.innerHTML = iconHtml + `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<hr class="tip-divider">${detailLine(detailAffixes.suffix, 'tip-suffix')}<div class="tip-section">魂铸</div>${l.item_soul ? `<div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : '<div class="tip-empty">无</div>'}`;
     div.appendChild(marketTip);
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {

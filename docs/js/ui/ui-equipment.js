@@ -18,7 +18,6 @@
   const { getActivePet } = window.Pet;
   const { getInventory, equipItem, describeItem, scoreOf } = window.Equipment;
   const Materials = window.Materials;
-  const Market = window.Market;
   const Salvage = window.Salvage;
 
   /* ---------- 装备筛选 + 多选（仅装备页，不影响数据结构） ---------- */
@@ -362,16 +361,24 @@
     const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
     // 词缀行统一走 Equipment.formatAffixHtml（POE 式：label +值 (该T阶区间 min~max)，T1/满roll 金色）
     const line = (a, cls) => a.map(x => window.Equipment.formatAffixHtml(x, cls)).join('') || '<div class="tip-empty">无</div>';
+    // PoE 式顶部大图标（部位映射与背包共用 UI.EQUIP_ICON），描边随稀有度色
+    const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
+    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + r.color + '"><span class="emoji">' + (ICONS[eq.slot] || '🛡') + '</span></span></div>';
     return `
+      ${iconHtml}
       <div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}</div>
-      <div class="tip-line">等级：<b>${itemLevel}</b></div>
+      <div class="tip-line"><span>底材</span><b>T${eq.materialTier ?? eq.tier ?? 4}</b></div>
+      <div class="tip-line"><span>物品等级</span><b>${window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : itemLevel}</b></div>
       <div class="tip-section">基底词缀</div>
       <div class="tip-base">${escapeHtml(b.label)} +${b.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div>
-      <div class="tip-section">前缀</div>
+      <div class="tip-section">词缀</div>
       ${line(prefix, 'tip-prefix')}
-      <div class="tip-section">后缀</div>
+      <hr class="tip-divider">
       ${line(suffix, 'tip-suffix')}
-      ${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}
+      <div class="tip-section">魂铸</div>
+      ${eq.soulAffix
+        ? '<div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>'
+        : '<div class="tip-empty">无</div>'}
       ${buildEquipCompare(pet, eq)}`;
   }
 
@@ -393,35 +400,8 @@
     if (emptyEl) emptyEl.style.display = 'none';
     body.style.display = 'flex';
     hostEl.classList.remove('lock-mode'); // 重置锁定模式（打造区切换时会再设回）
-    const pet = getActivePet();
-    const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
-    const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
-    const inSell = Market.isItemListed(eq.cloudId);
-    const info = hostEl.querySelector('.eq-detail-info');
-    if (info) {
-      info.innerHTML = `
-        <div class="eq-detail-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}${eq.locked ? ' <span class="eq-lock">🔒</span>' : ''}</div>
-        <div class="eq-detail-meta">${r.label}装 · T${eq.tier ?? 4} · ${eq.slot || '武器'}｜${b.label}+${b.value}</div>
-        <div class="eq-detail-compare">${buildEquipCompare(pet, eq)}</div>
-        <div class="eq-detail-actions">
-          <button class="btn-sm primary" id="eq-detail-equip">⚔️ 穿上</button>
-          ${(UI.isLoggedIn() && eq.cloudId && !inSell) ? '<button class="btn-sm alt" id="eq-detail-sell">💰 上架</button>' : ''}
-          ${inSell ? '<span class="hint">在售中，先取回才能操作</span>' : ''}
-        </div>`;
-      const eqBtn = info.querySelector('#eq-detail-equip');
-      if (eqBtn) eqBtn.onclick = () => {
-        const changes = equipDeltas(pet, eq);
-        const res = equipItem(pet, eq.id);
-        if (res) {
-          addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
-          if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
-          UI.renderAll();
-          renderEqDetailInto(hostEl, eq);
-        }
-      };
-      const sellBtn = info.querySelector('#eq-detail-sell');
-      if (sellBtn) sellBtn.onclick = () => UI.openSellForItem(eq);
-    }
+    /* 右栏只留打造（2026-09-07）：属性详情/穿上/上架已移除——
+     * 具体属性看物品 tooltip，穿上走列表卡片按钮，上架走市集。 */
     const craftEl = hostEl.querySelector('.eq-detail-craft');
     if (craftEl && UI.renderCraftInto) UI.renderCraftInto(craftEl, eq);
   }

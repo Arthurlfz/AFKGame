@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260906evoitems">
+<link rel="stylesheet" href="css/game.css?v=20260907tip">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260903c">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
@@ -468,7 +468,6 @@
         <div class="panel-title">背包
           <span class="panel-actions">
             <span class="hint">点选装备看详情与打造 · 多选用于批量分解 · 上架在「市场」页</span>
-            <button class="btn-mini danger" id="btn-salvage">🗑 一键分解</button>
           </span>
         </div>
         <div id="inv-filter" class="inv-filter"></div>
@@ -484,7 +483,6 @@
           <aside class="eq-detail" id="eq-detail" aria-label="装备详情与打造面板">
             <div class="eq-detail-empty" id="eq-detail-empty">← 点选一件装备，右侧显示详情与打造</div>
             <div class="eq-detail-body" id="eq-detail-body" style="display:none">
-              <div class="eq-detail-info" id="eq-detail-info"></div>
               <div class="eq-detail-craft" id="eq-detail-craft"></div>
             </div>
           </aside>
@@ -691,7 +689,6 @@
             <aside class="eq-detail" id="bag-eq-detail" aria-label="装备详情与打造">
               <div class="eq-detail-empty">← 点选一件装备，右侧显示详情与打造</div>
               <div class="eq-detail-body" style="display:none">
-                <div class="eq-detail-info"></div>
                 <div class="eq-detail-craft"></div>
               </div>
             </aside>
@@ -793,8 +790,6 @@
     if (sc) sc.onclick = () => window.UI.closeSalvagePanel();
     const tcc = document.getElementById('trade-cancel');
     if (tcc) tcc.onclick = () => window.UI.closeBuyPanel();
-    const sb = document.getElementById('btn-salvage');
-    if (sb) sb.onclick = () => window.UI.openSalvagePanel();
   });
 </script>
 
@@ -856,14 +851,14 @@ window.PetSprites = {
 <script src="js/ui/ui-quest.js?v=20260903notab"></script>
 <script src="js/ui/ui-battle.js?v=20260905match1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260905esm"></script>
+<script src="js/ui/ui-pet.js?v=20260907fix"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260906evoitems"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260907niritem"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260905esm"></script>
-<script src="js/ui/ui-bag.js?v=b8cdb91a"></script>
-<script src="js/ui/ui-equipment.js?v=20260904affix2"></script>
+<script src="js/ui/ui-bag.js?v=20260907fix2"></script>
+<script src="js/ui/ui-equipment.js?v=20260907fix2"></script>
 <script src="js/ui/ui-craft.js?v=20260904lx"></script>
-<script src="js/ui/ui-market.js?v=7a70ce5d"></script>
+<script src="js/ui/ui-market.js?v=20260907tip"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>
 <script src="js/ui/ui-codex.js?v=20260907codex2"></script>

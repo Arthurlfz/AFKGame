@@ -12,7 +12,7 @@
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
   const Config = window.Config;
-  const { getInventory, equipItem, describeItem, rarityOf, flattenAffixes, scoreOf } = window.Equipment;
+  const { getInventory, equipItem, rarityOf, flattenAffixes } = window.Equipment;
   const { getEggCount, getEggs, hatchEgg } = window.Drop;
   const { getActivePet } = window.Pet;
   const Materials = window.Materials;
@@ -28,6 +28,9 @@
     if (/兽|魂|晶|珠/.test(name)) return '🔮';
     return '🧪';
   };
+  // 部位 → emoji 图标（背包格与装备 tooltip 共用；挂 UI 供 ui-equipment / ui-market 复用）
+  const EQUIP_ICON = { 武器:'🗡', 单手剑:'🗡', 双手剑:'⚔️', 长剑:'🗡', 弓:'🏹', 法杖:'🪄', 杖:'🪄', 盾:'🛡', 胸甲:'🦺', 头盔:'⛑️', 帽:'⛑️', 手套:'🧤', 靴:'🥾', 鞋:'🥾', 戒指:'💍', 项链:'📿', 护符:'📿', 腰带:'🔗' };
+  UI.EQUIP_ICON = EQUIP_ICON;
 
   const CONSUMABLES = [
     { name: Config.craft.reforge.name, icon: '🎲', desc: '重铸全部词缀' },
@@ -78,26 +81,75 @@
     card.addEventListener('mouseenter', () => showBagTip(card, html));
     card.addEventListener('mouseleave', hideBagTip);
   }
-  // 装备 tooltip：复用打造页 .equip-tip 结构（前后缀分组 + T阶角标）
+  // 装备 tooltip：复用打造页 .equip-tip 结构（大图标 + 名称 + 底材/等级 + 前后缀 + 魂铸）
   function equipTipHtml(eq, unid) {
     const r = rarityOf(eq);
+    const mt = eq.materialTier ?? eq.tier ?? 4;
+    const ilvl = window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.ilvl != null ? eq.ilvl : '—');
+    const matLines = `<div class="tip-line"><span>底材</span><b>T${mt}</b></div>
+      <div class="tip-line"><span>物品等级</span><b>${ilvl}</b></div>`;
+    // PoE 式顶部大图标：稀有度色描边底座；未鉴定显示封印卷轴
+    const icon = unid
+      ? SVG_SEALED
+      : '<span class="emoji">' + (EQUIP_ICON[eq.slot] || '🛡') + '</span>';
+    const iconHtml = '<div class="tip-icon"><span class="ico"' + (unid ? '' : ' style="border-color:' + r.color + '"') + '>' + icon + '</span></div>';
     if (unid) {
-      return `<div class="tip-name">${escapeHtml(eq.name)}</div>
-        <div class="tip-line"><span>未鉴定的 ${eq.slot}</span><b>T${eq.tier}</b></div>
+      return iconHtml + `<div class="tip-name">${escapeHtml(eq.name)}</div>
+        <div class="tip-line"><span>未鉴定的 ${eq.slot}</span></div>
+        ${matLines}
         <div class="tip-line hint">开启手持鉴定后点此揭晓属性</div>`;
     }
     const aff = (eq.affixes && { prefix: eq.affixes.prefix || [], suffix: eq.affixes.suffix || [] }) || { prefix: [], suffix: [] };
     const line = (list, cls) => list.length
       ? list.map(a => window.Equipment.formatAffixHtml ? window.Equipment.formatAffixHtml(a, cls) : `<div class="${cls}">${escapeHtml(a.label)} +${a.value}%<span class="tip-tier">T${a.tier || 1}</span></div>`).join('')
       : '<div class="tip-empty">无</div>';
-    return `<div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name)}</div>
-      <div class="tip-line"><span>${describeItem(eq)}</span><b>${scoreOf(eq)}</b></div>
+    return iconHtml + `<div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name)}</div>
+      ${matLines}
       <div class="tip-section">词缀</div>
       ${line(aff.prefix, 'tip-prefix')}
       <hr class="tip-divider">
       ${line(aff.suffix, 'tip-suffix')}
-      ${eq.soulAffix ? '<div class="tip-section">魂铸</div><div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>' : ''}
+      <div class="tip-section">魂铸</div>
+      ${eq.soulAffix
+        ? '<div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>'
+        : '<div class="tip-empty">无</div>'}
       <div class="tip-line hint" style="border-bottom:none;margin-top:4px">Ctrl/Alt+点击 分解 · 点开看词缀</div>`;
+  }
+
+  /* ---------- 网格列数（流放式固定格，auto-fill） ----------
+   * CSS 用 repeat(auto-fill, var(--bag-cell)) 排列，列数随容器宽度变；
+   * 这里不能硬编码列数，否则空格槽数量会和实际排列错位。
+   * 口径：--bag-cell 48px / --bag-gap 2px / padding 6px（game.css），这里只作估算与回退。 */
+  const BAG_CELL = 48, BAG_GAP = 2, BAG_PAD = 6;
+  const BAG_FALLBACK_COLS = 6;
+  const BAG_MIN_ROWS = 5;          // 最少显示行数（物品少时也露出空格槽）
+  let bagLastCols = 0;             // 最近一次实际采用的列数（ResizeObserver 用它判断要不要重排）
+  let bagResizeObserver = null, bagResizeTimer = 0;
+  // 读浏览器实际解析出的列数。display:none 下 auto-fill 不解析（返回原文），clientWidth<=0 一律不采信
+  function readRealCols(grid) {
+    try {
+      if (typeof getComputedStyle !== 'function' || !grid || grid.clientWidth <= 0) return 0;
+      const t = String(getComputedStyle(grid).gridTemplateColumns || '');
+      const parts = t.split(/\s+/).filter(Boolean);
+      return parts.length > 1 ? parts.length : 0;
+    } catch (e) { return 0; }
+  }
+  // 容器宽度变化 → 列数变了才重渲染（防抖 100ms，拖动背包窗口时不高频重建 DOM）
+  function watchBagGrid(gridArea) {
+    if (typeof ResizeObserver !== 'function' || !gridArea) return;
+    if (!bagResizeObserver) {
+      bagResizeObserver = new ResizeObserver(() => {
+        window.clearTimeout(bagResizeTimer);
+        bagResizeTimer = window.setTimeout(() => {
+          const grid = document.querySelector('.bag-window .bag-item-grid');
+          if (!grid) return;
+          const cols = readRealCols(grid);
+          if (cols && cols !== bagLastCols) renderBag();
+        }, 100);
+      });
+    }
+    bagResizeObserver.disconnect();
+    bagResizeObserver.observe(gridArea);
   }
 
   function renderBag() {
@@ -184,21 +236,9 @@
       footer.appendChild(src);
     }
 
-    // --- 右侧详情面板 ---
-    const detail = document.createElement('div');
-    detail.className = 'bag-detail-panel';
-    detail.id = 'bag-detail-panel';
-    detail.innerHTML = '<div class="bag-detail-empty">选择物品<br>查看详情</div>';
-    layout.appendChild(detail);
-
-    // 显示详情到右侧面板（点击时先收起悬浮 tooltip，避免盖住详情）
-    function showDetail(html) {
-      hideBagTip();
-      detail.innerHTML = html;
-    }
+    // 右侧详情面板已移除（2026-09-07）：物品信息统一走悬停 tooltip；蛋详情仍是独立弹窗
 
     // ===== 渲染物品卡片（统一进一个网格，按分类过滤） =====
-    const EQUIP_ICON = { 武器:'🗡', 单手剑:'🗡', 双手剑:'⚔️', 长剑:'🗡', 弓:'🏹', 法杖:'🪄', 杖:'🪄', 盾:'🛡', 胸甲:'🦺', 头盔:'⛑️', 帽:'⛑️', 手套:'🧤', 靴:'🥾', 鞋:'🥾', 戒指:'💍', 项链:'📿', 护符:'📿', 腰带:'🔗' };
     const highestAffixTier = eq => {
       let best = Infinity;
       for (const aff of flattenAffixes(eq.affixes)) best = Math.min(best, aff.tier || 5);
@@ -217,7 +257,11 @@
         if (bagAffixType !== 'all' && !hasAffixType(eq, bagAffixType)) return false;
         return true;
       });
-      eqList = eqList.slice().sort((a, b) => scoreOf(b) - scoreOf(a));
+      // 排序：稀有度（金>蓝>白）优先，再按底材T 高在前（评分已从展示层移除，不再按分排）
+      const rarityRank = id => ({ gold: 0, blue: 1, white: 2 }[id] != null ? { gold: 0, blue: 1, white: 2 }[id] : 3);
+      eqList = eqList.slice().sort((a, b) =>
+        rarityRank((a.rarity && a.rarity.id) || 'white') - rarityRank((b.rarity && b.rarity.id) || 'white') ||
+        (a.tier ?? 4) - (b.tier ?? 4));
       for (const eq of eqList) {
         const unid = eq.identified === false;
         const rar = (eq.rarity && eq.rarity.id) || 'white';
@@ -234,11 +278,10 @@
         }
         card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: eq.id, act: 'salvage' })); e.dataTransfer.effectAllowed = 'move'; });
         const ico = unid ? SVG_SEALED : '<span class="emoji">' + (EQUIP_ICON[eq.slot] || '🛡') + '</span>';
-        card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>' + (unid ? '' : '<div class="corner">' + scoreOf(eq) + '</div>') + (unid ? '<div class="qmark">?</div>' : '') + '<div class="unseal-sweep"></div>';
+        card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>' + (unid ? '<div class="qmark">?</div>' : '') + '<div class="unseal-sweep"></div>';
         card.onclick = e => {
           if (identifyMode && unid) { identifyEquip(eq, card); return; }
           if (e.ctrlKey || e.altKey) { quickSalvage(eq); return; }
-          showDetail(equipTipHtml(eq, unid) + '<div style="margin-top:8px"><button class="btn-mini" onclick="document.querySelectorAll(\'.bag-subtab\').forEach(t=>{if(t.dataset.bagSubtab===\'equip\')t.click()})">去装备页穿上</button></div>');
         };
         bindTip(card, equipTipHtml(eq, unid));
         bagItems.push(card);
@@ -253,7 +296,6 @@
         card.className = 'poe-item q-mat';
         card.innerHTML = '<div class="ico">' + matIcon(m.name) + '</div><div class="nm">' + escapeHtml(m.name) + '</div><div class="corner">×' + m.qty + '</div>';
         const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div><div class="tip-line"><span>素材</span><b>×' + m.qty + '</b></div><div class="tip-line hint">用于合成/涅槃/进化/打造等消耗</div>';
-        card.onclick = () => showDetail(tip);
         bindTip(card, tip);
         bagItems.push(card);
       }
@@ -267,7 +309,6 @@
         card.className = 'poe-item q-cons';
         card.innerHTML = '<div class="ico">' + c.icon + '</div><div class="nm">' + escapeHtml(c.name) + '</div><div class="corner">×' + c.qty + '</div>';
         const tip = '<div class="tip-name">' + c.icon + ' ' + escapeHtml(c.name) + '</div><div class="tip-line"><span>' + c.desc + '</span><b>×' + c.qty + '</b></div><div class="tip-line hint">用于装备改造</div>';
-        card.onclick = () => showDetail(tip);
         bindTip(card, tip);
         bagItems.push(card);
       }
@@ -282,7 +323,7 @@
         card.className = 'poe-item q-egg';
         card.innerHTML = '<div class="ico">🥚</div><div class="nm">' + escapeHtml(eggName) + '</div><div class="corner">×' + count + '</div>';
         const tip = '<div class="tip-name">🥚 ' + escapeHtml(eggName) + '</div><div class="tip-line"><span>宠物蛋</span><b>×' + count + '</b></div><div class="tip-line hint">点击查看 / 孵化 ' + escapeHtml(baseName) + '，也可在市场交易</div>';
-        card.onclick = () => { showDetail(tip); showEggDetail(baseName, count, eggName); };
+        card.onclick = () => { showEggDetail(baseName, count, eggName); };
         bindTip(card, tip);
         bagItems.push(card);
       }
@@ -294,18 +335,30 @@
       grid.dataset.empty = totalCount ? '没有符合条件的物品' : '背包空空，去挂机捡装备吧';
     }
 
-    // ===== 真实背包格子：固定列数 + 空格槽（流放式凹槽网格） =====
-    const BAG_COLS = 6;      // 每行格子数
-    const BAG_MIN_ROWS = 5;  // 最少显示行数（物品少时也露出空格槽）
-    const n = bagItems.length;
-    const rows = Math.max(BAG_MIN_ROWS, Math.ceil(n / BAG_COLS));
-    const total = rows * BAG_COLS;
-    for (let i = 0; i < total; i++) {
-      const slot = document.createElement('div');
-      slot.className = 'bag-slot' + (i >= n ? ' empty' : '');
-      if (i < n) slot.appendChild(bagItems[i]);
-      grid.appendChild(slot);
-    }
+    // ===== 真实背包格子：先按估算列数铺槽位，渲染后按浏览器实际解析列数校正一次 =====
+    const renderSlots = cols => {
+      const n = bagItems.length;
+      const rows = Math.max(BAG_MIN_ROWS, Math.ceil(n / cols));
+      grid.innerHTML = '';
+      const total = rows * cols;
+      for (let i = 0; i < total; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'bag-slot' + (i >= n ? ' empty' : '');
+        if (i < n) slot.appendChild(bagItems[i]);
+        grid.appendChild(slot);
+      }
+    };
+    // 估算列数：容器内容宽 ÷（格 + 间隙）；容器尚不可见（背包窗未打开）时用回退值，打开后由监听校正
+    const innerW = (gridArea.clientWidth || 0) - BAG_PAD * 2;
+    const estCols = innerW > 0
+      ? Math.max(1, Math.floor((innerW + BAG_GAP) / (BAG_CELL + BAG_GAP)))
+      : BAG_FALLBACK_COLS;
+    renderSlots(estCols);
+    // 真实列数校正：auto-fill 由浏览器按容器宽解析，比估算准；最多重排一次，防抖动
+    const realCols = readRealCols(grid);
+    if (realCols && realCols !== estCols) renderSlots(realCols);
+    bagLastCols = realCols || estCols;
+    watchBagGrid(gridArea);
   }
 
   // 鉴定：消耗 1 鉴定石 → 揭晓未鉴定装备属性（扫光演出后重渲染）
