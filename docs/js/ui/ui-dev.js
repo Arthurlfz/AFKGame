@@ -912,10 +912,11 @@
       if (chainErr) { toast('❌ ' + chainErr, '引导标记已清 ' + n + ' 条，但引导链未重置'); return; }
       toast('已清除 ' + n + ' 条引导标记（含云端）并重置引导链', '刷新页面后从 G1 重走（已发过的奖励不回收）');
     };
-    // 清理重复教学副宠：配置 grants 里 type=pet 的名字，同名多只只留最早（云端 loadPets 按 created_at 升序，先到的在前）
+    // 清理重复教学副宠：2026-09-08 补给箱重构后 grants 已废弃；type=pet 的具名教学宠（当前配置无）
+    // 换成 supplyBox 来源。注意素材宠（fodder）同名多只是正常状态，绝不能进去被误删。
     const petDedupe = $('dev-pet-dedupe');
     if (petDedupe) petDedupe.onclick = async () => {
-      const T = (Config.tutorialMode && Config.tutorialMode.grants) || [];
+      const T = (Config.tutorialMode && Config.tutorialMode.supplyBox && Config.tutorialMode.supplyBox.items) || [];
       const names = T.filter(g => g.type === 'pet').map(g => g.name).filter(Boolean);
       const pets = (Pet.getPets && Pet.getPets()) || [];
       const seen = {};

@@ -1247,33 +1247,28 @@ window.Config = {
       { target: '.sb-btn[data-page="equip"]', title: '第三站 · 魂铸工坊', npc: '神兵不只出自掉落。这座铁砧，能把废品炼成护身之甲、把特质铸成传承。' },
       { target: '.sb-btn[data-page="market"]', title: '第四站 · 市集', npc: '当你足够强大，多余的造物可挂上市集，与天下魂师交换所需之物。' }
     ],
-    // 「钥匙表」：每个消耗型引导关声明它自己激活时需要的资源。
-    // 引擎（tutorial_mode.applyGrantsFor）在任务激活时按【当前库存差量】补齐，幂等自愈：
-    //   材料/蛋/装备/副宠 缺多少补到多少，库存够就什么都不发。
-    // 任务奖励只是锦上添花的正向反馈，不再承担"喂下一关"的职责——奖励被花掉也卡不了链。
-    grants: [
-      // G2 进化：进化素材 ×1（g1 奖励可能已被消耗，这里兜底）
-      { taskId: 'g2', type: 'mat', name: '进化素材', qty: 1 },
-      // G3 穿装备：一件未穿戴的装备（g1 蓝装可能已被提前穿上，兜底一件）
-      { taskId: 'g3', type: 'gear', spec: { rarity: 'blue', areaTier: 1, materialTier: 3, count: 1, identified: true } },
-      // G4 打造：需要"背包装备 + 石头"，各兜底一件/一颗
-      { taskId: 'g4', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
-      { taskId: 'g4', type: 'mat', name: '重铸石', qty: 1 },
-      // G5 化废为宝：分解需要一件背包装备当"废品"
-      { taskId: 'g5', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
-      // G6 孵化：孵化吃"按品种的蛋"（Drop.hatchEgg），不是材料 → 直接发真蛋
-      { taskId: 'g6', type: 'egg', baseName: '腐噜兽', qty: 1 },
-      // G7 融合：合成之石 + 保证素材池 ≥3 只（合成要吃掉 2 只，剩下 1 只 + 合成产物 = G9 涅槃的两只）。
-      // 血泪：曾用自命名「泥沼从者」当副宠 —— 那是凭空造物种，玩家完全没见过。现在只补已有基础宠，
-      // 不发明任何新名字。补的数量 = 缺口（幂等），宠物等级由经验包统一顶到门槛。
-      { taskId: 'g7', type: 'mat', name: '合成之石', qty: 1 },
-      { taskId: 'g7', type: 'petCount', baseName: '腐噜兽', min: 3 },
-      // G8 上架：一件未穿戴装备
-      { taskId: 'g8', type: 'gear', spec: { rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true } },
-      // G9 登临终阶：进化素材全额兜底（G9 不再是涅槃，见上；终阶共需 精粹1 + 传说5）
-      { taskId: 'g9', type: 'mat', name: '精粹进化素材', qty: 1 },
-      { taskId: 'g9', type: 'mat', name: '传说进化素材', qty: 5 }
-    ]
+    /* 「新手补给箱」（2026-09-08 重构，替代旧 grants 差量补齐）：
+     * 旧机制按库存差量补钥匙，玩家消耗即误判 → 重登可无限刷（G5 白装/G6 蛋/G7 素材宠最严重）。
+     * 新机制：进入第一个引导关时一次性发全箱（账本 supplyBox 守门，仅一次）；
+     * 玩家中途把钥匙弄丢 → 引导条「补发」按钮手动补，每关每种限 1 次（走账本 reissue:*）。
+     * items 里 taskIds 标注这把钥匙服务哪一关：引导条据此显示"缺什么"、补发据此定位。
+     * 注意：白装不能绑定 —— G8 教学任务本身要求上架装备，绑了就卡死 G8。防刷靠账本，不靠绑定。 */
+    supplyBox: {
+      name: '新手补给箱',
+      items: [
+        { type: 'mat', name: '进化素材', qty: 1, taskIds: ['g2'] },
+        { type: 'gear', rarity: 'blue', areaTier: 1, materialTier: 3, count: 1, identified: true, taskIds: ['g3'] },
+        { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g4'] },
+        { type: 'mat', name: '重铸石', qty: 1, taskIds: ['g4'] },
+        { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g5'] },
+        { type: 'egg', baseName: '腐噜兽', qty: 1, taskIds: ['g6'] },
+        { type: 'mat', name: '合成之石', qty: 1, taskIds: ['g7'] },
+        { type: 'fodder', baseName: '腐噜兽', min: 3, taskIds: ['g7'] },
+        { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g8'] },
+        { type: 'mat', name: '精粹进化素材', qty: 1, taskIds: ['g9'] },
+        { type: 'mat', name: '传说进化素材', qty: 5, taskIds: ['g9'] }
+      ]
+    },
   },
 
   dev: {

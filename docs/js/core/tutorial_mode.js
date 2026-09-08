@@ -266,107 +266,116 @@
   }
 
   /* ============================================================
-   * 教学补给 = 「这一关的钥匙」按库存差量补齐（第一原则版）
-   * 反模式（已废弃）：一次性标记发放 + 靠"上一关奖励喂下一关"。
-   *   奖励会被玩家花掉/卖掉/穿在身上，链因此断；补发标记一丢又造成重复发放。
-   * 现在：每个引导关在 config.tutorialMode.grants 声明它【自己】要用的钥匙，
-   * checkGuide 在任务激活时调用 applyGrantsFor → 逐项对当前库存求差：
-   *   - 材料：< 需求量 → 补到需求
-   *   - 装备：背包未穿戴件数 < 需求量 → 补足
-   *   - 蛋  ：该品种蛋数 < 需求量 → 补足
-   *   - 宠物：缺同名 → 建一只
-   * 幂等（不靠标记）：补齐后库存达标，再次调用什么都不发。
-   * 自愈：奖励被花掉/历史账号卡链，重登触发一次 reconcile 即恢复，无需推倒重走。
+   * 新手补给箱（2026-09-08 重构，替代旧 applyGrantsFor 差量补齐）
+   * 旧机制（已删）：任务激活时按库存差量补钥匙 → 玩家消耗钥匙即被误判"没发过"
+   *   → 重登/重交无限刷（G5 白装分解、G6 蛋、G7 素材宠最严重）。
+   * 新机制：
+   *   - 一次性：进入第一个引导关时整箱发放，账本 supplyBox 守门（仅一次）。
+   *   - 自愈靠手动：钥匙弄丢卡关 → 引导条「补发」按钮（reissueKeys），
+   *     每关每种限 1 次，走账本 reissue:{taskId}:{key} —— 不卡链也刷不了。
+   *   - 注意：白装不能绑定（G8 教学任务本身要求上架装备），防刷靠账本不靠绑定。
    * ============================================================ */
-  async function applyGrantsFor(taskId) {
-    if (!taskId) return;
-    // 安全闸：只允许给「当前正在做的引导关」补钥匙。
-    // 反例：玩家开控制台调 applyGrantsFor('g9') 想提前刷涅槃材料 → 不是当前任务，拒绝。
-    // 引导条显示的当前关（getGuideQuest）才是唯一合法任务。
-    const cur = (window.Quest && window.Quest.getGuideQuest) ? window.Quest.getGuideQuest() : null;
-    if (!cur || cur.id !== taskId) {
-      console.warn('[guide] 已拒绝：非当前引导任务，不允许补发钥匙:', taskId);
-      return;
+  function boxItems() { return (TM().supplyBox && TM().supplyBox.items) || []; }
+  // 每把钥匙的唯一 key（补发账本 keyId 用）
+  function itemKeyOf(it) {
+    return it.type + ':' + (it.name || it.baseName || '') + (it.rarity ? ':' + it.rarity : '');
+  }
+  // 该钥匙当前持有量（与发放口径一致：背包=未穿戴；素材宠=全宠数量）
+  function haveOf(it) {
+    const E = window.Equipment, D = window.Drop, Pet = window.Pet, M = window.Materials;
+    if (it.type === 'mat') return (M && M.getQuantity) ? (M.getQuantity(it.name) || 0) : 0;
+    if (it.type === 'gear') {
+      if (!E || !E.getInventory) return 0;
+      const rid = it.rarity || 'white';
+      return (E.getInventory() || []).filter(eq => eq && eq.rarity && eq.rarity.id === rid).length;
     }
-    const t = TM();
-    const list = (t.grants || []).filter(g => g.taskId === taskId);
-    if (!list.length) return;
-    const E = window.Equipment, D = window.Drop, Pet = window.Pet, I = window.Items, M = window.Materials;
-    const added = [];
-    for (const g of list) {
-      try {
-        if (g.type === 'gear') {
-          if (!E || !E.generateEquipment || !E.addToInventory) continue;
-          const spec = g.spec || {};
-          const need = Math.max(1, Number(spec.count) || 1);
-          const have = (E.getInventory ? E.getInventory() : []).length; // 背包 = 未穿戴
-          let add = need - have;
-          if (add <= 0) continue;
-          const rarity = (Config.equipment.rarities || []).find(r => r.id === (spec.rarity || 'white')) || (Config.equipment.rarities || [])[0];
-          for (let i = 0; i < add; i++) {
-            const eq = E.generateEquipment(rarity, spec.areaTier || 1, spec.materialTier || 1);
-            eq.identified = spec.identified === false ? false : true;
-            E.addToInventory(eq);
-            added.push('装备×1');
-            if (I && I.saveItem) { const r = await I.saveItem(eq); if (r && r.error) console.warn('[guide] 补给装备云端存档失败', r.error); }
-          }
-        } else if (g.type === 'mat' || g.type === 'mats') {
-          const items = g.type === 'mat' ? [{ name: g.name, qty: g.qty || 1 }] : (g.list || []);
-          for (const m of items) {
-            const need = Math.max(1, Number(m.qty) || 1);
-            const have = (M && M.getQuantity) ? M.getQuantity(m.name) : 0;
-            const add = need - have;
-            if (add <= 0) continue;
-            await M.gain(m.name, add);
-            added.push(m.name + '×' + add);
-          }
-        } else if (g.type === 'egg') {
-          if (!D || !D.grantEgg) continue;
-          const base = g.baseName || '腐噜兽';
-          const need = Math.max(1, Number(g.qty) || 1);
-          const have = D.getEggCountOf ? D.getEggCountOf(base) : 0;
-          const add = need - have;
-          for (let i = 0; i < add; i++) { await D.grantEgg(base, 1); added.push(base + '蛋×1'); }
-        } else if (g.type === 'pet') {
-          if (!Pet || !Pet.getPets || !Pet.createPet) continue;
-          if (Pet.getPets().some(p => p && p.name === g.name)) continue;
-          await grantPet(g); // 内部已做同名幂等 + 云端建档失败兜底
-          added.push('宠物「' + g.name + '」');
-        } else if (g.type === 'petCount') {
-          // 素材池差量补宠：总数 < min → 补到 min（用真实基础宠，不发明新物种）
-          if (!Pet || !Pet.getPets || !Pet.createPet) continue;
-          const min = Math.max(1, Number(g.min) || 1);
-          const add = min - Pet.getPets().length;
-          const base = g.baseName || '腐噜兽';
-          for (let i = 0; i < add; i++) { await grantFodderPet(base); added.push('素材宠「' + base + '」'); }
-        }
-      } catch (e) {
-        console.warn('[guide] 教学补给失败', g, e);
+    if (it.type === 'egg') return (D && D.getEggCountOf) ? (D.getEggCountOf(it.baseName || '腐噜兽') || 0) : 0;
+    if (it.type === 'fodder') return (Pet && Pet.getPets) ? (Pet.getPets() || []).length : 0;
+    return 0;
+  }
+  function needOf(it) {
+    if (it.type === 'gear') return Math.max(1, Number(it.count) || 1);
+    if (it.type === 'fodder') return Math.max(1, Number(it.min) || 1);
+    return Math.max(1, Number(it.qty) || 1);
+  }
+  // 只读检测：这一关还缺哪些钥匙（引导条显示用，不发任何东西）
+  function missingKeysFor(taskId) {
+    if (!taskId) return [];
+    return boxItems()
+      .filter(it => !it.taskIds || it.taskIds.indexOf(taskId) >= 0)
+      .map(it => ({ it, key: itemKeyOf(it), need: needOf(it), have: haveOf(it) }))
+      .filter(x => x.have < x.need)
+      .map(x => ({ key: x.key, type: x.it.type, name: x.it.name || x.it.baseName, need: x.need, have: x.have, item: x.it }));
+  }
+  // 按缺口发一把钥匙（amount = 要发的数量）。云端存档失败只提示不回滚（同任务奖励口径）。
+  async function grantBoxItem(it, amount) {
+    const E = window.Equipment, D = window.Drop, I = window.Items, M = window.Materials;
+    const n = Math.max(0, Number(amount) || 0);
+    if (n <= 0) return [];
+    const got = [];
+    if (it.type === 'mat') {
+      if (M && M.gain) { await M.gain(it.name, n); got.push(it.name + '×' + n); }
+    } else if (it.type === 'gear') {
+      if (!E || !E.generateEquipment || !E.addToInventory) return got;
+      const rarity = (Config.equipment.rarities || []).find(r => r.id === (it.rarity || 'white')) || (Config.equipment.rarities || [])[0];
+      for (let i = 0; i < n; i++) {
+        const eq = E.generateEquipment(rarity, it.areaTier || 1, it.materialTier || 1);
+        eq.identified = it.identified === false ? false : true;
+        E.addToInventory(eq);
+        got.push(((eq.rarity && eq.rarity.label) || '') + '装备「' + eq.name + '」');
+        if (I && I.saveItem) { const r = await I.saveItem(eq); if (r && r.error) console.warn('[guide] 补给装备云端存档失败', r.error); }
       }
+    } else if (it.type === 'egg') {
+      if (D && D.grantEgg) { for (let i = 0; i < n; i++) await D.grantEgg(it.baseName || '腐噜兽', 1); got.push((it.baseName || '腐噜兽') + '蛋×' + n); }
+    } else if (it.type === 'fodder') {
+      for (let i = 0; i < n; i++) { await grantFodderPet(it.baseName || '腐噜兽'); got.push('素材宠「' + (it.baseName || '腐噜兽') + '」'); }
     }
-    if (!added.length) {
-      // 诊断：任务激活了、钥匙表也配了，却无事可补 —— 把“应该补 vs 实际有”打出来，方便定位
-      console.warn('[guide] reconcile 无事可补（清单与当前库存）:', taskId, list.map(function (g) {
-        if (g.type === 'egg') {
-          return { type: 'egg', base: g.baseName, need: g.qty, have: (D && D.getEggCountOf) ? D.getEggCountOf(g.baseName || '腐噜兽') : '?', eggMap: (D && D.getEggs) ? D.getEggs() : null };
-        }
-        if (g.type === 'gear') {
-          return { type: 'gear', need: (g.spec && g.spec.count) || 1, haveBag: (E && E.getInventory) ? E.getInventory().length : '?' };
-        }
-        if (g.type === 'pet') {
-          return { type: 'pet', name: g.name, have: (Pet && Pet.getPets) ? Pet.getPets().some(p => p && p.name === g.name) : '?' };
-        }
-        const items = g.type === 'mat' ? [{ name: g.name, qty: g.qty }] : (g.list || []);
-        return { type: g.type, mats: items.map(m => ({ name: m.name, need: m.qty, have: (M && M.getQuantity) ? M.getQuantity(m.name) : '?' })) };
-      }));
-      return;
+    return got;
+  }
+  // 整箱发放（账本 supplyBox 守门后调用，仅一次）：按缺口补到配置量
+  async function openSupplyBox() {
+    const M = window.Materials;
+    const added = [];
+    for (const it of boxItems()) {
+      try {
+        const add = Math.max(0, needOf(it) - haveOf(it));
+        if (add <= 0) continue;
+        const got = await grantBoxItem(it, add);
+        added.push.apply(added, got);
+      } catch (e) { console.warn('[guide] 补给箱发放失败', it, e); }
     }
     if (M && M.flushMaterials) { try { await M.flushMaterials(); } catch (e) { /* 忽略 */ } }
-    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略渲染异常 */ } }
-    if (window.UI && window.UI.addLog) window.UI.addLog(`教学补给到账（${taskId}）：${added.join('、')}`);
-    if (window.UI && window.UI.showToast) {
-      try { window.UI.showToast('教学补给到账', added.join('、') + ' —— 这一关的钥匙已备好'); } catch (e) { /* 忽略 */ }
+    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
+    const boxName = (TM().supplyBox && TM().supplyBox.name) || '新手补给箱';
+    if (added.length) {
+      if (window.UI && window.UI.addLog) window.UI.addLog(`${boxName}已开启：${added.join('、')}`);
+      if (window.UI && window.UI.showToast) {
+        try { window.UI.showToast(boxName, added.join('、') + ' —— 引导全程的钥匙都在这了'); } catch (e) { /* 忽略 */ }
+      }
+    } else {
+      if (window.UI && window.UI.addLog) window.UI.addLog(`${boxName}已开启（钥匙都在背包里，没重复发）`);
     }
+    return added;
+  }
+  // 手动补发（引导条「补发」按钮）：只给当前引导关补缺的钥匙，每关每种限 1 次（账本）
+  async function reissueKeys(taskId) {
+    const cur = (window.Quest && window.Quest.getGuideQuest) ? window.Quest.getGuideQuest() : null;
+    if (!cur || cur.id !== taskId) return { ok: false, error: '只能为当前引导关补发钥匙' };
+    const missing = missingKeysFor(taskId);
+    if (!missing.length) return { ok: true, skipped: true };
+    const granted = [], blocked = [];
+    for (const m of missing) {
+      const r = await grantOnce('reissue:' + taskId + ':' + m.key, async () => {
+        const got = await grantBoxItem(m.item, Math.max(1, m.need - m.have));
+        const M = window.Materials;
+        if (M && M.flushMaterials) { try { await M.flushMaterials(); } catch (e) { /* 忽略 */ } }
+        if (got.length && window.UI && window.UI.addLog) window.UI.addLog(`补发钥匙（${taskId}）：${got.join('、')}`);
+      }, { max: 1 });
+      if (r.ok) granted.push(m.name || m.key);
+      else if (!/已发放过/.test(r.error || '')) blocked.push((m.name || m.key) + '：' + r.error);
+    }
+    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
+    return { ok: granted.length > 0, granted, blocked };
   }
 
   function rarityLabel(r) {
@@ -392,60 +401,6 @@
         const { data, error } = await supabase.savePet(pet);
         if (!error && data && data.id) pet.cloudId = data.id;
       } catch (e) { console.warn('[guide] 素材宠云端建档异常', e); }
-    }
-  }
-
-  // 教学副宠：创建 + 特质 + 存档（有 cloudId 才能被合成/涅槃/魂铸）
-  async function grantPet(g) {
-    const Pet = window.Pet;
-    if (!Pet || !Pet.createPet) return;
-    // 幂等：账号名下已有同名教学副宠（登录时云端宠物已全量在本地列表）→ 不再重复发。
-    // 血泪：补发标记曾只存 localStorage，清缓存/换设备就丢 → checkGuide 每登一次重发一只，
-    // 云端一路 INSERT 出 N 只同款「泥沼从者」。这里按名挡一层，并把已存在的重复旧档顺手清掉。
-    const same = (Pet.getPets ? Pet.getPets() : []).filter(p => p && p.name === g.name);
-    if (same.length) {
-      if (same.length > 1) {
-        // 自愈：只留一只（优先有 cloudId 的正式档，否则最早那只），其余删云端+本地
-        const keep = same.find(p => p.cloudId) || same[0];
-        const supabase = window.Supabase;
-        let cleaned = 0;
-        for (const d of same) {
-          if (d === keep) continue;
-          try {
-            if (d.cloudId && supabase && supabase.deletePet) {
-              const r = await supabase.deletePet(d.cloudId);
-              if (r && r.error) { console.warn('[guide] 删除重复教学副宠云端失败', d.cloudId, r.error); continue; }
-            }
-            Pet.removePet(d.id);
-            cleaned++;
-          } catch (e) { console.warn('[guide] 清理重复教学副宠异常', e); }
-        }
-        if (cleaned > 0) console.warn(`[guide] 教学副宠重复，已自动清理 ${cleaned} 只，保留 ${keep.name}`);
-      }
-      return;
-    }
-    const base = (Config.pet.starters || []).find(s => s.name === g.baseName);
-    const B = Config.pet.legacyBase || {};
-    const pet = Pet.createPet(g.name || g.baseName, (base && base.icon) || '',
-      g.growth || 5, (base && base.baseHp) || B.hp || 100, (base && base.baseAtk) || B.atk || 20,
-      (base && base.baseDef) || B.def || 10, (Config.pet.speeds && Config.pet.speeds[g.baseName]) || B.spd || 40, g.baseName || '腐噜兽');
-    pet.level = g.level || 1;
-    if (g.traits && g.traits.length) {
-      pet.traits = g.traits.map(id => ({ id, tier: 2 }));
-    } else if (Pet.rollPetTraits) {
-      Pet.rollPetTraits(pet, {});
-    }
-    Pet.addPet(pet);
-    const supabase = window.Supabase;
-    if (supabase && supabase.savePet) {
-      try {
-        const { data, error } = await supabase.savePet(pet);
-        if (!error && data && data.id) pet.cloudId = data.id;
-        else if (error) console.warn('[guide] 教学副宠云端建档失败', error);
-      } catch (e) {
-        // 存档失败不抛：本地已在（applyGrantsFor 已先落「已发」标记），下次同名幂等会跳过，不会叠宠
-        console.warn('[guide] 教学副宠云端建档异常', e);
-      }
     }
   }
 
@@ -541,14 +496,18 @@
     const task = shown || internal;
     if (task) {
       // 进入引导 → 打「引导已开始」标记（Q6：老账号链已完成、没真正走过引导 → 不发礼包）
-      if (!readStarted()) markStarted();
+      if (!readStarted()) {
+        markStarted();
+        // 新手补给箱：第一次进引导 → 整箱一次性发（账本 supplyBox 守门，仅一次）。
+        // 老账号（引导已开始、账本无 supplyBox 记录）不自动发 —— 避免与已拿过的差量资源叠加，
+        // 钥匙弄丢走引导条「补发」按钮（每关每种限 1 次）。
+        await grantOnce('supplyBox', openSupplyBox);
+      }
       // buff 已激活且超时 → 自动关（玩家用完 30 分钟恢复正式节奏）
       if (active && buffExpired()) exit();
       // 引导经验包：把名下所有宠顶到本任务的等级门槛
       // （进化 Lv10 / 合成 Lv40 两只都要 / 涅槃 Lv60 两只都要 —— 只顶出战宠会卡在融合）
       if (task.boostLevel) await boostGuidePetToLevel(task.boostLevel);
-      // 教学补给 = 按库存差量补齐这一关的钥匙（幂等自愈，不依赖任何"已发"标记）
-      await applyGrantsFor(task.id);
       return;
     }
     // 引导段全完成
@@ -630,11 +589,13 @@
 
   window.TutorialMode = {
     enter, exit, isActive, bindUser,
-    hasClaimedPack, markClaimedPack, checkGuide, applyGrantsFor, grantStarterPack, markSkipped,
+    hasClaimedPack, markClaimedPack, checkGuide, grantStarterPack, markSkipped,
     hasBlessing, useBlessing, blessingActive, blessingRemainSec, grantInitialBlessing,
     startGuideRoutine,
     boostGuidePetToLevel,  // 引导经验包：把出战宠顶到指定等级（教学期等级门槛专用）
     // 发放账本（2026-09-08）：经济类发放统一走这里；补发钥匙用 grantOnce(keyId, fn, {max})
-    grantOnce, ledgerOf, ledgerBackfill
+    grantOnce, ledgerOf, ledgerBackfill,
+    // 新手补给箱（2026-09-08）：missingKeysFor 只读检测 + reissueKeys 手动补发（每关每种限1次）
+    missingKeysFor, reissueKeys, openSupplyBox
   };
 })();

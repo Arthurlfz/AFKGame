@@ -398,13 +398,20 @@
     bar.innerHTML = items.map(it => {
       const pct = it.need ? Math.min(100, Math.round(it.progress / it.need * 100)) : 0;
       const g = guideOf(it);
+      // 补发钥匙（2026-09-08 补给箱重构）：这一关的钥匙被花掉/卖掉 → 引导条给手动补发，
+      // 每关每种限 1 次（账本）。不显示 = 不缺，别让按钮常驻打扰。
+      const T = window.TutorialMode;
+      const missing = (it.isTutorial && T && T.missingKeysFor) ? T.missingKeysFor(it.id) : [];
+      const reissueBtn = (missing.length && T && T.reissueKeys)
+        ? `<button class="btn-mini ghost qt-reissue" data-id="${it.id}" title="${escapeHtml('钥匙弄丢了？补一次（每关每种限 1 次）：' + missing.map(m => m.name || m.key).join('、'))}">补钥匙</button>`
+        : '';
       const acts = it.isTutorial
         // 引导任务已达标 → 主按钮变「领取奖励」（G1 领资粮这类"等级即目标"的任务靠它交）
         ? (it.done
             ? `<button class="btn-mini primary qt-submit" data-id="${it.id}">领取奖励</button>
                <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`
             : `<button class="btn-mini primary qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
-               <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
+               ${reissueBtn}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
         : `<button class="btn-mini ghost qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
            <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`;
       return `<div class="qt-item${it.done ? ' qt-done' : ''}" data-id="${it.id}">
@@ -441,6 +448,24 @@
     });
     const skip = bar.querySelector('.qt-skip');
     if (skip) skip.onclick = () => { if (Quest.skipGuide) Quest.skipGuide(); renderQuestTracker(); };
+    // 补发钥匙：账本限每关每种 1 次；重复点会被 grantOnce 拦下并提示
+    bar.querySelectorAll('.qt-reissue').forEach(b => {
+      b.onclick = async () => {
+        const T = window.TutorialMode;
+        if (!T || !T.reissueKeys) return;
+        const label = b.textContent;
+        b.disabled = true;
+        b.textContent = '补发中…';
+        let r;
+        try { r = await T.reissueKeys(b.dataset.id); }
+        finally { b.disabled = false; b.textContent = label; }
+        if (r && r.error) { if (UI.showToast) UI.showToast('无法补发', r.error); }
+        else if (r && r.skipped) { if (UI.showToast) UI.showToast('不缺钥匙', '这一关的钥匙都在，直接做任务吧'); }
+        else if (r && r.ok) { if (UI.showToast) UI.showToast('钥匙已补发', (r.granted || []).join('、')); }
+        else { if (UI.showToast) UI.showToast('补发未完成', ((r && r.blocked) || []).join('；') || '该钥匙已补发过一次'); }
+        renderQuestTracker();
+      };
+    });
     bar.querySelectorAll('.qt-untrack').forEach(b => {
       b.onclick = () => { Quest.toggleTrack(b.dataset.id); renderQuestTracker(); };
     });
