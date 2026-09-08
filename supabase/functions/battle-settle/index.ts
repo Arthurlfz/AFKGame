@@ -48,6 +48,25 @@ function json(body, status = 200) {
 }
 
 Deno.serve(async (req) => {
+  /* ⚠️ 全局 try/catch（2026-09-08 血泪）：
+   * 之前 handler 任何一处抛异常（如 pets/equip_items 行里出现脏引用）都会变成
+   * Deno 未捕获异常 → 网关返回【裸 500，无 error/detail】→ 前端和开发者都无从定位，
+   * 只能看 Postgres 日志盲猜。现在异常必须带着 error/detail 回到响应体。
+   * （2026-09-08 现场取证：Postgres 每 1.2s 报一次 `invalid input syntax for type uuid: "null"`，
+   *   与前端 500 完全同步 —— 脏 uuid 引用进了查询。见下方 equipIds 白名单过滤。） */
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error('[battle-settle] 未捕获异常:', e);
+    return json({
+      ok: false,
+      error: 'INTERNAL',
+      detail: String((e && (e as Error).message) || e)
+    }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, 405);
 
@@ -123,9 +142,12 @@ Deno.serve(async (req) => {
   if (!petRow) return json({ ok: false, error: 'PET_NOT_FOUND' });
 
   // 4) 读装备（容错：失败按裸装结算，P1 不阻塞）
+  // ⚠️ 白名单过滤：equipment jsonb 里若混入脏引用（"null"/数字/坏串），
+  //    .in('id', ...) 会把整条查询炸成 invalid uuid —— postgres 日志里的 500 元凶之一。
   let equipItems = [];
   const equipRef = (petRow.equipment && typeof petRow.equipment === 'object') ? petRow.equipment : {};
-  const equipIds = Object.values(equipRef).filter(x => x);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const equipIds = Object.values(equipRef).filter((x: any) => typeof x === 'string' && UUID_RE.test(x));
   if (equipIds.length) {
     const { data: items, error: eqErr } = await supabase
       .from('equip_items')
@@ -212,4 +234,4 @@ Deno.serve(async (req) => {
     totalFights: settleRes?.total_fights ?? session.total_fights + plan.result.totalFights,
     totalExp: settleRes?.total_exp ?? session.total_exp + plan.result.totalExp
   });
-});
+}

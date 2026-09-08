@@ -53,7 +53,7 @@ A(dropObj&&dropObj.dropOk===true,'rollReward 能掉落并入库（装备/蛋）'
 // 注意 equipItem(pet, id) 收的是装备 id，不是装备对象。
 // 以前这里传的是 inv[0]（对象）→ findIndex 找不到 → 装备根本没穿上，
 // 而断言只看 getEquipBonuses 返回的对象结构 → 假通过（2026-08-29 修）。
-const eqDiag=C('(function(){try{const inv=Equipment.getInventory();if(!inv.length)return "no-item";const p=Pet.getActivePet();const eq=inv[0];const res=Equipment.equipItem(p,eq.id);const b=Equipment.getEquipBonuses(p);return JSON.stringify({hasItem:!!eq,slot:eq&&eq.slot,equipped:!!(res&&res.equipped),inSlot:!!(p.equipment&&p.equipment[eq.slot]),bonusKeys:Object.keys(b)})}catch(e){return "err:"+e.message}})()');
+const eqDiag=C('(function(){try{const inv=Equipment.getInventory();if(!inv.length)return "no-item";const p=Pet.getActivePet();const eq=inv[0];eq.identified=true;const res=Equipment.equipItem(p,eq.id);const b=Equipment.getEquipBonuses(p);return JSON.stringify({hasItem:!!eq,slot:eq&&eq.slot,equipped:!!(res&&res.equipped),inSlot:!!(p.equipment&&p.equipment[eq.slot]),bonusKeys:Object.keys(b)})}catch(e){return "err:"+e.message}})()');
 console.log('  [eqDiag] '+eqDiag);
 // 只穿一次：穿上后装备就从背包移走了，再调一次会拿到空背包
 const d=(()=>{try{return JSON.parse(eqDiag)}catch(e){return {}}})();

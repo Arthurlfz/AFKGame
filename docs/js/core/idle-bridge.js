@@ -257,6 +257,10 @@
         if (window.UI) window.UI.updateStatus('stopped', totalFights);
         return r;
       }
+      /* 失败也要设冷却（2026-09-08 血泪）：gaugeTick 每帧都在等剧本，
+       * 剧本空 + settle 失败 + 无冷却 = 每秒轰炸一次服务器（控制台 500 刷屏就是它）。
+       * 冷却 30s = 正常结算节奏：真账由服务器惰性记账，晚结算不亏。 */
+      nextScriptTryAt = Date.now() + SCRIPT_RETRY_MS;
       if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机暂时没有更新，正在继续运行…');
       return r;
     }

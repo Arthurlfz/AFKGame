@@ -59,8 +59,11 @@ const inv0 = await C(`(async()=>{
 A(inv0 > 0, `掉落装备已入库（背包 ${inv0} 件）`);
 
 // —— 穿到身上 ——
+// ⚠️ 2026-09-08：掉落即未鉴定（drop.js "PoE 式鉴定流"），未鉴定不能穿（equipment.equipItem 拦截）。
+// 本测试守的是"穿→F5→还在"，不是鉴定流 → 先把这件鉴定掉再穿，与玩家真实操作一致。
 const equipInfo = C(`(function(){
   const inv=Equipment.getInventory(); const p=Pet.getActivePet();
+  inv[0].identified = true;   // 模拟玩家已用鉴定石揭晓
   const r=Equipment.equipItem(p, inv[0].id);
   return r && r.equipped ? {slot:r.equipped.slot, name:r.equipped.name, cloudId:r.equipped.cloudId, id:r.equipped.id} : null;
 })()`);

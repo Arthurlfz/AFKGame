@@ -344,20 +344,34 @@
       const btn = btnCast;
       btn.disabled = true;
       btn.textContent = '⚒ 魂铸中…';
-      const petObj = (window.Pet && window.Pet.getPets ? window.Pet.getPets() : []).find(p => p.id === soulState.petId);
-      if (!petObj) { btn.disabled = false; btn.textContent = '⚒ 确认魂铸'; return; }
-      const res = await Craft.soulCast(eq, petObj, soulState.tier, soulState.traitId || undefined);
-      const box = body.querySelector('#craft-soul-result');
-      if (!box) { if (UI.renderAll) UI.renderAll(); return; }
-      if (res && res.ok) {
-        box.innerHTML = `<span style="color:#7fae7f">⚒ 魂铸成功：${res.aff.label}（T${res.aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
-        addLog(`⚒ 魂铸成功：${eq.name} 获得 ${res.aff.label}（T${res.aff.tier}），${res.petName} 被消耗`);
-        showToast('⚒ 魂铸成功', `${res.aff.label}（T${res.aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
-        // 宠已被消耗、装备已有魂铸词缀 → 清空选择，避免残留指向不存在的宠
-        soulState.petId = null; soulState.traitId = null;
-        if (UI.renderAll) UI.renderAll();
-      } else {
-        box.innerHTML = `<span class="err">❌ ${(res && res.error) || '魂铸失败'}</span>`;
+      /* ⚠️ 整段必须 try/catch（2026-09-08 血泪）：
+       * 这里原来读 res.aff.label，但 Craft.soulCast 返回的字段名是 soulAffix（没有 aff）
+       * → 魂铸其实已经成功，却在这一行抛 TypeError → 后面的 btn.disabled=false 永远不执行
+       * → 按钮永久卡在「魂铸中…」，玩家以为整条线坏了。
+       * 结论：任何 await 之后的异常都必须先把按钮放回来，否则一次小错误 = 界面永久卡死。 */
+      try {
+        const petObj = (window.Pet && window.Pet.getPets ? window.Pet.getPets() : []).find(p => p.id === soulState.petId);
+        if (!petObj) { btn.disabled = false; btn.textContent = '⚒ 确认魂铸'; return; }
+        const res = await Craft.soulCast(eq, petObj, soulState.tier, soulState.traitId || undefined);
+        const box = body.querySelector('#craft-soul-result');
+        if (!box) { if (UI.renderAll) UI.renderAll(); return; }
+        if (res && res.ok) {
+          const aff = res.soulAffix || {};
+          box.innerHTML = `<span style="color:#7fae7f">⚒ 魂铸成功：${aff.label || '魂铸词缀'}（T${aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
+          addLog(`⚒ 魂铸成功：${eq.name} 获得 ${aff.label || '魂铸词缀'}（T${aff.tier}），${res.petName} 被消耗`);
+          showToast('⚒ 魂铸成功', `${aff.label || '魂铸词缀'}（T${aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
+          // 宠已被消耗、装备已有魂铸词缀 → 清空选择，避免残留指向不存在的宠
+          soulState.petId = null; soulState.traitId = null;
+          if (UI.renderAll) UI.renderAll();
+        } else {
+          box.innerHTML = `<span class="err">❌ ${(res && res.error) || '魂铸失败'}</span>`;
+          btn.disabled = false;
+          btn.textContent = '⚒ 确认魂铸';
+        }
+      } catch (e) {
+        console.error('[soulcast] 魂铸异常', e);
+        const box = body.querySelector('#craft-soul-result');
+        if (box) box.innerHTML = `<span class="err">❌ 魂铸异常：${(e && e.message) || e}</span>`;
         btn.disabled = false;
         btn.textContent = '⚒ 确认魂铸';
       }
