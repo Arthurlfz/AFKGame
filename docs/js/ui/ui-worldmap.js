@@ -287,7 +287,7 @@
     // 返回大地图
     const back = body.querySelector('#nd-back');
     if (back) back.onclick = () => { el.hidden = true; };
-    // 出战宠物切换：setActive 后重渲染详情页（下一场生效，与战斗页 roster 同口径）
+    // 出战宠物切换：点击头像 setActive 后重渲染详情页（下一场生效，与战斗页 roster 同口径）
     body.querySelectorAll('.nd-pet').forEach(card => {
       card.onclick = () => {
         const pid = card.dataset.pid;
