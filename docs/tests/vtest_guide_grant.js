@@ -115,6 +115,15 @@ true`);
   const g3r = await Q(`TutorialMode.grantOnce('ledger-fail', async () => { globalThis.__ran += 10; })`);
   A(g3r && g3r.ok && C(`globalThis.__ran`) === 11, '重载后自愈：云端确实没有这条账 → 可再发');
 
+  /* ---------- 根因回归：经验包顶等级必须 update，不得 INSERT 复制宠 ---------- */
+  C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,40,'腐噜兽');Pet.addPet(p);globalThis.__fodder=p;return true})()`);
+  await Q(`(async()=>{ const r = await Supabase.savePet(globalThis.__fodder); if (r.data && r.data.id) globalThis.__fodder.cloudId = r.data.id; })()`);
+  const rowsAfterInsert = C(`petsTable.length`);
+  const br2 = await Q(`TutorialMode.boostGuidePetToLevel(10)`);
+  A(br2 && br2.ok, 'boostGuidePetToLevel 把 Lv1 素材宠顶到 Lv10');
+  A(C(`petsTable.length`) === rowsAfterInsert, '顶等级后云端行数不变（update 而非 INSERT——2026-09-08 复制宠根因回归）');
+  A(C(`petsTable.find(x => x.id === __fodder.cloudId).level`) === 10, '云端该宠等级已更新为 10（同一行）');
+
   /* ---------- resetGuideChain 管理员鉴权 ---------- */
   const deny = C(`Quest.resetGuideChain()`);
   A(deny && deny.error, '非管理员调用 resetGuideChain 被拒（' + ((deny && deny.error) || '') + '）');

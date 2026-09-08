@@ -507,6 +507,14 @@
   async function savePet(p) {
     const S = window.Supabase;
     if (!S || !S.savePet) return;
+    // 已建档的宠走 update（savePet 是无条件 INSERT，会复制出重复宠——2026-09-08 血泪）
+    if (p.cloudId && S.updatePet) {
+      const { error } = await S.updatePet(p.cloudId, {
+        level: p.level, exp: Math.max(0, Math.round(p.exp || 0)), growth: p.growth, name: p.name
+      });
+      if (error) { if (UI.showToast) UI.showToast('⚠️ 云端更新失败', error.message || String(error)); }
+      return;
+    }
     const { data, error } = await S.savePet(p);
     if (error) { if (UI.showToast) UI.showToast('⚠️ 云端存档失败', error.message || String(error)); return; }
     if (data && data.id) p.cloudId = data.id;

@@ -225,10 +225,16 @@
     if (M.resetLevel) { main.level = 1; main.exp = 0; }
     main.curHp = getStats(main).hp;
 
-    // 副宠消失
-    removePet(sub.id);
-    const { error: delErr } = await Supabase.deletePet(sub.cloudId);
-    if (delErr) console.warn('云端删除副宠失败：', delErr.message);
+    // 副宠消失。顺序铁律（2026-09-08）：先删云端、成功才删本地——
+    // 反过来时云端删除失败（网络抖动）副宠会在刷新后"复活"（本地已删、云端还在，
+    // loadPets 全量拉回就凭空多宠）。删除失败保留本地行，玩家资产不凭空消失，可重试放生。
+    const delSub = await Supabase.deletePet(sub.cloudId);
+    if (delSub.error) {
+      console.warn('云端删除副宠失败，本地保留（刷新后仍在，请重试放生）：', delSub.error.message);
+      if (window.UI && window.UI.addLog) window.UI.addLog(`⚠️ 副宠「${sub.name}」云端删除失败，它还在你的列表里，稍后可再试放生`);
+    } else {
+      removePet(sub.id);
+    }
 
     // 主宠成长/等级同步云端
     const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits, evolve_stage: main.evolveStage };
@@ -345,19 +351,32 @@
     const cloudWarn = saved.error ? ('新宠云端建档失败：' + saved.error.message) : null;
     if (cloudWarn) console.warn(cloudWarn);
 
-    // 两只素材宠都消失（本地 + 云端）
-    // 云端删除失败必须记录：否则素材宠刷新后"复活"，看起来就是"合成一次却多出一只"
-    removePet(main.id);
-    removePet(sub.id);
-    const { error: delMainErr } = await Supabase.deletePet(main.cloudId);
-    if (delMainErr) console.warn('云端删除主素材宠失败（刷新后会复活）：', delMainErr.message);
-    const { error: delErr } = await Supabase.deletePet(sub.cloudId);
-    if (delErr) console.warn('云端删除副素材宠失败（刷新后会复活）：', delErr.message);
+    // 两只素材宠都消失。顺序铁律（2026-09-08）：先删云端、成功才删本地——
+    // 反过来时云端删除失败（网络抖动）素材宠会在刷新后"复活"，看起来就是"合成一次却多出一只"。
+    // 删除失败时保留本地行并如实上报：玩家资产不凭空消失，也不与云端打架，可重试放生。
+    const resurrected = [];
+    const delMain = await Supabase.deletePet(main.cloudId);
+    if (delMain.error) {
+      resurrected.push(main.name);
+      console.warn('云端删除主素材宠失败，本地保留：', delMain.error.message);
+    } else {
+      removePet(main.id);
+    }
+    const delSub = await Supabase.deletePet(sub.cloudId);
+    if (delSub.error) {
+      resurrected.push(sub.name);
+      console.warn('云端删除副素材宠失败，本地保留：', delSub.error.message);
+    } else {
+      removePet(sub.id);
+    }
+    if (resurrected.length && window.UI && window.UI.addLog) {
+      window.UI.addLog(`⚠️ 素材宠「${resurrected.join('、')}」云端删除失败，仍在你的列表里，可稍后再放生`);
+    }
 
     // 任务进度上报：所有 type=synth 的任务 +1
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('synth', 1);
 
-    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, synthItem, godStatCoeffBonus };
+    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, synthItem, godStatCoeffBonus, resurrected };
   }
 
   /* ---------- 血脉特质继承 / 植入（设计 v1） ---------- */

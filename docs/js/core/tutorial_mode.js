@@ -412,7 +412,10 @@
    * 现在语义：经验包不是发给"一只宠"，而是发给"这一关要用的所有宠"——把名下宠物全部
    * 顶到门槛等级，保证无论选哪两只配对都能过。
    * 幂等：达标即跳过；只在教学链进行中调用，不会污染正常养成。
-   * 持久化：本地即时生效 + 逐只 savePet 云端（失败只提示不回滚）。 */
+   * 持久化：本地即时生效 + 逐只同步云端（失败只提示不回滚）。
+   * ⚠️ 血泪（2026-09-08 根因修复）：这里原来调 savePet——它是无条件 INSERT（建档语义），
+   * 结果每用一次经验包，名下每只宠都被再插一行，刷新后 loadPets 全量拉回 =
+   * 「莫名多出一堆重复宠」。顶等级是"更新已有宠"，必须走 updatePet；无 cloudId 才建档。 */
   async function boostGuidePetToLevel(target) {
     const lv = Number(target) || 0;
     if (!lv) return { ok: false, error: '目标等级为空' };
@@ -433,9 +436,16 @@
       if ('exp' in pet) pet.exp = 0;   // 顶完不残留旧经验，避免到门槛就立刻再升一级
       needName.push(pet.name || '魂兽');
       boosted++;
-      if (Supabase && Supabase.savePet) {
-        try { await Supabase.savePet(pet); }
-        catch (e) { console.warn('[guide] 引导经验包等级云端存档失败', e); }
+      if (Supabase) {
+        try {
+          if (pet.cloudId) {
+            // 已建档：更新等级/经验（绝不 INSERT——savePet 是建档，会复制出重复宠）
+            await Supabase.updatePet(pet.cloudId, { level: pet.level, exp: 0 });
+          } else if (Supabase.savePet) {
+            const r = await Supabase.savePet(pet);
+            if (!r.error && r.data && r.data.id) pet.cloudId = r.data.id;
+          }
+        } catch (e) { console.warn('[guide] 引导经验包等级云端存档失败', e); }
       }
     }
     if (!boosted) {

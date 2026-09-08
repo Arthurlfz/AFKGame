@@ -135,6 +135,10 @@
   }
   // savePet(pet)：把宠物写入当前用户的存档；未登录返回 error
   // 成功后返回 data（含云端 id），调用方应回写到 pet.cloudId 供市场上架使用
+  // ⚠️ 语义 = 无条件 INSERT 新行（建档），不看 pet.cloudId！
+  //   「更新已有宠」一律用 updatePet(pet.cloudId, {...})——2026-09-08 血泪：经验包顶等级
+  //   误用本函数，每用一次全宠各插一行副本，刷新后 loadPets 全量拉回 = 凭空多出一堆宠。
+  //   市场买宠依赖 INSERT 语义（快照宠物在新主人名下建新行），故不改本函数行为。
   // 装备槽分两步：先存宠物本体（必成功，兼容旧库），再单独更新 equipment（列不存在则忽略，不影响宠物）
   async function savePet(pet) {
     const user = await getCurrentUser();

@@ -259,7 +259,12 @@
   // 孵化出的宠物自动写入 Supabase pets 表（存档失败只提示，不阻塞本地游玩）
   // 云端同步：消耗一颗该品种的 pet_egg（标记已孵化并关联新宠物）
   // baseName：蛋品种 = 要孵出的基础宠名（如'血狐'）。不传或没有该品种蛋则返回 null。
+  // ⚠️ 防连点（2026-09-08 血泪）：扣蛋前有 await（getCurrentUser），双击时两次调用都在
+  // 扣蛋前通过了 eggMap>0 检查 → 一颗蛋孵出两只宠（蛋行 pet_id 被第二次覆盖）。
+  // 全局 hatching 闸门 + 扣蛋放进闸门之后，一次只许孵一颗。
+  let hatching = false;
   async function hatchEgg(baseName) {
+    if (hatching) return { error: '正在孵化中，别连点' };
     if (!baseName) {
       // 兼容旧调用：没有指定品种时，若有蛋，取第一个有数量的品种
       const first = Object.keys(eggMap).find(k => (eggMap[k] || 0) > 0);
@@ -267,22 +272,27 @@
       baseName = first;
     }
     if ((eggMap[baseName] || 0) <= 0) return null;
-    const user = await Supabase.getCurrentUser();
-    if (!user) return { error: '请先登录账号，才能孵化宠物' };
-    eggMap[baseName]--;
-    if (eggMap[baseName] <= 0) delete eggMap[baseName];
-    const baby = createBaby(baseName); // 按品种定向生成对应基础宠
-    addPet(baby);
-    const { data, error } = await Supabase.savePet(baby);
-    if (!error && data && data.id) {
-      baby.cloudId = data.id; // 回写云端 id，供市场上架
-      await Supabase.consumeEgg(baseName, data.id); // 云端消耗一颗该品种的蛋（失败仅提示，本地照常）
+    hatching = true;
+    try {
+      const user = await Supabase.getCurrentUser();
+      if (!user) return { error: '请先登录账号，才能孵化宠物' };
+      eggMap[baseName]--;
+      if (eggMap[baseName] <= 0) delete eggMap[baseName];
+      const baby = createBaby(baseName); // 按品种定向生成对应基础宠
+      addPet(baby);
+      const { data, error } = await Supabase.savePet(baby);
+      if (!error && data && data.id) {
+        baby.cloudId = data.id; // 回写云端 id，供市场上架
+        await Supabase.consumeEgg(baseName, data.id); // 云端消耗一颗该品种的蛋（失败仅提示，本地照常）
+      }
+      // 先存档拿到 cloudId，再设为出战 → is_active 才能同步到云端（刷新后仍为出战）
+      setActive(baby.id);
+      // 任务进度上报：所有 type=hatch 的任务 +1（petName = 孵出的品种，供宠物专属任务区分）
+      if (window.Quest && window.Quest.reportType) window.Quest.reportType('hatch', 1, { petName: baby ? baby.name : null });
+      return { baby, saveError: error || null };
+    } finally {
+      hatching = false;
     }
-    // 先存档拿到 cloudId，再设为出战 → is_active 才能同步到云端（刷新后仍为出战）
-    setActive(baby.id);
-    // 任务进度上报：所有 type=hatch 的任务 +1（petName = 孵出的品种，供宠物专属任务区分）
-    if (window.Quest && window.Quest.reportType) window.Quest.reportType('hatch', 1, { petName: baby ? baby.name : null });
-    return { baby, saveError: error || null };
   }
 
   /* ---------- 查询 / 云端恢复 ---------- */
