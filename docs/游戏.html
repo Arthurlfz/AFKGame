@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260907tip">
+<link rel="stylesheet" href="css/game.css?v=20260908guide3">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260903c">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
@@ -94,8 +94,10 @@
           <div class="worldmap-stage">
             <div class="worldmap-canvas-wrap" id="worldmap-canvas-wrap">
               <div class="worldmap-canvas" id="worldmap-canvas"></div>
-              <!-- 点位信息卡（悬停弹出）：放 wrap 内，absolute 相对 wrap 定位，与 JS 坐标基准一致 -->
-              <div class="worldmap-tip" id="worldmap-tip" hidden></div>
+            </div>
+            <!-- 节点详情页（2026-09-08）：选完图后弹出，替代直接进战斗；hover 信息卡已取消 -->
+            <div class="area-detail" id="area-detail" hidden>
+              <div class="nd-page" id="area-detail-body"></div>
             </div>
           </div>
           <!-- 可拖拽分隔条：上/下分栏（默认 65/35，比例存 localStorage） -->
@@ -848,7 +850,7 @@ window.PetSprites = {
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
-<script src="js/ui/ui-quest.js?v=20260908guide1"></script>
+<script src="js/ui/ui-quest.js?v=20260908guide3"></script>
 <script src="js/ui/ui-battle.js?v=20260905match1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260907fix"></script>

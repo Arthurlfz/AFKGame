@@ -14,63 +14,6 @@
   const UI = window.UI || (window.UI = {});
   const $ = UI.$ || (sel => document.querySelector(sel));
 
-  // 信息卡：显示某野图点位的掉落预览
-  function tipHTML(point) {
-    const area = ((window.Config && window.Config.battle) || {}).areas;
-    const a = area && area.find(x => x.id === point.areaId);
-    const lv = a ? a.levelRange || a.recommended : (point.recommended || '');
-    const pv = point._preview || {};
-    // gold 已是百分比数值（如 3 = 3%），直接展示
-    const gold = (typeof pv.gold === 'number') ? pv.gold + '%' : '—';
-    // 进化素材档位 → 短标签（普通/精粹/传说），避免信息卡里出现冗长的素材全名
-    const evoShort = (pv.evoTiers || []).map(n =>
-      n.indexOf('精粹') >= 0 ? '精粹' : n.indexOf('传说') >= 0 ? '传说' : '普通'
-    );
-    // 材料掉落分布块：条形长度=相对权重，数字=占材料分支百分比（双表达，不只靠颜色）
-    let distHtml = '';
-    if (pv.dropDist && pv.dropDist.length) {
-      const rows = pv.dropDist.map(d => {
-        const varNote = d.variants && d.variants.length > 1
-          ? ` <span class="wm-drop-var">(${evoShort.join('/')})</span>` : '';
-        return `<div class="wm-drop-row">`
-          + `<span class="wm-drop-name" title="${UI.escapeHtml ? UI.escapeHtml(d.name) : d.name}">${UI.escapeHtml ? UI.escapeHtml(d.name) : d.name}${varNote}</span>`
-          + `<span class="wm-drop-bar"><span class="wm-drop-fill" style="width:${d.bar}%"></span></span>`
-          + `<span class="wm-drop-pct">${d.pct}%</span>`
-          + `</div>`;
-      }).join('');
-      distHtml = `<div class="wm-tip-sub">材料掉落分布</div>${rows}`;
-    }
-    // 守关 Boss（2026-09-05 地图系统）：该图怪池 level 最高怪，挂机每累计 100 场出现
-    const enemyList = (window.EnemyData && window.EnemyData.list) || [];
-    const bossEnemy = (a && a.enemyIds ? enemyList.filter(e => (a.enemyIds || []).indexOf(e.id) >= 0) : [])
-      .sort((x, y) => (y.level || 0) - (x.level || 0))[0];
-    const bossName = bossEnemy ? '霸主·' + bossEnemy.name : '霸主·？？？';
-    // 首通状态：该图 Boss 首通任务已完成（Quest.completed 云端同步）
-    const cleared = !!(window.Quest && window.Quest.isAreaCleared && window.Quest.isAreaCleared(point.areaId));
-    const firstPass = cleared
-      ? '<span class="wm-tip-pass wm-tip-pass--done">✓ 已首通</span>'
-      : '<span class="wm-tip-pass">未首通</span>';
-    // 地图委托：把“这张图现在值得刷什么”直接放进信息卡
-    const loopQuest = window.Quest && window.Quest.getQuests
-      ? window.Quest.getQuests().find(q => q.type === 'collect_loop' && q.area === point.areaId)
-      : null;
-    const loopHtml = loopQuest
-      ? `<div class="wm-tip-sub">地图委托</div>`
-        + `<div class="wm-tip-line">${UI.escapeHtml ? UI.escapeHtml(loopQuest.name) : loopQuest.name}：${loopQuest.progress}/${loopQuest.need}</div>`
-        + `<div class="wm-drop-bar wm-drop-bar--quest"><span class="wm-drop-fill" style="width:${loopQuest.need ? Math.min(100, Math.round(loopQuest.progress / loopQuest.need * 100)) : 0}%"></span></div>`
-        + `<div class="wm-tip-line">完成奖励：${Object.entries(loopQuest.reward || {}).map(([n, v]) => `${UI.escapeHtml ? UI.escapeHtml(n) : n} ×${v}`).join('、')}${loopQuest.expReward ? `、经验 +${loopQuest.expReward}` : ''}</div>`
-      : '';
-    return `
-      <div class="wm-tip-name">${UI.escapeHtml ? UI.escapeHtml(point.name) : point.name}</div>
-      <div class="wm-tip-line">建议等级：${UI.escapeHtml ? UI.escapeHtml(String(lv)) : lv}</div>
-      <div class="wm-tip-line">守关 Boss：${UI.escapeHtml ? UI.escapeHtml(bossName) : bossName}（每 100 场）</div>
-      <div class="wm-tip-line">首通：${firstPass}</div>
-      ${loopHtml}
-      ${distHtml}
-      <div class="wm-tip-line">金装概率：约 ${gold}</div>
-      <div class="wm-tip-cta">点击进入挂机</div>`;
-  }
-
   // 回城休整：出战宠物回满血（提取到 UI 共享层，主城页「旅店」复用）
   function healActivePet() {
     const Pet = window.Pet;
@@ -87,36 +30,8 @@
   UI.healActivePet = healActivePet;
   UI.capName = capName;
 
-  // 绑定单个点位的事件（悬停信息卡 / 点击进图）
+  // 绑定单个点位的事件（点击进图 → 打开节点详情页；hover 信息卡已取消，2026-09-08）
   function bindPoint(marker, point) {
-    const tip = $('worldmap-tip');
-    const canvas = $('worldmap-canvas');
-    const wrap = $('worldmap-canvas-wrap');
-    marker.addEventListener('mouseenter', () => {
-      if (!tip || !canvas) return;
-      tip.innerHTML = point.type === 'capital'
-        ? `<div class="wm-tip-name">${UI.escapeHtml ? UI.escapeHtml(point.name) : point.name}</div>
-           <div class="wm-tip-line">安全区 · 可回血休整</div>
-           <div class="wm-tip-cta">点击进入主城</div>`
-        : tipHTML(point);
-      tip.hidden = false;
-      // 信息卡跟随标记上方；tip absolute 相对 wrap 定位（HTML 里 tip 在 wrap 内）
-      const mr = marker.getBoundingClientRect();
-      const wr = wrap ? wrap.getBoundingClientRect() : canvas.getBoundingClientRect();
-      // 以红点中心为锚（marker 含名字，红点在 marker 顶部，取 mr.top 即红点顶；marker 中心偏下）
-      const anchorX = mr.left + mr.width / 2;
-      const anchorY = mr.top;
-      let tx = anchorX - wr.left - 90; // 卡片左缘对齐锚点左 90px（近似水平居中）
-      let ty = anchorY - wr.top - 8;
-      tip.style.left = tx + 'px';
-      tip.style.top = ty + 'px';
-      tip.style.transform = 'translateY(-100%)';
-      // 简单防超屏（相对 wrap 可视区）
-      const tW = tip.offsetWidth, tH = tip.offsetHeight;
-      if (tx + tW > wr.width - 8) tip.style.left = (wr.width - tW - 8) + 'px';
-      if (ty - tH < 8) tip.style.top = (anchorY - wr.top + mr.height + 8) + 'px', tip.style.transform = '';
-    });
-    marker.addEventListener('mouseleave', () => { if (tip) tip.hidden = true; });
     marker.addEventListener('click', () => {
       // 主城标记：跳到主城页（2026-09-01 主城升级为独立页，不再弹 dialog）
       if (point.type === 'capital') {
@@ -143,10 +58,10 @@
           if (!ok) return;
         }
       }
-      // 重复点击当前正在挂机的图：只是「返回观看战斗」，不要停掉挂机（否则一返回战斗画面就没了）
+      // 重复点击当前正在挂机的图：同样打开详情页（可换宠/查看领主），不影响挂机运行
       const curArea = Battle.getCurrentArea && Battle.getCurrentArea();
       if (curArea && curArea.id === point.areaId) {
-        UI.switchPage && UI.switchPage('battle');
+        showAreaDetail(point);
         return;
       }
       // 挂机中直接换图：先停挂机 → 切到新图（不自动重启挂机，避免误操作）
@@ -162,13 +77,8 @@
         UI.showToast && UI.showToast('无法进入', '该图暂不可用。');
         return;
       }
-      // 进入战斗页（三级），刷新战斗页地图条
-      UI.switchPage && UI.switchPage('battle');
-      if (UI.updateBattleArea) UI.updateBattleArea(Battle.getCurrentArea());
-      // 切图后给个明确反馈：原挂机已被停，避免玩家以为还在挂
-      if (wasRunning) {
-        UI.showToast && UI.showToast('已停止挂机', '当前地图已切换为「' + point.name + '」，回到战斗页手动开始挂机。');
-      }
+      // 打开节点详情页（选完图 → 先看地图/怪物/领主 → 再进战斗），替代直接跳战斗页
+      showAreaDetail(point);
     });
   }
 
@@ -265,8 +175,159 @@
     return el;
   }
 
+
+  /* ============================================================
+   * 节点详情页（2026-09-08）：选完图后弹出，替代直接进战斗。
+   * 左：地图介绍（怪物 + 掉落）｜中：出战宠物选择｜右：守关领主（霸主）
+   * 底部：只进战斗 / 开始挂机。hover 信息卡已取消，信息全部集中到这里。
+   * ============================================================ */
+  const esc = s => UI.escapeHtml ? UI.escapeHtml(s) : String(s);
+
+  function areaDetailHTML(point) {
+    const area = ((window.Config && window.Config.battle) || {}).areas
+      && ((window.Config && window.Config.battle) || {}).areas.find(a => a.id === point.areaId);
+    const list = (window.EnemyData && window.EnemyData.list) || [];
+    const mobs = (area && area.enemyIds ? list.filter(e => (area.enemyIds || []).indexOf(e.id) >= 0) : [])
+      .sort((x, y) => (y.level || 0) - (x.level || 0));
+    const boss = mobs[0] || null;   // 图内最高级怪 = 守关霸主
+    const pv = point._preview || {};
+    const gold = (typeof pv.gold === 'number') ? pv.gold + '%' : '—';
+    const cleared = !!(window.Quest && window.Quest.isAreaCleared && window.Quest.isAreaCleared(point.areaId));
+    const [lo, hi] = (area && area.levelRange) ? area.levelRange : [null, null];
+    // 地图委托：详情页里给出「这张图现在值得刷什么」
+    const loopQuest = window.Quest && window.Quest.getQuests
+      ? window.Quest.getQuests().find(q => q.type === 'collect_loop' && q.area === point.areaId)
+      : null;
+    const loopHtml = loopQuest
+      ? `<div class="nd-boss-row"><span class="k">委托</span><span class="v">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>`
+      : '';
+
+    // 怪物列表（普通/变异分档）
+    const mobHtml = mobs.map(m => {
+      const evolved = m.enemyType === 'evolved';
+      return `<div class="nd-mob${evolved ? ' evolved' : ''}"><span class="ic">${m.icon || '🐾'}</span><span class="nm">${esc(m.name)}</span><span class="lv">Lv.${m.level || '—'}</span></div>`;
+    }).join('') || '<div class="nd-mob"><span class="nm">未知怪群</span></div>';
+
+    // 出战宠物选择
+    const Pet = window.Pet;
+    const pets = (Pet && Pet.getPets) ? Pet.getPets() : [];
+    const active = (Pet && Pet.getActivePet) ? Pet.getActivePet() : null;
+    const petHtml = pets.map(p => {
+      const god = (Pet && Pet.isGodPet) ? Pet.isGodPet(p) : !!p.isGodPet;
+      const growth = (p.growth || 0).toFixed(1);
+      const meta = god ? '' : `<div class="p-meta">Lv.${p.level || 1} · 成长${growth}</div>`;
+      const godTxt = god ? '<div class="p-god">★ 神级</div>' : '';
+      return `<div class="nd-pet${active && active.id === p.id ? ' active' : ''}${god ? ' god' : ''}" data-pid="${p.id}">
+        <div class="p-ic">${p.icon || '🐾'}</div>
+        <div class="p-nm">${esc(p.name)}</div>${meta}${godTxt}
+      </div>`;
+    }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
+    const activeInfo = active
+      ? `出战：<b>${esc(active.name)}</b> · 成长 <b>${(active.growth || 0).toFixed(1)}</b>`
+      : '还没有出战宠物';
+
+    return `
+      <div class="nd-top">
+        <div class="nd-title">${esc(area ? area.name : point.name)}</div>
+        <div class="nd-sub">
+          ${lo != null ? `<span>Lv.<b>${lo}~${hi}</b></span>` : ''}
+          <span>推荐成长 <b>${area && area.recGrowth ? area.recGrowth : '—'}</b></span>
+          ${cleared ? '<span>首通 <b style="color:var(--r-gold)">✓ 已完成</b></span>' : ''}
+        </div>
+        <button type="button" class="nd-back" id="nd-back">← 返回大地图</button>
+      </div>
+      <div class="nd-grid">
+        <div class="nd-card">
+          <div class="nd-card-title">地图介绍<span class="hint">该图会出现的野怪</span></div>
+          <div class="nd-mobs">${mobHtml}</div>
+          <div class="nd-card-title" style="margin-top:14px">掉落预览<span class="hint">挂机收益</span></div>
+          <div class="nd-drop">
+            <div class="nd-drop-cell"><div class="k">金装</div><div class="v">${gold}</div></div>
+            <div class="nd-drop-cell"><div class="k">材料</div><div class="v">≈25%</div></div>
+            <div class="nd-drop-cell"><div class="k">宠物蛋</div><div class="v">≈2%</div></div>
+          </div>
+        </div>
+        <div class="nd-card">
+          <div class="nd-card-title">选择战斗宠物<span class="hint">点击切换出战</span></div>
+          <div class="nd-pets">${petHtml}</div>
+          <div class="nd-active-row"><span>${activeInfo}</span><span class="tag">可出战</span></div>
+        </div>
+        <div class="nd-card">
+          <div class="nd-card-title">守关领主<span class="hint">挂机每 100 场现身</span></div>
+          <div class="nd-boss-art">${boss ? (boss.icon || '👹') : '👹'}</div>
+          <div class="nd-boss-name">霸主 · ${esc(boss ? boss.name : '？？？')}</div>
+          <div class="nd-boss-rows">
+            <div class="nd-boss-row"><span class="k">等级</span><span class="v warn">Lv.${boss ? (boss.level || '—') : '—'}</span></div>
+            <div class="nd-boss-row"><span class="k">首通</span><span class="v">${cleared ? '✓ 已首通' : '未首通'}</span></div>
+            ${loopHtml}
+          </div>
+          <button type="button" class="nd-boss-btn" id="nd-boss">⚔ 挑战领主</button>
+        </div>
+      </div>
+      <div class="nd-foot">
+        <span class="tip">进入后自动挂机，经验 / 材料 / 装备持续入账 · <b>打不过会自动停</b></span>
+        <button type="button" class="nd-go nd-go--ghost" id="nd-fight">只进战斗</button>
+        <button type="button" class="nd-go" id="nd-idle">⚔ 开始挂机</button>
+      </div>`;
+  }
+
+  function showAreaDetail(point) {
+    const el = $('area-detail');
+    const body = $('area-detail-body');
+    if (!el || !body) {
+      // 兜底：容器缺失（老页面结构）时保持原行为直接进战斗
+      if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
+      return;
+    }
+    body.innerHTML = areaDetailHTML(point);
+    el.hidden = false;
+    const Battle = window.Battle;
+    // 返回大地图
+    const back = body.querySelector('#nd-back');
+    if (back) back.onclick = () => { el.hidden = true; };
+    // 出战宠物切换：setActive 后重渲染详情页（下一场生效，与战斗页 roster 同口径）
+    body.querySelectorAll('.nd-pet').forEach(card => {
+      card.onclick = () => {
+        const pid = card.dataset.pid;
+        if (!pid || !window.Pet || !window.Pet.setActive) return;
+        window.Pet.setActive(pid);
+        showAreaDetail(point);
+      };
+    });
+    // 进战斗页（不自动挂机）
+    const enterBattle = () => {
+      el.hidden = true;
+      if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
+      if (window.UI && window.UI.updateBattleArea) window.UI.updateBattleArea(Battle && Battle.getCurrentArea());
+    };
+    const fight = body.querySelector('#nd-fight');
+    if (fight) fight.onclick = enterBattle;
+    // 开始挂机：进战斗页后点挂机开关（复用主流程：托管/本地自动判断）
+    const idle = body.querySelector('#nd-idle');
+    if (idle) idle.onclick = () => {
+      enterBattle();
+      setTimeout(() => {
+        const b = document.getElementById('btn-battle');
+        if (b && typeof b.click === 'function') b.click();
+      }, 150);
+    };
+    // 挑战领主：进入该图并开始挂机（霸主随挂机每 100 场现身）
+    const boss = body.querySelector('#nd-boss');
+    if (boss) boss.onclick = () => {
+      enterBattle();
+      setTimeout(() => {
+        const b = document.getElementById('btn-battle');
+        if (b && typeof b.click === 'function') b.click();
+      }, 150);
+      if (window.UI && window.UI.showToast) {
+        window.UI.showToast('正在前往迎战', '霸主随挂机每 100 场现身，开始挂机即可遭遇。');
+      }
+    };
+  }
+
   // 对外 API
   UI.renderWorldMapPage = renderWorldMapPage;
+  UI.showAreaDetail = showAreaDetail;
   UI.healActivePet = healActivePet;
   UI.capName = capName;
 })();

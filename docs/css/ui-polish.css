@@ -220,24 +220,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* 首通标记（2026-09-05 地图系统 A 项）：已首通的图，红点转金色 + ✓ 徽标 */
 .wm-marker--cleared .wm-marker-dot { background: rgb(var(--action-gold-rgb)); border-color: #fff; box-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .8), inset 0 0 4px rgb(0 0 0 / .4); }
 .wm-marker-pass { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #1a1b1c; background: rgb(var(--action-gold-rgb)); border: 1px solid #fff; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; line-height: 1.4; }
-.wm-tip-pass { color: var(--text-dim); font-weight: 700; }
-.wm-tip-pass--done { color: rgb(var(--action-gold-rgb)); }
-.worldmap-tip { position: absolute; z-index: 5; min-width: 150px; max-width: 240px; padding: 10px 12px; background: rgb(24 32 33 / .96); border: 1px solid var(--line-hi); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel); pointer-events: none; text-align: left; }
-.worldmap-tip[hidden] { display: none; }
-.wm-tip-name { color: var(--accent-hi); font-weight: 700; margin-bottom: 4px; }
-.wm-tip-line, .wm-tip-cta { font-size: var(--fs-sm); line-height: 1.5; }
-.wm-tip-line { color: var(--text); }
-.wm-tip-cta { margin-top: 6px; color: var(--accent); font-weight: 700; }
-
-/* 材料掉落分布（世界地图信息卡）—— 条形长度=相对权重、数字=占材料分支百分比（双表达，不只靠颜色） */
-.wm-tip-sub { margin: 7px 0 4px; padding-top: 5px; border-top: 1px solid var(--line); color: var(--accent); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .5px; }
-.wm-drop-row { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); line-height: 1.7; }
-.wm-drop-name { flex: 0 0 auto; max-width: 104px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wm-drop-var { color: var(--text-dim); font-size: var(--fs-xs); margin-left: 2px; }
-.wm-drop-bar { flex: 1 1 auto; height: 6px; background: rgb(0 0 0 / .35); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-.wm-drop-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); border-radius: 999px; }
-.wm-drop-pct { flex: 0 0 auto; width: 32px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
-
 /* ============================================================
  * 主城页（不归城）：等距城寨全景（City.png 底图）+ 建筑热区
  * 底图为 meowa 等距暗黑水墨城寨；建筑热区 = 名字标签浮在图上，
