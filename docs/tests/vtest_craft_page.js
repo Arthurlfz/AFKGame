@@ -45,6 +45,30 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   C(`(function(){const eq=globalThis.__eq;eq.soulAffix={type:'lifesteal',awaken:false,traitId:'嗜血',tier:2,stat:'lifesteal',value:5,source:'soulcast',label:'魂·嗜血 T2'};return true})()`);
   const bodyHtml = C(`(function(){const h={innerHTML:'',querySelector:function(){return {innerHTML:''}},querySelectorAll:function(){return []},addEventListener:function(){}};UI.renderCraftInto(h,globalThis.__eq);return h.innerHTML})()`);
   A(bodyHtml.indexOf('魂·嗜血') >= 0, '打造页已铸入区显示魂铸词缀');
+
+  /* ---- 魂铸：特质按钮必须真能点（2026-09-08 修复） ----
+   * 血泪：bindSoulCast 漏绑 .soul-trait 的 onclick → 宠有 ≥2 条特质时选不上特质
+   * → canCast 永远 false → 确认按钮一直 disabled「先选宠物」，魂铸整条线看起来坏了。
+   * 这里用假容器验证三个交互元素都拿到了 onclick（桩的 querySelectorAll 恒空，只能这样测）。 */
+  C(`(function(){const q=Pet.createPet('毒沼蛙','🐸',4,120,18,12,60,'毒沼蛙');
+    q.level=45;q.growth=15;q.traits=[{id:'嗜血',tier:2},{id:'铁壁',tier:1}];Pet.addPet(q);globalThis.__q=q;
+    delete globalThis.__eq.soulAffix; return true})()`);
+  const bound = C(`(function(){
+    const traitBtns=[{dataset:{trait:'嗜血'}},{dataset:{trait:'铁壁'}}];
+    const petBtns=[{dataset:{pet:String(globalThis.__q.id)}}];
+    const castBtn={disabled:false};
+    const fake=()=>({ innerHTML:'',
+      querySelector:s=>s==='#craft-soul-cast'?castBtn:{innerHTML:''},
+      querySelectorAll:s=> s==='.soul-trait'?traitBtns : s==='.craft-soul-pet'?petBtns : [] });
+    UI.bindSoulCast(fake(), globalThis.__eq, ()=>{});
+    return { trait: traitBtns.every(b=>typeof b.onclick==='function'),
+             pet: petBtns.every(b=>typeof b.onclick==='function'),
+             cast: typeof castBtn.onclick==='function' };
+  })()`);
+  A(bound.trait, '魂铸：特质按钮绑定了 onclick（漏绑 = 多特质宠永远选不了 → 魂铸用不了）');
+  A(bound.pet, '魂铸：宠物行绑定了 onclick');
+  A(bound.cast, '魂铸：确认按钮绑定了 onclick');
+
   console.log('\n打造页回归验证完成');
   process.exit(process.exitCode || 0);
 })().catch(e => { console.error('EXC', e && (e.stack || e.message)); process.exit(1) });

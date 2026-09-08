@@ -307,7 +307,8 @@
       const aw = window.Pet.getAwakenState(pet);
       if (!aw) return { ok: false, error: '传承魂铸需要 Lv60 终形态宠物（且已解锁主动技能）' };
     }
-    if (Materials.getQuantity(S.material) < C) return { ok: false, error: '需要 ' + C + ' 颗' + S.material + '，满级挂机会自动凝聚' };
+    const haveCrystal = Materials.getQuantity(S.material);
+    if (haveCrystal < C) return { ok: false, error: '需要 ' + C + ' 颗' + S.material + '（当前 ' + haveCrystal + ' 颗）：满级魂兽挂机会自动凝聚，走完新手引导也会送一份' };
 
     // 铸出词缀（soulAffix 驼峰为装备内存字段；DB 列 soul_affix 由序列化映射）
     const defs = Config.petTraits || {};

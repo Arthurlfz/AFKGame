@@ -25,6 +25,9 @@
    * 锁定侧在重铸/神圣中整组保留、剥离/增缀不触及；重铸/神圣时按锁定侧条数扣锁定石。
    */
   function renderCraftInto(el, eq) {
+    // 魂铸选择状态跟着装备走：换一件装备就清空重选。
+    // 残留的 petId/traitId 指向的宠可能已不在当前档位候选里 → selPet 为空 → 确认按钮一直灰着。
+    if (!activeCraftEq || activeCraftEq.id !== eq.id) { soulState.petId = null; soulState.traitId = null; }
     activeCraftEq = eq;
     const C = Config.craft;
     const inSell = Market.isItemListed(eq.cloudId);
@@ -269,7 +272,16 @@
         : (T.source === 'awaken' ? '觉醒特质' : '无特质');
       const sel = selPet && selPet.id === p.id ? ' sel' : '';
       return `<div class="craft-soul-pet${sel}" data-pet="${p.id}"><span class="sp-name">${p.name}</span><span class="sp-meta">Lv${p.level} · 成长${p.growth}</span><span class="sp-traits">${traits}</span></div>`;
-    }).join('') : `<div class="craft-soul-empty">当前档位没有可魂铸的宠物（${T.label}：Lv${T.minLevel != null ? T.minLevel : T.level}+ / 成长≥${T.minGrowth != null ? T.minGrowth : T.growth}${T.needFinal ? ' / 终形态' : ''}）</div>`;
+    }).join('') : (function () {
+      // 空态必须能自查：光写"门槛 Lv40 / 成长≥10"，玩家看不出自己差哪一项、差多少。
+      const all = (window.Pet && window.Pet.getPets) ? (window.Pet.getPets() || []) : [];
+      const maxLv = all.length ? Math.max.apply(null, all.map(p => Number(p.level) || 1)) : 0;
+      const maxGrw = all.length ? Math.max.apply(null, all.map(p => Number(p.growth) || 0)) : 0;
+      const diag = all.length
+        ? `你名下 ${all.length} 只：最高 Lv${maxLv} · 最高成长 ${maxGrw.toFixed(1)}`
+        : '你名下还没有魂兽';
+      return `<div class="craft-soul-empty">当前档位没有可魂铸的宠物（${T.label}：Lv${T.minLevel != null ? T.minLevel : T.level}+ / 成长≥${T.minGrowth != null ? T.minGrowth : T.growth}${T.needFinal ? ' / 终形态' : ''}）<br>${diag}</div>`;
+    })();
     // 特质自选（血脉档：宠有多条特质时选 1 条）
     let traitSel = '';
     if (selPet && T.source !== 'awaken') {
@@ -283,6 +295,11 @@
       }
     }
     const canCast = !!selPet && (T.source === 'awaken' || !!(soulState.traitId || (selPet.traits || []).length === 1));
+    // 按钮文案要说清到底缺哪一步（旧版不论缺什么都写"先选宠物"，误导玩家）
+    const castText = inSell ? '装备在售中'
+      : !selPet ? '先选宠物'
+        : canCast ? '⚒ 确认魂铸（消耗 1 只宠物 + ' + matCount + ' ' + mat + '）'
+          : '先选要铸的特质';
     return `<div class="craft-soul-block">
         <div class="craft-soul-tiers">${tierBtns}</div>
         <div class="craft-soul-desc">${T.label}：${T.source === 'awaken' ? '铸觉醒特质（固定 T1）' : '铸血脉特质'} · 消耗装备 + 宠物（消失）+ ${matCount} 颗${mat}</div>
@@ -290,7 +307,7 @@
         ${traitSel}
         <div class="craft-soul-actions">
           <button class="btn-mini primary" id="craft-soul-cast" ${inSell || !canCast ? 'disabled' : ''}>
-            ${inSell ? '装备在售中' : canCast ? '⚒ 确认魂铸（消耗 1 只宠物 + ' + matCount + ' ' + mat + '）' : '先选宠物'}
+            ${castText}
           </button>
           <div class="craft-soul-result" id="craft-soul-result"></div>
         </div>
@@ -313,6 +330,15 @@
         rerender();
       };
     });
+    // 特质自选（宠有 2 条以上特质时必须选 1 条才能铸）。
+    // 血泪（2026-09-08）：这段绑定漏了 → 特质按钮点了没反应 → canCast 永远 false
+    // → 确认按钮一直 disabled「先选宠物」，魂铸整条线看起来"完全不能用"。
+    body.querySelectorAll('.soul-trait').forEach(btn => {
+      btn.onclick = () => {
+        soulState.traitId = btn.dataset.trait;
+        rerender();
+      };
+    });
     const btnCast = body.querySelector('#craft-soul-cast');
     if (btnCast && !btnCast.disabled) btnCast.onclick = async () => {
       const btn = btnCast;
@@ -327,6 +353,8 @@
         box.innerHTML = `<span style="color:#7fae7f">⚒ 魂铸成功：${res.aff.label}（T${res.aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
         addLog(`⚒ 魂铸成功：${eq.name} 获得 ${res.aff.label}（T${res.aff.tier}），${res.petName} 被消耗`);
         showToast('⚒ 魂铸成功', `${res.aff.label}（T${res.aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
+        // 宠已被消耗、装备已有魂铸词缀 → 清空选择，避免残留指向不存在的宠
+        soulState.petId = null; soulState.traitId = null;
         if (UI.renderAll) UI.renderAll();
       } else {
         box.innerHTML = `<span class="err">❌ ${(res && res.error) || '魂铸失败'}</span>`;
