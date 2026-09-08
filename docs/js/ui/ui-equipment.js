@@ -130,7 +130,7 @@
           activeEqId = eq.id;
           renderInventory();
           renderInvToolbar();
-          renderEqDetail(eq);
+          renderBagEqDetail(eq);
           return;
         }
         if (selectedEqIds.has(eq.id)) selectedEqIds.delete(eq.id);
@@ -141,7 +141,7 @@
         activeEqId = eq.id;
         renderInventory();
         renderInvToolbar();
-        renderEqDetail(eq);
+        renderBagEqDetail(eq);
       };
 
       const actions = document.createElement('div');

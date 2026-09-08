@@ -65,7 +65,6 @@
       <button class="sb-btn active" data-page="capital"><span class="sb-icon">🏯</span><span class="sb-label">主城</span></button>
       <button class="sb-btn" data-page="worldmap"><span class="sb-icon">🗺️</span><span class="sb-label">世界地图</span></button>
       <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
-      <button class="sb-btn" data-page="equip"><span class="sb-icon">🛠️</span><span class="sb-label">装备打造</span></button>
       <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">市集</span></button>
       <button class="sb-btn" data-page="shop"><span class="sb-icon">🪙</span><span class="sb-label">魔石商店</span></button>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon">💬</span><span class="sb-label">聊天</span></button>
@@ -464,34 +463,6 @@
         <!-- 背包已改为可拖动浮窗，见下方 bag-window-host -->
 
 
-    <!-- ============ 装备页（装备打造）：背包网格 + 打造 + 分解 + 上架 ============ -->
-    <section class="tab-page" id="tab-equip">
-      <div class="panel">
-        <div class="panel-title">背包
-          <span class="panel-actions">
-            <span class="hint">点选装备看详情与打造 · 多选用于批量分解 · 上架在「市场」页</span>
-          </span>
-        </div>
-        <div id="inv-filter" class="inv-filter"></div>
-        <div class="inv-toolbar">
-          <span class="hint" id="inv-count">共 0 件</span>
-          <button class="btn-mini ghost" id="btn-select-all">全选</button>
-          <button class="btn-mini danger" id="btn-salvage-selected" disabled>批量分解（0）</button>
-        </div>
-        <div class="inv-master-detail">
-          <div class="inv-list-wrap">
-            <div class="inv-list" id="inv-list"></div>
-          </div>
-          <aside class="eq-detail" id="eq-detail" aria-label="装备详情与打造面板">
-            <div class="eq-detail-empty" id="eq-detail-empty">← 点选一件装备，右侧显示详情与打造</div>
-            <div class="eq-detail-body" id="eq-detail-body" style="display:none">
-              <div class="eq-detail-craft" id="eq-detail-craft"></div>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </section>
-
       <!-- ============ 市集页（交易市场 + 我的上架 合并：顶部级联筛选 + 视图切换） ============ -->
       <section class="tab-page" id="tab-market">
         <div class="guide-bar" style="margin:0 0 10px">💰 <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
@@ -683,8 +654,14 @@
           </div>
           <div class="ew-col ew-bag">
             <div class="panel">
-              <div class="panel-title">换装背包<span class="hint">点选装备 · 右侧详情与打造</span></div>
-              <div class="equip-inv" id="pet-equip-inv"></div>
+              <div class="panel-title">背包<span class="hint">点选装备看详情与打造 · 多选批量分解</span></div>
+              <div id="inv-filter" class="inv-filter"></div>
+              <div class="inv-toolbar">
+                <span class="hint" id="inv-count">共 0 件</span>
+                <button class="btn-mini ghost" id="btn-select-all">全选</button>
+                <button class="btn-mini danger" id="btn-salvage-selected" disabled>批量分解（0）</button>
+              </div>
+              <div class="inv-list" id="inv-list"></div>
             </div>
           </div>
           <div class="ew-col ew-detail">
@@ -857,8 +834,8 @@ window.PetSprites = {
 <script src="js/ui/ui-pet-evolve.js?v=20260906evoitems"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260907niritem"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260905esm"></script>
-<script src="js/ui/ui-bag.js?v=20260908guide1"></script>
-<script src="js/ui/ui-equipment.js?v=20260907fix2"></script>
+<script src="js/ui/ui-bag.js?v=20260909merge"></script>
+<script src="js/ui/ui-equipment.js?v=20260909merge"></script>
 <script src="js/ui/ui-craft.js?v=20260908soulfix"></script>
 <script src="js/ui/ui-market.js?v=20260907tip"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>

@@ -528,7 +528,9 @@
     renderBag();
     // 装备子面板也要刷新（12槽 + 换装背包 + 出战宠物属性）
     if (UI.renderEquipSlots) UI.renderEquipSlots();
-    if (UI.renderPetEquipInv) UI.renderPetEquipInv();
+    if (UI.renderInvFilter) UI.renderInvFilter();
+    if (UI.renderInventory) UI.renderInventory();
+    if (UI.renderInvToolbar) UI.renderInvToolbar();
     const host = document.getElementById('bag-window');
     if (!host) return;
     host.style.display = 'block';
@@ -566,7 +568,9 @@
         // 切到装备tab时刷新装备面板
         if (name === 'equip') {
           if (UI.renderEquipSlots) UI.renderEquipSlots();
-          if (UI.renderPetEquipInv) UI.renderPetEquipInv();
+          if (UI.renderInvFilter) UI.renderInvFilter();
+          if (UI.renderInventory) UI.renderInventory();
+          if (UI.renderInvToolbar) UI.renderInvToolbar();
         }
       });
     }
