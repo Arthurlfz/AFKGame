@@ -272,6 +272,11 @@
       if (window.UI && window.UI.showToast) window.UI.showToast('⚠️ 已上架的装备不能穿戴', '请先在市场取回');
       return null;
     }
+    // 未鉴定装备不能穿戴（PoE 规则）：词缀未揭晓前穿戴会绕过鉴定，直接泄露属性
+    if (eq.identified === false) {
+      if (window.UI && window.UI.showToast) window.UI.showToast('🔒 未鉴定的装备不能穿戴', '先到背包用鉴定石揭晓');
+      return null;
+    }
     const old = pet.equipment[eq.slot];
     if (old) inventory[i] = old;      // 同部位旧装备回背包
     else inventory.splice(i, 1);
@@ -387,6 +392,8 @@
       `${label} +${val}${pct}${rangeHtml} <span class="tip-tier">T${a ? (a.tier || '?') : '?'}</span></div>`;
   }
   function describeItem(eq) {
+    if (!eq) return '';
+    if (eq.identified === false) return '未鉴定·' + (eq.slot || '装备') + '（需鉴定石揭晓）';
     const affixes = flattenAffixes(eq.affixes).map(formatAffix).join(' ');
     const soul = eq.soulAffix ? (' 魂·' + (eq.soulAffix.label || eq.soulAffix.traitId || '?') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '')) : '';
     const b = baseOf(eq);

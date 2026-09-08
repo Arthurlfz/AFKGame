@@ -109,14 +109,17 @@
       const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
       const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
       const card = document.createElement('div');
+      const unid = eq.identified === false; // 未鉴定：词缀封印，鉴定石揭晓
       const selected = selectedEqIds.has(eq.id);
       const active = activeEqId === eq.id;
-      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '') + (active ? ' active' : '');
+      card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '') + (active ? ' active' : '') + (unid ? ' q-unid' : '');
       // 卡片只显示核心信息；详情与打造统一进右侧面板（2026-09-04 主从式，去掉 hover 浮层）
-      const affRows = (window.Equipment.flattenAffixes ? window.Equipment.flattenAffixes(eq.affixes) : [])
-        .filter(a => !a.base)
-        .map(a => window.Equipment.formatAffixHtml(a, 'tip-affix'))
-        .join('');
+      const affRows = unid
+        ? '<div class="ec-unid">🔒 未鉴定 · 词缀封印</div>'
+        : (window.Equipment.flattenAffixes ? window.Equipment.flattenAffixes(eq.affixes) : [])
+          .filter(a => !a.base)
+          .map(a => window.Equipment.formatAffixHtml(a, 'tip-affix'))
+          .join('');
       card.innerHTML = `
         <div class="ec-name" style="color:${r.color}">
           ${eq.fresh ? '<span class="eq-new">新</span>' : ''}${escapeHtml(eq.name || '未知装备')}${eq.locked ? '<span class="eq-lock">🔒</span>' : ''}
@@ -150,6 +153,10 @@
       const btn = document.createElement('button');
       btn.className = 'btn-sm';
       btn.textContent = '穿上';
+      if (unid) {
+        btn.disabled = true;
+        btn.title = '未鉴定 · 先用鉴定石揭晓';
+      }
       btn.onclick = (e) => {
         e.stopPropagation();
         // 差异必须在换装【之前】算：换完之后候选装备已经上身，再比对就是 0 了
@@ -162,6 +169,14 @@
         }
       };
       actions.appendChild(btn);
+      if (unid) {
+        const idBtn = document.createElement('button');
+        idBtn.className = 'btn-sm id';
+        idBtn.textContent = '🔍 鉴定';
+        idBtn.title = '消耗 1 鉴定石揭晓词缀';
+        idBtn.onclick = (e) => { e.stopPropagation(); identifyEq(eq); };
+        actions.appendChild(idBtn);
+      }
       const lockBtn = document.createElement('button');
       lockBtn.className = 'btn-sm lock' + (eq.locked ? ' on' : '');
       lockBtn.textContent = eq.locked ? '🔒' : '🔓';
@@ -353,6 +368,15 @@
 
   // 装备详情浮层内容：按“等级 / 基底词缀 / 前缀 / 后缀 / 对比身上装备”分段展示
   function buildEquipTip(eq, pet) {
+    if (eq.identified === false) {
+      const r2 = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
+      const mt = eq.materialTier ?? eq.tier ?? 4;
+      return '<div class="tip-icon"><span class="ico"><span class="emoji">🔒</span></span></div>' +
+        '<div class="tip-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
+        '<div class="tip-line"><span>底材</span><b>T' + mt + '</b></div>' +
+        '<div class="tip-line"><span>物品等级</span><b>' + (window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.level ?? eq.itemLevel ?? 1)) + '</b></div>' +
+        '<div class="tip-section">词缀</div><div class="tip-empty">未鉴定 · 需要鉴定石揭晓</div>';
+    }
     const affixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
     const prefix = affixes.prefix || [];
     const suffix = affixes.suffix || [];
@@ -403,10 +427,40 @@
     /* 右栏只留打造（2026-09-07）：属性详情/穿上/上架已移除——
      * 具体属性看物品 tooltip，穿上走列表卡片按钮，上架走市集。 */
     const craftEl = hostEl.querySelector('.eq-detail-craft');
+    if (eq.identified === false) {
+      // 未鉴定：右侧只给封印信息 + 鉴定入口，不暴露任何词缀/打造
+      if (craftEl) {
+        const r2 = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
+        const mt = eq.materialTier ?? eq.tier ?? 4;
+        craftEl.innerHTML =
+          '<div class="eq-unid-block">' +
+            '<div class="eq-unid-icon">🔒</div>' +
+            '<div class="eq-unid-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
+            '<div class="eq-unid-line">未鉴定的 ' + escapeHtml(eq.slot || '装备') + ' · T' + mt + '</div>' +
+            '<div class="eq-unid-line hint">词缀被封印，鉴定后揭晓</div>' +
+            '<button class="btn-sm id" id="eq-unid-btn">🔍 鉴定（消耗 1 鉴定石）</button>' +
+          '</div>';
+        const idBtn = craftEl.querySelector('#eq-unid-btn');
+        if (idBtn) idBtn.onclick = () => identifyEq(eq);
+      }
+      return;
+    }
     if (craftEl && UI.renderCraftInto) UI.renderCraftInto(craftEl, eq);
   }
   function renderEqDetail(eq) { renderEqDetailInto($('eq-detail'), eq); } // 侧边栏装备页
   function renderBagEqDetail(eq) { renderEqDetailInto($('bag-eq-detail'), eq); } // 背包窗口装备子页
+  /* ---------- 鉴定：消耗 1 鉴定石揭晓未鉴定装备（与背包 tab 的 identifyEquip 同规则） ---------- */
+  async function identifyEq(eq) {
+    if (!eq || eq.identified !== false) return;
+    const have = window.Materials && window.Materials.getQuantity ? window.Materials.getQuantity('鉴定石') : 0;
+    if (!have || have <= 0) { showToast('🔍 没有鉴定石', '去挂机捡鉴定石'); return; }
+    const r = await window.Materials.spend('鉴定石', 1);
+    if (!r || !r.ok) { showToast('❌ 鉴定失败', (r && r.error) || '鉴定石不足'); return; }
+    eq.identified = true;
+    showToast('✨ 鉴定完成', eq.name);
+    UI.renderAll();
+    if (activeEqId === eq.id) renderBagEqDetail(eq);
+  }
   function hideEqDetail() {
     const hostEl = $('eq-detail');
     if (!hostEl) return;

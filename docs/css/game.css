@@ -3585,3 +3585,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 @media (max-width: 1080px) {
   .area-detail .nd-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== 未鉴定装备（2026-09-09 真实鉴定：词缀封印，鉴定石揭晓） ===== */
+.equip-card.q-unid { border-style: dashed; opacity: .82; }
+.equip-card.q-unid .ec-unid { color: #8b90a0; font-size: 11px; margin-top: 2px; }
+.btn-sm.id { border-color: #7a6a3a; color: #f0d48a; background: #2a2630; }
+.btn-sm:disabled { opacity: .45; cursor: not-allowed; }
+.eq-unid-block { padding: 14px 12px; text-align: center; }
+.eq-unid-icon { font-size: 34px; margin-bottom: 8px; }
+.eq-unid-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.eq-unid-line { font-size: 12px; color: #c9c3b4; margin: 3px 0; }
+.eq-unid-line.hint { color: #8b90a0; }
+.eq-unid-block .btn-sm.id { margin-top: 10px; padding: 6px 16px; }

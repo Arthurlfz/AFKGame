@@ -120,7 +120,7 @@
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byId = id => document.getElementById(id);
 window.Drop = { getEggCount: () => 0, getEggs: () => [], hatchEgg: async () => ({}) };
-window.Materials = { getLocal: () => [], getQuantity: () => 0 };
+window.Materials = { getLocal: () => [], getQuantity: (n) => (n === '鉴定石' ? 5 : 0), spend: async () => ({ ok: true }) };
 window.UI = {
   $: byId,
   escapeHtml,
@@ -177,6 +177,7 @@ window.__INV__ = [
   { id: 'e2', name: '霜狼皮甲', slot: 'armor', rarity: { id: 'blue', label: '蓝色', color: '#4f8ddb' }, base: { label: '生命', value: 30 }, tier: 2, level: 12, locked: false, fresh: true, affixes: [{ label: '生命', value: 12, base: true }], _score: 18 },
   { id: 'e3', name: '赤霄金冠', slot: 'helm', rarity: { id: 'gold', label: '金色', color: '#e0a94f' }, base: { label: '防御', value: 8 }, tier: 4, level: 45, locked: true, affixes: [{ label: '防御', value: 20 }], _score: 55 },
   { id: 'e4', name: '枯骨指环', slot: 'ring', rarity: { id: 'blue', label: '蓝色', color: '#4f8ddb' }, base: { label: '攻击', value: 4 }, tier: 2, level: 15, locked: false, affixes: [{ label: '暴击率', value: 3 }], _score: 14 },
+  { id: 'e5', name: '赤霄战刃', slot: 'weapon', rarity: { id: 'gold', label: '金色', color: '#e0a94f' }, base: { label: '攻击', value: 12 }, tier: 5, level: 52, locked: false, identified: false, affixes: [{ label: '攻击', value: 40 }, { label: '暴击率', value: 8 }], _score: 88 },
 ];
 window.demoOpenBag = () => { if (window.UI.openBagWindow) window.UI.openBagWindow(); };
 window.demoOpenEquipTab = () => {
@@ -190,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<script src="js/ui/ui-equipment.js?v=20260909merge"></script>
-<script src="js/ui/ui-bag.js?v=20260909merge"></script>
+<script src="js/ui/ui-equipment.js?v=20260909ident"></script>
+<script src="js/ui/ui-bag.js?v=20260909ident"></script>
 </body>
 </html>
