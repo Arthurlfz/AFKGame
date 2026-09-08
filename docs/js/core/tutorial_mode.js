@@ -266,24 +266,29 @@
   }
 
   /* ============================================================
-   * 新手补给箱（2026-09-08 重构，替代旧 applyGrantsFor 差量补齐）
-   * 旧机制（已删）：任务激活时按库存差量补钥匙 → 玩家消耗钥匙即被误判"没发过"
-   *   → 重登/重交无限刷（G5 白装分解、G6 蛋、G7 素材宠最严重）。
-   * 新机制：
-   *   - 一次性：进入第一个引导关时整箱发放，账本 supplyBox 守门（仅一次）。
-   *   - 自愈靠手动：钥匙弄丢卡关 → 引导条「补发」按钮（reissueKeys），
-   *     每关每种限 1 次，走账本 reissue:{taskId}:{key} —— 不卡链也刷不了。
-   *   - 注意：白装不能绑定（G8 教学任务本身要求上架装备），防刷靠账本不靠绑定。
+   * 引导钥匙表（2026-09-08 v2「奖励即钥匙」，替代 v1 开局整箱补给箱）
+   * v0（已删）：任务激活时按库存差量补钥匙 → 玩家消耗即误判"没发过" → 无限刷。
+   * v1：进入第一个引导关时整箱发 → 不刷了，但玩家背包一上来就躺满，
+   *     感知不到"这是上一关给的"，奖励与下一关的因果链是断的。
+   * v2：钥匙按关发放（grantKeysFor），该关激活的那一刻（= 上一关完成瞬间）到手。
+   *   - 防刷：账本 keys:{taskId}，每关只发一次；花掉不补。
+   *   - 自愈：钥匙弄丢卡关 → 引导条「补发」按钮（reissueKeys），每关每种限 1 次。
+   *   - 白装不能绑定（G8 教学任务本身要求上架装备），防刷靠账本不靠绑定。
    * ============================================================ */
   function boxItems() { return (TM().supplyBox && TM().supplyBox.items) || []; }
   // 每把钥匙的唯一 key（补发账本 keyId 用）
   function itemKeyOf(it) {
+    if (it.type === 'exppack') return 'exppack:cap' + (it.cap || 0);
     return it.type + ':' + (it.name || it.baseName || '') + (it.rarity ? ':' + it.rarity : '');
   }
   // 该钥匙当前持有量（与发放口径一致：背包=未穿戴；素材宠=全宠数量）
   function haveOf(it) {
     const E = window.Equipment, D = window.Drop, Pet = window.Pet, M = window.Materials;
     if (it.type === 'mat') return (M && M.getQuantity) ? (M.getQuantity(it.name) || 0) : 0;
+    if (it.type === 'exppack') {
+      const pk = expPackFor(it.cap);
+      return (pk && M && M.getQuantity) ? (M.getQuantity(pk.name) || 0) : 0;
+    }
     if (it.type === 'gear') {
       if (!E || !E.getInventory) return 0;
       const rid = it.rarity || 'white';
@@ -329,32 +334,42 @@
       if (D && D.grantEgg) { for (let i = 0; i < n; i++) await D.grantEgg(it.baseName || '腐噜兽', 1); got.push((it.baseName || '腐噜兽') + '蛋×' + n); }
     } else if (it.type === 'fodder') {
       for (let i = 0; i < n; i++) { await grantFodderPet(it.baseName || '腐噜兽'); got.push('素材宠「' + (it.baseName || '腐噜兽') + '」'); }
+    } else if (it.type === 'exppack') {
+      const pk = expPackFor(it.cap);
+      if (pk) { for (let i = 0; i < n; i++) await grantExpPack(pk); got.push(pk.name + '×' + n); }
     }
     return got;
   }
-  // 整箱发放（账本 supplyBox 守门后调用，仅一次）：按缺口补到配置量
-  async function openSupplyBox() {
-    const M = window.Materials;
-    const added = [];
-    for (const it of boxItems()) {
-      try {
-        const add = Math.max(0, needOf(it) - haveOf(it));
-        if (add <= 0) continue;
-        const got = await grantBoxItem(it, add);
-        added.push.apply(added, got);
-      } catch (e) { console.warn('[guide] 补给箱发放失败', it, e); }
-    }
-    if (M && M.flushMaterials) { try { await M.flushMaterials(); } catch (e) { /* 忽略 */ } }
-    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
-    const boxName = (TM().supplyBox && TM().supplyBox.name) || '新手补给箱';
-    if (added.length) {
-      if (window.UI && window.UI.addLog) window.UI.addLog(`${boxName}已开启：${added.join('、')}`);
-      if (window.UI && window.UI.showToast) {
-        try { window.UI.showToast(boxName, added.join('、') + ' —— 引导全程的钥匙都在这了'); } catch (e) { /* 忽略 */ }
+  /* 按关发放钥匙（2026-09-08 v2：奖励即钥匙，替代 v1 的开局整箱）
+   * 时机：该关成为"当前引导关"的那一刻 —— completeQuest 后会 fire-and-forget 触发
+   *       checkGuide，此时 getGuideQuest 已切到下一关 → 钥匙正好在"上一关完成的瞬间"到手，
+   *       玩家的因果感就是「做完了 → 拿到下一样要用的东西」。
+   * 防刷：账本 keys:{taskId}，每关只发一次；花掉不补（补发走 reissueKeys，每关每种限 1 次）。
+   * 老档：v1 已整箱发过的账号 → keys:* 全部补账，不会二次到手。 */
+  async function grantKeysFor(taskId) {
+    if (!taskId) return [];
+    const items = boxItems().filter(it => it.taskIds && it.taskIds.indexOf(taskId) >= 0);
+    if (!items.length) return [];
+    let added = [];
+    await grantOnce('keys:' + taskId, async () => {
+      for (const it of items) {
+        try {
+          const add = Math.max(0, needOf(it) - haveOf(it));
+          if (add <= 0) continue;
+          const got = await grantBoxItem(it, add);
+          added.push.apply(added, got);
+        } catch (e) { console.warn('[guide] 钥匙发放失败', taskId, it, e); }
       }
-    } else {
-      if (window.UI && window.UI.addLog) window.UI.addLog(`${boxName}已开启（钥匙都在背包里，没重复发）`);
+      const M = window.Materials;
+      if (M && M.flushMaterials) { try { await M.flushMaterials(); } catch (e) { /* 忽略 */ } }
+    });
+    if (added.length) {
+      if (window.UI && window.UI.addLog) window.UI.addLog(`获得引导奖励：${added.join('、')}（下一关要用）`);
+      if (window.UI && window.UI.showToast) {
+        try { window.UI.showToast('任务奖励', added.join('、') + ' —— 下一关要用'); } catch (e) { /* 忽略 */ }
+      }
     }
+    if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
     return added;
   }
   // 手动补发（引导条「补发」按钮）：只给当前引导关补缺的钥匙，每关每种限 1 次（账本）
@@ -546,29 +561,28 @@
     const task = shown || internal;
     if (task) {
       // 进入引导 → 打「引导已开始」标记（Q6：老账号链已完成、没真正走过引导 → 不发礼包）
-      if (!readStarted()) {
-        markStarted();
-        // 新手补给箱：第一次进引导 → 整箱一次性发（账本 supplyBox 守门，仅一次）。
-        // 老账号（引导已开始、账本无 supplyBox 记录）不自动发 —— 避免与已拿过的差量资源叠加，
-        // 钥匙弄丢走引导条「补发」按钮（每关每种限 1 次）。
-        await grantOnce('supplyBox', openSupplyBox);
+      if (!readStarted()) markStarted();
+      // 老档兼容：v1「开局整箱补给箱」已发过的账号 → keys:* 全部补账，v2 不再发第二遍
+      if (ledgerOf().supplyBox && !ledgerOf()['keys:g1']) {
+        for (const gq of ((Config.drop && Config.drop.quests) || [])) {
+          if (gq.category === 'tutorial') await ledgerBackfill('keys:' + gq.id);
+        }
       }
       // buff 已激活且超时 → 自动关（玩家用完 30 分钟恢复正式节奏）
       if (active && buffExpired()) exit();
-      // 分档经验包（2026-09-08）：不再隐式顶等级，改为发真实道具（背包可见、玩家手动使用）。
-      // 账本按 'expPack:{cap}' 记账 —— G1/G2 同为 Lv10 共享初阶一份，同档关卡不重复发。
-      if (task.boostLevel) {
-        const pack = expPackFor(task.boostLevel);
-        if (pack && !ledgerOf()['expPack:' + pack.cap]) {
-          await grantOnce('expPack:' + pack.cap, () => grantExpPack(pack));
-        }
-      }
+      /* 奖励即钥匙（2026-09-08 v2）：本关的钥匙在这一刻发放（账本 keys:{id} 守门，每关只发一次）。
+       * 分档经验包已并入钥匙表（type:'exppack' 按 taskIds 走），不再按 boostLevel 单独发 ——
+       * 两套并行会让同一档经验包到手两份。boostLevel 字段保留作等级门槛说明。 */
+      await grantKeysFor(task.id);
       return;
     }
     // 引导段全完成
     if (active) exit();
     // 只有"真正走过引导"的账号才发礼包（Q6 修复：老账号自动完成新手链 → 不再白拿）
     if (readStarted() && !readSkipped()) {
+      // G10 魂铸不是 isGuide（毕业后普通任务），getGuideQuest 永远不会指向它 →
+      // 它的钥匙（凝魂晶石×10 = soulCast.materialCount）只能在引导段收尾时补发，否则必卡。
+      await grantKeysFor('g10');
       // 老档兼容：旧 packClaimed 标记领过的 → 只补账不发货，防账本缺失导致重发
       if (hasClaimedPack()) { await ledgerBackfill('graduatePack'); return; }
       // 账本守门：graduatePack 记账成功才发货（strict 落盘失败 → 不发，宁可少拿）
@@ -650,8 +664,8 @@
     boostGuidePetToLevel,  // 引导经验包：把出战宠顶到指定等级（教学期等级门槛专用）
     // 发放账本（2026-09-08）：经济类发放统一走这里；补发钥匙用 grantOnce(keyId, fn, {max})
     grantOnce, ledgerOf, ledgerBackfill,
-    // 新手补给箱（2026-09-08）：missingKeysFor 只读检测 + reissueKeys 手动补发（每关每种限1次）
-    missingKeysFor, reissueKeys, openSupplyBox,
+    // 引导钥匙表（2026-09-08 v2 奖励即钥匙）：grantKeysFor 按关发放 + missingKeysFor 只读检测 + reissueKeys 手动补发（每关每种限1次）
+    grantKeysFor, missingKeysFor, reissueKeys,
     // 分档经验包（2026-09-08）：useExpPack 是通用使用入口（背包消耗品点击调用）
     useExpPack, expPackFor
   };

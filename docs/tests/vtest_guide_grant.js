@@ -42,32 +42,32 @@ true`);
   C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,40,'腐噜兽');Pet.addPet(p);Pet.setActive(p.id);return true})()`);
   A(C(`Pet.getPets().length`) === 1, '账号下 1 只宠（Lv1 出战宠）');
 
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
   /* ---------- 门闩：云端进度没拉完 → 不发放 ---------- */
   await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('重铸石')`) === 0, '云端未就绪：checkGuide 不发补给箱（门闩生效）');
-  A(C(`!TutorialMode.ledgerOf().supplyBox`), '云端未就绪：账本无 supplyBox 记录');
+  A(C(`__matQty('初阶经验包')`) === 0, '云端未就绪：checkGuide 不发钥匙（门闩生效）');
+  A(!C(`TutorialMode.ledgerOf()['keys:g1']`), '云端未就绪：账本无 keys:g1 记录');
 
-  /* ---------- 首次 checkGuide：整箱 + 初阶经验包 一次性发放 ---------- */
+  /* ---------- 按关发放（v2 奖励即钥匙）：当前 g1 → 只发 g1 的钥匙 ---------- */
   await Q(`Quest.loadCloudProgress()`);
   A(C(`Quest.isCloudLoaded()`) === true, '云端进度已拉取（isCloudLoaded 门闩放行）');
+  A(C(`(Quest.getGuideQuest() || {}).id`) === 'g1', '引导条当前指向 g1');
   await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('重铸石')`) >= 1, '补给箱到账：重铸石 ×1（G4 钥匙）');
-  A(C(`__matQty('传说进化素材')`) >= 5, '补给箱到账：传说进化素材 ×5（G9 钥匙）');
-  A(C(`__matQty('腐噜兽蛋') || (Drop.getEggCountOf ? Drop.getEggCountOf('腐噜兽') : 0)`) >= 1, '补给箱到账：腐噜兽蛋 ×1（G6 钥匙）');
-  A(C(`Pet.getPets().length`) >= 3, '补给箱到账：素材宠补到 3 只（G7 合成要吃 2 只）');
-  A(C(`__matQty('初阶经验包')`) === 1, '初阶经验包到账 ×1（真实道具，不再是隐式顶等级）');
+  A(C(`__matQty('初阶经验包')`) === 1, 'g1 钥匙到账：初阶经验包 ×1（真实道具，不再是隐式顶等级）');
   A(C(`Pet.getActivePet().level`) === 1, '经验包发放 ≠ 自动升级：宠还是 Lv1，等玩家自己用');
+  A(C(`__matQty('重铸石')`) === 0, '按关发：g4 的钥匙 重铸石 现在还没到手（v1 整箱会提前给）');
+  A(C(`Drop.getEggCountOf ? Drop.getEggCountOf('腐噜兽') : 0`) === 0, '按关发：g6 的钥匙 腐噜兽蛋 现在还没到手');
+  A(C(`Pet.getPets().length`) === 1, '按关发：不再凭空补素材宠（G7 的副宠由 G6 孵化产出）');
 
   /* ---------- 核心回归：花掉钥匙后重跑 checkGuide → 不再补（旧版在这里无限刷） ---------- */
-  await Q(`Materials.spend('重铸石', 1)`);
-  A(C(`__matQty('重铸石')`) === 0, '玩家把重铸石花掉了（模拟 G4 打造消耗）');
+  await Q(`Materials.spend('初阶经验包', 1)`);
+  A(C(`__matQty('初阶经验包')`) === 0, '玩家把初阶经验包用掉了（模拟已消耗）');
   await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('重铸石')`) === 0, '重跑 checkGuide 不再补发（账本 supplyBox 已记账，差量补齐已退役）');
-  A(C(`__matQty('传说进化素材')`) === 5, '同样不重发：传说进化素材维持 5 个（旧版重登可无限刷）');
+  A(C(`__matQty('初阶经验包')`) === 0, '重跑 checkGuide 不再补发（账本 keys:g1 已记账，差量补齐已退役）');
+  await Q(`Materials.gain('初阶经验包', 1)`);
 
-  /* ---------- 手动补发：只补当前关缺的钥匙，每关每种限 1 次 ---------- */
-  // 当前引导关是 g1（等级任务）：先把宠顶到 Lv10 并交任务，推进到 g2（进化素材 · 缺）
-  A(C(`(Quest.getGuideQuest() || {}).id`) === 'g1', '引导条当前指向 g1');
+  /* ---------- 奖励即钥匙：交完 g1 → g2 的钥匙立刻到手 ---------- */
   const ur = await Q(`TutorialMode.useExpPack('初阶经验包')`);
   A(ur && ur.ok, '使用初阶经验包成功');
   A(C(`Pet.getPets().every(p => p.level >= 10)`), '全宠直升 Lv10（档位锁死：≤10 的顶到 10，不超）');
@@ -75,7 +75,12 @@ true`);
   const r1 = await Q(`Quest.completeQuest('g1')`);
   A(r1 && r1.ok, '提交 g1 成功（等级达标）');
   A(C(`(Quest.getGuideQuest() || {}).id`) === 'g2', '引导条推进到 g2');
-  // g2 需要 进化素材 ×1：箱子发 1 + g1 奖励送 1，全部花掉制造缺口
+  await sleep(120);  // completeQuest 里 checkGuide 是 fire-and-forget，等它落地
+  A(!!C(`TutorialMode.ledgerOf()['keys:g2']`), 'g1 完成 → g2 钥匙已记账（keys:g2）');
+  A(C(`__matQty('进化素材')`) >= 1, 'g1 完成 → g2 钥匙到账：进化素材 ×1（上一关奖励 = 下一关钥匙）');
+
+  /* ---------- 手动补发：只补当前关缺的钥匙，每关每种限 1 次 ---------- */
+  // g2 需要 进化素材 ×1：把它花光制造缺口
   await Q(`Materials.spend('进化素材', Materials.getQuantity('进化素材'))`);
   A(C(`TutorialMode.missingKeysFor('g2').length`) >= 1, 'missingKeysFor 只读检测：g2 缺 进化素材');
   const ri1 = await Q(`TutorialMode.reissueKeys('g2')`);
@@ -87,9 +92,19 @@ true`);
   const ri3 = await Q(`TutorialMode.reissueKeys('g9')`);
   A(ri3 && ri3.error, '非当前引导关拒绝补发（g9 不是当前关）');
 
-  /* ---------- 同档不重发：g1/g2 同为 Lv10，共用一份初阶包 ---------- */
+  /* ---------- 后续关的钥匙不会提前到手 ---------- */
   await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('初阶经验包')`) === 0, '进 g2（同为 Lv10 档）不再重发初阶经验包（账本 expPack:10）');
+  A(C(`__matQty('初阶经验包')`) === 0, '进 g2：初阶经验包不再发（g2 的钥匙表里没有它）');
+  A(C(`__matQty('重铸石')`) === 0, '进 g2：g4 的钥匙 重铸石 仍未提前发放');
+  A(C(`__matQty('传说进化素材')`) === 0, '进 g2：g9 的钥匙 传说进化素材 仍未提前发放');
+
+  /* ---------- 钥匙表守恒（改配置必挂） ---------- */
+  const box = C(`Config.tutorialMode.supplyBox.items`);
+  const sum = (tid, name) => box.filter(i => i.taskIds.indexOf(tid) >= 0 && i.name === name).reduce((s, i) => s + (i.qty || 0), 0);
+  A(sum('g9', '传说进化素材') >= 5, 'G9 钥匙守恒：传说进化素材 ≥5（终阶 extra 3 个已算在内）');
+  A(sum('g9', '精粹进化素材') >= 1, 'G9 钥匙守恒：精粹进化素材 ≥1');
+  A(sum('g10', '凝魂晶石') >= C(`Config.soulCast.materialCount`), 'G10 钥匙守恒：凝魂晶石 ≥ soulCast.materialCount（给少了 G10 魂铸必卡）');
+  A(C(`(Config.drop.quests||[]).filter(q=>q.category==='tutorial'&&q.isGuide&&q.reward).length`) === 0, '引导关 reward 已清空（钥匙统一走 supplyBox，两套并行会重复到手）');
 
   /* ---------- 分档配置与使用守卫 ---------- */
   A(C(`TutorialMode.expPackFor(10).name`) === '初阶经验包' && C(`TutorialMode.expPackFor(60).cap`) === 60, '档位映射正确：boostLevel 10/40/60 → 初/中/终阶');

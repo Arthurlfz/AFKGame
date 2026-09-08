@@ -492,24 +492,27 @@ window.Config = {
       /* ---- 新手引导 G1~G10（2026-09-03 目标驱动主线重写，替代原 t1~t13）----
        * 内核仍是任务链：G1~G9 = 引导段（isGuide:true，带 NPC 台词 / hint 怎么做 / target 指引锚点 / boostLevel 等级资粮）；
        * G10 魂铸 = 毕业后普通任务（isGuide:false：不进引导条、不进加速）。
-       * 顺序即「变强主线」：领资粮升 Lv10 → 进化 → 武装 → 打造 → 分解 → 孵化副宠 → 融合 → 市集 → 涅槃毕业 → 魂铸。
-       * 等级门槛全部由「引导经验包」顶上去（boostLevel，见 tutorial_mode.boostGuidePetToLevel），玩家不刷级：
-       *   进 G2 前 →Lv10（进化）/ 进 G7 前 →Lv40（合成）/ 进 G9 前 →Lv60（涅槃）。
-       * 奖励纯 B 明给闭环（每一步给下一步要用的东西，不给玩家卡手的机会）：
-       *   G1 蓝装→G3 穿 / G1 进化素材→G2 进化 / G5 宠物蛋→G6 孵化 / G6 合成之石→G7 合成 /
-       *   G7 涅磐兽 + 副宠（grants 发）→G9 涅槃 / G9 毕业礼包（账号仅一次）。
+       * 顺序即「变强主线」：领资粮升 Lv10 → 进化 → 武装 → 打造 → 分解 → 孵化副宠 → 融合 → 市集 → 终阶毕业 → 魂铸。
+       * ⚠️ 奖励即钥匙（2026-09-08 v2）：引导关的 reward 一律**清空**，
+       *   每一步要用的东西由 `tutorialMode.supplyBox`（钥匙表）在该关激活时发放 —— 两套并行会让玩家
+       *   看到两份来源不明的资源，也讲不清"这东西是上一关给的"。唯一例外是 G10（非 isGuide，
+       *   拿不到 grantKeysFor），它的钥匙 凝魂晶石×10 仍放在钥匙表里，由引导段收尾时补发。
+       *   闭环链：G1 经验包→G2 素材→G3 蓝装→G4 重铸石+白装→G5 白装→G6 蛋→G7 合成石+经验包→
+       *           G8 白装→G9 精粹1+传说5+经验包→G10 凝魂晶石×10。
+       * 经验包：三档真实道具（见 tutorialMode.expPacks），走钥匙表 type:'exppack'，玩家背包里手动用。
+       * boostLevel 字段保留，仅作"这一关的等级门槛"说明，不再驱动发放。
        * npc 字段 = 引路人台词草稿，文案可直接在这里改。target = 单步指引 hotspot 的锚点选择器。 */
-      { id: 'g1', category: 'tutorial', type: 'level', need: 10, name: '引路人的馈赠', guide: { page: 'pet', btn: '去领取' }, isGuide: true, hint: '初阶经验包已发：去<b>背包 · 消耗品</b>点它使用，出战魂兽直升 Lv10', target: '.qt-go', npc: '腐土虽是你的战场，但蜕变不该靠苦熬。这份资粮，助你直抵进化之境。', boostLevel: 10, reward: { 进化素材: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'blue', materialTier: 3 } },
-      { id: 'g2', category: 'tutorial', type: 'evolve', need: 1, requires: 'g1', name: '初次蜕变', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏完成第一次进化（Lv10＋进化素材都已备好）', target: '.pet-tab[data-pet-tab="evolve"]', npc: '形态蜕变、属性跃升——这是养成的第一个跳变。越过此境，你的魂兽才真正属于你。', boostLevel: 10, reward: { 神圣石: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'white', materialTier: 1 } },
-      { id: 'g3', category: 'tutorial', type: 'equip', need: 1, requires: 'g2', name: '披甲上阵', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, isGuide: true, hint: '在宠物页打开 <b>装备</b> 栏，把刚领到的蓝装穿到出战魂兽身上', target: '.pet-tab[data-pet-tab="equip"]', npc: '蜕变之后仍需甲胄护身，战力才扎实。披上残甲，别让它静静躺在背包蒙尘。', reward: { 重铸石: 1 } },
-      { id: 'g4', category: 'tutorial', type: 'craft', need: 1, requires: 'g3', name: '亲手淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页用重铸石强化背包里的装备 1 次', target: '.sb-btn[data-page="equip"]', npc: '掉落终有尽时。学会亲手锻造，你的战力便不再仰仗天命。', reward: { 增缀石: 1 }, rewardGear: { count: 1, areaTier: 1, rarity: 'white', materialTier: 1 } },
-      { id: 'g5', category: 'tutorial', type: 'salvage', need: 1, requires: 'g4', name: '化废为宝', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点 <b>一键分解</b>，把「亲手淬炼」送的那件白装拆掉（它就是给你分解用的废品）', target: '#btn-salvage', npc: '废品并非无用。拆了回炉成打造石，养成的循环才真正闭合。', reward: { 剥离石: 1 } },
-      { id: 'g6', category: 'tutorial', type: 'hatch', need: 1, requires: 'g5', name: '孵化新生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, isGuide: true, hint: '在宠物页 <b>宠物蛋</b> 栏孵化 1 颗蛋，得到第二只魂兽', target: '.pet-tab[data-pet-tab="egg"]', npc: '战场不该只容一只孤魂。孵化这颗蛋，让副宠为你并肩而战。', reward: { 合成之石: 1 } },
-      { id: 'g7', category: 'tutorial', type: 'synth', need: 1, requires: 'g6', name: '融合之力', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物页 <b>合成</b> 栏：主宠融合副宠（中阶经验包已发，背包使用后升到 Lv40）', target: '.pet-tab[data-pet-tab="synth"]', npc: '魂兽之间亦有高下。主宠融副宠、继承其特质，向更上一层蜕变。', boostLevel: 40, reward: { 涅磐兽: 1 } },
-      { id: 'g8', category: 'tutorial', type: 'list', need: 1, requires: 'g7', name: '初入市集', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页上架 1 件装备（进任务时已自动在背包放 1 件可上架白装，直接去市集上架它）', target: '.sb-btn[data-page="market"]', npc: '你亲手锻造之物，可换他人之资。市集之上，强者互通有无。', reward: { 重铸石: 2, 增缀石: 2 } },
+      { id: 'g1', category: 'tutorial', type: 'level', need: 10, name: '引路人的馈赠', guide: { page: 'pet', btn: '去领取' }, isGuide: true, hint: '初阶经验包已发：去<b>背包 · 消耗品</b>点它使用，出战魂兽直升 Lv10', target: '.qt-go', npc: '腐土虽是你的战场，但蜕变不该靠苦熬。这份资粮，助你直抵进化之境。', boostLevel: 10 },
+      { id: 'g2', category: 'tutorial', type: 'evolve', need: 1, requires: 'g1', name: '初次蜕变', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏完成第一次进化（Lv10＋进化素材都已备好）', target: '.pet-tab[data-pet-tab="evolve"]', npc: '形态蜕变、属性跃升——这是养成的第一个跳变。越过此境，你的魂兽才真正属于你。', boostLevel: 10 },
+      { id: 'g3', category: 'tutorial', type: 'equip', need: 1, requires: 'g2', name: '披甲上阵', guide: { page: 'pet', tab: 'equip', btn: '去穿装备' }, isGuide: true, hint: '在宠物页打开 <b>装备</b> 栏，把刚领到的蓝装穿到出战魂兽身上', target: '.pet-tab[data-pet-tab="equip"]', npc: '蜕变之后仍需甲胄护身，战力才扎实。披上残甲，别让它静静躺在背包蒙尘。' },
+      { id: 'g4', category: 'tutorial', type: 'craft', need: 1, requires: 'g3', name: '亲手淬炼', guide: { page: 'equip', btn: '去打造' }, isGuide: true, hint: '去 <b>打造</b> 页，用刚领的重铸石重铸背包里那件白装 1 次', target: '.sb-btn[data-page="equip"]', npc: '掉落终有尽时。学会亲手锻造，你的战力便不再仰仗天命。' },
+      { id: 'g5', category: 'tutorial', type: 'salvage', need: 1, requires: 'g4', name: '化废为宝', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点 <b>一键分解</b>，把刚领到的那件白装拆掉（白装本无产出，完成这一步会给你一颗宠物蛋）', target: '#btn-salvage', npc: '废品并非无用。拆了回炉成打造石，养成的循环才真正闭合。' },
+      { id: 'g6', category: 'tutorial', type: 'hatch', need: 1, requires: 'g5', name: '孵化新生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, isGuide: true, hint: '在宠物页 <b>宠物蛋</b> 栏孵化刚领到的那颗蛋，得到第二只魂兽', target: '.pet-tab[data-pet-tab="egg"]', npc: '战场不该只容一只孤魂。孵化这颗蛋，让副宠为你并肩而战。' },
+      { id: 'g7', category: 'tutorial', type: 'synth', need: 1, requires: 'g6', name: '融合之力', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物页 <b>合成</b> 栏：主宠融合副宠（中阶经验包已发，背包使用后升到 Lv40）', target: '.pet-tab[data-pet-tab="synth"]', npc: '魂兽之间亦有高下。主宠融副宠、继承其特质，向更上一层蜕变。', boostLevel: 40 },
+      { id: 'g8', category: 'tutorial', type: 'list', need: 1, requires: 'g7', name: '初入市集', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页，把刚领到的那件白装挂上去（1 件即可）', target: '.sb-btn[data-page="market"]', npc: '你亲手锻造之物，可换他人之资。市集之上，强者互通有无。' },
       /* G9 2026-09-06 改：手册 2.7「只有神级宠才能涅槃」→ 引导期玩家只有普通宠，涅槃任务必然卡死（落地方案 R2）。
        * 引导最后一环改为【登临终阶】（累计进化 4 次 = 走到 5 阶终形态），涅槃降级为长线主线目标（m19/m31）。 */
-      { id: 'g9', category: 'tutorial', type: 'evolve', need: 4, requires: 'g8', name: '登临终阶', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏把魂兽推到 <b>终阶</b>（累计进化 4 次；终阶经验包已发，背包使用后升到 Lv60，进化素材已备）', target: '.pet-tab[data-pet-tab="evolve"]', npc: 'Lv60 —— 形态的尽头。越过此境，你的魂兽才算真正长成；再往上，唯有神级之路。', boostLevel: 60, reward: { 凝魂晶石: 2 } },
+      { id: 'g9', category: 'tutorial', type: 'evolve', need: 4, requires: 'g8', name: '登临终阶', guide: { page: 'pet', tab: 'evolve', btn: '去进化' }, isGuide: true, hint: '在宠物页 <b>进化</b> 栏把魂兽推到 <b>终阶</b>（累计进化 4 次；终阶经验包已发，背包使用后升到 Lv60，进化素材已备）', target: '.pet-tab[data-pet-tab="evolve"]', npc: 'Lv60 —— 形态的尽头。越过此境，你的魂兽才算真正长成；再往上，唯有神级之路。', boostLevel: 60 },
       { id: 'g10', category: 'tutorial', type: 'soulcast', need: 1, requires: 'g9', name: '魂铸传承', guide: { page: 'equip', tab: 'soulcast', btn: '去魂铸' }, hint: '毕业后普通任务：去 <b>打造</b> 页把魂兽特质铸入装备', target: '.sb-btn[data-page="equip"]', npc: '特质可铸入装备，世代相传。毕业之后，仍有可走的更深之路。', reward: { 神圣石: 2 } },
 
       /* ---- 主线 40 条：10 图 × 4 条（击败 / 收集 / 养成 / 装备），按等级解锁。
@@ -1258,26 +1261,33 @@ window.Config = {
       { target: '.sb-btn[data-page="equip"]', title: '第三站 · 魂铸工坊', npc: '神兵不只出自掉落。这座铁砧，能把废品炼成护身之甲、把特质铸成传承。' },
       { target: '.sb-btn[data-page="market"]', title: '第四站 · 市集', npc: '当你足够强大，多余的造物可挂上市集，与天下魂师交换所需之物。' }
     ],
-    /* 「新手补给箱」（2026-09-08 重构，替代旧 grants 差量补齐）：
-     * 旧机制按库存差量补钥匙，玩家消耗即误判 → 重登可无限刷（G5 白装/G6 蛋/G7 素材宠最严重）。
-     * 新机制：进入第一个引导关时一次性发全箱（账本 supplyBox 守门，仅一次）；
+    /* 「引导钥匙表」（2026-09-08 重构 v2，替代 v1 的整箱补给箱）
+     * v1 = 开局一次性整箱发 → 玩家背包一上来就躺满，感知不到"这是上一关给的"，因果链断。
+     * v2 = **奖励即钥匙**：每一项的 taskIds 标注"它是哪一关的钥匙"，
+     *      在该关激活时（= 上一关完成的瞬间）由 grantKeysFor(taskId) 发放，账本 keys:{taskId} 守门只发一次。
+     *      链：G1 经验包→G2 素材→G3 蓝装→G4 重铸石+白装→G5 白装→G6 蛋→G7 合成石+经验包→
+     *          G8 白装(不绑定，要上架)→G9 精粹1+传说5+经验包→G10 凝魂晶石×10。
+     * 数量守恒（改这里必须同步核）：G9 进化 4 次总需 精粹1+传说5（终阶 extra 3 个已算在内）；
+     *   G10 魂铸需 凝魂晶石×10（= soulCast.materialCount，给少了必卡）。
      * 玩家中途把钥匙弄丢 → 引导条「补发」按钮手动补，每关每种限 1 次（走账本 reissue:*）。
-     * items 里 taskIds 标注这把钥匙服务哪一关：引导条据此显示"缺什么"、补发据此定位。
      * 注意：白装不能绑定 —— G8 教学任务本身要求上架装备，绑了就卡死 G8。防刷靠账本，不靠绑定。 */
     supplyBox: {
       name: '新手补给箱',
       items: [
+        { type: 'exppack', cap: 10, qty: 1, taskIds: ['g1'] },
         { type: 'mat', name: '进化素材', qty: 1, taskIds: ['g2'] },
         { type: 'gear', rarity: 'blue', areaTier: 1, materialTier: 3, count: 1, identified: true, taskIds: ['g3'] },
-        { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g4'] },
         { type: 'mat', name: '重铸石', qty: 1, taskIds: ['g4'] },
+        { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g4'] },
         { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g5'] },
         { type: 'egg', baseName: '腐噜兽', qty: 1, taskIds: ['g6'] },
         { type: 'mat', name: '合成之石', qty: 1, taskIds: ['g7'] },
-        { type: 'fodder', baseName: '腐噜兽', min: 3, taskIds: ['g7'] },
+        { type: 'exppack', cap: 40, qty: 1, taskIds: ['g7'] },
         { type: 'gear', rarity: 'white', areaTier: 1, materialTier: 1, count: 1, identified: true, taskIds: ['g8'] },
         { type: 'mat', name: '精粹进化素材', qty: 1, taskIds: ['g9'] },
-        { type: 'mat', name: '传说进化素材', qty: 5, taskIds: ['g9'] }
+        { type: 'mat', name: '传说进化素材', qty: 5, taskIds: ['g9'] },
+        { type: 'exppack', cap: 60, qty: 1, taskIds: ['g9'] },
+        { type: 'mat', name: '凝魂晶石', qty: 10, taskIds: ['g10'] }
       ]
     },
   },

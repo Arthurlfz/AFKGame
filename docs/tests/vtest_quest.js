@@ -82,25 +82,27 @@ const C = code => vm.runInContext(code, ctx);
   A(r2 && r2.error, '一次性任务不能重复交（提示：' + (r2.error || '') + '）');
   A(C(`Quest.getQuests().find(q=>q.id==='g1').finished`) === true, 'g1 标记为已完成');
 
-  /* ---------- 新手链送装备：g3「披甲上阵」的前置 g2 必须给一件，否则引导卡死 ----------
+  /* ---------- 新手链送装备：g3「披甲上阵」必须有一件装备可穿，否则引导卡死 ----------
    * 装备只能靠战斗 5% 掉落（drop.js），新手做完 g1（升级）时背包很可能还是空的，
-   * 而 g3 要的正是「穿上 1 件装备」—— g2 不送就是死循环。 */
+   * 而 g3 要的正是「穿上 1 件装备」—— 不给就是死循环。
+   * 2026-09-08 v2「奖励即钥匙」：装备改由钥匙表（tutorialMode.supplyBox，taskIds:'g3'）在
+   *   g3 激活时发放，不再挂在 g2 的 rewardGear 上（来源统一，玩家才看得懂"这是上一关给的"）。
+   *   运行时的按关发放由 vtest_guide_grant 覆盖，这里只守住"配置层面 g3 一定有装备可穿"。 */
   A(C(`(function(){const g3=Config.drop.quests.find(q=>q.id==='g3');
-    const g2=Config.drop.quests.find(q=>q.id===g3.requires);
-    return !!g3 && g3.type==='equip' && !!g2 && (Number(g2.rewardGear&&g2.rewardGear.count)||Number(g2.rewardGear)||0)>=1})`),
-    'g3（穿装备）的前置任务送至少 1 件装备（不送会卡死引导）');
+    if(!g3||g3.type!=='equip') return false;
+    const keys=(Config.tutorialMode.supplyBox.items||[]).filter(i=>(i.taskIds||[]).indexOf('g3')>=0);
+    return keys.some(i=>i.type==='gear'&&(Number(i.count)||1)>=1)})`),
+    'g3（穿装备）的钥匙表里有至少 1 件装备（不送会卡死引导）');
+  // 钥匙表里的那件装备必须真能生成、真能穿（g3 有解）
+  C(`(function(){const it=(Config.tutorialMode.supplyBox.items||[]).find(i=>(i.taskIds||[]).indexOf('g3')>=0&&i.type==='gear');
+    const r=(Config.equipment.rarities||[]).find(x=>x.id===(it.rarity||'white'))||(Config.equipment.rarities||[])[0];
+    const eq=Equipment.generateEquipment(r,it.areaTier||1,it.materialTier||1);eq.identified=true;Equipment.addToInventory(eq);return true})()`);
+  A(C(`Equipment.getInventory().length`) >= 1, '钥匙表里的装备能正常生成并入包');
+  A(C(`(function(){const eq=Equipment.getInventory()[0];return !!Equipment.equipItem(Pet.getActivePet(), eq.id)})()`),
+    '这件装备能直接穿上（g3 有解，引导链不断）');
   C(`Quest.reportType('evolve', 1)`); // g2 进化任务上报 1 次即达标
-  const bagBefore = C(`Equipment.getInventory().length`);
   const rT2 = await C(`Quest.completeQuest('g2')`);
   A(rT2 && rT2.ok, '提交 g2 成功（' + ((rT2.rewards || []).join('、') || '无奖励') + '）');
-  const bagAfter = C(`Equipment.getInventory().length`);
-  A(bagAfter === bagBefore + 1, `交 g2 后背包 +1 件装备（${bagBefore} → ${bagAfter}）`);
-  const gift = JSON.parse(C(`JSON.stringify(Equipment.getInventory()[0]||{})`));
-  A(!!(gift.slot && gift.rarity && gift.rarity.id), `送的是一件完整装备（部位 ${gift.slot} / ${gift.rarity && gift.rarity.label}）`);
-  A((rT2.rewards || []).join('').indexOf('装备') >= 0, '奖励列表写明了送的装备（玩家看得见领到什么）');
-  // 送的装备必须能立刻穿上 —— g3 就是靠它完成的
-  A(C(`(function(){const eq=Equipment.getInventory()[0];return !!Equipment.equipItem(Pet.getActivePet(), eq.id)})()`),
-    '送的装备能直接穿上（g3 有解，引导链不断）');
   A(C(`(Quest.getQuests().find(q=>q.id==='g3')||{}).progress`) >= 1, '穿装备上报到 g3 进度（引导链能继续走）');
   A(C(`(Quest.getQuests().find(q=>q.id==='g3')||{}).unlocked`) === true, '交完 g2 后 g3 解锁（前置依赖生效）');
 
