@@ -107,6 +107,7 @@
         <div class="quest-detail-sec">
           <div class="quest-detail-head">奖励物品</div>
           ${rewardRows.length ? rewardRows.map(r => `<div class="quest-reward-row">${r}</div>`).join('') : '<div class="quest-detail-text">无</div>'}
+          ${(() => { const pv = rewardPreviewOf(q); return pv ? `<div class="quest-reward-row quest-next-row">完成可得 ${escapeHtml(pv.labels.join('、'))} <span class="quest-next-use">→ 下一步「${escapeHtml(pv.next.name)}」要用</span></div>` : ''; })()}
         </div>
         <div class="quest-actions">
           ${!q.unlocked ? '<div class="quest-detail-text">等级或前置条件达成后解锁</div>' :
@@ -134,7 +135,12 @@
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
     const gearHtml = gearCount > 0
       ? `<span class="quest-card-mat gear">🎁 装备 ×${gearCount}</span>` : '';
-    const rewards = `<span class="quest-card-exp">经验 +${expVal}</span>` + mats + gearHtml;
+    // 奖励即钥匙：卡片上直接写明"做完给什么、下一步是谁要用的"
+    const pv = rewardPreviewOf(q);
+    const nextHtml = pv
+      ? `<span class="quest-card-next">完成可得 ${escapeHtml(pv.labels.join('、'))} <i>→ 下一步「${escapeHtml(pv.next.name)}」</i></span>`
+      : '';
+    const rewards = `<span class="quest-card-exp">经验 +${expVal}</span>` + mats + gearHtml + nextHtml;
     let btn;
     if (!q.unlocked) btn = `<button class="quest-card-btn locked" disabled>${q.lockText || '未解锁'}</button>`;
     else if (q.finished) btn = `<button class="quest-card-btn finished" disabled>${q.repeat ? '今日已完成' : '已完成'}</button>`;
@@ -177,7 +183,9 @@
           btn.textContent = label;
         }
         if (r.error) { UI.showToast ? UI.showToast('任务失败', r.error) : alert(r.error); return; }
-        if (UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
+        // 引导任务走"奖励即钥匙"弹窗（拿到什么 + 给谁用 + 一键跳下一关）；其余维持 toast
+        const q = Quest.getQuests().find(x => x.id === btn.dataset.id);
+        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
         renderQuestPanel();
         renderQuestTracker(); // 交完的任务要从追踪栏撤下
       };
@@ -203,7 +211,8 @@
           btn.textContent = label;
         }
         if (r.error) { UI.showToast ? UI.showToast('任务失败', r.error) : alert(r.error); return; }
-        if (UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
+        const q = Quest.getQuests().find(x => x.id === btn.dataset.id);
+        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
         renderQuestPanel();
         renderQuestTracker();
       };
@@ -341,6 +350,52 @@
     }
   }
 
+  /* ---------- 奖励即钥匙（2026-09-08 v2）：奖励写清楚"给什么、给谁用" ----------
+   * 引导关的 reward 已清空，真正的奖励是「下一关的钥匙」——钥匙表里 taskIds 指向下一关的那些项。
+   * 展示层必须让玩家【接任务时】就看到"做完给什么、下一步要拿它干嘛"，否则闭环对玩家是隐形的。
+   * 数据只有一份来源（钥匙表），UI 不另造一份，避免两处漂移。 */
+  function nextQuestOf(qid) {
+    return (Config.drop.quests || []).find(x => x.requires === qid) || null;
+  }
+  function keyLabelOf(it) {
+    if (!it) return '';
+    if (it.type === 'mat') return `${it.name} ×${Number(it.qty) || 1}`;
+    if (it.type === 'gear') {
+      const r = (Config.equipment.rarities || []).find(x => x.id === (it.rarity || 'white'));
+      return `${(r && r.label) || ''}装备 ×${Number(it.count) || 1}`;
+    }
+    if (it.type === 'egg') return `${it.baseName || ''}蛋 ×${Number(it.qty) || 1}`;
+    if (it.type === 'exppack') {
+      const p = (window.TutorialMode && window.TutorialMode.expPackFor) ? window.TutorialMode.expPackFor(it.cap) : null;
+      return p ? p.name : '经验包';
+    }
+    if (it.type === 'fodder') return `素材宠「${it.baseName || ''}」`;
+    return '';
+  }
+  // 完成这一关会拿到什么（= 下一关的钥匙）；没有下一关则返回 null
+  function rewardPreviewOf(q) {
+    const T = window.TutorialMode;
+    const next = nextQuestOf(q.id);
+    if (!next || !T || !T.keyItemsFor) return null;
+    const labels = T.keyItemsFor(next.id).map(keyLabelOf).filter(Boolean);
+    return labels.length ? { next: next, labels: labels } : null;
+  }
+  // 交完引导任务：用对话气泡讲清"拿到什么、下一步要用"（替代原来只有一行 toast）
+  function showGuideReward(q) {
+    const pv = rewardPreviewOf(q);
+    if (!pv || !UI.showDialog) return false;
+    const g = guideOf(pv.next);
+    UI.showDialog({
+      icon: '🎁',
+      speaker: '引路人',
+      text: `「${escapeHtml(q.name || '任务')}」完成，拿到 `
+        + `<b>${escapeHtml(pv.labels.join('、'))}</b><br>`
+        + `<span class="quest-next-use">这是下一步「${escapeHtml(pv.next.name)}」要用的</span>`,
+      buttons: [{ label: g.btn || '去用掉它', onClick: () => goGuide(g, pv.next.area) }]
+    });
+    return true;
+  }
+
   // 追踪栏条目：新手链当前任务排最前，后面接玩家钉住的任务，最多 TRACK_MAX 条
   function trackerItems() {
     const items = [];
@@ -414,12 +469,18 @@
                ${reissueBtn}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
         : `<button class="btn-mini ghost qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
            <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`;
+      // 奖励即钥匙：引导条上常驻一行"完成可得什么、下一步是谁要用的"
+      const pv = it.isTutorial ? rewardPreviewOf(it) : null;
+      const rewardRow = pv
+        ? `<div class="qt-reward">完成可得 ${escapeHtml(pv.labels.join('、'))} <span class="quest-next-use">→ 下一步「${escapeHtml(pv.next.name)}」要用</span></div>`
+        : '';
       return `<div class="qt-item${it.done ? ' qt-done' : ''}" data-id="${it.id}">
         <span class="qt-tag">${escapeHtml(it.tag)}</span>
         <span class="qt-name">${escapeHtml(it.name)}</span>
         <span class="qt-prog">${Math.min(it.progress, it.need)} / ${it.need}</span>
         <div class="qt-bar"><div class="qt-bar-fill" style="width:${pct}%"></div></div>
         ${acts}
+        ${rewardRow}
       </div>`;
     }).join('');
 
@@ -441,7 +502,9 @@
         try { r = await Quest.completeQuest(b.dataset.id); }
         finally { b.disabled = false; b.textContent = label; }
         if (r && r.error) { if (UI.showToast) UI.showToast('领取失败', r.error); return; }
-        if (UI.showToast && r) UI.showToast('任务完成', '奖励：' + (r.rewards || []).join('、'));
+        // 引导条交任务：优先弹"奖励即钥匙"（拿到什么 + 下一步要用 + 一键跳过去）
+        const it = items.find(x => x.id === b.dataset.id);
+        if (!(it && showGuideReward(it)) && UI.showToast && r) UI.showToast('任务完成', '奖励：' + (r.rewards || []).join('、'));
         if (UI.renderAll) UI.renderAll();
         renderQuestTracker();
       };

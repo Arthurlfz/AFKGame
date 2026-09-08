@@ -303,6 +303,11 @@
     if (it.type === 'fodder') return Math.max(1, Number(it.min) || 1);
     return Math.max(1, Number(it.qty) || 1);
   }
+  // 只读：这一关的钥匙清单（UI 展示"完成上一关会拿到什么"用，不发任何东西）
+  function keyItemsFor(taskId) {
+    if (!taskId) return [];
+    return boxItems().filter(it => it.taskIds && it.taskIds.indexOf(taskId) >= 0);
+  }
   // 只读检测：这一关还缺哪些钥匙（引导条显示用，不发任何东西）
   function missingKeysFor(taskId) {
     if (!taskId) return [];
@@ -664,8 +669,8 @@
     boostGuidePetToLevel,  // 引导经验包：把出战宠顶到指定等级（教学期等级门槛专用）
     // 发放账本（2026-09-08）：经济类发放统一走这里；补发钥匙用 grantOnce(keyId, fn, {max})
     grantOnce, ledgerOf, ledgerBackfill,
-    // 引导钥匙表（2026-09-08 v2 奖励即钥匙）：grantKeysFor 按关发放 + missingKeysFor 只读检测 + reissueKeys 手动补发（每关每种限1次）
-    grantKeysFor, missingKeysFor, reissueKeys,
+    // 引导钥匙表（2026-09-08 v2 奖励即钥匙）：grantKeysFor 按关发放 + keyItemsFor/missingKeysFor 只读查询 + reissueKeys 手动补发（每关每种限1次）
+    grantKeysFor, keyItemsFor, missingKeysFor, reissueKeys,
     // 分档经验包（2026-09-08）：useExpPack 是通用使用入口（背包消耗品点击调用）
     useExpPack, expPackFor
   };
