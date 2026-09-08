@@ -202,10 +202,12 @@
       ? `<div class="nd-boss-row"><span class="k">委托</span><span class="v">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>`
       : '';
 
-    // 怪物列表（普通/变异分档）
+    // 怪物列表（普通/变异分档）：真实头像图（PetSprites.avatarOf），无图回退 emoji
+    const spriteOf = name => (window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(name) : null;
     const mobHtml = mobs.map(m => {
       const evolved = m.enemyType === 'evolved';
-      return `<div class="nd-mob${evolved ? ' evolved' : ''}"><span class="ic">${m.icon || '🐾'}</span><span class="nm">${esc(m.name)}</span><span class="lv">Lv.${m.level || '—'}</span></div>`;
+      const av = spriteOf(m.name);
+      return `<div class="nd-mob${evolved ? ' evolved' : ''}"><span class="ic">${av ? '<img src="' + av + '" alt="">' : (m.icon || '🐾')}</span><span class="nm">${esc(m.name)}</span><span class="lv">Lv.${m.level || '—'}</span></div>`;
     }).join('') || '<div class="nd-mob"><span class="nm">未知怪群</span></div>';
 
     // 出战宠物选择
@@ -217,8 +219,9 @@
       const growth = (p.growth || 0).toFixed(1);
       const meta = god ? '' : `<div class="p-meta">Lv.${p.level || 1} · 成长${growth}</div>`;
       const godTxt = god ? '<div class="p-god">★ 神级</div>' : '';
+      const pAv = spriteOf(p.name);
       return `<div class="nd-pet${active && active.id === p.id ? ' active' : ''}${god ? ' god' : ''}" data-pid="${p.id}">
-        <div class="p-ic">${p.icon || '🐾'}</div>
+        <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : (p.icon || '🐾')}</div>
         <div class="p-nm">${esc(p.name)}</div>${meta}${godTxt}
       </div>`;
     }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
@@ -253,15 +256,14 @@
           <div class="nd-active-row"><span>${activeInfo}</span><span class="tag">可出战</span></div>
         </div>
         <div class="nd-card">
-          <div class="nd-card-title">守关领主<span class="hint">挂机每 100 场现身</span></div>
-          <div class="nd-boss-art">${boss ? (boss.icon || '👹') : '👹'}</div>
+          <div class="nd-card-title">守关领主<span class="hint">挂机按小时现身</span></div>
+          <div class="nd-boss-art">${boss ? (((window.PetSprites && window.PetSprites.pathOf) && window.PetSprites.pathOf(boss.name)) ? '<img src="' + window.PetSprites.pathOf(boss.name) + '" alt="">' : (boss.icon || '👹')) : '👹'}</div>
           <div class="nd-boss-name">霸主 · ${esc(boss ? boss.name : '？？？')}</div>
           <div class="nd-boss-rows">
             <div class="nd-boss-row"><span class="k">等级</span><span class="v warn">Lv.${boss ? (boss.level || '—') : '—'}</span></div>
             <div class="nd-boss-row"><span class="k">首通</span><span class="v">${cleared ? '✓ 已首通' : '未首通'}</span></div>
             ${loopHtml}
           </div>
-          <button type="button" class="nd-boss-btn" id="nd-boss">⚔ 挑战领主</button>
         </div>
       </div>
       <div class="nd-foot">
@@ -310,18 +312,6 @@
         const b = document.getElementById('btn-battle');
         if (b && typeof b.click === 'function') b.click();
       }, 150);
-    };
-    // 挑战领主：进入该图并开始挂机（霸主随挂机每 100 场现身）
-    const boss = body.querySelector('#nd-boss');
-    if (boss) boss.onclick = () => {
-      enterBattle();
-      setTimeout(() => {
-        const b = document.getElementById('btn-battle');
-        if (b && typeof b.click === 'function') b.click();
-      }, 150);
-      if (window.UI && window.UI.showToast) {
-        window.UI.showToast('正在前往迎战', '霸主随挂机每 100 场现身，开始挂机即可遭遇。');
-      }
     };
   }
 

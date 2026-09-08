@@ -3406,23 +3406,25 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 节点详情页（2026-09-08）：大地图选图后弹出，替代直接进战斗；
  * 同时取消地图点位 hover 信息卡（信息全部转移进详情页）
  * ============================================================ */
+/* 2026-09-08 v2：全屏平铺（用户要求第一个页面平铺，不再居中弹窗） */
 .area-detail {
-  position: absolute; inset: 0; z-index: 40;
-  display: flex; align-items: center; justify-content: center;
-  padding: 18px 22px;
-  background: rgb(8 11 12 / .88);
-  backdrop-filter: blur(4px);
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: stretch; justify-content: stretch;
+  padding: 0;
+  background: rgb(6 9 10 / .96);
+  backdrop-filter: blur(6px);
   overflow: auto;
 }
 .area-detail[hidden] { display: none; }
 .area-detail .nd-page {
-  width: min(1180px, 100%);
+  width: 100%; min-height: 100%;
   background: linear-gradient(180deg, var(--panel), var(--ink));
   background-image: var(--ui-paper-texture);
-  border: 1px solid rgb(var(--action-gold-rgb) / .28);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel), 0 0 60px rgb(0 0 0 / .6);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
+  display: flex; flex-direction: column;
 }
 .area-detail .nd-top {
   display: flex; align-items: center; gap: var(--gap-md);
@@ -3569,6 +3571,17 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   border: 1px solid var(--line); box-shadow: none;
 }
 .area-detail .nd-go--ghost:hover { border-color: rgb(var(--action-gold-rgb) / .5); color: var(--accent-hi); box-shadow: none; }
+
+/* 2026-09-08：战斗页「开始自动战斗」按钮取消（挂机统一从节点详情页发起） */
+#btn-battle { display: none !important; }
+/* 节点详情页真实图片（2026-09-08：宠物/怪物不再用 emoji） */
+.area-detail .nd-mob .ic img, .area-detail .nd-pet .p-ic img {
+  width: 100%; height: 100%; object-fit: contain;
+}
+.area-detail .nd-boss-art img {
+  width: 100%; height: 100%; object-fit: contain;
+  filter: drop-shadow(0 0 10px rgb(var(--hp-hi-rgb) / .35));
+}
 @media (max-width: 1080px) {
   .area-detail .nd-grid { grid-template-columns: 1fr; }
 }
