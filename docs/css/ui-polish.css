@@ -243,6 +243,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* 首通标记（2026-09-05 地图系统 A 项）：已首通的图，红点转金色 + ✓ 徽标 */
 .wm-marker--cleared .wm-marker-dot { background: rgb(var(--action-gold-rgb)); border-color: #fff; box-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .8), inset 0 0 4px rgb(0 0 0 / .4); }
 .wm-marker-pass { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #1a1b1c; background: rgb(var(--action-gold-rgb)); border: 1px solid #fff; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; line-height: 1.4; }
+/* 资源副本节点（2026-09-09）：菱形青玉标记，与野图红点 / 主城金圈视觉区分 */
+.wm-marker--trial .wm-marker-dot { display: block; width: 14px; height: 14px; margin-left: -7px; border-radius: 3px; background: linear-gradient(135deg, #7fd4c9, #3f9e93); border: 1px solid var(--ink); box-shadow: 0 0 8px rgb(63 158 147 / .55), inset 0 0 4px rgb(0 0 0 / .4); transform: rotate(45deg); transition: transform .18s ease, box-shadow .18s ease; }
+.wm-marker--trial:hover .wm-marker-dot, .wm-marker--trial:focus-visible .wm-marker-dot { transform: rotate(45deg) scale(1.28); box-shadow: 0 0 14px rgb(63 158 147 / .85), inset 0 0 6px rgb(0 0 0 / .35); }
+.wm-marker-remain { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #7fd4c9; background: rgb(12 17 18 / .86); border: 1px solid rgb(63 158 147 / .5); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: normal; }
+.wm-marker-remain.is-empty { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
 /* ============================================================
  * 主城页（不归城）：等距城寨全景（City.png 底图）+ 建筑热区
  * 底图为 meowa 等距暗黑水墨城寨；建筑热区 = 名字标签浮在图上，
@@ -402,3 +407,50 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri { grid-template-columns: 1fr; }
   #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
 }
+
+/* ---------- 试炼战斗画面（2026-09-09）：进入副本后的战斗演出 ---------- */
+.trial-battle { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+.tb-top { display: flex; align-items: center; gap: 12px; }
+.tb-name { font-family: var(--font-title); font-size: var(--fs-lg); color: var(--accent-hi); letter-spacing: 2px; }
+.tb-round { margin-left: auto; font-size: var(--fs-sm); color: var(--text-dim); letter-spacing: 1px; }
+.tb-round b { color: var(--r-gold); font-family: var(--font-num); }
+.tb-close { width: 28px; height: 28px; border: 1px solid rgb(255 255 255 / .18); border-radius: var(--radius-sm); background: rgb(0 0 0 / .3); color: var(--text-dim); cursor: pointer; font-size: 13px; line-height: 1; }
+.tb-close:hover { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
+.tb-stage { position: relative; display: flex; align-items: stretch; justify-content: space-between; gap: 16px; padding: 18px 22px; min-height: 300px; border: 1px solid rgb(255 255 255 / .1); border-radius: var(--radius-md); background: radial-gradient(ellipse at 50% 18%, rgb(63 158 147 / .12), transparent 62%), linear-gradient(160deg, var(--panel-2), var(--bg-deep)); }
+.tb-stage.tb-hit { animation: tb-hit .26s ease; }
+@keyframes tb-hit { 0% { filter: brightness(1); } 35% { filter: brightness(1.55); } 100% { filter: brightness(1); } }
+.tb-side { flex: 1; max-width: 42%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tb-sprite { width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
+.tb-sprite img { max-width: 150px; max-height: 150px; object-fit: contain; filter: drop-shadow(0 8px 14px rgb(0 0 0 / .55)); animation: tb-breathe 2.6s ease-in-out infinite; }
+@keyframes tb-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.tb-fallback { font-size: 64px; line-height: 1; filter: drop-shadow(0 6px 10px rgb(0 0 0 / .5)); }
+.tb-label { font-size: var(--fs-md); color: var(--text); letter-spacing: 1px; text-align: center; }
+.tb-hp-track { width: 100%; max-width: 220px; height: 12px; border-radius: 8px; overflow: hidden; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .14); }
+.tb-hp-fill { height: 100%; width: 100%; transition: width .45s ease; }
+.tb-hp-fill--pet { background: linear-gradient(90deg, #58c08a, #8fe3ae); box-shadow: 0 0 10px rgb(88 192 138 / .5); }
+.tb-hp-fill--pet.is-low { background: linear-gradient(90deg, #d9534f, #ff7a5c); box-shadow: 0 0 10px rgb(217 83 79 / .6); }
+.tb-hp-fill--enemy { background: linear-gradient(90deg, #d9534f, #ff7a5c); box-shadow: 0 0 10px rgb(217 83 79 / .5); }
+.tb-hp-num { font-size: var(--fs-2xs); color: var(--text-dim); font-family: var(--font-num); letter-spacing: 1px; }
+.tb-vs { align-self: center; font-family: var(--font-title); font-size: var(--fs-lg); color: var(--r-gold); letter-spacing: 4px; text-shadow: 0 0 14px rgb(var(--action-gold-rgb) / .5); }
+.tb-log { max-height: 130px; overflow-y: auto; border: 1px solid rgb(255 255 255 / .1); border-radius: var(--radius-sm); background: rgb(0 0 0 / .32); padding: 8px 10px; font-size: var(--fs-xs); line-height: 1.7; }
+.tb-log-line { color: var(--text-dim); }
+.tb-log-line.is-fail { color: var(--danger-hi); }
+
+/* ---------- 试炼结算面板（2026-09-09）：打完副本后弹出 ---------- */
+.trial-settle { position: fixed; inset: 0; z-index: 500; display: flex; align-items: center; justify-content: center; }
+.trial-settle[hidden] { display: none; }
+.ts-mask { position: absolute; inset: 0; background: rgb(0 0 0 / .62); backdrop-filter: blur(3px); }
+.ts-card { position: relative; width: min(440px, 92vw); padding: 24px 26px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; border: 1px solid rgb(var(--action-gold-rgb) / .35); border-radius: var(--radius-md); background: linear-gradient(165deg, var(--panel-2), var(--bg-deep)); box-shadow: 0 24px 60px rgb(0 0 0 / .6); animation: ts-pop .22s ease; }
+@keyframes ts-pop { 0% { transform: scale(.92) translateY(8px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+.ts-badge { padding: 4px 18px; border-radius: 999px; font-family: var(--font-title); font-size: var(--fs-md); letter-spacing: 3px; }
+.ts-badge.is-clear { color: #8fe3ae; background: rgb(88 192 138 / .14); border: 1px solid rgb(88 192 138 / .5); box-shadow: 0 0 18px rgb(88 192 138 / .25); }
+.ts-badge.is-fail { color: var(--danger-hi); background: rgb(var(--hp-hi-rgb) / .14); border: 1px solid rgb(var(--hp-hi-rgb) / .5); }
+.ts-title { font-family: var(--font-title); font-size: var(--fs-lg); color: var(--accent-hi); letter-spacing: 2px; }
+.ts-stat { font-size: var(--fs-sm); color: var(--text-dim); letter-spacing: 1px; }
+.ts-stat b { color: var(--r-gold); font-family: var(--font-num); }
+.ts-reward { width: 100%; border: 1px solid rgb(255 255 255 / .12); border-radius: var(--radius-sm); background: rgb(0 0 0 / .3); padding: 12px 14px; }
+.ts-reward-h { font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 2px; margin-bottom: 8px; }
+.ts-reward-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.ts-item { padding: 4px 12px; border: 1px solid rgb(var(--action-gold-rgb) / .45); border-radius: 999px; color: var(--r-gold); background: rgb(var(--action-gold-rgb) / .08); font-size: var(--fs-sm); font-family: var(--font-num); }
+.ts-note { font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 1px; }
+.ts-actions { display: flex; gap: 10px; margin-top: 4px; }

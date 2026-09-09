@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-08T14:18:52.485Z
+// 生成时间：2026-09-09T14:49:32.506Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1103,12 +1103,12 @@ const serverConfig = {
     "areaEnemyStats": {
       "corrupted-forest": {
         "hp": 225,
-        "atk": 38,
+        "atk": 32,
         "def": 16
       },
       "plague-swamp": {
         "hp": 460,
-        "atk": 80,
+        "atk": 58,
         "def": 38
       },
       "shadow-mountains": {
@@ -1132,12 +1132,12 @@ const serverConfig = {
         "def": 119
       },
       "rotfen-bog": {
-        "hp": 1611,
+        "hp": 1640,
         "atk": 314,
         "def": 139
       },
       "ember-hollow": {
-        "hp": 1853,
+        "hp": 1890,
         "atk": 359,
         "def": 158
       },
@@ -1375,6 +1375,7 @@ const serverConfig = {
     "enabled": true,
     "ticketName": "资源试炼门票",
     "rounds": 5,
+    "freeEntriesPerDay": 3,
     "hitRatio": 0.045,
     "roundRatio": 0.15,
     "roundDelayMs": 420,
@@ -1382,43 +1383,134 @@ const serverConfig = {
     "routes": [
       {
         "id": "metamorph",
-        "name": "蜕变试炼",
+        "name": "副本·蜕变试炼",
         "desc": "定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。",
         "minLevel": 1,
         "difficulty": 1,
         "reward": "evolution",
+        "guardian": {
+          "name": "影蚀魔君",
+          "title": "蜕变守护者"
+        },
         "tiers": [
-          { "minLevel": 1, "items": [{ "name": "进化素材", "qty": 2 }] },
-          { "minLevel": 25, "items": [{ "name": "精粹进化素材", "qty": 1 }] },
-          { "minLevel": 40, "items": [{ "name": "传说进化素材", "qty": 1 }] }
+          {
+            "minLevel": 1,
+            "items": [
+              {
+                "name": "进化素材",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "minLevel": 25,
+            "items": [
+              {
+                "name": "精粹进化素材",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "minLevel": 40,
+            "items": [
+              {
+                "name": "传说进化素材",
+                "qty": 1
+              }
+            ]
+          }
         ],
-        "consolation": [{ "name": "进化素材", "qty": 1 }]
+        "consolation": [
+          {
+            "name": "进化素材",
+            "qty": 1
+          }
+        ]
       },
       {
         "id": "nirvana",
-        "name": "涅槃试炼",
+        "name": "副本·涅槃试炼",
         "desc": "定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。",
         "minLevel": 25,
         "difficulty": 1.35,
         "reward": "phoenix",
+        "guardian": {
+          "name": "幽火魔狐",
+          "title": "涅槃守护者"
+        },
         "tiers": [
-          { "minLevel": 25, "items": [{ "name": "涅槃丹", "qty": 1 }] }
+          {
+            "minLevel": 25,
+            "items": [
+              {
+                "name": "涅槃丹",
+                "qty": 1
+              }
+            ]
+          }
         ],
-        "consolation": [{ "name": "合成之石", "qty": 1 }]
+        "consolation": [
+          {
+            "name": "合成之石",
+            "qty": 1
+          }
+        ]
       },
       {
         "id": "temper",
-        "name": "淬炼试炼",
+        "name": "副本·淬炼试炼",
         "desc": "定向获得打造通货；高阶额外产出神圣石与锁定石（锁前/锁后的唯一来源）。",
         "minLevel": 1,
         "difficulty": 1.1,
         "reward": "craft",
+        "guardian": {
+          "name": "骸骨君主",
+          "title": "淬炼守护者"
+        },
         "tiers": [
-          { "minLevel": 1, "items": [{ "name": "重铸石", "qty": 2 }] },
-          { "minLevel": 25, "items": [{ "name": "增缀石", "qty": 1 }, { "name": "剥离石", "qty": 1 }] },
-          { "minLevel": 43, "items": [{ "name": "神圣石", "qty": 1 }, { "name": "锁定石", "qty": 1 }] }
+          {
+            "minLevel": 1,
+            "items": [
+              {
+                "name": "重铸石",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "minLevel": 25,
+            "items": [
+              {
+                "name": "增缀石",
+                "qty": 1
+              },
+              {
+                "name": "剥离石",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "minLevel": 43,
+            "items": [
+              {
+                "name": "神圣石",
+                "qty": 1
+              },
+              {
+                "name": "锁定石",
+                "qty": 1
+              }
+            ]
+          }
         ],
-        "consolation": [{ "name": "重铸石", "qty": 1 }]
+        "consolation": [
+          {
+            "name": "重铸石",
+            "qty": 1
+          }
+        ]
       }
     ]
   }

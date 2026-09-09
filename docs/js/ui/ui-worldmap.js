@@ -58,26 +58,11 @@
           if (!ok) return;
         }
       }
-      // 重复点击当前正在挂机的图：同样打开详情页（可换宠/查看领主），不影响挂机运行
-      const curArea = Battle.getCurrentArea && Battle.getCurrentArea();
-      if (curArea && curArea.id === point.areaId) {
-        showAreaDetail(point);
-        return;
-      }
-      // 挂机中直接换图：先停挂机 → 切到新图（不自动重启挂机，避免误操作）
-      const wasRunning = Battle.isRunning && Battle.isRunning();
-      if (wasRunning) {
-        // 服务器托管会话一起停，否则服务器还在旧图替我们打
-        // （最多丢最后 30 秒：换图是玩家主动操作，不值得为这点收益加异步等待）
-        if (window.IdleBridge) window.IdleBridge.stop();
-        Battle.stopAutoBattle && Battle.stopAutoBattle();
-      }
-      if (!Battle.selectArea(point.areaId)) {
-        // 选图失败（极端情况，比如图 id 不对），恢复挂机状态并提示
-        UI.showToast && UI.showToast('无法进入', '该图暂不可用。');
-        return;
-      }
-      // 打开节点详情页（选完图 → 先看地图/怪物/领主 → 再进战斗），替代直接跳战斗页
+      // 2026-09-09 修复「看一眼别的图，原挂机就没了」：
+      // 以前点别的图会【立刻】停掉正在跑的挂机并切图 —— 玩家只是看了眼详情页就退出，
+      // 或者点了「开始挂机」却被满血门槛静默挡住，旧挂机已经停了 = 两头空。
+      // 现在选图 / 停挂机全部推迟到详情页的「只进战斗 / 开始挂机」按钮里：
+      // 看完点「返回大地图」，原挂机毫发无损继续跑。
       showAreaDetail(point);
     });
   }
@@ -108,11 +93,8 @@
     // 「返回战斗」只在已选地图（有正在看的战斗）时显示，没选图时隐藏
     const rb = $('btn-return-battle');
     if (rb) rb.hidden = !(window.Battle && window.Battle.getCurrentArea && window.Battle.getCurrentArea());
-    const trialBtn = $('btn-resource-trial');
-    if (trialBtn && !trialBtn._boundResourceTrial) {
-      trialBtn._boundResourceTrial = true;
-      trialBtn.onclick = () => window.UI && window.UI.openResourceTrial && window.UI.openResourceTrial();
-    }
+    // 「资源副本」标题栏按钮已移除（2026-09-09 用户拍板）：入口收敛到大地图的副本节点；
+    // 面板 #resource-trial-panel 保留，仅供引导 N6 落点与结算返回使用。
     if (window.UI && window.UI.renderResourceTrial) window.UI.renderResourceTrial();
     if (!rendered) {
       // 底图拉伸填满整个 canvas：点位百分比 = 画布百分比，无换算、无黑边、点位永不裁出
@@ -132,8 +114,16 @@
         bindPoint(m, p);
         canvas.appendChild(m);
       }
+      // 资源副本节点（2026-09-09）：三个试炼副本，节点进入；徽标显示今日免费剩余
+      for (const p of (window.WorldMap.trialPoints || [])) {
+        const m = makeTrialMarker(p);
+        bindTrialPoint(m, p);
+        canvas.appendChild(m);
+      }
       rendered = true;
     }
+    // 副本节点徽标：每次进页刷新今日免费剩余（北京时间 12:00 换日）
+    if (window.UI && window.UI.refreshTrialMarkers) window.UI.refreshTrialMarkers();
     // 首通状态变化后同步标记（canvas 不重建，只更新 class 与 ✓ 徽标）
     if (window.Quest && window.Quest.isAreaCleared) {
       const markers = canvas.querySelectorAll('.wm-marker');
@@ -182,6 +172,49 @@
   }
 
 
+  /* ---------- 资源副本节点（2026-09-09） ----------
+   * 三个试炼副本在大地图上作为独立节点（类型 trial，见 worldmap.js trialPoints）。
+   * 与野图点位的区别：没有 areaId（不经过 Battle.selectArea），点击直接打开副本详情页；
+   * 每日免费剩余次数显示在标记下方徽标里，由 refreshTrialMarkers 按试炼日刷新。 */
+  function makeTrialMarker(point) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'wm-marker wm-marker--trial';
+    el.style.left = point.x + '%';
+    el.style.top = point.y + '%';
+    el.setAttribute('aria-label', point.name);
+    el.title = point.name;
+    if (point.routeId) el.dataset.routeId = point.routeId;
+    const nameHTML = '<span class="wm-marker-name">' + (UI.escapeHtml ? UI.escapeHtml(point.name) : point.name) + '</span>';
+    const remainHTML = '<span class="wm-marker-remain"></span>';
+    el.innerHTML = '<span class="wm-marker-dot"></span>' + nameHTML + remainHTML;
+    return el;
+  }
+
+  function bindTrialPoint(marker, point) {
+    marker.addEventListener('click', () => {
+      if (window.UI && window.UI.showTrialDetail) window.UI.showTrialDetail(point);
+      else if (window.UI && window.UI.openResourceTrial) window.UI.openResourceTrial(); // 兜底：老版本无详情页时退回面板
+    });
+  }
+
+  // 副本节点徽标：显示每个副本今日免费剩余次数（北京时间 12:00 刷新）
+  UI.refreshTrialMarkers = () => {
+    const canvas = $('worldmap-canvas');
+    if (!canvas || !window.ResourceTrial || !window.ResourceTrial.getDailyInfo) return;
+    const byRoute = {};
+    window.ResourceTrial.getDailyInfo().forEach(i => { byRoute[i.routeId] = i; });
+    canvas.querySelectorAll('.wm-marker--trial').forEach(m => {
+      const rid = m.dataset && m.dataset.routeId;
+      const badge = m.querySelector('.wm-marker-remain');
+      if (!rid || !badge || !byRoute[rid]) return;
+      const left = byRoute[rid].freeLeft;
+      badge.textContent = left > 0 ? '免费' + left : '需门票';
+      badge.classList.toggle('is-empty', !(left > 0));
+    });
+  };
+
+
   /* ============================================================
    * 节点详情页（2026-09-08）：选完图后弹出，替代直接进战斗。
    * 左：地图介绍（怪物 + 掉落）｜中：出战宠物选择｜右：守关领主（霸主）
@@ -189,15 +222,14 @@
    * ============================================================ */
   const esc = s => UI.escapeHtml ? UI.escapeHtml(s) : String(s);
 
-  function areaDetailHTML(point) {
+  function areaDetailHTML(point, pendingId) {
     const area = ((window.Config && window.Config.battle) || {}).areas
       && ((window.Config && window.Config.battle) || {}).areas.find(a => a.id === point.areaId);
     const list = (window.EnemyData && window.EnemyData.list) || [];
     const mobs = (area && area.enemyIds ? list.filter(e => (area.enemyIds || []).indexOf(e.id) >= 0) : [])
       .sort((x, y) => (y.level || 0) - (x.level || 0));
     const boss = mobs[0] || null;   // 图内最高级怪 = 守关霸主
-    const pv = point._preview || {};
-    const gold = (typeof pv.gold === 'number') ? pv.gold + '%' : '—';
+    /* 金装概率（point._preview.gold）已不再展示：2026-09-09 用户拍板「掉落只列东西，不写概率」。 */
     const cleared = !!(window.Quest && window.Quest.isAreaCleared && window.Quest.isAreaCleared(point.areaId));
     const [lo, hi] = (area && area.levelRange) ? area.levelRange : [null, null];
     // 地图委托：详情页里给出「这张图现在值得刷什么」
@@ -208,18 +240,55 @@
       ? `<div class="nd-boss-row"><span class="k">委托</span><span class="v">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>`
       : '';
 
-    // 怪物列表（普通/变异分档）：真实头像图（PetSprites.avatarOf），无图回退 emoji
+    // 怪物列表（普通/进化/变异分档）：真实头像图（PetSprites.avatarOf），无图回退 emoji。
+    // 2026-09-09 补全介绍：类型 + 强度倍率 + 战斗定位（复用宠物的 petProfiles 定位，变异/进化剥「·异变」后缀查基宠）。
     const spriteOf = name => (window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(name) : null;
+    const typeMultCfg = ((window.Config && window.Config.battle) || {}).typeMult || {};
+    const profilesCfg = ((window.Config && window.Config.pet) || {}).petProfiles || {};
+    const roleOf = name => {
+      const base = String(name || '').split('·')[0].trim();
+      const p = profilesCfg[base];
+      return p && p.role ? p.role : '';
+    };
     const mobHtml = mobs.map(m => {
-      const evolved = m.enemyType === 'evolved';
+      const typeTxt = m.enemyType === 'mutant' ? '变异体' : m.enemyType === 'evolved' ? '进化体' : '野生';
+      const mult = typeMultCfg[m.enemyType] != null ? typeMultCfg[m.enemyType] : 1;
+      const role = roleOf(m.name);
+      const isBoss = !!(boss && m.id === boss.id);
       const av = spriteOf(m.name);
-      return `<div class="nd-mob${evolved ? ' evolved' : ''}"><span class="ic">${av ? '<img src="' + av + '" alt="">' : (m.icon || '🐾')}</span><span class="nm">${esc(m.name)}</span><span class="lv">Lv.${m.level || '—'}</span></div>`;
+      return `<div class="nd-mob${m.enemyType === 'evolved' ? ' evolved' : ''}${m.enemyType === 'mutant' ? ' mutant' : ''}${isBoss ? ' is-boss' : ''}">
+        <span class="ic">${av ? '<img src="' + av + '" alt="">' : (m.icon || '🐾')}</span>
+        <div class="tx">
+          <div class="nm">${esc(m.name)}${isBoss ? '<span class="boss-tag">霸主</span>' : ''}<span class="lv">Lv.${m.level || '—'}</span></div>
+          <div class="ds">${role ? esc(role) + ' · ' : ''}${typeTxt} · 强度 ×${mult}</div>
+        </div>
+      </div>`;
     }).join('') || '<div class="nd-mob"><span class="nm">未知怪群</span></div>';
 
-    // 出战宠物选择
+    // 掉落总览（2026-09-09）：列出这张图能掉的所有东西（不含概率，概率属于数值层不给玩家看）。
+    // 数据全部现读 config：区域材料 / 进化素材档位 / 材料子权重表 / 装备 / 宠物蛋。
+    const allAreas = (window.Config && window.Config.battle && window.Config.battle.areas) || [];
+    const tierNo = allAreas.findIndex(a => a.id === point.areaId) + 1;
+    const mwCfg = ((window.Config.drop || {}).materialWeightsByTier || {})[tierNo] || {};
+    const evoTiersCfg = ((window.Config.drop || {}).areaEvolutionTiers || {})[point.areaId] || [];
+    const areaMatCfg = ((window.Config.drop || {}).areaMaterials || {})[point.areaId];
+    const dropNames = [];
+    if (areaMatCfg && areaMatCfg.name) dropNames.push(areaMatCfg.name);
+    evoTiersCfg.forEach(e => dropNames.push(e));
+    Object.keys(mwCfg).forEach(k => {
+      if (k !== '区域材料' && k !== '进化素材') dropNames.push(k);
+    });
+    dropNames.push('装备（未鉴定）');
+    dropNames.push('宠物蛋');
+    const dropHtml = dropNames.map(d => `<span class="nd-drop-chip">${esc(d)}</span>`).join('');
+
+    // 出战宠物选择：pendingId = 详情页里刚点选、还没生效的宠物（点「只进战斗/开始挂机」才真正切换，
+    // 不然 setActive 会换掉正在挂机的宠物，下一个战报回来 IdleBridge 就把挂机停了）
     const Pet = window.Pet;
     const pets = (Pet && Pet.getPets) ? Pet.getPets() : [];
-    const active = (Pet && Pet.getActivePet) ? Pet.getActivePet() : null;
+    const cur = (Pet && Pet.getActivePet) ? Pet.getActivePet() : null;
+    const active = (pendingId != null) ? (pets.find(p => p.id === pendingId) || cur) : cur;
+    const petChanged = !!(pendingId != null && cur && active && cur.id !== active.id);
     const petHtml = pets.map(p => {
       const god = (Pet && Pet.isGodPet) ? Pet.isGodPet(p) : !!p.isGodPet;
       const growth = (p.growth || 0).toFixed(1);
@@ -232,7 +301,7 @@
       </div>`;
     }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
     const activeInfo = active
-      ? `出战：<b>${esc(active.name)}</b> · 成长 <b>${(active.growth || 0).toFixed(1)}</b>`
+      ? `出战：<b>${esc(active.name)}</b> · 成长 <b>${(active.growth || 0).toFixed(1)}</b>${petChanged ? '<span class="nd-pending">已改选，进入后生效</span>' : ''}`
       : '还没有出战宠物';
 
     return `
@@ -249,12 +318,8 @@
         <div class="nd-card">
           <div class="nd-card-title">地图介绍<span class="hint">该图会出现的野怪</span></div>
           <div class="nd-mobs">${mobHtml}</div>
-          <div class="nd-card-title" style="margin-top:14px">掉落预览<span class="hint">挂机收益</span></div>
-          <div class="nd-drop">
-            <div class="nd-drop-cell"><div class="k">金装</div><div class="v">${gold}</div></div>
-            <div class="nd-drop-cell"><div class="k">材料</div><div class="v">≈19%</div></div>
-            <div class="nd-drop-cell"><div class="k">宠物蛋</div><div class="v">≈2%</div></div>
-          </div>
+          <div class="nd-card-title" style="margin-top:14px">掉落预览<span class="hint">这张图能掉的全部东西</span></div>
+          <div class="nd-drop-list">${dropHtml}</div>
         </div>
         <div class="nd-card">
           <div class="nd-card-title">选择战斗宠物<span class="hint">点击切换出战</span></div>
@@ -279,6 +344,98 @@
       </div>`;
   }
 
+  // 详情页内待生效的出战选择：点卡片只先记下，点「只进战斗/开始挂机」才真正切换
+  let pendingPetId = null;
+
+  function renderAreaDetail(point) {
+    const el = $('area-detail');
+    const body = $('area-detail-body');
+    if (!el || !body) return;
+    body.innerHTML = areaDetailHTML(point, pendingPetId);
+    const Battle = window.Battle;
+    // 返回大地图：不动挂机、不应用待选宠物（看完就走，原挂机继续跑）
+    const back = body.querySelector('#nd-back');
+    if (back) back.onclick = () => { el.hidden = true; pendingPetId = null; };
+    // 出战宠物切换：只记下待选并重渲染（真正 setActive 推迟到进入按钮那一刻）
+    body.querySelectorAll('.nd-pet').forEach(card => {
+      card.onclick = () => {
+        const pid = Number(card.dataset.pid);
+        if (!pid || !window.Pet) return;
+        pendingPetId = pid;
+        renderAreaDetail(point);
+      };
+    });
+    // 应用待选宠物，返回「是否换了出战宠物」
+    const applyPendingPet = () => {
+      const pid = pendingPetId;
+      pendingPetId = null;
+      if (pid != null && window.Pet && window.Pet.setActive) window.Pet.setActive(pid);
+      return pid != null;
+    };
+    // 停掉正在跑的挂机（换图进战斗 / 换宠重开才需要）：托管先结算再停，收益不丢。
+    // 托管会话用 stop(true) 只拆本地：服务器侧由紧接着的 battle_session('start')
+    // 「停旧建新」一条事务接替，这里再发 stop 反而可能乱序把新会话停掉。
+    const stopRunningIdle = async () => {
+      const IB = window.IdleBridge;
+      const B = window.Battle;
+      const managed = !!(IB && IB.isActive && IB.isActive());
+      const local = !!(B && B.isRunning && B.isRunning());
+      if (!managed && !local) return;
+      if (managed && IB.settleNow) { try { await IB.settleNow(); } catch (e) { /* 忽略 */ } }
+      if (IB && IB.stop) IB.stop(true);
+      if (B && B.stopAutoBattle) B.stopAutoBattle();
+      // 本地挂机经验是本地记账，停之前补写一次云端（托管由服务器写库，不能本地补）
+      if (!managed && window.Game && window.Game.flushPetProgress) window.Game.flushPetProgress();
+    };
+    // 进战斗页（不自动挂机）
+    const enterBattle = () => {
+      const el2 = $('area-detail');
+      if (el2) el2.hidden = true;
+      if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
+      if (window.UI && window.UI.updateBattleArea) window.UI.updateBattleArea(Battle && Battle.getCurrentArea());
+    };
+    const fight = body.querySelector('#nd-fight');
+    if (fight) fight.onclick = async () => {
+      const changed = applyPendingPet();
+      const cur = Battle && Battle.getCurrentArea && Battle.getCurrentArea();
+      const sameMap = !!(cur && cur.id === point.areaId);
+      try {
+        // 进别的图的战斗页必须先停旧挂机：托管演出/结算都锚在旧图会话上，切图后剧本与掉落全错位。
+        // 换了出战宠同理：旧会话绑的是旧宠，留着也会被下一个战报停掉。
+        if (!sameMap || changed) await stopRunningIdle();
+        if (!sameMap && Battle && !Battle.selectArea(point.areaId)) {
+          UI.showToast && UI.showToast('无法进入', '该图暂不可用。');
+          return;
+        }
+      } catch (e) { /* 停挂机失败不阻断进图 */ }
+      enterBattle();
+    };
+    // 开始挂机：换图/换宠时先停旧挂机（先结算，收益不丢），再选图并走主启动流程。
+    // 本图已在挂且没换宠 = 重复点击：直接进战斗页看，绝不能再点挂机按钮（那会停掉挂机）。
+    const idle = body.querySelector('#nd-idle');
+    if (idle) idle.onclick = async () => {
+      const changed = applyPendingPet();
+      const cur = Battle && Battle.getCurrentArea && Battle.getCurrentArea();
+      const sameMap = !!(cur && cur.id === point.areaId);
+      const running = !!((window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive())
+        || (Battle && Battle.isRunning && Battle.isRunning()));
+      try {
+        if (running && sameMap && !changed) { enterBattle(); return; }
+        if (running) await stopRunningIdle();
+        if (!sameMap && Battle && !Battle.selectArea(point.areaId)) {
+          UI.showToast && UI.showToast('无法进入', '该图暂不可用。');
+          return;
+        }
+      } catch (e) { /* 停挂机失败不阻断启动 */ }
+      enterBattle();
+      // 走主按钮的启动分支（门槛已放宽为「活着就能开」，低血量由托管自动等回血）
+      setTimeout(() => {
+        const b = document.getElementById('btn-battle');
+        if (b && typeof b.click === 'function') b.click();
+      }, 150);
+    };
+  }
+
   function showAreaDetail(point) {
     const el = $('area-detail');
     const body = $('area-detail-body');
@@ -287,38 +444,9 @@
       if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
       return;
     }
-    body.innerHTML = areaDetailHTML(point);
+    pendingPetId = null;
+    renderAreaDetail(point);
     el.hidden = false;
-    const Battle = window.Battle;
-    // 返回大地图
-    const back = body.querySelector('#nd-back');
-    if (back) back.onclick = () => { el.hidden = true; };
-    // 出战宠物切换：点击头像 setActive 后重渲染详情页（下一场生效，与战斗页 roster 同口径）
-    body.querySelectorAll('.nd-pet').forEach(card => {
-      card.onclick = () => {
-        const pid = card.dataset.pid;
-        if (!pid || !window.Pet || !window.Pet.setActive) return;
-        window.Pet.setActive(pid);
-        showAreaDetail(point);
-      };
-    });
-    // 进战斗页（不自动挂机）
-    const enterBattle = () => {
-      el.hidden = true;
-      if (window.UI && window.UI.switchPage) window.UI.switchPage('battle');
-      if (window.UI && window.UI.updateBattleArea) window.UI.updateBattleArea(Battle && Battle.getCurrentArea());
-    };
-    const fight = body.querySelector('#nd-fight');
-    if (fight) fight.onclick = enterBattle;
-    // 开始挂机：进战斗页后点挂机开关（复用主流程：托管/本地自动判断）
-    const idle = body.querySelector('#nd-idle');
-    if (idle) idle.onclick = () => {
-      enterBattle();
-      setTimeout(() => {
-        const b = document.getElementById('btn-battle');
-        if (b && typeof b.click === 'function') b.click();
-      }, 150);
-    };
   }
 
   // 对外 API

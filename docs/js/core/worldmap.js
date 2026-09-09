@@ -71,6 +71,16 @@
      * （vtest_worldmap.js 守一致性）。 */
   ];
 
+  /* ---------- 资源副本点位（2026-09-09）：三个资源试炼副本，节点进入 ----------
+   * routeId 必须与 Config.resourceTrials.routes[].id 一一对应（vtest_resource_trial.js 守一致性）。
+   * 落点选在地图左侧水域的「试炼群岛」上，与野图（wild）和主城（capital）视觉区分。
+   * 点击节点 → 打开副本详情页（免费次数 / 门票 / 掉落 / 选宠）→ 进入试炼。 */
+  const TRIAL_POINTS = [
+    { id: 't-metamorph', routeId: 'metamorph', name: '副本·蜕变试炼', type: 'trial', x: 8, y: 10 },
+    { id: 't-nirvana', routeId: 'nirvana', name: '副本·涅槃试炼', type: 'trial', x: 6, y: 45 },
+    { id: 't-temper', routeId: 'temper', name: '副本·淬炼试炼', type: 'trial', x: 9, y: 82 }
+  ];
+
   /* ---------- 掉落预览（从 Config 推导，纯展示） ---------- */
   // 专属材料名 + 进化素材档位 + 金装概率倾向 + 各图材料掉落分布（materialWeightsByTier）
   function buildPreview(point) {
@@ -130,6 +140,7 @@
     img: WORLD_MAP_IMG,
     capital: CAPITAL,
     points: WILD_POINTS,
+    trialPoints: TRIAL_POINTS,
     buildPreview: buildPreview
   };
 })();

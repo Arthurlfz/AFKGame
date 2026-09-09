@@ -46,7 +46,7 @@ console.log('  [salvDiag] '+JSON.stringify(salvDiag));
 A(salvDiag&&(salvDiag.ran===true||salvDiag.ran===false),'分解已执行');
 
 // ===== 3) 地图专属材料 + 进化素材掉落 =====
-const matDiag=await C(`(async()=>{const area={id:"corrupted-forest",name:"枯荣之地"};const e={name:"测试怪",level:1,tier:"common"};let guard=0,gotArea=false,gotEvo=false;while((!gotArea||!gotEvo)&&guard<100){const r=await Drop.rollReward(e,area);if(r&&r.material==="枯荣种荚")gotArea=true;if(r&&r.material==="进化素材")gotEvo=true;guard++;}return {gotArea,gotEvo,guard,areaNow:Materials.getQuantity("枯荣种荚"),evoNow:Materials.getQuantity("进化素材")}})()`);
+const matDiag=await C(`(async()=>{const area={id:"corrupted-forest",name:"枯荣之地"};const e={name:"测试怪",level:1,tier:"common"};let guard=0,gotArea=false,gotEvo=false;while((!gotArea||!gotEvo)&&guard<1500){const r=await Drop.rollReward(e,area);if(r&&r.material==="枯荣种荚")gotArea=true;if(r&&r.material==="进化素材")gotEvo=true;guard++;}return {gotArea,gotEvo,guard,areaNow:Materials.getQuantity("枯荣种荚"),evoNow:Materials.getQuantity("进化素材")}})()`);
 console.log('  [matDiag] '+JSON.stringify(matDiag));
 A(matDiag&&matDiag.gotArea===true,`枯荣之地掉专属材料「枯荣种荚」`+`（${matDiag&&matDiag.areaNow}个）`);
 A(matDiag&&matDiag.gotEvo===true,`掉落进化素材「进化素材」（${matDiag&&matDiag.evoNow}个）`);

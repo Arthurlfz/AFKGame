@@ -554,7 +554,11 @@
         if (IdleBridge) IdleBridge.stop();
         stopAutoBattle();                // 本地模式停止（托管时本地循环本就没跑，no-op）
         if (!wasManaged) flushPetProgress(); // 托管时经验由服务器写库，本地别再 flush
-      } else if (getCurHp(getActivePet()) >= getStats(getActivePet()).hp) {
+      /* 2026-09-09 门槛放宽：满血才能开 → 活着就能开。
+       * 挂机本身自带「血量见底 → 等待回血 → 自动再战」，低血量开局与打输一场后没有区别；
+       * 旧满血门槛的真实效果是：挂过一场血没回满就点开始 = 静默无响应（连提示都没有），
+       * 换图重开时旧挂机已停、新挂机又起不来 = 玩家两头空。 */
+      } else if (getCurHp(getActivePet()) > 0) {
         const area = window.Battle.getCurrentArea();
         if (!area) {
           addLog('⚠️ 请先选择挂机地图。');
@@ -568,6 +572,8 @@
         } else {
           startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
         }
+      } else {
+        addLog('💤 出战宠物气血见底，恢复一些后再开始挂机。');
       }
       syncButton();
     });
@@ -647,6 +653,7 @@
 
   // refreshStats 必须导出：idle-bridge.js 战报到账后会调 window.Game.refreshStats()，
   // 之前这里漏了 → 那行一直是空调用（有判空所以不报错，但顶栏统计不刷新）
-  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats };
+  // flushPetProgress 导出：ui-worldmap 详情页停本地挂机时也要把经验补写云端（与主按钮同一份逻辑）
+  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats, flushPetProgress };
   init();
 })();

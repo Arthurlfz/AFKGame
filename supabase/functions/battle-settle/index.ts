@@ -16,7 +16,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import serverConfig from '../_shared/config-server.mjs';
 import enemyList from '../_shared/enemy-data-server.mjs';
-import { settlePlan, hashSeed } from '../_shared/settle-core.mjs';
+import { settlePlan, hashSeed, num } from '../_shared/settle-core.mjs';
 
 function mergeConfig(base: any, override: any): any {
   if (!override || typeof override !== 'object' || Array.isArray(override)) return base;
@@ -123,14 +123,27 @@ async function handle(req: Request): Promise<Response> {
   if (sessErr) return json({ ok: false, error: 'SESSION_QUERY_FAILED', detail: sessErr.message }, 500);
   if (!session) return json({ ok: false, error: 'NO_ACTIVE_SESSION' });
 
-  // 2) 结算窗口 = 现在 - last_settled_at（惰性结算游标，只进不退）
-  //    口径（2026-09-04 最终确认）：页面活着就挂——切后台/最小化不影响，前端继续 settle；
-  //    页面关闭后没人来结算，下次回来只补「最近 GRACE 秒」= 页面还活着的最后一段，更早的作废
-  //    （即"关了页面就没有了"，不需要离线收益，也不需要前端可见性暂停）。
-  const lastSettled = new Date(session.last_settled_at).getTime();
-  const elapsedSec = Math.max(0, Math.floor((Date.now() - lastSettled) / 1000));
-  if (elapsedSec <= 0) return json({ ok: true, fights: 0, exp: 0, elapsedSec: 0 });
-  const settleSec = Math.min(elapsedSec, GRACE_SETTLE_SECONDS);
+  // 2) 结算（2026-09-09 架构改版：服务器唯一模拟器 + 先记账后放片）
+  //    - pending_script 未到期 → 幂等原样再发（刷新/重连不重复记账）；
+  //    - 到期/不存在 → 补账窗（游标到现在的真实时间）+ 剧本窗（接下来 SCRIPT_WINDOW_SECONDS）
+  //      一次算好、一次入账，游标直接跳到剧本窗尾，录像下发客户端纯回放。
+  //      玩家看到的每场战斗/每个数字 = 服务器已入账的数字（实时结算，无校准无漂移）。
+  const SCRIPT_WINDOW_SECONDS = 30; // 剧本窗时长（客户端回放时长 = 服务器的记账步长）
+  const PENDING_GRACE_MS = 2000;    // 剧本到期宽容（客户端回放节奏有毫秒级抖动）
+  const pending: any = (session as any).pending_script || null;
+  const nowMs = Date.now();
+  const lastSettledMs = new Date(session.last_settled_at).getTime();
+  if (pending && pending.script && pending.until
+      && nowMs < new Date(pending.until).getTime() - PENDING_GRACE_MS) {
+    const sc: any = pending.script;
+    return json({
+      ok: true, elapsedSec: 0, fights: 0, exp: 0,
+      endHp: sc.endHp, petMaxHp: sc.petMaxHp, level: sc.level, expLeft: sc.expLeft,
+      detail: [], script: sc,
+      totalFights: session.total_fights, totalExp: session.total_exp
+    });
+  }
+  const gapSec = Math.min(Math.max(0, Math.floor((nowMs - lastSettledMs) / 1000)), GRACE_SETTLE_SECONDS);
 
   // 3) 读出战宠物
   const { data: petRow, error: petErr } = await supabase
@@ -156,28 +169,43 @@ async function handle(req: Request): Promise<Response> {
     if (!eqErr && items) equipItems = items;
   }
 
-  // 5) 结算计划（纯计算：快照 → 模拟 → 经验 → patch）
+  // 5) 结算计划（纯计算：补账窗 + 剧本窗链式模拟 → 已入账录像 + 落库 patch）
   const plan = settlePlan({
     session,
     petRow,
     equipItems,
-    seconds: settleSec,
-    seed: hashSeed(uid, session.id, session.last_settled_at),
     config: runtimeConfig,
     enemyList,
+    gapSeconds: gapSec,
+    gapSeed: gapSec > 0 ? hashSeed(uid, session.id, session.last_settled_at) : 0,
+    nextSeconds: SCRIPT_WINDOW_SECONDS,
+    nextSeed: hashSeed(uid, session.id, now),
     bossState: { lastBossFight: (session as any).last_boss_fight ?? null }
   });
 
-  // 6) 写库：会话累计 + 结算日志（battle_settle RPC，幂等）
+  // 剧本装饰：身份 + 回放基线（客户端从「窗前真值」重演到「窗后真值」，漂移为零）
+  const script: any = plan.script;
+  const untilIso = new Date(nowMs + SCRIPT_WINDOW_SECONDS * 1000).toISOString();
+  script.id = now;
+  script.until = untilIso;
+  script.level = plan.exp.level;              // 窗后真值（applyResult 兜底校准用）
+  script.expLeft = plan.petPatch.exp;
+  script.levelBefore = plan.result.scriptLevelBefore; // 窗前真值（回放起点基线）
+  script.expBefore = plan.result.scriptExpBefore;
+
+  // 6) 写库：会话累计 + 结算日志 + pending_script（一次 RPC 原子提交，幂等）
+  //    游标直接跳到剧本窗尾（p_cursor）——这段战斗已全部入账，下次 settle 只补窗尾之后的账。
   const { data: settleRes, error: settleErr } = await supabase.rpc('battle_settle', {
     p_session_id: session.id,
     p_fights: plan.result.totalFights,
     p_exp: plan.result.totalExp,
-    p_detail: JSON.stringify(plan.detail),
+    p_detail: JSON.stringify(plan.logDetail),
     p_now: now,
     p_expected_last_settled_at: session.last_settled_at,
     p_last_boss_fight: plan.result.bossState && plan.result.bossState.lastBossFight != null
-      ? plan.result.bossState.lastBossFight : null
+      ? plan.result.bossState.lastBossFight : null,
+    p_cursor: untilIso,
+    p_pending_script: JSON.stringify({ id: script.id, until: untilIso, script })
   });
   if (settleErr) return json({ ok: false, error: 'SETTLE_RPC_FAILED', detail: settleErr.message }, 500);
   if (settleRes && settleRes.error === 'STALE_SETTLE_CURSOR') {
@@ -208,10 +236,10 @@ async function handle(req: Request): Promise<Response> {
   }
   if (petUpdErr) return json({ ok: false, error: 'PET_UPDATE_FAILED', detail: petUpdErr.message }, 500);
 
-  // 奖励由服务器直接入账。battle_settle 已用游标幂等，重复请求不会再次走到这里。
+  // 奖励由服务器直接入账（补账窗 + 剧本窗一起）。battle_settle 已用游标幂等，重复请求不会再次走到这里。
   // 当前先落材料；装备/宠物蛋沿用同一 detail 结构接入对应表。
   const rewardTotals: Record<string, number> = {};
-  for (const reward of (plan.detail || []).map((x: any) => x.reward)) {
+  for (const reward of (plan.logDetail || []).map((x: any) => x.reward)) {
     if (reward && reward.type === 'material' && reward.material) {
       rewardTotals[reward.material] = (rewardTotals[reward.material] || 0) + Math.max(1, Math.floor(Number(reward.qty) || 1));
     }
@@ -226,10 +254,13 @@ async function handle(req: Request): Promise<Response> {
 
   return json({
     ok: true,
-    elapsedSec: settleSec,
+    elapsedSec: gapSec,
     ...plan.summary,
+    fights: plan.summary.gapFights,   // 刚补账的场次（客户端没看到的，detail 与之对应）
+    exp: plan.summary.gapExp,
     expLeft: plan.petPatch.exp,       // 升级/封顶后的剩余经验（前端经验条）
-    detail: plan.detail,              // 最近 50 场剧本：[{win,lv,name,exp,hp}]（前端演出）
+    detail: plan.detail,              // 补账明细（客户端只展示掉落，经验已在回放基线里）
+    script,                           // 已入账的演出录像（客户端纯回放）
     batchSeq: settleRes?.batch_seq ?? null,
     totalFights: settleRes?.total_fights ?? session.total_fights + plan.result.totalFights,
     totalExp: settleRes?.total_exp ?? session.total_exp + plan.result.totalExp

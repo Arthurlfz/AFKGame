@@ -689,19 +689,19 @@
     }
     return php > 0;
     function pTurn() {
-      if (Math.random() < strengthHitChance(pet.hit, enemy.dodge)) {
-        let dmg = Math.max(1, pet.atk - enemy.def);
-        if (Math.random() < pet.critRate) dmg = Math.floor(dmg * pet.critDamage);
-        ehp -= dmg;
-        if (pet.lifesteal > 0) php = Math.min(pet.hp, php + Math.floor(dmg * pet.lifesteal));
+      /* 2026-09-09：dev 强度预估不再自己实现伤害公式，直接复用 Battle.calcDamage
+       *（唯一公式源）—— 此前这里是手写的「攻击 − 防御」旧减法，公式一改就漂移。 */
+      const r = window.Battle.calcDamage(pet, enemy);
+      if (!r.isMiss) {
+        ehp -= r.damage;
+        if (r.heal > 0) php = Math.min(pet.hp, php + r.heal);
       }
     }
     function eTurn() {
-      if (Math.random() < strengthHitChance(enemy.hit, pet.dodge)) {
-        let dmg = Math.max(1, enemy.atk - pet.def);
-        if (Math.random() < enemy.critRate) dmg = Math.floor(dmg * enemy.critDamage);
-        php -= dmg;
-        if (enemy.lifesteal > 0) ehp = Math.min(enemy.hp, ehp + Math.floor(dmg * enemy.lifesteal));
+      const r = window.Battle.calcDamage(enemy, pet);
+      if (!r.isMiss) {
+        php -= r.damage;
+        if (r.heal > 0) ehp = Math.min(enemy.hp, ehp + r.heal);
       }
     }
   }

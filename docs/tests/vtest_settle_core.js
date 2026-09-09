@@ -47,25 +47,27 @@ const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } c
   const g3 = CORE.grantExp(10, 5, 5, config);
   A(!g3.leveled && g3.level === 5 && g3.exp === 15, 'B3. 经验不足不升级');
 
-  // ===== C. settlePlan =====
+  // ===== C. settlePlan（2026-09-09 回放版签名：gapSeconds/gapSeed + nextSeconds/nextSeed） =====
   const session = {
     id: 'sess-1', area_id: 'corrupted-forest', status: 'active',
     last_settled_at: new Date(Date.now() - 30000).toISOString()
   };
   const plan = CORE.settlePlan({
-    session, petRow, equipItems, seconds: 30,
-    seed: 12345, config, enemyList
+    session, petRow, equipItems, config, enemyList,
+    gapSeconds: 30, gapSeed: 12345, nextSeconds: 5, nextSeed: 67890, bossState: {}
   });
-  A(plan.summary.fights > 0, `C1. 30 秒至少打 1 场（${plan.summary.fights} 场）`);
+  A(plan.summary.fights > 0, `C1. 30 秒补账 + 5 秒剧本至少打 1 场（${plan.summary.fights} 场）`);
   A(plan.summary.exp >= 0 && plan.summary.exp === plan.result.totalExp, `C2. 经验自洽（${plan.summary.exp}）`);
   A(plan.summary.endHp >= 0 && plan.summary.endHp <= plan.summary.petMaxHp, `C3. 血量在 [0, maxHp]（${plan.summary.endHp}/${plan.summary.petMaxHp}）`);
   A(plan.petPatch.cur_hp === plan.summary.endHp && plan.petPatch.level === plan.summary.level, 'C4. petPatch 与 summary 一致');
   A(Array.isArray(plan.detail) && plan.detail.length <= 50, 'C5. detail 明细 <= 50 条');
+  A(plan.script.events.every(e => e.reward !== undefined) && plan.script.events.every(e => ['t0','t1','petHits','petDmg'].every(k => e[k] !== undefined)),
+    'C7. 剧本事件带 reward/时间轴/刀数（客户端回放所需）');
   // 装备加成生效：穿装宠物 atk 应高于裸装（同种子对比）
   const bareRow = { ...petRow, equipment: {} };
   const planBare = CORE.settlePlan({
-    session, petRow: bareRow, equipItems: [], seconds: 30,
-    seed: 12345, config, enemyList
+    session, petRow: bareRow, equipItems: [], config, enemyList,
+    gapSeconds: 30, gapSeed: 12345, nextSeconds: 5, nextSeed: 67890, bossState: {}
   });
   A(planBare.summary.fights >= plan.summary.fights, 'C6. 穿装场数 >= 裸装场数（装备有效）');
 

@@ -51,6 +51,14 @@ A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['锁定石']
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['涅槃丹'] || 0) > 0)`),
   'nirvana pills never drop from maps');
 
+/* ---- 3b. 高级物品不进地图掉落表（2026-09-09 产出削减，归属见 Config.towerDrops） ---- */
+// 地图只出「燃料」；高级物品归通天塔（塔未开发，见 towerDrops 占位登记）。
+const TOWER_ITEMS = ['神圣石', '越龙之石', '天仙玉露', '强化丹B'];
+A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => ${JSON.stringify(TOWER_ITEMS)}.some(n => (w[n] || 0) > 0))`),
+  'holy/jade/overdragon/pill-b never drop from maps (tower-owned)');
+A(C(`(Config.towerDrops && Config.towerDrops.items.map(i => i.name).join(','))`) === TOWER_ITEMS.join(','),
+  'towerDrops registers every map-removed high tier item');
+
 /* ---- 4. 资源试炼：每种通货唯一主来源，失败补偿不含区域材料 ---- */
 const routes = C('Config.resourceTrials.routes');
 const route = id => routes.find(r => r.id === id) || {};
@@ -69,6 +77,8 @@ A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['锁定石']
 // 涅槃路线必须发道具化的涅槃丹 —— 涅磐兽早已不是涅槃消耗品（pet_merge.js 改走道具）
 A((route('nirvana').tiers || []).flatMap(t => t.items.map(i => i.name)).includes('涅槃丹'),
   'the nirvana trial grants the actual nirvana item, not the retired phoenix beast');
+// 神圣石从地图移除后，淬炼试炼是它唯一还在运转的来源（塔落地前）
+A(craftItems.includes('神圣石'), 'the craft trial still backs holy stones after map removal');
 
 /* ---- 5. 新手引导禁止发放终阶资源（矩阵 7.4） ---- */
 const box = C('Config.tutorialMode.supplyBox.items');

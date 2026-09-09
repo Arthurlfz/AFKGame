@@ -58,5 +58,16 @@ function el() { return { setAttribute() {}, style: { setProperty() {} }, classLi
   const r3 = sim.simulateSessionScript(input(999));
   A(sig(r1) !== sig(r3), 'D1. 不同种子剧本不同（随机性真实存在）');
 
+  /* ---------- E. 演出刀数（2026-09-09） ----------
+   * 演出层靠 petHits/enemyHits 给行动条定速、把本场总掉血按刀分摊。
+   * 少了它演出就退回「时间插值扣血」→ 行动条没跑满怪就死、飘字与血条对不上。 */
+  let hitsOk = true;
+  const hitInfo = [];
+  for (const e of r1.events) {
+    if (!(Number(e.petHits) >= 1) || !(Number(e.enemyHits) >= 0)) hitsOk = false;
+    hitInfo.push(e.petHits + '/' + e.enemyHits);
+  }
+  A(hitsOk, 'E1. 每场都带出手刀数（我方/敌方：' + hitInfo.join('、') + '）');
+
   console.log('\nALL SCRIPT SIM TESTS PASSED');
 })().catch(e => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

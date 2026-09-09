@@ -87,10 +87,12 @@ function evaluate(st, L, G, type) {
   const area = areas.find(a => L >= a.levelRange[0] && L <= a.levelRange[1]);
   const e = enemyStatsAt(area, L, type);
   const petHit = s.hit / (s.hit + dodgeOf(type));
-  const petDps = (s.spd / (SPEED_SCALE * 10)) * Math.max(1, s.atk - e.def) * petHit
+  // 2026-09-09 攻防递减对抗（与 battle.js calcDamage 同源）：dmg = atk²/(atk + def)
+  const dmgOf = (atk, def) => Math.max(1, Math.round(atk * atk / (atk + def)));
+  const petDps = (s.spd / (SPEED_SCALE * 10)) * dmgOf(s.atk, e.def) * petHit
                  * (1 + s.critRate * (s.critDamage - 1));
   const eneHit = 90 / (90 + s.dodge);
-  const eneDps = (e.spd / (SPEED_SCALE * 10)) * Math.max(1, e.atk - s.def) * eneHit * 1.05; // 怪暴击 10%/1.5 倍
+  const eneDps = (e.spd / (SPEED_SCALE * 10)) * dmgOf(e.atk, s.def) * eneHit * 1.05; // 怪暴击 10%/1.5 倍
   const tKill = e.hp / petDps;
   const netDmg = Math.max(0, eneDps * tKill - s.ls * e.hp);
   const dies = netDmg >= s.hp;

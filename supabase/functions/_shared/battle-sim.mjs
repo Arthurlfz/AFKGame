@@ -299,7 +299,9 @@ function calcDamage(att, defStats, config, rnd) {
   const mult = (att.critDamage == null) ? config.battle.critMultiplier : att.critDamage;
   const isCrit = rnd() < rate;
   const effDef = Math.max(0, defStats.def - Math.max(0, att.pen || 0));
-  let dmg = Math.max(1, att.atk - effDef);
+  // 攻防递减对抗（2026-09-09，与 battle.js calcDamage 同源，见 docs/战斗公式重设计_v1.md）：
+  // 防御与攻击力相等时挡掉一半，永远挡不完 → dmg = atk × atk / (atk + effDef)
+  let dmg = Math.max(1, Math.round(att.atk * att.atk / (att.atk + effDef)));
   if (isCrit) dmg = Math.floor(dmg * mult);
   if (att.dmgBonus) dmg = Math.floor(dmg * (1 + att.dmgBonus / 100));
   const dr = Math.min(90, Math.max(0, defStats.dr || 0));
@@ -426,7 +428,7 @@ function simulateFight(input) {
         // 血统触发（与前端同序：伤害结算后）
         if (bl && isPet && !result.isMiss) {
           if (bl.type === 'onCritExtraHit' && result.isCrit && bl.params && rnd() < bl.params.chance) {
-            const extraDmg = Math.max(1, Math.floor((atkRef.atk - defRef.def) * (bl.params.damageMult || 1)));
+            const extraDmg = Math.max(1, Math.round(atkRef.atk * atkRef.atk / (atkRef.atk + defRef.def) * (bl.params.damageMult || 1)));
             defRef.hp -= extraDmg;
             events.push({ t, by: attacker, dmg: extraDmg, crit: false, miss: false, skill: false, note: 'extra' });
           }
@@ -445,7 +447,7 @@ function simulateFight(input) {
           events.push({ t, by: attacker, dmg: reflectDmg, crit: false, miss: false, skill: false, note: 'reflect' });
         }
         if (bl && !isPet && result.isMiss && bl.type === 'onDodgeCounter' && bl.params) {
-          const counterDmg = Math.max(1, Math.floor((P.atk - atkRef.def) * (bl.params.damageMult || 0.8)));
+          const counterDmg = Math.max(1, Math.round(P.atk * P.atk / (P.atk + atkRef.def) * (bl.params.damageMult || 0.8)));
           atkRef.hp -= counterDmg;
           events.push({ t, by: attacker, dmg: counterDmg, crit: false, miss: false, skill: false, note: 'counter' });
         }
@@ -593,4 +595,106 @@ function simulateSession(input) {
   return { fights, totalFights, totalExp, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, bossState: bs };
 }
 
-export { simulateSession, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, skillOf, getEquipBonuses, getBloodline, getAwakenState };
+/* ============================================================
+ * simulateSessionScript —— 带时间轴的会话模拟（演出剧本版）
+ * 与 simulateSession 完全同结构同 rng 消耗序（同 seed → 同结果），
+ * 但输出的是"演出剧本"：每场的开始/结束时刻、起止血量、胜负、经验、完整敌人数据。
+ * 2026-09-09 架构改版：**这是运行时唯一在跑的会话模拟**——服务器预结算
+ * 接下来一段挂机并把"已入账的录像"下发，客户端纯回放，不再本地模拟。
+ * ⚠️ 本函数必须与 docs/js/core/battle-sim.mjs 的同名函数逐字同步
+ *（vtest_sim_sync.js 守护）；改这里必须同步前端副本，反之亦然。
+ * ============================================================ */
+function simulateSessionScript(input) {
+  const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset, bossState } = input;
+  const rnd = mulberry32(seed || 1);
+  const bs = bossState || {};      // 与 simulateSession 同结构同消耗序
+  const bRand = bossRand(seed);
+  const B = config.battle;
+  const area = (B.areas || []).find(a => a.id === areaId);
+  if (!area) throw new Error('AREA_NOT_FOUND: ' + areaId);
+  const stats = petStats(pet, config);
+  let hp = clamp(Number(curHp) || stats.hp, 0, stats.hp);
+  let pendingKillBuff = false;
+  let msLeft = Math.max(0, Number(seconds) || 0) * 1000;
+  let regenAccum = 0, checkAccum = 0, waitingRecover = false;
+  let tMs = 0;
+  const events = [];
+  const regenTick2 = (dtMs) => {
+    if (!(stats.hp > 0) || hp >= stats.hp) return;
+    hp = Math.min(stats.hp, hp + stats.hp * (config.regen.hpPerSecRatio || 0.2) * dtMs / 1000);
+  };
+  const idleSlice2 = (dtMs) => {
+    regenAccum += dtMs;
+    if (regenAccum >= 1000) { regenTick2(regenAccum); regenAccum = 0; }
+    if (waitingRecover) {
+      checkAccum += dtMs;
+      if (checkAccum >= 500) { checkAccum = 0; if (hp >= stats.hp) waitingRecover = false; }
+    }
+  };
+  const [aMin, aMax] = (area.levelRange) || [1, 60];
+  const ids = new Set(area.enemyIds || []);
+  const pool = (enemyList || []).filter(e => {
+    if (!ids.has(e.id)) return false;
+    const [m1, m2] = e.levelRange || [e.level || 1, e.level || 1];
+    return m2 >= aMin && m1 <= aMax;
+  });
+  while (msLeft > 0 && events.length < 200) {
+    if (waitingRecover || hp < stats.hp) {
+      const s = Math.min(100, msLeft);
+      idleSlice2(s); msLeft -= s; tMs += s;
+      continue;
+    }
+    if (!pool.length) break;
+    const fightNo = events.length + (Number(fightOffset) || 0);
+    const isBossTurn = rollBoss(fightNo, bs, bRand);
+    const picked = isBossTurn ? { ...pickBossEnemy(pool), isBoss: true } : pickWeighted(pool, x => x.weight || 1, rnd);
+    const hpStart = hp, t0 = tMs;
+    const fight = simulateFight({ pet, stats, area, enemyData: picked, config, rnd, curHp: hp, pendingKillBuff });
+    hp = fight.petHpLeft;
+    pendingKillBuff = fight.win && fight.killBuffActive;
+    const xp = fight.win ? expFromBattle(fight.enemyLevel, area, config, rnd) : 0;
+    /* 本场双方实际出手刀数（2026-09-09 演出节奏用）。
+     * 演出层过去按「速度公式」自己跑行动条、血量却按剧本时间线性插值 —— 两条时钟不同源，
+     * 于是「行动条没跑满怪就死了」「飘 300 血条只掉一点」。现在把刀数交给演出层：
+     *   行动条按 span/petHits 定速（条满→出刀），血条按「剩余血/剩余刀」扣（最后一刀归零），
+     *   飘字 = 血条实际扣减 → 三者同源，且总量守恒（终点仍是剧本权威的 hpLeft）。
+     * 血统追击/反伤/反击等额外伤害带 note，不是一次出手，不计入刀数。 */
+    let petHits = 0, enemyHits = 0;
+    // petDmg（2026-09-09）：宠每刀【真实伤害】序列（miss=0；血统 extra/true 追伤并入上一刀）。
+    // 演出层用它替代「怪血均摊」——否则低级宠打高级图，每刀真实 1 点也会演成飘几百，
+    // 观感上「9 级就能打 50 级图」，等级压制被演出抹掉了。胜利场 ΣpetDmg = 怪血（模拟里怪被砍死），
+    // 血条扣减与飘字依然同源。
+    const petDmg = [];
+    for (const ev of (fight.events || [])) {
+      if (ev.by === 'pet') {
+        if (ev.note) {
+          if (petDmg.length) petDmg[petDmg.length - 1] += (ev.miss ? 0 : ev.dmg);
+          continue;
+        }
+        petDmg.push(ev.miss ? 0 : ev.dmg);
+        petHits++;
+      } else if (ev.by === 'enemy' && !ev.note) enemyHits++;
+    }
+    events.push({
+      type: 'fight', t0, t1: tMs + fight.durationMs,
+      win: fight.win, enemy: picked, enemyLevel: fight.enemyLevel, enemyName: fight.enemyName,
+      exp: xp, hpStart, hpLeft: hp, durationMs: fight.durationMs, isBoss: !!fight.isBoss,
+      petHits, enemyHits, petDmg
+    });
+    tMs += fight.durationMs; msLeft -= fight.durationMs;
+    const stopRatio = B.stopHpRatio || 0.3;
+    if (msLeft <= 0) break;
+    if (!fight.win || hp <= stats.hp * stopRatio) waitingRecover = true;
+    else {
+      let gapLeft = B.nextFightDelay || 600;
+      while (gapLeft > 0 && msLeft > 0) {
+        const s = Math.min(100, Math.min(gapLeft, msLeft));
+        idleSlice2(s); gapLeft -= s; msLeft -= s; tMs += s;
+      }
+      if (gapLeft > 0) break;
+    }
+  }
+  return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs };
+}
+
+export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, skillOf, getEquipBonuses, getBloodline, getAwakenState };

@@ -340,7 +340,7 @@
       if (bl && isPet && !result.isMiss) {
         // 血狐：暴击追加普攻
         if (bl.type === 'onCritExtraHit' && result.isCrit && bl.params && Math.random() < bl.params.chance) {
-          const extraDmg = Math.max(1, Math.floor((atkData.atk - defData.def) * (bl.params.damageMult || 1)));
+          const extraDmg = Math.max(1, Math.round(atkData.atk * atkData.atk / (atkData.atk + defData.def) * (bl.params.damageMult || 1)));
           defData.hp -= extraDmg;
           window.UI.showDamage('enemy', extraDmg, 'normal');
         }
@@ -363,7 +363,7 @@
       }
       // 幽影兔：闪避反击
       if (bl && !isPet && result.isMiss && bl.type === 'onDodgeCounter' && bl.params) {
-        const counterDmg = Math.max(1, Math.floor((state.pet.atk - atkData.def) * (bl.params.damageMult || 0.8)));
+        const counterDmg = Math.max(1, Math.round(state.pet.atk * state.pet.atk / (state.pet.atk + atkData.def) * (bl.params.damageMult || 0.8)));
         atkData.hp -= counterDmg;
         window.UI.showDamage('enemy', counterDmg, 'normal');
       }
@@ -381,10 +381,16 @@
     window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
     return true;
   }
-  // 完整伤害结算：命中判定 → 攻防减法(含穿透) → 暴击 → 伤害加成% → 受伤减免%(clamp) → 吸血
-  // 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
-  // 2026-09-04 新增三个纯数值词缀结算（怪物侧字段缺省=0，行为不变）：
-  //   穿透 pen：减法伤害里无视 pen 点防御；伤害加成 dmgBonus/100：结果乘 (1+x)；受伤减免 dr/100：受击侧乘 (1-x)，最低承伤 clamp 10%。
+  /* 完整伤害结算：命中判定 → 攻防对抗(含穿透) → 暴击 → 伤害加成% → 受伤减免%(clamp) → 吸血
+   * 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
+   * 2026-09-04 新增三个纯数值词缀结算（怪物侧字段缺省=0，行为不变）：
+   *   穿透 pen：无视 pen 点防御；伤害加成 dmgBonus/100：结果乘 (1+x)；受伤减免 dr/100：受击侧乘 (1-x)，最低承伤 clamp 10%。
+   * ⭐2026-09-09 攻防层由【减法】改为【递减对抗】（见 docs/战斗公式重设计_v1.md）：
+   *     dmg = atk × atk / (atk + effDef)     等价写法：atk × (1 − effDef/(atk + effDef))
+   *   直觉：防御与攻击力相等时正好挡掉一半；防御再高也挡不完，防御为 0 时吃满攻击。
+   *   为什么换掉减法：玩家穿装后 def 反超写死的怪攻 → 净伤恒为 0（实测 10 图 9 图「挨打 0.0%」），
+   *   挂机完全不掉血；而调高怪攻又必然打死裸装新手 —— 减法下两端不可兼得。
+   *   好处：无新增常数、攻守对称、低级高级图自动缩放、推图刀数几乎不变。 */
   function calcDamage(att, defStats) {
     const atk = att.atk, def = defStats.def;
     const hit = Math.max(0, att.hit || 0);
@@ -400,7 +406,8 @@
     const isCrit = Math.random() < rate;
     // 穿透：只削防御，不把防御削成负数（负防御会放大伤害，穿透不该有这个收益）
     const effDef = Math.max(0, def - Math.max(0, att.pen || 0));
-    let dmg = Math.max(1, atk - effDef);
+    // 攻防递减对抗（2026-09-09）：防御与攻击相等时挡掉一半，永远挡不完
+    let dmg = Math.max(1, Math.round(atk * atk / (atk + effDef)));
     if (isCrit) dmg = Math.floor(dmg * mult);
     // 伤害加成%：进攻侧最终乘区
     if (att.dmgBonus) dmg = Math.floor(dmg * (1 + att.dmgBonus / 100));
@@ -418,6 +425,12 @@
     clearInterval(interval);
     interval = null;
     const win = state.pet.hp > 0;
+    // 诊断埋点：确认玩家走的是不是这条路（不是服务器托管）
+    try {
+      var _m = '[本地战斗·收尾] ⚠️battle.js 本地战斗（非托管）| 怪血=' + Math.round(state.enemy.hp) + '/' + state.enemy.maxHp + ' | 胜=' + win;
+      (window.__battleLog = window.__battleLog || []).push(new Date().toISOString().slice(11, 23) + ' ' + _m);
+      console.log(_m);
+    } catch (e) { /* 忽略 */ }
     // 血统被动：骨狼击杀增益跨场传递
     if (win && bloodline && bloodline.type === 'killDamageBuff') {
       pendingKillBuff = true;

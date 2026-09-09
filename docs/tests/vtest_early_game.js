@@ -42,7 +42,8 @@ const result = C(`(function () {
     const hit = Math.max(0, att.hit || 0), dodge = Math.max(0, defStats.dodge || 0);
     const chance = hit + dodge > 0 ? Math.max(0.05, Math.min(0.95, hit / (hit + dodge))) : 0.05;
     if (Math.random() >= chance) return 0;
-    let d = Math.max(1, att.atk - defStats.def);
+    // 2026-09-09 攻防递减对抗（与 battle.js calcDamage 同源）：dmg = atk²/(atk + def)
+    let d = Math.max(1, Math.round(att.atk * att.atk / (att.atk + defStats.def)));
     if (Math.random() < (att.critRate == null ? 0.1 : att.critRate)) d = Math.floor(d * (att.critDamage == null ? 1.5 : att.critDamage));
     return d;
   }
@@ -141,9 +142,12 @@ for (const ai of [0, 1]) {
   console.log(`  最低胜率 ${(wWin * 100).toFixed(1)}%｜最低剩余血 ${(wLeft * 100).toFixed(0)}%｜最慢 ${slow.toFixed(1)}s\n`);
 }
 
-// 不是死板的 100%：模拟里最脆的宠在连续未命中的极端情况下仍有 <0.5% 翻车概率，
-// 真实挂机有回血兜底，不构成卡关。守的目标是「不会稳定打不过」，不是「永不失手」。
-A(worstWin >= 0.995, `新手期两张图全程不会稳定打不过（最低胜率 ${(worstWin * 100).toFixed(1)}%）`);
+/* 不是死板的 100%：模拟里最脆的宠在连续未命中的极端情况下会翻车，真实挂机有回血兜底，
+ * 不构成卡关。守的目标是「不会稳定打不过」，不是「永不失手」。
+ * 2026-09-09 阈值 99.5% → 98.5%：攻防改递减对抗后新手期真的会挨打了（单场剩余血 42~50%），
+ * 尾部翻车率随之升到 1% 左右，属于「有压力」的正常表现而非卡死；
+ * 真正的硬门槛是下面两条（剩余血 ≥25% + 单场 ≤20 秒），失败本身不损失任何东西。 */
+A(worstWin >= 0.985, `新手期两张图全程不会稳定打不过（最低胜率 ${(worstWin * 100).toFixed(1)}%）`);
 A(worstLeft >= 0.25, `新手期单场剩余血 ≥25%（最低 ${(worstLeft * 100).toFixed(0)}%，推得动不磨）`);
 A(slowest <= 20, `单场耗时 ≤20 秒（最慢 ${slowest.toFixed(1)}s，挂机节奏不拖沓）`);
 

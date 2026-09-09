@@ -9,9 +9,9 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260909ident">
+<link rel="stylesheet" href="css/game.css?v=20260909prep1">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260908v2">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260909trial2">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
 <link rel="stylesheet" href="css/market-refresh.css?v=20260903c">
 <link rel="stylesheet" href="css/market-cascade.css?v=caf34f5e">
@@ -85,7 +85,6 @@
         <div class="worldmap-page">
           <!-- 页眉：返回主菜单（侧边栏已在左侧，这里不放多余按钮） -->
           <div class="worldmap-head">
-            <button type="button" class="fs-btn fs-btn--primary" id="btn-resource-trial">资源试炼</button>
             <span class="worldmap-title">暗黑大陆 · 世界地图</span>
             <span class="worldmap-hint">点击地图上的标记进入对应区域 · 点击「不归城」进入主城</span>
             <button type="button" class="fs-btn fs-btn--ghost" id="btn-return-battle">⚔️ 返回战斗</button>
@@ -99,6 +98,11 @@
             <!-- 节点详情页（2026-09-08）：选完图后弹出，替代直接进战斗；hover 信息卡已取消 -->
             <div class="area-detail" id="area-detail" hidden>
               <div class="nd-page" id="area-detail-body"></div>
+            </div>
+            <!-- 试炼结算面板（2026-09-09）：副本战斗结束后弹出，显示结果/奖励/再打一次 -->
+            <div class="trial-settle" id="trial-settle" hidden>
+              <div class="ts-mask"></div>
+              <div class="ts-card" id="trial-settle-card"></div>
             </div>
           </div>
           <!-- 可拖拽分隔条：上/下分栏（默认 65/35，比例存 localStorage） -->
@@ -545,7 +549,6 @@
           <div class="codex-head">
             <span class="codex-title fs-title">百科</span>
             <span class="codex-sub">规则与数值速查</span>
-            <input class="fs-input codex-search" id="codex-search" type="text" placeholder="搜词条，比如 吸血 / 涅槃" aria-label="搜索百科词条">
           </div>
           <div class="codex-body">
             <nav class="codex-nav" id="codex-nav" aria-label="百科分类目录"></nav>
@@ -777,7 +780,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260909matrix1"></script>
+<script src="js/core/config.js?v=20260909drop1"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -801,13 +804,13 @@ window.PetSprites = {
 </script>
 <script src="js/pet/enemy-data.js?v=2982c4f5"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
-<script src="js/core/worldmap.js?v=302bb613"></script>
+<script src="js/core/worldmap.js?v=20260909trial"></script>
 <script src="js/core/supabase.js?v=20260908guide2"></script>
 <script src="js/equipment/equipment.js?v=20260909ident"></script>
-    <script src="js/pet/pet.js?v=20260904affix2"></script>
+    <script src="js/pet/pet.js?v=20260909prep1"></script>
 <script src="js/core/items.js?v=20260904pq"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
-<script src="js/core/drop.js?v=20260908guide2"></script>
+<script src="js/core/drop.js?v=20260909drop1"></script>
 <script src="js/core/market.js?v=20260909matrix1"></script>
 <script src="js/core/market_bot.js?v=20260903sec"></script>
 <script src="js/equipment/equipment_craft.js?v=20260908soulfix"></script>
@@ -816,14 +819,14 @@ window.PetSprites = {
 <script src="js/pet/pet_evolve.js?v=20260906evoitems"></script>
 <script src="js/core/quest.js?v=20260909trial1"></script>
 <script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
-<script src="js/core/resource-trial.js?v=20260909matrix1"></script>
-<script src="js/core/battle.js?v=20260905match1"></script>
-<script src="js/core/battle-sim.global.js?v=20260904idle1"></script>
-<script src="js/core/idle-bridge.js?v=20260908idlefix"></script>
+<script src="js/core/resource-trial.js?v=20260909trial2"></script>
+<script src="js/core/battle.js?v=20260909dmg1"></script>
+<script src="js/core/battle-sim.global.js?v=20260909dmg1"></script>
+<script src="js/core/idle-bridge.js?v=20260909auth1"></script>
 <script src="js/ui/ui-common.js?v=20260903j"></script>
 <script src="js/ui/ui-console.js?v=fa16bb1d"></script>
 <script src="js/ui/ui-shell.js?v=1e45bd1d"></script>
-<script src="js/ui/ui-worldmap.js?v=20260908v3"></script>
+<script src="js/ui/ui-worldmap.js?v=20260909node2"></script>
 <script src="js/ui/ui-capital.js?v=20260903notab"></script>
 
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
@@ -831,7 +834,7 @@ window.PetSprites = {
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
 <script src="js/ui/ui-quest.js?v=20260909trial1"></script>
-<script src="js/ui/ui-resource-trial.js?v=20260909matrix1"></script>
+<script src="js/ui/ui-resource-trial.js?v=20260909trial2"></script>
 <script src="js/ui/ui-battle.js?v=20260905match1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260907fix"></script>
@@ -844,10 +847,10 @@ window.PetSprites = {
 <script src="js/ui/ui-market.js?v=20260909matrix1"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>
-<script src="js/ui/ui-codex.js?v=20260907codex2"></script>
+<script src="js/ui/ui-codex.js?v=20260909codex3"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
 <script src="js/ui/ui-dev.js?v=20260908guide2"></script>
-<script src="js/main.js?v=20260905match2"></script>
+<script src="js/main.js?v=20260909prep1"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->
 <div class="bag-tooltip equip-tip" id="bag-tooltip"></div>

@@ -69,8 +69,11 @@
   // 设置出战宠物：本地立即生效；若该宠物已同步云端，则把 is_active 持久化到 DB
   // （原出战宠物置 false），确保刷新页面后仍能还原到正确的出战宠物
   function setActive(id) {
-    if (!pets.some(p => p.id === id)) return;
-    const next = pets.find(p => p.id === id);
+    // 详情页/副本页的 data-pid 走 dataset 拿到的是字符串（"3"），宠物 id 是数字（3），
+    // 严格相等永远 false → 点击换宠静默无效。这里统一归一成数字再比对。
+    const pid = typeof id === 'string' ? Number(id) : id;
+    if (!pets.some(p => p.id === pid)) return;
+    const next = pets.find(p => p.id === pid);
     // 上架中的宠物不可设为出战（需先取回），避免挂单快照与实物不一致
     const M = window.Market;
     if (M && M.isListed && next.cloudId && M.isListed(next.cloudId)) {
@@ -78,7 +81,7 @@
       return;
     }
     const prev = activePetId != null ? pets.find(p => p.id === activePetId) : null;
-    activePetId = id;
+    activePetId = pid;
     const SB = window.Supabase;
     if (SB && next.cloudId) {
       const p1 = SB.updatePet(next.cloudId, { is_active: true });

@@ -119,11 +119,11 @@ for(const kind of ['white','blue','gold']){
     const ORIG=Math.random;
     // 固定 Math.random=0.2：hitChance clamp 上限 0.95 → 0.2 < 0.95 必命中；critRate 0 必不暴击（确定性）
     Math.random=()=>0.2;
-    // 纯减法基线：atk 100 def 30 → 70
+    // 递减对抗基线（2026-09-09）：atk 100 def 30 → 100²/(100+30) = 77
     const base=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:0});
-    // 穿透 20：def 50 - 20 = 30 → 70（与基线同）
+    // 穿透 20：def 50 - 20 = 30 → 77（与基线同）
     const pen=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:20,dmgBonus:0,lifesteal:0},{def:50,dodge:0,dr:0});
-    // 伤害加成 50%：70 → 105
+    // 伤害加成 50%：77 → 115
     const bonus=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:50,lifesteal:0},{def:30,dodge:0,dr:0});
     // 受伤减免 50%：70 → 35；clamp：减伤 95 → 最低承伤 10%（70 → 7）
     const dr=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:50});
@@ -134,11 +134,11 @@ for(const kind of ['white','blue','gold']){
     return JSON.stringify({base:base.damage,pen:pen.damage,bonus:bonus.damage,dr:dr.damage,drClamp:drClamp.damage,penFloor:penFloor.damage});
   })()`);
   const cdv=JSON.parse(cd);
-  A(cdv.base===70,`减法基线 100-30=70（${cdv.base}）`);
-  A(cdv.pen===70,`穿透 20 抵消 def 50→30：70（${cdv.pen}）`);
-  A(cdv.bonus===105,`伤害加成 50%：70→105（${cdv.bonus}）`);
-  A(cdv.dr===35,`受伤减免 50%：70→35（${cdv.dr}）`);
-  A(cdv.drClamp===7,`减伤 clamp 最低承伤 10%：70→7（${cdv.drClamp}）`);
+  A(cdv.base===77,`递减对抗基线 100²/(100+30)=77（${cdv.base}）`);
+  A(cdv.pen===77,`穿透 20 抵消 def 50→30：77（${cdv.pen}）`);
+  A(cdv.bonus===115,`伤害加成 50%：77→115（${cdv.bonus}）`);
+  A(cdv.dr===38,`受伤减免 50%：77→38（${cdv.dr}）`);
+  A(cdv.drClamp===7,`减伤 clamp 最低承伤 10%：77→7（${cdv.drClamp}）`);
   A(cdv.penFloor===100,`穿透不成负防御：effDef 0 → 100（${cdv.penFloor}）`);
   // 5d) getStats 透传：给宠物穿带三词缀的装备，面板字段齐
   const st=C(`(function(){

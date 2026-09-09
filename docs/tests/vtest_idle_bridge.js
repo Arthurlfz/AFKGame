@@ -22,7 +22,8 @@ function el() {
   return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', style: { setProperty() {} }, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, appendChild() {}, append() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [], children: [], remove() {}, scrollTop: 0, scrollHeight: 0 };
 }
 
-/* ---------- 可配置的 EF 桩 ---------- */
+/* ---------- 可配置的 EF 桩 ----------
+ * 2026-09-09 回放版：settle 响应带 script（服务器已入账的录像），客户端不再本地模拟。 */
 let settleResp = { fights: 3, exp: 90, endHp: 500, petMaxHp: 800, level: 2, expLeft: 40, ok: true };
 let failNext = false;
 const calls = [];
@@ -62,12 +63,10 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   // 桩：给一个登录态，否则桥接层拿不到 token 会直接 NO_LOGIN
   C('Supabase.getSession = async () => ({ access_token: "tok-1", user: { id: "u1" } })');
 
-  // 桩：让 buildNextScript 在沙箱里能跑通（真实环境靠 idle_sessions 表 + battle.js）
-  // 必须在第一次 settle 之前装好——loadSim 会把首次加载结果缓存，之后再补就晚了
+  // 桩：resumeActive 恢复会话用（客户端已不本地模拟，不再需要 BattleSim 桩）
   C('Supabase.getClient = () => ({ from: () => ({ select: () => ({ eq: () => ({ order: () => ({ limit: () => ({ maybeSingle: async () => ({ data: { id: "sess-1", last_settled_at: new Date().toISOString() } }) }) }) }) }) }) });');
   C('window.Battle = window.Battle || {}; window.Battle.getCurrentArea = () => ({ id: "a1", levelRange: [1, 6] }); window.Battle.pickScaledEnemy = () => ({ name: "测试怪", level: 3 });');
   C('window.Drop = { rollReward: async () => { globalThis.__dropCalls = (globalThis.__dropCalls || 0) + 1; return { type: "none" }; } };');
-  C('window.BattleSim = { simulateSessionScript: function (input) { globalThis.__simCalls = globalThis.__simCalls || []; globalThis.__simCalls.push(input); return { events: [{ type: "fight", t0: 0, t1: 5000, win: true, enemy: { name: "腐噜兽", level: 3 }, enemyLevel: 3, enemyName: "腐噜兽", exp: 10, hpStart: 100, hpLeft: 80 }], endHp: 80, petMaxHp: 100, totalExp: 10 }; } };');
 
   /* ---------- A. 总开关 ---------- */
   A(C('IdleBridge.enabled') === true, 'A1. 默认开启服务器托管挂机');
@@ -114,14 +113,16 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(pet().exp === 777, 'F1. 满级时 exp 留本地不动（经验池归本地管，服务器是晶石计数）');
 
-  /* ---------- G. 战报到账通知 + 覆盖式应用（剧本驱动版） ---------- */
+  /* ---------- G. 战报到账通知 + 覆盖式应用（回放版） ---------- */
   C('globalThis.__notified = 0; IdleBridge.onChange = function(){ globalThis.__notified++; }');
   C('Pet.getActivePet().level = 5');
   settleResp = { fights: 10, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, totalFights: 100, detail: [{ win: true, lv: 6, name: '腐噜兽', exp: 23 }], ok: true };
   await C('IdleBridge.settleNow()');
   A(C('globalThis.__notified') >= 1, 'G1. 战报到账通知已发');
   await C('IdleBridge.settleNow()');
-  A(pet().level === 5 && pet().exp === 10, 'G2. 服务器值不变 → 覆盖式应用不产生漂移');
+  // 2026-09-09 回放版：补账场不再重复给经验——补账经验已含在剧本回放基线（expBefore）里，
+  // 这里再给一次就是第二次跳变。覆盖式应用后 exp = expLeft(10)，重复结算不变（幂等）。
+  A(pet().level === 5 && pet().exp === 10, 'G2. 覆盖式应用+补账场不重复给经验（10，重复结算不变）');
 
   /* ---------- H. 换宠 → 停止不重开 ---------- */
   C(`(function(){
@@ -150,21 +151,25 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   A(C('IdleBridge.isActive()') === false, 'J1. 服务器无会话 → 停止不再重试');
   settleResp = realResp;
 
-  /* ---------- K. 剧本时长 = 真实结算窗口（不再固定 30 秒） ---------- */
+  /* ---------- K. 服务器录像安装 + 回放基线 + 幂等判重（回放版核心） ---------- */
   await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
   await S(60);
-  C('globalThis.__simCalls = []; globalThis.__dropCalls = 0;');
-  settleResp = { fights: 2, exp: 20, endHp: 500, petMaxHp: 800, level: 5, expLeft: 10, elapsedSec: 45, totalFights: 200, ok: true };
-  await C('IdleBridge.settleNow()');
-  const lastSim = C('globalThis.__simCalls[globalThis.__simCalls.length-1]');
-  A(lastSim && lastSim.seconds === 45, 'K1. 下一段剧本时长用上次窗口真实秒数 45（服务器按真实时间记账，演出必须同长度）');
-  A(C('globalThis.__dropCalls') === 2, 'K2. 服务器打了 2 场、演出 0 场 → 补发 2 次掉落（不掉在空气里）');
-
-  /* ---------- L. 补发上限（切后台很久回来不刷屏） ---------- */
   C('globalThis.__dropCalls = 0;');
-  settleResp = { fights: 50, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, elapsedSec: 120, totalFights: 250, ok: true };
+  const scriptEvt = { type: 'fight', t0: 0, t1: 5000, win: true, enemy: { name: '腐噜兽', level: 3 }, enemyLevel: 3, enemyName: '腐噜兽', exp: 30, hpStart: 400, hpLeft: 380, petHits: 3, enemyHits: 1, petDmg: [100, 10, 10] };
+  settleResp = { fights: 2, exp: 20, endHp: 500, petMaxHp: 800, level: 6, expLeft: 90, elapsedSec: 45, totalFights: 200, ok: true,
+    script: { id: 'w-45', events: [scriptEvt], endHp: 500, petMaxHp: 800, totalExp: 30, level: 6, expLeft: 90, levelBefore: 5, expBefore: 10 } };
   await C('IdleBridge.settleNow()');
-  A(C('globalThis.__dropCalls') === 20, 'L1. 补发上限 20 场（50 场只补 20，防止一次性刷垮日志）');
+  A(C('IdleBridge.getScriptId()') === 'w-45', 'K1. 服务器返回的已入账录像被安装为当前剧本');
+  A(pet().exp === 10 && pet().level === 5, 'K2. 装剧本时回放基线=窗前真值（exp=' + pet().exp + ' Lv.' + pet().level + '，演完正好落在 expLeft/level）');
+  await C('IdleBridge.settleNow()'); // 服务器幂等重发同一段（刷新/切回前台场景）
+  A(C('IdleBridge.getScriptId()') === 'w-45' && pet().exp === 10, 'K3. 同一段录像重发被忽略（不重装不重播不重复给经验）');
+
+  /* ---------- L. 补账上限（切后台很久回来不刷屏） ---------- */
+  C('globalThis.__dropCalls = 0;');
+  settleResp = { fights: 50, exp: 100, endHp: 700, petMaxHp: 800, level: 5, expLeft: 10, elapsedSec: 120, totalFights: 250, ok: true,
+    detail: Array.from({ length: 50 }, () => ({ win: true, lv: 6, name: '腐噜兽', exp: 23 })) };
+  await C('IdleBridge.settleNow()');
+  A(C('globalThis.__dropCalls') === 20, 'L1. 补账按 detail 行数计，展示上限 20 场（50 场只补 20，防止一次性刷垮日志）');
 
   C('IdleBridge.stop()'); // K/L 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
 

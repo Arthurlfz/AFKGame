@@ -40,10 +40,13 @@ const enemyStats = (areaId, enemyLevel, type) => {
   const tm = typeMult[type] || 1;
   return { hp: b.hp * ratio * tm, atk: b.atk * ratio * tm, def: b.def * ratio * tm };
 };
+/* 2026-09-09 新攻防公式（与 battle.js calcDamage 同源，见 docs/战斗公式重设计_v1.md）：
+ * dmg = atk × atk / (atk + def) —— 防御与攻击力相等时挡掉一半，永远挡不完。 */
+const dmgOf = (atk, def) => Math.max(1, Math.round(atk * atk / (atk + def)));
 const hitsOf = (areaId, lv, growth, type, geared) => {
   const e = enemyStats(areaId, lv, type);
   const p = geared ? geared : barePlayer(lv, growth);
-  return { hits: e.hp / Math.max(1, p.atk - e.def), dmg: e.atk - p.def, pHp: p.hp };
+  return { hits: e.hp / dmgOf(p.atk, e.def), dmg: dmgOf(e.atk, p.def), pHp: p.hp };
 };
 
 // 1. Lv1 起手（图 1，怪 Lv1，成长 5 裸装）
@@ -62,9 +65,16 @@ areas.forEach((a, i) => {
   const bare = hitsOf(a.id, lv, 5.5, 'normal', false);
   const geared = SIM.simulate(tier, lv, 5.5, 'geared', 150);
   const maxed = SIM.simulate(tier, lv, 11, 'maxed', 150);
-  const gearHits = table[a.id].hp / Math.max(1, geared.atk - table[a.id].def);
-  const maxHits = table[a.id].hp / Math.max(1, maxed.atk - table[a.id].def);
-  console.log(`   ${a.name.padEnd(6)} 贫民 ${bare.hits.toFixed(2)} 刀  正常 ${gearHits.toFixed(2)} 刀  毕业 ${maxHits.toFixed(2)} 刀`);
+  const gearHits = table[a.id].hp / dmgOf(geared.atk, table[a.id].def);
+  const maxHits = table[a.id].hp / dmgOf(maxed.atk, table[a.id].def);
+  /* 生存侧读数（2026-09-09 补，只打印不做断言）：
+   * 「杀怪刀数」只说明推图速度，看不出难度；「挨打掉血% / 被杀需刀数」才说明玩家会不会输。
+   * 被杀需刀数 = 玩家血 / 每刀净伤；净伤 ≤0 = 完全免伤（Infinity）。 */
+  const bareDmg = Math.max(0, bare.dmg), gearDmg = dmgOf(table[a.id].atk, geared.def);
+  const bareKill = bareDmg > 0 ? bare.pHp / bareDmg : Infinity;
+  const gearKill = gearDmg > 0 ? geared.hp / gearDmg : Infinity;
+  const pct = (d, hp) => hp > 0 ? (d / hp * 100) : 0;
+  console.log(`   ${a.name.padEnd(6)} 贫民 ${bare.hits.toFixed(2)} 刀(挨打 ${pct(bareDmg, bare.pHp).toFixed(1)}%/被杀 ${bareKill === Infinity ? '∞' : bareKill.toFixed(0)} 刀)  正常 ${gearHits.toFixed(2)} 刀(挨打 ${pct(gearDmg, geared.hp).toFixed(1)}%/被杀 ${gearKill === Infinity ? '∞' : gearKill.toFixed(0)} 刀)  毕业 ${maxHits.toFixed(2)} 刀  [正常档 血${geared.hp} 防${geared.def} | 现怪攻${table[a.id].atk}]`);
   if (bare.hits < 3 || bare.hits > 6) bareOk = false;
   // 图1-2 新手宽容：装备梯度在低图拉不开（白蓝为主、且玩家实际穿不满 12 部位，实际更慢），
   // 正常档下限 图1 宽容到 1.8 / 图2 到 2.0（2026-09-06 校准注记）

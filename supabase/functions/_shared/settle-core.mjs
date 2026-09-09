@@ -6,7 +6,7 @@
  *   3. settlePlan：完整结算编排（快照 → 模拟 → 经验 → 落库 patch 计划）
  * 输入输出均为纯数据，DB 读写由调用方（Edge Function / 测试桩）负责。
  * ============================================================ */
-import { simulateSession } from './battle-sim.mjs';
+import { simulateSessionScript } from './battle-sim.mjs';
 
 const num = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? 0 : Number(v));
 
@@ -119,44 +119,93 @@ function rewardForFight(fight, areaId, seed, index) {
   return roll < 0.18 ? { type: 'material', material, qty: 1 } : { type: 'none' };
 }
 
-// 完整结算计划（纯计算）：输入会话/宠物/装备/时长 → 输出模拟结果 + 落库 patch
-function settlePlan({ session, petRow, equipItems, seconds, seed, config, enemyList, bossState }) {
+// 完整结算编排（纯计算）—— 2026-09-09 架构改版：「服务器唯一模拟器 + 先记账后放片」
+//   1) 补账窗（gapSeconds > 0）：把上次游标到现在的真实时间补算掉（客户端没看到/没演到的场次）
+//   2) 剧本窗（nextSeconds）：预结算接下来一段挂机，生成【已入账的演出录像】下发给客户端纯回放
+// 两窗链式衔接：补账窗的 endHp / 累计场数 / Boss 状态 = 剧本窗的起点。
+// 经验只发一次账：grantExp 分两步链式（补账后真值 = 剧本窗起点基线 → 剧本窗后真值），
+// 客户端从基线开始重演，演完正好落在服务器 expLeft（漂移为零，applyResult 只做兜底校准）。
+function settlePlan({ session, petRow, equipItems, config, enemyList,
+  gapSeconds = 0, gapSeed = 0, nextSeconds, nextSeed, bossState }) {
   const byId = new Map((equipItems || []).map(it => [String(it.id), it]));
   const pet = petFromRow(petRow, byId, config);
-  const result = simulateSession({
-    pet,
-    areaId: session.area_id,
-    seconds,
-    seed,
-    config,
-    enemyList,
-    curHp: pet.curHp,
-    fightOffset: session.total_fights || 0, // 跨段累计场数（全局 fightNo 锚点）
-    bossState // 守关 Boss 保底/冷却跨段状态（{ lastBossFight }，全局坐标）
+  const areaId = session.area_id;
+  const offset0 = session.total_fights || 0; // 跨段累计场数（全局 fightNo 锚点）
+  const bsIn = { lastBossFight: (bossState && bossState.lastBossFight != null) ? Number(bossState.lastBossFight) : null };
+
+  // 1) 补账窗（真实经过但没演到的时间）
+  let gap = null;
+  if (gapSeconds > 0) {
+    gap = simulateSessionScript({
+      pet, areaId, seconds: gapSeconds, seed: gapSeed, config, enemyList,
+      curHp: pet.curHp, fightOffset: offset0, bossState: bsIn
+    });
+  }
+  const gapEvents = gap ? gap.events : [];
+  const gapExp = gap ? gap.totalExp : 0;
+
+  // 2) 剧本窗（接下来一段，先入账后回放）
+  const scriptRaw = simulateSessionScript({
+    pet, areaId, seconds: nextSeconds, seed: nextSeed, config, enemyList,
+    curHp: gap ? gap.endHp : pet.curHp,
+    fightOffset: offset0 + gapEvents.length,
+    bossState: gap ? gap.bossState : bsIn
   });
-  const g = grantExp(pet.exp, pet.level, result.totalExp, config);
-  const offset = Math.max(0, result.fights.length - 50);
-  const detail = result.fights.slice(-50).map((f, i) => ({
-    win: f.win, lv: f.enemyLevel, name: f.enemyName, exp: f.exp, hp: f.hpLeft,
-    boss: !!f.isBoss, reward: rewardForFight(f, session.area_id, seed, offset + i)
+
+  // 掉落归属：补账窗按 gapSeed、剧本窗按 nextSeed 派生（同游标重放结果一致，可对账）
+  const withReward = (e, seed, i) => Object.assign({}, e, { reward: rewardForFight(e, areaId, seed, offset0 + i) });
+  const gapDetail = gapEvents.map((e, i) => {
+    const row = withReward(e, gapSeed, i);
+    return { win: row.win, lv: row.enemyLevel, name: row.enemyName, exp: row.exp, hp: row.hpLeft, boss: !!row.isBoss, reward: row.reward };
+  });
+  const scriptEvents = scriptRaw.events.map((e, i) => withReward(e, nextSeed, gapEvents.length + i));
+  const scriptDetail = scriptEvents.map(e => ({
+    win: e.win, lv: e.enemyLevel, name: e.enemyName, exp: e.exp, hp: e.hpLeft, boss: !!e.isBoss, reward: e.reward
   }));
+
+  // 经验链式两步：gGap = 补账后真值（剧本窗起点基线）；g = 剧本窗后真值（落库）
+  const gGap = grantExp(pet.exp, pet.level, gapExp, config);
+  const scriptExp = scriptRaw.totalExp;
+  const g = grantExp(gGap.exp, gGap.level, scriptExp, config);
+
+  const totalFights = gapEvents.length + scriptEvents.length;
+  const totalExp = gapExp + scriptExp;
   return {
-    result, // simulateSession 完整输出（含 bossState）
+    // 演出录像（客户端纯回放；EF 再装饰 id/until/expLeft/level/expBefore/levelBefore）
+    script: {
+      events: scriptEvents,
+      endHp: scriptRaw.endHp,
+      petMaxHp: scriptRaw.petMaxHp,
+      totalExp: scriptExp
+    },
+    // 补账明细（客户端只负责展示掉落，经验已在基线里，不再重复给）
+    detail: gapDetail.slice(-50),
+    // 审计日志明细（补账 + 剧本窗全部场次）
+    logDetail: gapDetail.concat(scriptDetail).slice(-100),
     exp: g,
-    detail,
     petPatch: {
-      cur_hp: Math.round(result.endHp),
+      cur_hp: Math.round(scriptRaw.endHp),
       exp: Math.max(0, g.exp),
       level: g.level
     },
     summary: {
-      fights: result.totalFights,
-      exp: result.totalExp,
-      endHp: Math.round(result.endHp),
-      petMaxHp: result.petMaxHp,
+      fights: totalFights,
+      exp: totalExp,
+      gapFights: gapEvents.length,
+      gapExp,
+      endHp: Math.round(scriptRaw.endHp),
+      petMaxHp: scriptRaw.petMaxHp,
       level: g.level,
       leveled: g.leveled,
       crystal: g.crystal
+    },
+    result: {
+      totalFights, totalExp,
+      endHp: Math.round(scriptRaw.endHp),
+      petMaxHp: scriptRaw.petMaxHp,
+      bossState: scriptRaw.bossState,
+      scriptExpBefore: gGap.exp,
+      scriptLevelBefore: gGap.level
     }
   };
 }

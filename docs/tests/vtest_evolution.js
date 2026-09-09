@@ -34,7 +34,7 @@ A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().some
 A(C('Evolve.getEvolutionRoutes({name:"腐噜兽"})[0].to')==='腐沼兽'&&C('Evolve.getEvolutionRoutes({name:"腐沼兽"})[0].to')==='腐沼王'&&C('Evolve.getEvolutionRoutes({name:"腐沼王"})[0].to')==='腐烂之母','腐噜兽可沿链进化至第3阶终点');
 A(C('(()=>{const t=Config.pet.evolution.tree;return Object.values(t).flat().every(r=>!t[r.to]||t[r.to].length===0||t[r.to].every(x=>[25,60].includes(x.minLevel)))})()'),'所有后续路线门槛为 Lv.25 或 Lv.60');
 A(C('Config.pet.evolution.boostItems.every(id=>{const i=Config.itemOf(id);return i&&i.category==="evolve"&&i.boost>0})'),'三个进化强化道具均有有效定义');
-A(C('Object.values(Config.drop.materialWeightsByTier).some(w=>w["强化丹B"])&&Object.values(Config.drop.materialWeightsByTier).some(w=>w["天仙玉露"])'),'强化丹B与天仙玉露均有掉落来源');
+A(C('!Object.values(Config.drop.materialWeightsByTier).some(w=>w["强化丹B"]||w["天仙玉露"]) && (Config.towerDrops.items.some(i=>i.name==="强化丹B")) && (Config.towerDrops.items.some(i=>i.name==="天仙玉露"))'),'强化丹B与天仙玉露移出地图掉落（2026-09-09 归通天塔，towerDrops 已登记）');
 
 /* ============ 2. 进化体速度继承 ============ */
 // 期望值不写死：从 Config.pet.speeds 的基宠取，速度带调整后不必改测试

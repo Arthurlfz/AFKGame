@@ -32,7 +32,9 @@ ctx.Battle.startAutoBattle(() => {});
 A(ctx.Battle.state.activeSkill?.id === 'corrosion-spit', 'Lv60 腐烂之母在开战时解锁腐蚀喷吐');
 A(ctx.Battle.useActiveSkill() === true && ctx.Battle.state.skillQueued, '点击主动技能只排队，不抢占行动条');
 const hpBefore = ctx.Battle.state.enemy.hp;
-const expectedDamage = Math.floor((ctx.Battle.state.pet.atk - ctx.Battle.state.enemy.def) * 1.5);
+// 2026-09-09 递减对抗：普攻 = atk²/(atk+def)；技能 = 普攻 + floor(普攻 × (倍率−1))，此处 1.5 倍 ≡ floor(普攻 × 1.5)
+const _pa = ctx.Battle.state.pet.atk, _ed = ctx.Battle.state.enemy.def;
+const expectedDamage = Math.floor(Math.round(_pa * _pa / (_pa + _ed)) * 1.5);
 const advancePetTurn = () => { for (let i = 0; i < 13; i++) fightTick(); };
 advancePetTurn();
 A(ctx.Battle.state.skillQueued === false && ctx.Battle.state.skillCooldown === 3, '下一次我方行动释放技能并进入 3 回合冷却');
