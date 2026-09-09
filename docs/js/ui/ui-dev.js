@@ -344,6 +344,15 @@
         '</div>' +
         '<div class="dev-note">走 Materials.gain，已登录自动同步云端；清单按 Config 自动分组（合成 / 进化 / 涅槃道具、打造石、进化素材、区域材料、其他）</div>' +
       '</div>');
+    // 发试炼门票
+    html += groupHtml('发试炼门票',
+      '<div class="dev-row">' +
+        '<div class="dev-inline">' +
+          '<input class="dev-input" id="res-ticket-amt" type="number" min="1" value="10" style="width:90px">' +
+          '<button class="btn-mini primary" id="res-ticket-go">发放</button>' +
+        '</div>' +
+        '<div class="dev-note">资源副本门票（Config.resourceTrials.ticketName），走 Materials.gain，自测副本不用等委托</div>' +
+      '</div>');
     // 发魔石
     html += groupHtml('发魔石',
       '<div class="dev-row">' +
@@ -417,6 +426,14 @@
       const name = $('res-mat-name') && $('res-mat-name').value;
       const amt = num('res-mat-amt', 1);
       if (!name || !amt) return;
+      if (window.Materials) window.Materials.gain(name, amt);
+      if (UI.renderAll) UI.renderAll();
+      toast('已发放', name + ' ×' + amt);
+    };
+    const ticketGo = $('res-ticket-go');
+    if (ticketGo) ticketGo.onclick = () => {
+      const amt = Math.max(1, Math.floor(num('res-ticket-amt', 1)));
+      const name = (window.Config.resourceTrials && window.Config.resourceTrials.ticketName) || '资源试炼门票';
       if (window.Materials) window.Materials.gain(name, amt);
       if (UI.renderAll) UI.renderAll();
       toast('已发放', name + ' ×' + amt);

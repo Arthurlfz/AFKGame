@@ -1383,70 +1383,9 @@ window.Config.tutorialMode.expPacks = [];
 window.Config.tutorialMode.disableBlessing = true;
 window.Config.tutorialMode.starterPack = { gear: [], mats: [], expItems: [], pet: null };
 
-/* 2026-09-09 resource trial MVP.
- * A trial is a short, ticketed choice inside the world-map page. It does not
- * replace ordinary maps and it does not introduce a new currency.
- * 2026-09-09 节点化：三个副本作为大地图节点进入（见 worldmap.js trialPoints），
- * 每日免费进入次数 freeEntriesPerDay 于【北京时间 12:00】刷新，用尽后可用门票继续进。
- */
-window.Config.resourceTrials = {
-  enabled: true,
-  ticketName: '资源试炼门票',
-  rounds: 5,
-  /* 每副本每日免费进入次数（北京时间 12:00 刷新，见 resource-trial.js 的 dayKeyOf）。
-   * 免费次数用尽后进入需消耗 1 张门票。设为 0 即回到纯门票模式。 */
-  freeEntriesPerDay: 3,
-  /* 难度参数（2026-09-09）：旧模型全等级 100% 通关，试炼没有风险也没有强度区分度。
-   * 现在每回合掉最大生命的 hitRatio，比例随轮次 ×(1 + round×roundRatio)：
-   *   攻击高 → 回合少 → 挨打少；轮次深 → 掉血快 → 后段可能撑不住。
-   * 实测（成长 3 起步宠裸装，剩血）：Lv10 蜕变 28% / 淬炼 15%；Lv15 蜕变 42% / 淬炼 29%；
-   *   Lv25 蜕变 42% / 涅槃 11% / 淬炼 36%；Lv60 蜕变 57% / 涅槃 21% / 淬炼 35%。
-   *   裸装最低配也能过但很紧张，穿装备 / 高成长 / 进化后明显轻松 —— 强度与打造都能体现。 */
-  hitRatio: 0.045,
-  roundRatio: 0.15,
-  roundDelayMs: 420,      // 每场之间的演出间隔（5 场约 2 秒，太快会看不出过程）
-  /* 门票来源：地图委托（collect_loop）每交一轮给 1 张（见 drop.quests 的 loop_* 奖励）。
-   * 走既有委托链，不新增货币、不改掉落表 —— 「挂机攒材料 → 交委托换门票 → 定向补资源」。 */
-  /* 奖励档位（2026-09-09 按《边界基线 v1》第 3 节资源归属矩阵重排）：
-   * 每种通货只有【一个】主来源，这里就是它的主来源；不复制普通地图的稳定掉落表，
-   * 否则地图又会变成所有资源的最优解。tiers 取「不高于宠物等级的最高档」；
-   * consolation 是失败补偿，必须属于本路线（给内向进度），且绝不是区域材料。 */
-  ticketSources: '完成地图委托（每轮 1 张）',
-  routes: [
-    { id: 'metamorph', name: '副本·蜕变试炼', desc: '定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。', minLevel: 1, difficulty: 1, reward: 'evolution', guardian: { name: '影蚀魔君', title: '蜕变守护者' },
-      tiers: [
-        { minLevel: 1,  items: [{ name: '进化素材', qty: 2 }] },
-        { minLevel: 25, items: [{ name: '精粹进化素材', qty: 1 }] },
-        { minLevel: 40, items: [{ name: '传说进化素材', qty: 1 }] }
-      ],
-      consolation: [{ name: '进化素材', qty: 1 }] },
-    { id: 'nirvana', name: '副本·涅槃试炼', desc: '定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。', minLevel: 25, difficulty: 1.35, reward: 'phoenix', guardian: { name: '幽火魔狐', title: '涅槃守护者' },
-      tiers: [
-        { minLevel: 25, items: [{ name: '涅槃丹', qty: 1 }] }
-      ],
-      consolation: [{ name: '合成之石', qty: 1 }] },
-    { id: 'temper', name: '副本·淬炼试炼', desc: '定向获得打造通货；高阶额外产出神圣石与锁定石（锁前/锁后的唯一来源）。', minLevel: 1, difficulty: 1.1, reward: 'craft', guardian: { name: '骸骨君主', title: '淬炼守护者' },
-      tiers: [
-        { minLevel: 1,  items: [{ name: '重铸石', qty: 2 }] },
-        { minLevel: 25, items: [{ name: '增缀石', qty: 1 }, { name: '剥离石', qty: 1 }] },
-        { minLevel: 43, items: [{ name: '神圣石', qty: 1 }, { name: '锁定石', qty: 1 }] }
-      ],
-      consolation: [{ name: '重铸石', qty: 1 }] }
-  ]
-};
-
-/* 门票的稳定来源（2026-09-09）：地图委托每交一轮给 1 张。
- * 之前门票只在 N6 引导发 1 张 —— 用完即止，资源试炼变成一次性演示，循环是断的。
- * 挂在 collect_loop 上而不是掉落表：不新增货币、不改掉落与战斗公式，
- * 且「挂机攒材料 → 交委托 → 换门票 → 定向补资源」正好是要验证的主循环。
- * 统一注入而非逐条改奖励表：以后加新图委托自动跟上。 */
-(function () {
-  const ticket = window.Config.resourceTrials.ticketName;
-  (window.Config.drop.quests || []).forEach(q => {
-    if (q.type !== 'collect_loop') return;
-    q.reward = Object.assign({}, q.reward, { [ticket]: 1 });
-  });
-})();
+/* 2026-09-10 资源副本改 20 层爬塔：resourceTrials 全部数值与门票注入
+ * 已迁至 js/trial/trial-config.js（副本模块自己的配置文件，一个文件一个职责）。
+ * 本文件不再定义 resourceTrials —— 加载顺序：config.js → … → battle.js → trial-config.js。 */
 
 /* ================= 通天塔掉落占位（2026-09-09，塔尚未开发） =================
  * 登记已从普通地图掉落表移除、归属通天塔的高级物品（掉落削减的另一半账本）。

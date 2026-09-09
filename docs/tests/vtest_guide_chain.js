@@ -2,6 +2,8 @@
 const fs = require('fs'), vm = require('vm');
 const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
+// 2026-09-10 起门票注入在 trial/trial-config.js（副本模块自己的配置文件）
+vm.runInContext(fs.readFileSync('../js/trial/trial-config.js', 'utf8'), ctx);
 const C = code => vm.runInContext(code, ctx);
 const A = (v, m) => { if (!v) { console.error('FAIL: ' + m); process.exit(1); } console.log('PASS: ' + m); };
 const guide = C(`Config.drop.quests.filter(q => q.category === 'tutorial' && q.isGuide)`);

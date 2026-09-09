@@ -1,18 +1,21 @@
-// 资源试炼/资源副本 契约测试（配置与真实 config.js 同源，避免测试用假配置跑出假绿）
-// 覆盖（2026-09-09 节点化后）：
-//   ① 每日免费进入次数（freeEntriesPerDay，北京时间 12:00 换日）
-//   ② 免费次数用尽后需门票，失败不回退次数/门票
-//   ③ 被等级拦截不消耗免费次数
-//   ④ 三条路线奖励/补偿仍正确（蜕变/涅槃/淬炼）
-//   ⑤ 副本命名带「副本」前缀；大地图 trialPoints 与路线一一对应
+// 资源副本（20 层爬塔）契约测试（配置与真实 trial/trial-config.js 同源，避免假配置跑出假绿）
+// 覆盖（2026-09-10 爬塔化后）：
+//   ① 配置形态：20 层、三条路线、层数档位 5/10/15/20、守关者
+//   ② 层难度曲线：等级线性、数值随层递增、强档层上浮、路线难度乘算
+//   ③ 每日免费进入次数（freeEntriesPerDay，北京时间 12:00 换日）+ 门票
+//   ④ 被等级拦截不消耗免费次数/门票
+//   ⑤ 通关拿最高档；死在第 4 层只给补偿；死在第 7 层拿第 5 层档（按最高到达层数）
+//   ⑥ 奖励绝不给区域材料（资源归属矩阵红线）
+//   ⑦ 血量跨层累计（层间写回、不回满）
+//   ⑧ 大地图 trialPoints 与路线一一对应；window.ResourceTrial 旧接口兼容
 const fs = require('fs');
 const vm = require('vm');
 
 const gained = [];
 let ticket = 0;
-// 强宠 / 弱宠两套属性：失败分支曾经是死代码（旧模型全等级 100% 通关）
-const strong = { level: 10, stats: { atk: 500, def: 500, hp: 5000 } };
-const weak = { level: 10, stats: { atk: 30, def: 5, hp: 200 } };
+// 强宠（一路赢到底）/ 弱宠（撑不了几层）
+const strong = { id: 'p1', name: '小强', level: 80, growth: 60, stats: { atk: 5000, def: 2000, hp: 50000 }, curHp: 50000 };
+const weak = { id: 'p2', name: '小弱', level: 12, growth: 3, stats: { atk: 90, def: 20, hp: 600 }, curHp: 600 };
 let pet = strong;
 
 // localStorage 桩（内存实现，供每日次数持久化）
@@ -23,12 +26,32 @@ const localStorageStub = {
   removeItem: k => { delete memStore[k]; }
 };
 
-const ctx = { console, setTimeout, clearTimeout, localStorage: localStorageStub, Date };
+// Battle 桩：记录 beginTrialFloor 注入的层上下文，胜负由测试脚本逐层驱动。
+// 血量写回与真实 battle.js endFight 同口径（onEnd 前先 setCurHp）。
+let floorCtx = null;
+let winUntilFloor = 20;      // 前 N 层赢，之后输（默认全赢）
+let hpLossPerFloor = 0;      // 每层固定掉血（测跨层累计用）
+const battleStub = {
+  beginTrialFloor(ctx2) { floorCtx = ctx2; return true; },
+  isRunning: () => false,
+  isTrialMode: () => false
+};
+
+const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, localStorage: localStorageStub, Date };
 ctx.window = ctx;
+ctx.document = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/core/worldmap.js', 'utf8'), ctx);
-ctx.Pet = { getActivePet: () => pet, getStats: p => p.stats };
+// 2026-09-10 起副本数值在 trial/trial-config.js（一个文件一个职责）
+vm.runInContext(fs.readFileSync('../js/trial/trial-config.js', 'utf8'), ctx);
+vm.runInContext('Config.resourceTrials.floorDelayMs = 1;', ctx); // 测试加速：层间停顿压到 1ms
+ctx.Pet = {
+  getActivePet: () => pet,
+  getStats: p => p.stats,
+  getCurHp: p => (p.curHp != null ? p.curHp : p.stats.hp),
+  setCurHp: (p, hp) => { p.curHp = hp; }
+};
 ctx.Materials = {
   getQuantity: name => (name === '资源试炼门票' ? ticket : 0),
   spend: async (name, amount) => {
@@ -38,95 +61,149 @@ ctx.Materials = {
   },
   gain: (name, qty) => gained.push([name, qty])
 };
-ctx.UI = { renderResourceTrial() {}, showToast() {} };
-vm.runInContext(fs.readFileSync('../js/core/resource-trial.js', 'utf8'), ctx);
-const T = ctx.ResourceTrial;
+ctx.Battle = battleStub;
+vm.runInContext(fs.readFileSync('../js/trial/trial-access.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/trial/trial-rewards.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/trial/trial-engine.js', 'utf8'), ctx);
+
+const Engine = ctx.TrialEngine;
+const Access = ctx.TrialAccess;
 const C = code => vm.runInContext(code, ctx);
 const ok = (condition, message) => {
   if (!condition) { console.error('FAIL: ' + message); process.exit(1); }
   console.log('PASS: ' + message);
 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// 逐层驱动：等引擎开层 → 按 winUntilFloor/hpLossPerFloor 决定该层胜负 → 回调
+async function runTrial(routeId) {
+  gained.length = 0;
+  const done = Engine.start(routeId, {});
+  let guard = 0;
+  while (guard++ < 500) {
+    await sleep(1);
+    if (floorCtx) {
+      const fc = floorCtx; floorCtx = null;
+      const state = Engine.getState();
+      const win = state.floor <= winUntilFloor;
+      const petHp = win ? Math.max(1, ctx.Pet.getCurHp(pet) - hpLossPerFloor) : 0;
+      ctx.Pet.setCurHp(pet, petHp);
+      fc.onEnd({ win, petHp, petMaxHp: pet.stats.hp });
+    } else if (!Engine.getState().running) {
+      break;
+    }
+  }
+  return done;
+}
 
 (async () => {
   const cfg = C('Config.resourceTrials');
 
-  /* ============ 0. 副本命名：带「副本」前缀 ============ */
+  /* ============ 0. 配置形态 ============ */
+  ok(cfg.floors === 20, '副本固定 20 层');
   ok(cfg.routes.every(r => r.name.indexOf('副本') === 0), '三个路线名都以「副本」开头（' + cfg.routes.map(r => r.name).join(' / ') + '）');
   ok(cfg.freeEntriesPerDay >= 1, 'freeEntriesPerDay 已配置（' + cfg.freeEntriesPerDay + '）');
+  ok(cfg.routes.every(r => JSON.stringify((r.floorTiers || []).map(t => t.floor)) === '[5,10,15,20]'),
+    '每条路线的层数档位都是 5/10/15/20（按最高到达层数给）');
+  ok(cfg.routes.every(r => r.guardian && r.guardian.name && r.guardian.title),
+    '每条路线配置了守关者（整页战斗立绘）：' + cfg.routes.map(r => (r.guardian || {}).name || '无').join(' / '));
+  ok(cfg.routes.every(r => ['影蚀魔君', '幽火魔狐', '骸骨君主'].indexOf(r.guardian.name) >= 0),
+    '守关者名字都存在于宠物立绘库（有真实立绘可显示）');
+  ok(cfg.floorLevelStart < cfg.floorLevelEnd && cfg.baseStats.hp > 0 && cfg.baseStats.atk > 0 && cfg.baseStats.def > 0,
+    '层等级区间与数值锚点（baseStats）已配置');
 
-  /* ============ 1. 每日免费进入：免费次数内不需要门票 ============ */
+  /* ============ 1. 层难度曲线（数值体系与大地图同源，参数全在 config） ============ */
+  const route1 = cfg.routes[0];
+  ok(Engine.floorLevelOf(1) === cfg.floorLevelStart && Engine.floorLevelOf(20) === cfg.floorLevelEnd,
+    `怪等级从第 1 层 ${Engine.floorLevelOf(1)} 级线性爬到第 20 层 ${Engine.floorLevelOf(20)} 级`);
+  const hpSeq = [];
+  for (let f = 1; f <= 20; f++) hpSeq.push(Engine.floorEnemyStats(route1, f).hp);
+  ok(hpSeq.every((v, i) => i === 0 || v > hpSeq[i - 1]), '守关者血量逐层严格递增（难度只跟层数走）');
+  ok(Engine.floorEnemyStats(route1, 20).hp > Engine.floorEnemyStats(route1, 6).hp * 5,
+    '顶层守关者强度远超前期（满成长+装备才有得上）');
+  const elite5 = Engine.floorDifficultyOf(route1, 5), floor4 = Engine.floorDifficultyOf(route1, 4);
+  ok(elite5 > floor4 * 1.1, '强档层（5/10/15/20）难度跳档（eliteMult 阶梯）');
+  const diffs = [];
+  for (let f = 1; f <= 20; f++) diffs.push(Engine.floorDifficultyOf(route1, f));
+  ok(diffs.every((v, i) => i === 0 || v > diffs[i - 1]), '层难度全程严格递增（强档层阶梯永久保留，绝不倒退）');
+  ok(Engine.floorDifficultyOf(cfg.routes[1], 10) > Engine.floorDifficultyOf(route1, 10),
+    '路线难度乘算（涅槃 1.35 > 蜕变 1.0）');
+  const e20 = Engine.floorEnemyStats(route1, 20);
+  ok(e20.name === route1.guardian.name && e20.level === cfg.floorLevelEnd && e20.maxHp === e20.hp,
+    '层敌人=守关者本体（名字/等级/血量口径一致，可直接喂 battle.js）');
+
+  /* ============ 2. 每日免费进入：免费次数内不需要门票 ============ */
   const freePerDay = cfg.freeEntriesPerDay;
   ticket = 0;
-  let r = await T.start('metamorph', { instant: true });
+  hpLossPerFloor = 0;
+  winUntilFloor = 20;
+  let r = await runTrial('metamorph');
   ok(r.ok && r.cleared && r.consumed === 'free', '免费次数内进入，不消耗门票（第 1 次，free）');
   ok(ticket === 0, '免费进入后门票数量不变');
   for (let i = 1; i < freePerDay; i++) {
-    r = await T.start('metamorph', { instant: true });
+    r = await runTrial('metamorph');
     ok(r.ok && r.consumed === 'free', `免费次数内进入（第 ${i + 1}/${freePerDay} 次）`);
   }
-  ok(T.getDailyInfo().find(i => i.routeId === 'metamorph').freeLeft === 0, '免费次数用尽后 freeLeft = 0');
-  ok(T.entryInfo('metamorph').freeLeft === 0, 'entryInfo 反映免费次数已用尽');
+  ok(Access.getDailyInfo().find(i => i.routeId === 'metamorph').freeLeft === 0, '免费次数用尽后 freeLeft = 0');
+  ok(Access.entryInfo('metamorph').freeLeft === 0, 'entryInfo 反映免费次数已用尽');
 
-  /* ============ 2. 免费次数用尽后：必须门票，且失败不回退 ============ */
+  /* ============ 3. 免费次数用尽后：必须门票，且失败不回退 ============ */
   ticket = 0;
-  r = await T.start('metamorph', { instant: true });
+  r = await runTrial('metamorph');
   ok(r.ok === false && (r.error || '').indexOf('门票') >= 0, '免费次数用尽且无门票时无法进入');
   ticket = 1;
-  r = await T.start('metamorph', { instant: true });
-  ok(r.ok && r.consumed === 'ticket', '有门票时消耗门票进入（第 ' + freePerDay + '+1 次）');
+  r = await runTrial('metamorph');
+  ok(r.ok && r.consumed === 'ticket', '有门票时消耗门票进入');
   ok(ticket === 0, '门票进入成功消耗 1 张门票');
 
-  /* ============ 3. 失败：消耗次数/门票，给本路线基础补偿，绝不给区域材料 ============ */
+  /* ============ 4. 通关：拿最高档（第 20 层档），奖励入包 ============ */
   gained.length = 0;
+  ticket = 1;
+  r = await runTrial('nirvana');
+  ok(r.ok && r.cleared && r.maxFloor === 20, '强宠 20 层全通（maxFloor=20）');
+  ok(r.tierFloor === 20, '通关拿第 20 层档位');
+  ok(gained.some(x => x[0] === '涅槃丹' && x[1] === 4), '涅槃路线第 20 层档 = 涅槃丹×4');
+  ok(!gained.some(x => x[0] === '区域材料'), '副本绝不给区域材料（区域材料只能是地图产出）');
+
+  /* ============ 5. 失败：按最高到达层数取档；不足第一层档只给补偿 ============ */
+  // 死在第 4 层（赢 3 输 1）→ 不足 5 层档 → 只给基础补偿
+  ticket = 1; winUntilFloor = 3; pet = weak;
+  r = await runTrial('metamorph');
+  ok(r.ok && r.cleared === false && r.maxFloor === 3, '弱宠止步第 3 层（爬塔有真实死亡风险）');
+  ok(r.tierFloor === 0 && gained.some(x => x[0] === '进化素材' && x[1] === 1),
+    '不足第 5 层档只给基础补偿（进化素材×1）');
+  ok(ticket === 0, '失败不退还门票');
+  // 死在第 7 层（赢 7 输 1）→ 达到第 5 层档 → 拿第 5 层档（不是补偿）
+  ticket = 1; winUntilFloor = 7; pet = strong;
+  r = await runTrial('metamorph');
+  ok(r.ok && !r.cleared && r.maxFloor === 7, '死在第 7 层，最高到达层数=7');
+  ok(r.tierFloor === 5 && gained.some(x => x[0] === '进化素材' && x[1] === 3),
+    '死在第 7 层仍拿第 5 层档（按最高到达层数给，越深越好）');
+  pet = strong; winUntilFloor = 20;
+
+  /* ============ 6. 等级拦截：不消耗免费次数也不消耗门票 ============ */
   ticket = 1;
   pet = weak;
-  r = await T.start('metamorph', { instant: true });
-  ok(r.ok && r.cleared === false && r.rounds < 5, '强度不足会在中途倒下');
-  ok(ticket === 0, '失败不退还门票');
-  ok(gained.some(x => x[0] === '进化素材' && x[1] === 1), '失败给本路线的基础补偿（进化素材×1，而非区域材料）');
-  ok(!gained.some(x => x[0] === '区域材料'), '失败绝不给区域材料（区域材料只能是地图产出）');
-  pet = strong;
-
-  /* ============ 4. 等级拦截：不消耗免费次数也不消耗门票 ============ */
-  ticket = 1;
-  const beforeNirvana = T.entryInfo('nirvana').freeLeft;
-  r = await T.start('nirvana', { instant: true });
+  const beforeNirvana = Access.entryInfo('nirvana').freeLeft;
+  r = await runTrial('nirvana');
   ok(r.ok === false && r.error === '需要宠物达到 Lv25', '低等级不能进入涅槃路线');
   ok(ticket === 1, '被等级拦截不消耗门票');
-  ok(T.entryInfo('nirvana').freeLeft === beforeNirvana, '被等级拦截不消耗免费次数');
-
-  /* ============ 5. 三条路线奖励正确（原有契约回归） ============ */
-  // 涅槃：Lv25 可进，发涅槃丹
-  gained.length = 0;
-  ticket = 1;
-  const lv25 = { level: 25, stats: { atk: 900, def: 300, hp: 9000 } };
-  pet = lv25;
-  r = await T.start('nirvana', { instant: true });
-  ok(r.ok && r.cleared, 'Lv25 可以通过涅槃路线');
-  ok(gained.some(x => x[0] === '涅槃丹' && x[1] === 1), '涅槃路线发放涅槃丹');
-  // 淬炼：低等级给重铸石，Lv25+ 给增缀/剥离
-  gained.length = 0;
-  ticket = 1;
-  pet = strong;
-  await T.start('temper', { instant: true });
-  ok(gained.some(x => x[0] === '重铸石' && x[1] === 2), '淬炼路线低等级给重铸石');
-  gained.length = 0;
-  ticket = 1;
-  pet = lv25;
-  await T.start('temper', { instant: true });
-  ok(gained.some(x => x[0] === '增缀石') && gained.some(x => x[0] === '剥离石'), '淬炼路线 Lv25+ 给增缀石与剥离石');
+  ok(Access.entryInfo('nirvana').freeLeft === beforeNirvana, '被等级拦截不消耗免费次数');
   pet = strong;
 
-  /* ============ 6. 难度参数必须存在且合理 ============ */
-  ok(cfg.hitRatio > 0 && cfg.roundRatio > 0, '试炼有掉血比例与轮次递增参数');
-  ok(cfg.roundDelayMs >= 200, '试炼每场之间有演出间隔');
+  /* ============ 7. 血量跨层累计：层间写回、不回满 ============ */
+  ticket = 1; hpLossPerFloor = 500;
+  r = await runTrial('temper');
+  // 引擎每层 emit floor 事件时带的 petHp 来自 Pet.getCurHp（层间由战斗引擎写回）
+  ok(hpLossPerFloor > 0 && r.ok, '带掉血跑通全层（跨层累计前提）');
+  ok(strong.curHp < strong.stats.hp, '通关后宠物血量没有回满（跨层累计，不白给）');
+  strong.curHp = strong.stats.hp; hpLossPerFloor = 0;
 
-  /* ============ 7. 每日刷新：北京时间 12:00 换日 ============ */
-  // 11:59 北京（03:59 UTC）仍属于 09-08 起的试炼日；12:00 北京（04:00 UTC）进入 09-09 试炼日
-  ok(T.dayKeyOf(new Date('2026-09-09T03:59:00Z')) === '2026-9-8', '北京时间 11:59 仍算上一试炼日（key=2026-9-8）');
-  ok(T.dayKeyOf(new Date('2026-09-09T04:00:00Z')) === '2026-9-9', '北京时间 12:00 进入新试炼日（key=2026-9-9）');
-  ok(T.dayKeyOf(new Date('2026-09-09T15:00:00Z')) === '2026-9-9', '北京时间 23:00 仍是当天试炼日（key=2026-9-9）');
-  ok(T.dayKeyOf(new Date('2026-09-09T16:00:00Z')) === '2026-9-9', '北京时间次日 00:00 仍是上一试炼日（key=2026-9-9）');
+  /* ============ 8. 每日刷新：北京时间 12:00 换日 ============ */
+  ok(Access.dayKeyOf(new Date('2026-09-10T03:59:00Z')) === '2026-9-9', '北京时间 11:59 仍算上一试炼日（key=2026-9-9）');
+  ok(Access.dayKeyOf(new Date('2026-09-10T04:00:00Z')) === '2026-9-10', '北京时间 12:00 进入新试炼日（key=2026-9-10）');
+  ok(Access.dayKeyOf(new Date('2026-09-10T15:00:00Z')) === '2026-9-10', '北京时间 23:00 仍是当天试炼日');
+  ok(Access.dayKeyOf(new Date('2026-09-10T16:00:00Z')) === '2026-9-10', '北京时间次日 00:00 仍是上一试炼日');
   // 换日清零：用「旧试炼日存档」的独立上下文加载模块 → 首次 getDailyInfo 必须触发重置
   {
     const staleStore = { 'fos_trial_usage': JSON.stringify({ dayKey: '2000-1-1', used: { metamorph: 99 } }) };
@@ -141,13 +218,14 @@ const ok = (condition, message) => {
     ctx2.window = ctx2;
     vm.createContext(ctx2);
     vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx2);
-    vm.runInContext(fs.readFileSync('../js/core/resource-trial.js', 'utf8'), ctx2);
-    const info2 = ctx2.ResourceTrial.getDailyInfo().find(i => i.routeId === 'metamorph');
+    vm.runInContext(fs.readFileSync('../js/trial/trial-config.js', 'utf8'), ctx2);
+    vm.runInContext(fs.readFileSync('../js/trial/trial-access.js', 'utf8'), ctx2);
+    const info2 = ctx2.TrialAccess.getDailyInfo().find(i => i.routeId === 'metamorph');
     ok(info2.freeLeft === freePerDay && info2.used === 0,
       '跨试炼日自动重置免费次数（旧存档 used=99 → 重置为 0, freeLeft=' + freePerDay + '）');
   }
 
-  /* ============ 8. 大地图节点一致性：trialPoints ↔ routes ============ */
+  /* ============ 9. 大地图节点一致性：trialPoints ↔ routes ============ */
   const points = C('window.WorldMap.trialPoints');
   ok(Array.isArray(points) && points.length === cfg.routes.length,
     `副本节点数量与路线一致（节点 ${points.length} / 路线 ${cfg.routes.length}）`);
@@ -157,27 +235,14 @@ const ok = (condition, message) => {
   ok(points.every(p => p.name.indexOf('副本') === 0), '副本节点名都带「副本」前缀');
   ok(points.every(p => typeof p.x === 'number' && typeof p.y === 'number' && p.x >= 0 && p.x <= 100 && p.y >= 0 && p.y <= 100),
     '副本节点坐标都是有效百分比（0~100）');
-  // 野图点位数量不受影响（原有一致性）
   ok(C('window.WorldMap.points.length') === C('Config.battle.areas.length'),
     '野图点位数量与 Config.battle.areas 仍一致（副本节点独立于野图点位）');
 
-  /* ============ 9. 守护者形象（战斗画面立绘用） ============ */
-  ok(cfg.routes.every(r => r.guardian && r.guardian.name && r.guardian.title),
-    '每条路线配置了守护者（战斗画面立绘）：' + cfg.routes.map(r => (r.guardian || {}).name || '无').join(' / '));
-  ok(cfg.routes.every(r => ['影蚀魔君', '幽火魔狐', '骸骨君主'].indexOf(r.guardian.name) >= 0),
-    '守护者名字都存在于宠物立绘库（有真实立绘可显示）');
-
-  /* ============ 10. 逐场回调 onRound（战斗画面演出数据） ============ */
-  ticket = 1;
-  const roundsSeen = [];
-  r = await T.start('metamorph', {
-    instant: true,
-    onRound: result => { roundsSeen.push(result); }
-  });
-  ok(roundsSeen.length === r.rounds, `onRound 每场触发一次（触发 ${roundsSeen.length} / 场次 ${r.rounds}）`);
-  ok(roundsSeen.every(x => x.round >= 1 && x.turns >= 1 && x.damage >= 1 && x.enemyHp >= 1 && x.maxHp >= 1),
-    '每场回调携带完整演出数据（round/turns/damage/enemyHp/maxHp）');
-  ok(roundsSeen.every((x, i) => i === 0 || x.hpLeft <= roundsSeen[i - 1].hpLeft), '血量跨场累计、不回满');
+  /* ============ 10. window.ResourceTrial 旧接口兼容（调用方零改动） ============ */
+  const T = ctx.ResourceTrial;
+  ok(typeof T.getDailyInfo === 'function' && typeof T.entryInfo === 'function' && typeof T.start === 'function',
+    'window.ResourceTrial 聚合挂载旧接口（ui-worldmap 等调用方零改动）');
+  ok(T.getDailyInfo().length === 3 && T.routeOf('temper').id === 'temper', '旧接口行为正常（getDailyInfo/routeOf）');
 
   console.log('ALL RESOURCE TRIAL TESTS PASSED');
 })().catch(error => { console.error(error); process.exit(1); });

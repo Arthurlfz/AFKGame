@@ -5,6 +5,8 @@
 const fs = require('fs'), vm = require('vm');
 const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
+// 2026-09-10 起资源副本数值迁至 trial/trial-config.js（一个文件一个职责）
+vm.runInContext(fs.readFileSync('../js/trial/trial-config.js', 'utf8'), ctx);
 const C = code => vm.runInContext(code, ctx);
 let failed = 0;
 const A = (v, m) => { if (!v) { console.error('FAIL: ' + m); failed++; } else console.log('PASS: ' + m); };
@@ -63,19 +65,19 @@ A(C(`(Config.towerDrops && Config.towerDrops.items.map(i => i.name).join(','))`)
 const routes = C('Config.resourceTrials.routes');
 const route = id => routes.find(r => r.id === id) || {};
 A(routes.length === 3, 'the trial offers exactly three directions');
-for (const r of routes) A((r.tiers || []).length > 0, `${r.id} declares its reward tiers in config`);
+for (const r of routes) A((r.floorTiers || []).length > 0, `${r.id} declares its reward tiers in config`);
 A(!C(`JSON.stringify(Config.resourceTrials).includes('区域材料')`),
   'the trial never grants area materials (that is the map\'s job)');
 const consolations = routes.flatMap(r => (r.consolation || []).map(i => i.name));
 A(consolations.length === 3 && !consolations.includes('区域材料'),
   'failure still pays direction progress, not area materials');
 // Lock stones exist but have no other source until the tower ships, so the trial must own them.
-const craftItems = (route('temper').tiers || []).flatMap(t => t.items.map(i => i.name));
+const craftItems = (route('temper').floorTiers || []).flatMap(t => t.items.map(i => i.name));
 A(craftItems.includes('锁定石'), 'the craft trial is the only source of lock stones');
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['锁定石'] || 0) > 0)`),
   'lock stones have exactly one source');
 // 涅槃路线必须发道具化的涅槃丹 —— 涅磐兽早已不是涅槃消耗品（pet_merge.js 改走道具）
-A((route('nirvana').tiers || []).flatMap(t => t.items.map(i => i.name)).includes('涅槃丹'),
+A((route('nirvana').floorTiers || []).flatMap(t => t.items.map(i => i.name)).includes('涅槃丹'),
   'the nirvana trial grants the actual nirvana item, not the retired phoenix beast');
 // 神圣石从地图移除后，淬炼试炼是它唯一还在运转的来源（塔落地前）
 A(craftItems.includes('神圣石'), 'the craft trial still backs holy stones after map removal');

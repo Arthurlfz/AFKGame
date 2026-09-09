@@ -36,7 +36,8 @@
   let onFightEnd = null;   // main.js 注入的每场结算回调
   let lastTickTs = 0;      // 战斗计时基准（tick 按真实流逝时间补步，后台节流不减速）
   let selectedAreaId = null;
-  const state = { pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
+  // state.mode：'wild' = 野图挂机（缺省，行为不变）；'trial' = 副本层战斗（见文件末尾副本区块）
+  const state = { mode: 'wild', pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
   // 血统被动：跨场状态
   let pendingKillBuff = false;  // 骨狼：击杀后下次攻击+伤害（跨场传递）
   let bloodline = null;          // 当前出战宠物的血统被动配置
@@ -98,6 +99,75 @@
   function getPlayerLevel() {
     const pet = getActivePet();
     return pet ? (pet.level || 1) : 1;
+  }
+  /* 战斗开场三件套（野图 beginFight 与副本 beginTrialFloor 共用，防止两份拷贝漂移）：
+   * snapshotPet = 出战宠物战斗快照；applyEnemyDefaults = 敌人机制属性兜底；
+   * initCombatSkills = 主动技/血统被动初始化。字段与旧版 beginFight 逐项一致。 */
+  function snapshotPet(pet) {
+    const stats = getStats(pet);
+    return { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
+  }
+  function applyEnemyDefaults(enemy) {
+    // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
+    // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
+    if (enemy.critRate == null) enemy.critRate = Config.battle.critRate;
+    if (enemy.critDamage == null) enemy.critDamage = Config.battle.critMultiplier;
+    if (enemy.hit == null) enemy.hit = 90;
+    if (enemy.dodge == null) {
+      const et = enemy.enemyType || 'normal';
+      enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
+    }
+    if (enemy.lifesteal == null) enemy.lifesteal = 0;
+    // 敌人侧三新词缀兜底：怪物没配就是 0，calcDamage 行为与旧版一致
+    if (enemy.pen == null) enemy.pen = 0;
+    if (enemy.dmgBonus == null) enemy.dmgBonus = 0;
+    if (enemy.dr == null) enemy.dr = 0;
+    return enemy;
+  }
+  function initCombatSkills(pet) {
+    // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
+    // 名字在技能表 = 曾经到过终形态（进化到终阶才改名；合成继承 / 涅槃名字不回退）
+    // → 技能永久保留，涅槃后 Lv1 也能放（2026-09-10 拍板：曾经到过终形态就激活）
+    const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
+      ? Config.pet.evolution.skillOf(pet.name)
+      : Config.pet.evolution.activeSkills?.[pet.name];
+    state.activeSkill = skill || null;
+    state.skillCooldown = 0;
+    state.skillQueued = false;
+    // 血统被动初始化
+    bloodline = window.Pet && window.Pet.getBloodline ? window.Pet.getBloodline(pet) : null;
+    killBuffActive = pendingKillBuff;
+    pendingKillBuff = false;
+    corruptionStacks = 0;
+  }
+  function beginFight() {
+    if (state.mode === 'trial') return; // 副本进行中：野图开战一律拒绝（战斗页被副本占用）
+    const pet = getActivePet();
+    const picked = pickEnemy();
+    if (!picked) {
+      window.UI.addLog(getCurrentArea() ? '⚠️ 当前地图没有可用野怪，请检查怪物池配置。' : '⚠️ 请先选择挂机地图。');
+      return;
+    }
+    const { enemy: ENEMY, area } = picked;
+    const enemyStats = scaleEnemyStats(ENEMY, area);
+    state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
+    state.pet = snapshotPet(pet);
+    state.enemy = applyEnemyDefaults(enemyStats);
+    state.petAction = 0;
+    state.enemyAction = 0;
+    initCombatSkills(pet);
+    clearFreeze('pet'); clearFreeze('enemy');
+    fightEnded = false;
+    const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
+    const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
+    window.UI.resetBattle(petLabel, enemyLabel, state.pet.maxHp, state.enemy.maxHp);
+    window.UI.updateBattleArea(area);
+    window.UI.updateStatus('fighting', fightCount);
+    window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+
+    lastTickTs = Date.now(); // 开场基准：防上一场遗留的 lastTickTs 造成首 tick 跳步
+    interval = setInterval(tick, 100);
   }
   function getEnemyPool() {
     return window.EnemyData?.list || Config.battle.enemies || [];
@@ -184,62 +254,6 @@
     const enemies = getAreaEnemyPool(area);
     const picked = enemies.length ? pickWeighted(enemies, item => item.weight || 1) : null;
     return picked ? { enemy: setEncounterLevel(picked, level, area), area, enemies } : null;
-  }
-  function beginFight() {
-    const pet = getActivePet();
-    const stats = getStats(pet);
-    const picked = pickEnemy();
-    if (!picked) {
-      window.UI.addLog(getCurrentArea() ? '⚠️ 当前地图没有可用野怪，请检查怪物池配置。' : '⚠️ 请先选择挂机地图。');
-      return;
-    }
-    const { enemy: ENEMY, area } = picked;
-    const enemyStats = scaleEnemyStats(ENEMY, area);
-    state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
-    state.pet = { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
-    state.enemy = enemyStats;
-    // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
-    // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
-    if (state.enemy.critRate == null) state.enemy.critRate = Config.battle.critRate;
-    if (state.enemy.critDamage == null) state.enemy.critDamage = Config.battle.critMultiplier;
-    if (state.enemy.hit == null) state.enemy.hit = 90;
-    if (state.enemy.dodge == null) {
-      const et = state.enemy.enemyType || 'normal';
-      state.enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
-    }
-    if (state.enemy.lifesteal == null) state.enemy.lifesteal = 0;
-    // 敌人侧三新词缀兜底：怪物没配就是 0，calcDamage 行为与旧版一致
-    if (state.enemy.pen == null) state.enemy.pen = 0;
-    if (state.enemy.dmgBonus == null) state.enemy.dmgBonus = 0;
-    if (state.enemy.dr == null) state.enemy.dr = 0;
-    state.petAction = 0;
-    state.enemyAction = 0;
-    // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
-    // 名字在技能表 = 曾经到过终形态（进化到终阶才改名；合成继承 / 涅槃名字不回退）
-    // → 技能永久保留，涅槃后 Lv1 也能放（2026-09-10 拍板：曾经到过终形态就激活）
-    const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
-      ? Config.pet.evolution.skillOf(pet.name)
-      : Config.pet.evolution.activeSkills?.[pet.name];
-    state.activeSkill = skill || null;
-    state.skillCooldown = 0;
-    state.skillQueued = false;
-    // 血统被动初始化
-    bloodline = window.Pet && window.Pet.getBloodline ? window.Pet.getBloodline(pet) : null;
-    killBuffActive = pendingKillBuff;
-    pendingKillBuff = false;
-    corruptionStacks = 0;
-    clearFreeze('pet'); clearFreeze('enemy');
-    fightEnded = false;
-    const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
-    const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
-    window.UI.resetBattle(petLabel, enemyLabel, state.pet.maxHp, state.enemy.maxHp);
-    window.UI.updateBattleArea(area);
-    window.UI.updateStatus('fighting', fightCount);
-    window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
-    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
-
-    lastTickTs = Date.now(); // 开场基准：防上一场遗留的 lastTickTs 造成首 tick 跳步
-    interval = setInterval(tick, 100);
   }
   // 血统被动：疫毛兽 疾风步 — 速度超阈值后每N点+攻速，上限cap
   function getBloodlineAspdMult() {
@@ -427,6 +441,17 @@
     clearInterval(interval);
     interval = null;
     const win = state.pet.hp > 0;
+    if (state.mode === 'trial') {
+      /* 副本层结算：不掉落/不上报/不回血/不连战。
+       * 血量写回后回调 TrialEngine（进下一层或终局结算），野图循环一概不碰。 */
+      setCurHp(state.petRef || getActivePet(), state.pet.hp);
+      const cb = trialOnEnd; trialOnEnd = null;
+      state.mode = 'wild';
+      const payload = { win, petHp: Math.max(0, Math.round(state.pet.hp)), petMaxHp: state.pet.maxHp, enemy: state.enemy };
+      state.enemy = null;
+      if (cb) cb(payload);
+      return;
+    }
     // 诊断埋点：确认玩家走的是不是这条路（不是服务器托管）
     try {
       var _m = '[本地战斗·收尾] ⚠️battle.js 本地战斗（非托管）| 怪血=' + Math.round(state.enemy.hp) + '/' + state.enemy.maxHp + ' | 胜=' + win;
@@ -483,5 +508,43 @@
     const lv = Number(level) || Number(enemyData.level) || 1;
     return scaleEnemyStats(Object.assign({}, enemyData, { level: lv }), area);
   }
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage };
+
+  /* ============================================================
+   * 副本模式区块（trial/ 模块的唯一接入点，2026-09-10）
+   * 20 层爬塔副本：每层敌人由 TrialEngine 注入（数值体系与野图同源，
+   * 见 trial/trial-engine.js 的 floorEnemyStats），层胜负不走掉落/任务/
+   * battle-settle 上报/回血/连战，改回调 floorCtx.onEnd({win,...})。
+   * state.mode 缺省 'wild'：本区块之外的野图路径行为零改动。
+   * 进入前由 TrialEngine 负责停掉野图挂机（startAutoBattle / IdleBridge），
+   * 结束后由 TrialEngine 负责恢复；本区块只管"开一层 / 结一层"。
+   * ============================================================ */
+  let trialOnEnd = null; // 当前层的结算回调（TrialEngine 注入，层结束即清空）
+  // 开打副本的一层。占用中/缺宠物/缺敌人返回 false，由 TrialEngine 兜底处理。
+  function beginTrialFloor(floorCtx) {
+    if (!floorCtx || !floorCtx.enemy || !floorCtx.onEnd) return false;
+    if (state.mode === 'trial' || autoRunning || waitingRecover || interval || nextFightTimer || recoverTimer) return false;
+    const pet = getActivePet();
+    if (!pet) return false;
+    state.mode = 'trial';
+    trialOnEnd = floorCtx.onEnd;
+    state.petRef = pet;
+    state.pet = snapshotPet(pet);
+    state.enemy = applyEnemyDefaults(floorCtx.enemy);
+    state.petAction = 0;
+    state.enemyAction = 0;
+    initCombatSkills(pet);
+    clearFreeze('pet'); clearFreeze('enemy');
+    fightEnded = false;
+    const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
+    const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
+    window.UI.resetBattle(petLabel, enemyLabel, state.pet.maxHp, state.enemy.maxHp);
+    window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+    window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+    lastTickTs = Date.now();
+    interval = setInterval(tick, 100);
+    return true;
+  }
+  const isTrialMode = () => state.mode === 'trial';
+
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage, beginTrialFloor, isTrialMode };
 })();

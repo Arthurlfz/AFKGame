@@ -408,35 +408,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   #tab-pet .pet-wrap--tri, .bag-window .pet-wrap--tri > .pcol:nth-child(3) { grid-column: auto; }
 }
 
-/* ---------- 试炼战斗画面（2026-09-09）：进入副本后的战斗演出 ---------- */
-.trial-battle { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
-.tb-top { display: flex; align-items: center; gap: 12px; }
-.tb-name { font-family: var(--font-title); font-size: var(--fs-lg); color: var(--accent-hi); letter-spacing: 2px; }
-.tb-round { margin-left: auto; font-size: var(--fs-sm); color: var(--text-dim); letter-spacing: 1px; }
-.tb-round b { color: var(--r-gold); font-family: var(--font-num); }
-.tb-close { width: 28px; height: 28px; border: 1px solid rgb(255 255 255 / .18); border-radius: var(--radius-sm); background: rgb(0 0 0 / .3); color: var(--text-dim); cursor: pointer; font-size: 13px; line-height: 1; }
-.tb-close:hover { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
-.tb-stage { position: relative; display: flex; align-items: stretch; justify-content: space-between; gap: 16px; padding: 18px 22px; min-height: 300px; border: 1px solid rgb(255 255 255 / .1); border-radius: var(--radius-md); background: radial-gradient(ellipse at 50% 18%, rgb(63 158 147 / .12), transparent 62%), linear-gradient(160deg, var(--panel-2), var(--bg-deep)); }
-.tb-stage.tb-hit { animation: tb-hit .26s ease; }
-@keyframes tb-hit { 0% { filter: brightness(1); } 35% { filter: brightness(1.55); } 100% { filter: brightness(1); } }
-.tb-side { flex: 1; max-width: 42%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.tb-sprite { width: 150px; height: 150px; display: flex; align-items: center; justify-content: center; }
-.tb-sprite img { max-width: 150px; max-height: 150px; object-fit: contain; filter: drop-shadow(0 8px 14px rgb(0 0 0 / .55)); animation: tb-breathe 2.6s ease-in-out infinite; }
-@keyframes tb-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-.tb-fallback { font-size: 64px; line-height: 1; filter: drop-shadow(0 6px 10px rgb(0 0 0 / .5)); }
-.tb-label { font-size: var(--fs-md); color: var(--text); letter-spacing: 1px; text-align: center; }
-.tb-hp-track { width: 100%; max-width: 220px; height: 12px; border-radius: 8px; overflow: hidden; background: rgb(0 0 0 / .5); border: 1px solid rgb(255 255 255 / .14); }
-.tb-hp-fill { height: 100%; width: 100%; transition: width .45s ease; }
-.tb-hp-fill--pet { background: linear-gradient(90deg, #58c08a, #8fe3ae); box-shadow: 0 0 10px rgb(88 192 138 / .5); }
-.tb-hp-fill--pet.is-low { background: linear-gradient(90deg, #d9534f, #ff7a5c); box-shadow: 0 0 10px rgb(217 83 79 / .6); }
-.tb-hp-fill--enemy { background: linear-gradient(90deg, #d9534f, #ff7a5c); box-shadow: 0 0 10px rgb(217 83 79 / .5); }
-.tb-hp-num { font-size: var(--fs-2xs); color: var(--text-dim); font-family: var(--font-num); letter-spacing: 1px; }
-.tb-vs { align-self: center; font-family: var(--font-title); font-size: var(--fs-lg); color: var(--r-gold); letter-spacing: 4px; text-shadow: 0 0 14px rgb(var(--action-gold-rgb) / .5); }
-.tb-log { max-height: 130px; overflow-y: auto; border: 1px solid rgb(255 255 255 / .1); border-radius: var(--radius-sm); background: rgb(0 0 0 / .32); padding: 8px 10px; font-size: var(--fs-xs); line-height: 1.7; }
-.tb-log-line { color: var(--text-dim); }
-.tb-log-line.is-fail { color: var(--danger-hi); }
-
-/* ---------- 试炼结算面板（2026-09-09）：打完副本后弹出 ---------- */
+/* ---------- 试炼战斗画面（2026-09-09）已删除：副本改 20 层爬塔后整页复用
+ * 大地图战斗页（#tab-battle），tb-* 浮层样式不再使用（2026-09-10）。
+ * ---------- 试炼结算面板（2026-09-09）：打完副本后弹出 ---------- */
 .trial-settle { position: fixed; inset: 0; z-index: 500; display: flex; align-items: center; justify-content: center; }
 .trial-settle[hidden] { display: none; }
 .ts-mask { position: absolute; inset: 0; background: rgb(0 0 0 / .62); backdrop-filter: blur(3px); }
