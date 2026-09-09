@@ -1386,7 +1386,13 @@ const serverConfig = {
         "desc": "定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。",
         "minLevel": 1,
         "difficulty": 1,
-        "reward": "evolution"
+        "reward": "evolution",
+        "tiers": [
+          { "minLevel": 1, "items": [{ "name": "进化素材", "qty": 2 }] },
+          { "minLevel": 25, "items": [{ "name": "精粹进化素材", "qty": 1 }] },
+          { "minLevel": 40, "items": [{ "name": "传说进化素材", "qty": 1 }] }
+        ],
+        "consolation": [{ "name": "进化素材", "qty": 1 }]
       },
       {
         "id": "nirvana",
@@ -1394,15 +1400,25 @@ const serverConfig = {
         "desc": "定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。",
         "minLevel": 25,
         "difficulty": 1.35,
-        "reward": "phoenix"
+        "reward": "phoenix",
+        "tiers": [
+          { "minLevel": 25, "items": [{ "name": "涅槃丹", "qty": 1 }] }
+        ],
+        "consolation": [{ "name": "合成之石", "qty": 1 }]
       },
       {
         "id": "temper",
         "name": "淬炼试炼",
-        "desc": "定向获得重铸、增缀、剥离等打造通货。",
+        "desc": "定向获得打造通货；高阶额外产出神圣石与锁定石（锁前/锁后的唯一来源）。",
         "minLevel": 1,
         "difficulty": 1.1,
-        "reward": "craft"
+        "reward": "craft",
+        "tiers": [
+          { "minLevel": 1, "items": [{ "name": "重铸石", "qty": 2 }] },
+          { "minLevel": 25, "items": [{ "name": "增缀石", "qty": 1 }, { "name": "剥离石", "qty": 1 }] },
+          { "minLevel": 43, "items": [{ "name": "神圣石", "qty": 1 }, { "name": "锁定石", "qty": 1 }] }
+        ],
+        "consolation": [{ "name": "重铸石", "qty": 1 }]
       }
     ]
   }

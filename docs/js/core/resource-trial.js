@@ -8,18 +8,31 @@
 
   function routeOf(id) { return routes().find(route => route.id === id) || null; }
 
-  function rewardFor(route, pet) {
-    // 涅磐兽早已不是涅槃消耗品（涅槃消耗的是涅槃丹，见 pet_merge.js），发它玩家不知道干嘛用
-    if (route.reward === 'phoenix') return { name: '涅槃丹', qty: 1 };
-    if (route.reward === 'craft') {
-      return Number(pet.level) >= 25
-        ? [{ name: '增缀石', qty: 1 }, { name: '剥离石', qty: 1 }]
-        : [{ name: '重铸石', qty: 2 }];
+  /* 奖励全部由 Config.resourceTrials.routes[].tiers / .consolation 决定（2026-09-09）。
+   * 旧写法把材料名硬编码在这里 —— 调数值要改 JS，且没法被测试静态校验，
+   * 于是"某种资源到底从哪来"这件事在代码里散落两份，资源归属矩阵形同虚设。 */
+  function tierOf(route, level) {
+    const tiers = Array.isArray(route.tiers) ? route.tiers : [];
+    let best = null;
+    for (const tier of tiers) {
+      if (level >= (Number(tier.minLevel) || 1) && (!best || (Number(tier.minLevel) || 1) > (Number(best.minLevel) || 1))) best = tier;
     }
-    const level = Number(pet.level) || 1;
-    if (level >= 40) return { name: '传说进化素材', qty: 1 };
-    if (level >= 25) return { name: '精粹进化素材', qty: 1 };
-    return { name: '进化素材', qty: 2 };
+    return best;
+  }
+
+  function rewardFor(route, pet) {
+    const level = Number(pet && pet.level) || 1;
+    const tier = tierOf(route, level);
+    if (tier && Array.isArray(tier.items) && tier.items.length) return tier.items.slice();
+    return null;
+  }
+
+  /* 失败补偿：只给本路线相关的基础进度。
+   * 旧写法给「区域材料」—— 违反基线 2.2「不定掉区域材料」，而且和所选方向无关，
+   * 玩家打输了拿到的东西跟他要追求的目标没关系，失败就没有可读的意义。 */
+  function consolationFor(route) {
+    const items = Array.isArray(route.consolation) ? route.consolation : null;
+    return items && items.length ? items.slice() : [{ name: '重铸石', qty: 1 }];
   }
 
   /* 单场结果（2026-09-09 修正伤害模型）
@@ -28,7 +41,7 @@
    *   全程 0 伤害 → 100% 通关、失败分支是死代码，试炼毫无风险也没有强度区分度。
    * 新模型：每回合按最大生命的固定比例掉血，比例随轮次递增，总伤害 = 比例 × 回合数。
    *   - 攻击越高 → 打得越快 → 回合越少 → 挨打越少（强度真正决定结果）
-   *   - 轮次越深 → 比例越高（后段有压力，撑不住就失败，只发区域材料补偿）
+   *   - 轮次越深 → 比例越高（后段有压力，撑不住就失败，改发本路线的基础补偿）
    *   - 血量跨场累计，不回满（连续 5 场是一场远征，不是 5 次独立判定）
    * 参数全在 Config.resourceTrials：hitRatio（每回合基础掉血比例）/ roundRatio（每轮递增）。 */
   function roundResult(pet, route, round, hpLeft) {
@@ -76,7 +89,7 @@
       if (!result.success) break;
     }
     const cleared = results.length === (cfg().rounds || 5) && results.every(result => result.success);
-    const reward = cleared ? rewardFor(route, pet) : { name: '区域材料', qty: 1 };
+    const reward = cleared ? rewardFor(route, pet) : consolationFor(route);
     for (const item of (Array.isArray(reward) ? reward : [reward])) window.Materials.gain(item.name, item.qty);
     const maxHp = Number((window.Pet.getStats(pet) || {}).hp) || 1;
     state.result = { cleared, reward, rounds: results.length, hpPercent: Math.max(0, Math.round(hpLeft / maxHp * 100)) };
@@ -87,5 +100,5 @@
   }
 
   function getState() { return { running: state.running, route: state.route, round: state.round, result: state.result }; }
-  window.ResourceTrial = { routes, routeOf, start, getState };
+  window.ResourceTrial = { routes, routeOf, start, getState, rewardFor, consolationFor };
 })();

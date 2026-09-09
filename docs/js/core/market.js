@@ -41,9 +41,14 @@
   function calcNet(qty) {
     return (qty || 0) - calcTax(qty);
   }
-  const LISTING_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋', '凝魂晶石']);
-  const PAYMENT_MATERIALS = new Set(['重铸石', '剥离石', '神圣石', '增缀石', '涅磐兽', '进化素材', '精粹进化素材', '传说进化素材', '宠物蛋', '凝魂晶石']);
-  const isPaymentMaterial = name => PAYMENT_MATERIALS.has(name);
+  /* 可作价材料 = Config.trade.materials【唯一来源】（2026-09-09）。
+   * 旧写法在这里又抄了一份名单 —— 改户籍地要改两个地方才生效，
+   * 于是「凝魂晶石应该不可交易」这件事在 config 改完、这里没改，规则照样漏。
+   * 现在只认 config：不在 Config.trade.materials 里的材料既不能上架也不能当收款物。 */
+  function tradeMaterialNames() {
+    return ((Config.trade && Config.trade.materials) || []).map(m => m.name);
+  }
+  const isPaymentMaterial = name => tradeMaterialNames().includes(name);
   // 材料名称 → 配置项（上架下拉 / 市场显示用）
   function findMaterial(name) {
     return Config.trade.materials.find(m => m.name === name) || { id: name, name, icon: '📦' };

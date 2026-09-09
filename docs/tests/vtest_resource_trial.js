@@ -52,7 +52,8 @@ const ok = (condition, message) => {
   result = await T.start('metamorph', { instant: true });
   ok(result.ok && result.cleared === false && result.rounds < 5, '强度不足会在中途倒下');
   ok(ticket === 0, '失败不退还门票');
-  ok(gained.some(x => x[0] === '区域材料' && x[1] === 1), '失败给区域材料补偿');
+  ok(gained.some(x => x[0] === '进化素材' && x[1] === 1), '失败给本路线的基础补偿（进化素材×1，而非区域材料）');
+  ok(!gained.some(x => x[0] === '区域材料'), '失败绝不给区域材料（区域材料只能是地图产出）');
   pet = strong;
 
   // 涅槃路线：奖励必须是当前真正会被消耗的东西（涅磐兽早已不是涅槃消耗品）

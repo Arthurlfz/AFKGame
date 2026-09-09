@@ -14,7 +14,9 @@ let failures=0;const A=(ok,msg)=>{if(ok)console.log('PASS: '+msg);else{console.e
 const EP=C('Config.pet.expPool'),NV=C('Config.nirvana'),MAX=C('Config.pet.maxLevel');
 A(!!EP&&EP.perCrystal>0&&!!EP.material,'经验池已配置：每 '+EP?.perCrystal+' 经验凝 1 颗'+EP?.material);
 A(NV.crystalBonus&&NV.crystalBonus.material===EP.material,'凝魂晶石用途落在涅槃加成上');
-A(C('Market.isPaymentMaterial("'+EP.material+'")')===true,'凝魂晶石可作交易支付材料');
+// ⚠️ 2026-09-09 改：边界基线 v1 第 5.3 节明确「账号级凝魂晶石不可交易」——
+// 它已从 Config.trade.materials 移除，因此不能作为收款物。这条断言以前是反的。
+A(C('Market.isPaymentMaterial("'+EP.material+'")')===false,'凝魂晶石账号绑定，不可作为交易支付材料');
 
 /* ---- 1. 满级后经验入池，攒满才凝晶 ---- */
 await C('(async()=>{const p=Pet.createPet("腐噜兽","x",10,100,20,10,8);p.level='+MAX+';Pet.addPet(p);await Supabase.savePet(p);globalThis.__m=p})()');await S(80);

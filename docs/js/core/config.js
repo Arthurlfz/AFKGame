@@ -427,7 +427,8 @@ window.Config = {
      * 三阶段设计：图1-3 重铸石为主 / 图4-7 增缀+剥离（合成·神圣解锁）/ 图8-10 神圣+合成+涅磐兽。
      * 「永远不够用」：前期重铸多但神圣没得洗，后期神圣多但前置材料吃紧。
      * 鉴定石为现有鉴定玩法必需（手册未提及，保留独立小权重，落地方案 R6）；
-     * 锁定石只随图 16/17 产出，图 11-17 删除后暂无来源（毕业系统一起回补）。
+     * 锁定石不进地图掉落表：按资源归属矩阵，它只由「资源试炼·淬炼高阶」定向产出，
+     *   是通天塔中高层落地前的唯一来源（vtest_resource_matrix.js 守这条唯一性）。
      * 表中没有的键 = 该图还不出；改这里只动材料比例，不碰掉落率总盘。 */
     materialWeightsByTier: {
       /* 进化增强道具：A 全图常见，B 从图 4 起掉落，玉露从图 8 起掉落。 */
@@ -488,6 +489,14 @@ window.Config = {
     //       unlockLevel 等级解锁（主线日常成就） / requires 前置任务（新手链线性引导）
     //       repeat 每日刷新 / name 任务名 / guide 引导条跳转目标 / reward 奖励材料
     //       rewardGear 奖励装备件数（新手链专用：送实体装备，不是材料）
+    /* ⚠️ 任务奖励的资源归属规则（2026-09-09 按《边界基线 v1》第 3 节落地，vtest_resource_matrix.js 守）：
+     *   1. 循环任务（repeat / repeatable）只发打造通货与经验 —— 严禁进化和涅槃材料，
+     *      否则每日任务会取代地图和试炼成为资源最优解。
+     *   2. 传说进化素材只能出现在 unlockLevel 31~48（= 图 6~8 阶段，和 areaEvolutionTiers 对齐）；
+     *      图 9~10（unlockLevel ≥49）一条都不给，改发该阶段的打造通货。
+     *   3. 单条任务给传说不超过 2 个（一只宠走到终阶总共只要 5 个）——任务只补当前缺口，
+     *      不提前发两个阶段的量。
+     * 改这张表前先跑 `node docs/tests/vtest_resource_matrix.js`。 */
     quests: [
       /* ---- 新手引导 G1~G10（2026-09-03 目标驱动主线重写，替代原 t1~t13）----
        * 内核仍是任务链：G1~G9 = 引导段（isGuide:true，带 NPC 台词 / hint 怎么做 / target 指引锚点 / boostLevel 等级资粮）；
@@ -534,32 +543,32 @@ window.Config = {
       { id: 'm11', category: 'main', type: 'evolve', need: 3, unlockLevel: 13, name: '三次进化', reward: { 精粹进化素材: 2, 涅磐兽: 1 } },
       { id: 'm12', category: 'main', type: 'salvage', need: 3, unlockLevel: 14, name: '拆解废品', reward: { 增缀石: 2 } },
       { id: 'm13', category: 'main', type: 'kill', area: 'bone-wastes', need: 150, unlockLevel: 19, name: '追逐幽影', reward: { 精粹进化素材: 2, 神圣石: 1 } },
-      { id: 'm14', category: 'main', type: 'collect', matName: '幽影魂丝', need: 160, unlockLevel: 19, name: '收集魂丝', reward: { 传说进化素材: 1 } },
+      { id: 'm14', category: 'main', type: 'collect', matName: '幽影魂丝', need: 160, unlockLevel: 19, name: '收集魂丝', reward: { 精粹进化素材: 2 } },
       { id: 'm15', category: 'main', type: 'hatch', need: 3, unlockLevel: 19, name: '孵化新宠', reward: { 宠物蛋: 2 } },
       { id: 'm16', category: 'main', type: 'equipDrop', need: 5, unlockLevel: 20, name: '再拾残甲', reward: { 重铸石: 3 } },
-      { id: 'm17', category: 'main', type: 'kill', area: 'blood-rift', need: 200, unlockLevel: 25, name: '血潮之中', reward: { 传说进化素材: 1, 神圣石: 2 } },
-      { id: 'm18', category: 'main', type: 'collect', matName: '血潮凝晶', need: 200, unlockLevel: 25, name: '凝取血晶', reward: { 传说进化素材: 2 } },
-      { id: 'm19', category: 'main', type: 'nirvana', need: 1, unlockLevel: 25, name: '初次涅槃', reward: { 涅磐兽: 2, 传说进化素材: 1 } },
+      { id: 'm17', category: 'main', type: 'kill', area: 'blood-rift', need: 200, unlockLevel: 25, name: '血潮之中', reward: { 精粹进化素材: 2, 神圣石: 2 } },
+      { id: 'm18', category: 'main', type: 'collect', matName: '血潮凝晶', need: 200, unlockLevel: 25, name: '凝取血晶', reward: { 精粹进化素材: 3 } },
+      { id: 'm19', category: 'main', type: 'nirvana', need: 1, unlockLevel: 25, name: '初次涅槃', reward: { 涅磐兽: 2, 精粹进化素材: 2 } },
       { id: 'm20', category: 'main', type: 'craft', need: 5, unlockLevel: 26, name: '精炼装备', reward: { 神圣石: 2 } },
       { id: 'm21', category: 'main', type: 'kill', area: 'echo-cliffs', need: 300, unlockLevel: 31, name: '攀上回响崖', reward: { 传说进化素材: 2, 神圣石: 2 } },
-      { id: 'm22', category: 'main', type: 'collect', matName: '回响之羽', need: 300, unlockLevel: 31, name: '拾取回响羽', reward: { 传说进化素材: 3 } },
+      { id: 'm22', category: 'main', type: 'collect', matName: '回响之羽', need: 300, unlockLevel: 31, name: '拾取回响羽', reward: { 传说进化素材: 2 } },
       { id: 'm23', category: 'main', type: 'evolve', need: 5, unlockLevel: 31, name: '五度进化', reward: { 精粹进化素材: 3, 涅磐兽: 2 } },
       { id: 'm24', category: 'main', type: 'salvage', need: 6, unlockLevel: 32, name: '拆解崖间废品', reward: { 增缀石: 3 } },
-      { id: 'm25', category: 'main', type: 'kill', area: 'rotfen-bog', need: 360, unlockLevel: 37, name: '踏入腐沼泽', reward: { 传说进化素材: 3, 神圣石: 3 } },
-      { id: 'm26', category: 'main', type: 'collect', matName: '腐沼黏液', need: 360, unlockLevel: 37, name: '收集腐沼液', reward: { 传说进化素材: 4 } },
+      { id: 'm25', category: 'main', type: 'kill', area: 'rotfen-bog', need: 360, unlockLevel: 37, name: '踏入腐沼泽', reward: { 传说进化素材: 2, 神圣石: 3 } },
+      { id: 'm26', category: 'main', type: 'collect', matName: '腐沼黏液', need: 360, unlockLevel: 37, name: '收集腐沼液', reward: { 传说进化素材: 2 } },
       { id: 'm27', category: 'main', type: 'hatch', need: 5, unlockLevel: 37, name: '孵化沼中生灵', reward: { 宠物蛋: 3 } },
       { id: 'm28', category: 'main', type: 'equipDrop', need: 14, unlockLevel: 38, name: '沼边拾甲', reward: { 重铸石: 4, 增缀石: 4 } },
-      { id: 'm29', category: 'main', type: 'kill', area: 'ember-hollow', need: 420, unlockLevel: 43, name: '深入余烬渊', reward: { 传说进化素材: 4, 涅磐兽: 2 } },
-      { id: 'm30', category: 'main', type: 'collect', matName: '余烬残灰', need: 420, unlockLevel: 43, name: '掬取余烬灰', reward: { 传说进化素材: 5 } },
-      { id: 'm31', category: 'main', type: 'nirvana', need: 2, unlockLevel: 43, name: '二次涅槃', reward: { 涅磐兽: 3, 传说进化素材: 3 } },
+      { id: 'm29', category: 'main', type: 'kill', area: 'ember-hollow', need: 420, unlockLevel: 43, name: '深入余烬渊', reward: { 传说进化素材: 2, 涅磐兽: 2 } },
+      { id: 'm30', category: 'main', type: 'collect', matName: '余烬残灰', need: 420, unlockLevel: 43, name: '掬取余烬灰', reward: { 传说进化素材: 2 } },
+      { id: 'm31', category: 'main', type: 'nirvana', need: 2, unlockLevel: 43, name: '二次涅槃', reward: { 涅磐兽: 3, 传说进化素材: 2 } },
       { id: 'm32', category: 'main', type: 'craft', need: 8, unlockLevel: 44, name: '精炼渊火装备', reward: { 神圣石: 4 } },
-      { id: 'm33', category: 'main', type: 'kill', area: 'soul-abyss', need: 480, unlockLevel: 49, name: '直面魂渊', reward: { 传说进化素材: 5, 涅磐兽: 3 } },
-      { id: 'm34', category: 'main', type: 'collect', matName: '魂渊之尘', need: 480, unlockLevel: 49, name: '凝取魂渊尘', reward: { 传说进化素材: 6 } },
-      { id: 'm35', category: 'main', type: 'synth', need: 2, unlockLevel: 49, name: '高阶合成', reward: { 合成之石: 3, 传说进化素材: 4 } },
+      { id: 'm33', category: 'main', type: 'kill', area: 'soul-abyss', need: 480, unlockLevel: 49, name: '直面魂渊', reward: { 合成之石: 3, 涅磐兽: 3 } },
+      { id: 'm34', category: 'main', type: 'collect', matName: '魂渊之尘', need: 480, unlockLevel: 49, name: '凝取魂渊尘', reward: { 合成之石: 3 } },
+      { id: 'm35', category: 'main', type: 'synth', need: 2, unlockLevel: 49, name: '高阶合成', reward: { 合成之石: 5 } },
       { id: 'm36', category: 'main', type: 'equipDrop', need: 18, unlockLevel: 50, name: '魂渊的尽头', reward: { 神圣石: 5, 增缀石: 5 } },
-      { id: 'm37', category: 'main', type: 'kill', area: 'blight-heart', need: 550, unlockLevel: 55, name: '直面腐变', reward: { 传说进化素材: 6, 涅磐兽: 4 } },
-      { id: 'm38', category: 'main', type: 'collect', matName: '腐变之心', need: 550, unlockLevel: 55, name: '腐变之心', reward: { 传说进化素材: 6 } },
-      { id: 'm39', category: 'main', type: 'synth', need: 3, unlockLevel: 55, name: '初次合成', reward: { 合成之石: 4, 传说进化素材: 5 } },
+      { id: 'm37', category: 'main', type: 'kill', area: 'blight-heart', need: 550, unlockLevel: 55, name: '直面腐变', reward: { 合成之石: 4, 涅磐兽: 4 } },
+      { id: 'm38', category: 'main', type: 'collect', matName: '腐变之心', need: 550, unlockLevel: 55, name: '腐变之心', reward: { 合成之石: 4 } },
+      { id: 'm39', category: 'main', type: 'synth', need: 3, unlockLevel: 55, name: '初次合成', reward: { 合成之石: 6 } },
       { id: 'm40', category: 'main', type: 'equipDrop', need: 20, unlockLevel: 56, name: '腐土的尽头', reward: { 神圣石: 6, 增缀石: 6 } },
 
       /* ---- 2026-09-06：主线 m41~m68（第二幕 28 条）随地图精简 17→10 删除 ---- */
@@ -572,13 +581,13 @@ window.Config = {
       { id: 'boss2', category: 'main', type: 'boss', area: 'plague-swamp', need: 1, unlockLevel: 7, name: '首通·泣腐泥沼', hint: '击败守关 Boss，首通此图', reward: { 泣腐之泪: 20, 重铸石: 3, 进化素材: 3 } },
       { id: 'boss3', category: 'main', type: 'boss', area: 'shadow-mountains', need: 1, unlockLevel: 13, name: '首通·白骨旷野', hint: '击败守关 Boss，首通此图', reward: { 白骨残片: 20, 重铸石: 3, 精粹进化素材: 3 } },
       { id: 'boss4', category: 'main', type: 'boss', area: 'bone-wastes', need: 1, unlockLevel: 19, name: '首通·幽影迷境', hint: '击败守关 Boss，首通此图', reward: { 幽影魂丝: 20, 重铸石: 3, 精粹进化素材: 3 } },
-      { id: 'boss5', category: 'main', type: 'boss', area: 'blood-rift', need: 1, unlockLevel: 25, name: '首通·血潮裂谷', hint: '击败守关 Boss，首通此图', reward: { 血潮凝晶: 20, 重铸石: 3, 传说进化素材: 3 } },
-      { id: 'boss6', category: 'main', type: 'boss', area: 'echo-cliffs', need: 1, unlockLevel: 31, name: '首通·回响崖', hint: '击败守关 Boss，首通此图', reward: { 回响之羽: 20, 重铸石: 3, 传说进化素材: 3 } },
-      { id: 'boss7', category: 'main', type: 'boss', area: 'rotfen-bog', need: 1, unlockLevel: 37, name: '首通·腐沼泽', hint: '击败守关 Boss，首通此图', reward: { 腐沼黏液: 20, 重铸石: 3, 传说进化素材: 3 } },
+      { id: 'boss5', category: 'main', type: 'boss', area: 'blood-rift', need: 1, unlockLevel: 25, name: '首通·血潮裂谷', hint: '击败守关 Boss，首通此图', reward: { 血潮凝晶: 20, 重铸石: 3, 精粹进化素材: 3 } },
+      { id: 'boss6', category: 'main', type: 'boss', area: 'echo-cliffs', need: 1, unlockLevel: 31, name: '首通·回响崖', hint: '击败守关 Boss，首通此图', reward: { 回响之羽: 20, 重铸石: 3, 传说进化素材: 2 } },
+      { id: 'boss7', category: 'main', type: 'boss', area: 'rotfen-bog', need: 1, unlockLevel: 37, name: '首通·腐沼泽', hint: '击败守关 Boss，首通此图', reward: { 腐沼黏液: 20, 重铸石: 3, 传说进化素材: 2 } },
       /* 图 8-10 的守关 Boss 首通额外掉涅槃丹（手册 2.6：涅槃丹来源之一 = BOSS 掉落） */
-      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
-      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
-      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 传说进化素材: 3, 涅槃丹: 1, 至尊神石: 1 } },
+      { id: 'boss8', category: 'main', type: 'boss', area: 'ember-hollow', need: 1, unlockLevel: 43, name: '首通·余烬渊', hint: '击败守关 Boss，首通此图', reward: { 余烬残灰: 20, 重铸石: 3, 传说进化素材: 2, 至尊神石: 1 } },
+      { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 合成之石: 3, 至尊神石: 1 } },
+      { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 合成之石: 3, 至尊神石: 1 } },
 
       /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「🐾 宠物」分类。
        * ⚠️ 机制约定（2026-08-31 用户拍板）：
@@ -600,7 +609,7 @@ window.Config = {
       { id: 'pe11', category: 'pet', type: 'kill', petName: '疫毛兽', need: 100, unlockLevel: 19, name: '疫毛兽试炼', reward: { 精粹进化素材: 3 } },
       { id: 'pe12', category: 'pet', type: 'evolve', petName: '疫毛兽', need: 1, unlockLevel: 19, name: '疫毛兽的进化', reward: { 剥离石: 2 } },
       { id: 'pe13', category: 'pet', type: 'hatch', petName: '骨狼', need: 1, unlockLevel: 25, name: '孵化·骨狼', reward: { 精粹进化素材: 2 } },
-      { id: 'pe14', category: 'pet', type: 'kill', petName: '骨狼', need: 120, unlockLevel: 25, name: '骨狼试炼', reward: { 传说进化素材: 1 } },
+      { id: 'pe14', category: 'pet', type: 'kill', petName: '骨狼', need: 120, unlockLevel: 25, name: '骨狼试炼', reward: { 精粹进化素材: 2 } },
       { id: 'pe15', category: 'pet', type: 'evolve', petName: '骨狼', need: 1, unlockLevel: 25, name: '骨狼的进化', reward: { 神圣石: 3 } },
       { id: 'pe16', category: 'pet', type: 'hatch', petName: '毒沼蛙', need: 1, unlockLevel: 31, name: '孵化·毒沼蛙', reward: { 精粹进化素材: 2 } },
       { id: 'pe17', category: 'pet', type: 'kill', petName: '毒沼蛙', need: 120, unlockLevel: 31, name: '毒沼蛙试炼', reward: { 传说进化素材: 1 } },
@@ -609,7 +618,7 @@ window.Config = {
       { id: 'pe20', category: 'pet', type: 'kill', petName: '尸犬', need: 150, unlockLevel: 37, name: '尸犬试炼', reward: { 传说进化素材: 2 } },
       { id: 'pe21', category: 'pet', type: 'evolve', petName: '尸犬', need: 1, unlockLevel: 37, name: '尸犬的进化', reward: { 神圣石: 3, 增缀石: 3 } },
       { id: 'pe22', category: 'pet', type: 'hatch', petName: '幽影兔', need: 1, unlockLevel: 43, name: '孵化·幽影兔', reward: { 传说进化素材: 2 } },
-      { id: 'pe23', category: 'pet', type: 'kill', petName: '幽影兔', need: 150, unlockLevel: 43, name: '幽影兔试炼', reward: { 传说进化素材: 3 } },
+      { id: 'pe23', category: 'pet', type: 'kill', petName: '幽影兔', need: 150, unlockLevel: 43, name: '幽影兔试炼', reward: { 传说进化素材: 2 } },
       { id: 'pe24', category: 'pet', type: 'evolve', petName: '幽影兔', need: 1, unlockLevel: 43, name: '幽影兔的进化', reward: { 涅磐兽: 2 } },
 
       /* ---- 日常 12 条：每日 00:00 刷新，可重复 ---- */
@@ -636,12 +645,12 @@ window.Config = {
       { id: 'd8', category: 'daily', type: 'collect', matName: '腐变之心', need: 20, repeat: true, name: '暮间取心', reward: { 增缀石: 1 } },
       { id: 'd9', category: 'daily', type: 'craft', need: 3, repeat: true, name: '每日淬炼', reward: { 重铸石: 1 } },
       { id: 'd10', category: 'daily', type: 'salvage', need: 5, repeat: true, name: '每日拆解', reward: { 增缀石: 1 } },
-      { id: 'd11', category: 'daily', type: 'hatch', need: 1, repeat: true, name: '每日孵化', reward: { 进化素材: 1 } },
+      { id: 'd11', category: 'daily', type: 'hatch', need: 1, repeat: true, name: '每日孵化', reward: { 鉴定石: 1 } },
       { id: 'd12', category: 'daily', type: 'trade', need: 2, repeat: true, name: '每日交易', reward: { 合成之石: 1 } },
 
       /* ---- 成就 6 条：长期累计，永不清零，一次性 ---- */
-      { id: 'a1', category: 'achieve', type: 'kill', need: 10000, name: '万兽斩', reward: { 传说进化素材: 5 } },
-      { id: 'a2', category: 'achieve', type: 'evolve', need: 50, name: '进化大师', reward: { 传说进化素材: 3 } },
+      { id: 'a1', category: 'achieve', type: 'kill', need: 10000, name: '万兽斩', reward: { 传说进化素材: 2 } },
+      { id: 'a2', category: 'achieve', type: 'evolve', need: 50, name: '进化大师', reward: { 传说进化素材: 2 } },
       { id: 'a3', category: 'achieve', type: 'nirvana', need: 20, name: '涅槃行者', reward: { 涅磐兽: 5 } },
       { id: 'a4', category: 'achieve', type: 'synth', need: 20, name: '合成匠人', reward: { 合成之石: 5 } },
       { id: 'a5', category: 'achieve', type: 'hatch', need: 50, name: '孵化之手', reward: { 宠物蛋: 5 } },
@@ -836,7 +845,7 @@ window.Config = {
     lock: {
       name: '锁定石', amount: 1, maxLocked: 4, icon: '<img class="mat-img" src="assets/icons/final/item_fused_stone.png" alt="">',
       effect: '锁定一条词缀：重铸/神圣时该词缀保持不变，剥离也不会移除它。',
-      rule: '锁定后每次重铸/神圣，每条已锁定的词缀额外消耗 1 颗锁定石；最多锁 4 条；仅图 16/17 掉落。'
+      rule: '锁定后每次重铸/神圣，每条已锁定的词缀额外消耗 1 颗锁定石；最多锁 4 条。仅由资源试炼·淬炼高阶（Lv43+）定向产出（通天塔落地前它是唯一来源）。'
     }
   },
 
@@ -868,8 +877,9 @@ window.Config = {
       { id: 'evolution-precise', name: '精粹进化素材', icon: '💎', category: 'evo' },
       { id: 'evolution-legend', name: '传说进化素材', icon: '✨', category: 'evo' },
       { id: 'egg',     name: '宠物蛋', icon: '🥚', category: 'egg' },
-      // 凝魂晶石：满级宠物把溢出经验凝出来的产物（见 Config.pet.expPool），只在第二幕产出
-      { id: 'soulcrystal', name: '凝魂晶石', icon: '🔷', category: 'soul' },
+      /* 凝魂晶石【刻意不在这里】（2026-09-09，边界基线 5.3「账号级凝魂晶石不可交易」）：
+       * 本表同时用作「上架物」和「收款物」白名单 —— 不进这张表 = 天然不可交易，
+       * 与经验包绑定的做法一致（见 tutorialMode.expPacks 注释）。商店直购不受影响。 */
       // 鉴定石：消耗品，鉴定未鉴定装备用（拖到装备上 / 点「鉴定」）。前期好掉、后期稀缺
       { id: 'identify', name: '鉴定石', icon: '🔍', category: 'stone' },
       // 涅槃丹（2026-09-06 新增，手册 2.6）：合成神级宠的保底道具（持有 1 颗 = 100% 出神级宠）。
@@ -931,14 +941,14 @@ window.Config = {
         holy: { pay: 'reforge', qty: [2, 4] },
         augment: { pay: 'reforge', qty: [2, 4] },
         synthesize: { pay: 'reforge', qty: [1, 3] },
-        phoenix: { pay: 'soulcrystal', qty: [1, 2] },
+        phoenix: { pay: 'holy', qty: [1, 2] },
         evolution: { pay: 'reforge', qty: [2, 4] },
         'evolution-precise': { pay: 'reforge', qty: [3, 6] },
         'evolution-legend': { pay: 'holy', qty: [2, 4] },
         identify: { pay: 'reforge', qty: [1, 2] },
         soulcrystal: { pay: 'reforge', qty: [1, 3] }
       },
-      materialSellWeights: { reforge: 5, strip: 5, holy: 5, augment: 5, synthesize: 5, phoenix: 6, evolution: 8, 'evolution-precise': 5, 'evolution-legend': 3, identify: 5, soulcrystal: 5 },
+      materialSellWeights: { reforge: 5, strip: 5, holy: 5, augment: 5, synthesize: 5, phoenix: 6, evolution: 8, 'evolution-precise': 5, 'evolution-legend': 3, identify: 5 },
       eggPrice: { pay: 'reforge', qty: [1, 4] }
     },
     minMaterial: 8,
@@ -1371,11 +1381,31 @@ window.Config.resourceTrials = {
   roundDelayMs: 420,      // 每场之间的演出间隔（5 场约 2 秒，太快会看不出过程）
   /* 门票来源：地图委托（collect_loop）每交一轮给 1 张（见 drop.quests 的 loop_* 奖励）。
    * 走既有委托链，不新增货币、不改掉落表 —— 「挂机攒材料 → 交委托换门票 → 定向补资源」。 */
+  /* 奖励档位（2026-09-09 按《边界基线 v1》第 3 节资源归属矩阵重排）：
+   * 每种通货只有【一个】主来源，这里就是它的主来源；不复制普通地图的稳定掉落表，
+   * 否则地图又会变成所有资源的最优解。tiers 取「不高于宠物等级的最高档」；
+   * consolation 是失败补偿，必须属于本路线（给内向进度），且绝不是区域材料。 */
   ticketSources: '完成地图委托（每轮 1 张）',
   routes: [
-    { id: 'metamorph', name: '蜕变试炼', desc: '定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。', minLevel: 1, difficulty: 1, reward: 'evolution' },
-    { id: 'nirvana', name: '涅槃试炼', desc: '定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。', minLevel: 25, difficulty: 1.35, reward: 'phoenix' },
-    { id: 'temper', name: '淬炼试炼', desc: '定向获得重铸、增缀、剥离等打造通货。', minLevel: 1, difficulty: 1.1, reward: 'craft' }
+    { id: 'metamorph', name: '蜕变试炼', desc: '定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。', minLevel: 1, difficulty: 1, reward: 'evolution',
+      tiers: [
+        { minLevel: 1,  items: [{ name: '进化素材', qty: 2 }] },
+        { minLevel: 25, items: [{ name: '精粹进化素材', qty: 1 }] },
+        { minLevel: 40, items: [{ name: '传说进化素材', qty: 1 }] }
+      ],
+      consolation: [{ name: '进化素材', qty: 1 }] },
+    { id: 'nirvana', name: '涅槃试炼', desc: '定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。', minLevel: 25, difficulty: 1.35, reward: 'phoenix',
+      tiers: [
+        { minLevel: 25, items: [{ name: '涅槃丹', qty: 1 }] }
+      ],
+      consolation: [{ name: '合成之石', qty: 1 }] },
+    { id: 'temper', name: '淬炼试炼', desc: '定向获得打造通货；高阶额外产出神圣石与锁定石（锁前/锁后的唯一来源）。', minLevel: 1, difficulty: 1.1, reward: 'craft',
+      tiers: [
+        { minLevel: 1,  items: [{ name: '重铸石', qty: 2 }] },
+        { minLevel: 25, items: [{ name: '增缀石', qty: 1 }, { name: '剥离石', qty: 1 }] },
+        { minLevel: 43, items: [{ name: '神圣石', qty: 1 }, { name: '锁定石', qty: 1 }] }
+      ],
+      consolation: [{ name: '重铸石', qty: 1 }] }
   ]
 };
 
