@@ -69,7 +69,10 @@ const serverConfig = {
   traitHatch: C.traitHatch,
   bloodlinePassive: C.bloodlinePassive,
   awakenBonus: C.awakenBonus,
-  awakenSkillDamage: C.awakenSkillDamage
+  awakenSkillDamage: C.awakenSkillDamage,
+  // 资源试炼（2026-09-09 服务端正式化）：试炼的成败与奖励由服务器判定，
+  // 必须与前端 Config.resourceTrials 同源 —— 改前端配置后重跑本脚本即可同步。
+  resourceTrials: C.resourceTrials
 };
 
 const json = JSON.stringify(serverConfig, null, 2);

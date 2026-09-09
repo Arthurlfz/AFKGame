@@ -85,10 +85,12 @@
         <div class="worldmap-page">
           <!-- 页眉：返回主菜单（侧边栏已在左侧，这里不放多余按钮） -->
           <div class="worldmap-head">
+            <button type="button" class="fs-btn fs-btn--primary" id="btn-resource-trial">资源试炼</button>
             <span class="worldmap-title">暗黑大陆 · 世界地图</span>
             <span class="worldmap-hint">点击地图上的标记进入对应区域 · 点击「不归城」进入主城</span>
             <button type="button" class="fs-btn fs-btn--ghost" id="btn-return-battle">⚔️ 返回战斗</button>
           </div>
+          <div class="resource-trial-panel" id="resource-trial-panel" hidden></div>
           <!-- 上半区：地图主舞台（16:9 底图 + 点位标记；外层 stage 吃掉剩余高度，canvas 等比居中） -->
           <div class="worldmap-stage">
             <div class="worldmap-canvas-wrap" id="worldmap-canvas-wrap">
@@ -775,7 +777,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260908guide3"></script>
+<script src="js/core/config.js?v=20260909trial1"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -812,8 +814,9 @@ window.PetSprites = {
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260908guide2"></script>
 <script src="js/pet/pet_evolve.js?v=20260906evoitems"></script>
-<script src="js/core/quest.js?v=20260908guide1"></script>
-<script src="js/core/tutorial_mode.js?v=20260908guide3"></script>
+<script src="js/core/quest.js?v=20260909trial1"></script>
+<script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
+<script src="js/core/resource-trial.js?v=20260909trial1"></script>
 <script src="js/core/battle.js?v=20260905match1"></script>
 <script src="js/core/battle-sim.global.js?v=20260904idle1"></script>
 <script src="js/core/idle-bridge.js?v=20260908idlefix"></script>
@@ -827,7 +830,8 @@ window.PetSprites = {
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
-<script src="js/ui/ui-quest.js?v=20260908guide3"></script>
+<script src="js/ui/ui-quest.js?v=20260909trial1"></script>
+<script src="js/ui/ui-resource-trial.js?v=20260909trial1"></script>
 <script src="js/ui/ui-battle.js?v=20260905match1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260907fix"></script>

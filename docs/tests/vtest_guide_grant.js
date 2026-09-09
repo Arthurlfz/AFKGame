@@ -1,150 +1,60 @@
-// 新手引导「发放层」重构回归（2026-09-08）——防"重登重复领取"
-//  - 云端就绪门闩：任务进度没拉完，checkGuide 不做任何发放
-//  - 补给箱一次性：花掉钥匙后重跑 checkGuide 不再补（靠账本，不是旧库存差量）
-//  - 手动补发：只补当前关缺的钥匙，每关每种限 1 次（账本）
-//  - 分档经验包：发放 → 背包使用 → 档位锁死不超；同档关卡不重发
-//  - 账本严格写：云端写失败不发货；账本幂等查重
-//  - resetGuideChain 管理员鉴权（控制台不再能随便调）
-// 复用 vstub.js 的 VM 桩；云端进度存取用可控桩（能模拟写失败）
-const fs = require('fs'), vm = require('vm');
-const VTF = require('./vtest_files');
-const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
-function el() { return { dataset: {}, setAttribute() { }, removeAttribute() { }, getAttribute: () => null, textContent: '', innerHTML: '', style: {}, classList: { add() { }, remove() { }, toggle() { }, contains() { return false } }, appendChild(c) { this.children.push(c) }, append() { }, addEventListener() { }, querySelector: () => el(), querySelectorAll: () => [], children: [], removeChild() { }, remove() { }, scrollTop: 0, scrollHeight: 0, disabled: false, value: '' } };
-const els = {};
-const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, fetch: global.fetch, URL, URLSearchParams, TextEncoder, TextDecoder, AbortController, Blob, FormData, Headers, Request, Response, ReadableStream, WritableStream, crypto: global.crypto, WebSocket: globalThis.WebSocket, navigator: { lock: undefined }, location: { href: 'http://x', hash: '' }, localStorage: mem, document: { getElementById: id => els[id] || (els[id] = el()), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [] }, session: null, petsTable: [], itemsTable: [], listingsTable: [], itemListTable: [], materialsTable: [], petEggTable: [], uidSeq: 0, rpcCalls: [], delCalls: [] };
+// N1-N6 grant/progression behavior checks.
+const fs = require('fs'), vm = require('vm'), VTF = require('./vtest_files');
+const mem = (() => { const m = {}; return { getItem: k => m[k] || null, setItem: (k, v) => { m[k] = String(v); }, removeItem: k => delete m[k] }; })();
+function el() { return { dataset: {}, style: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } }, addEventListener() {}, appendChild() {}, append() {}, querySelector: () => el(), querySelectorAll: () => [], children: [], disabled: false, value: '' }; }
+const ctx = { console, setTimeout, clearTimeout, fetch: global.fetch, URL, URLSearchParams, TextEncoder, TextDecoder, AbortController, Blob, FormData, Headers, Request, Response, ReadableStream, WritableStream, crypto: global.crypto, navigator: {}, location: { href: 'http://x', hash: '' }, localStorage: mem, document: { getElementById: () => el(), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [] }, petsTable: [], itemsTable: [], listingsTable: [], itemListTable: [], materialsTable: [], petEggTable: [], uidSeq: 0, rpcCalls: [] };
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
 for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/quest.js', '../js/core/tutorial_mode.js']) VTF.load(ctx, f);
-const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
-const C = code => vm.runInContext(code, ctx);
-const Q = async code => await C(code);
-
-// 可控云端进度桩：__qp 存整行 JSON；__qpFail 置位时写失败（模拟断网/超时）
+const C = code => vm.runInContext(code, ctx), Q = async code => await C(code);
+const A = (v, m) => { if (!v) { console.error('FAIL: ' + m); process.exit(1); } console.log('PASS: ' + m); };
 C(`globalThis.__qp = null; globalThis.__qpFail = false;
-Supabase.saveQuestProgress = async (data) => {
-  if (globalThis.__qpFail) return { data: null, error: { message: '模拟云端写失败' } };
-  globalThis.__qp = JSON.parse(JSON.stringify(data));
-  return { data: null, error: null };
-};
+Supabase.saveQuestProgress = async data => { if (globalThis.__qpFail) return { data: null, error: { message: 'write failed' } }; globalThis.__qp = JSON.parse(JSON.stringify(data)); return { data: null, error: null }; };
 Supabase.fetchQuestProgress = async () => ({ data: globalThis.__qp ? JSON.parse(JSON.stringify(globalThis.__qp)) : null, error: null });
-// UI 桩（tutorial_mode 只读 getAuthUser，不引 UI 模块）
-window.UI = { getAuthUser: () => ({ email: 'player@test.com', id: 'u1' }), addLog: () => {}, showToast: () => {}, renderAll: () => {} };
-globalThis.__matQty = name => Materials.getQuantity(name);
-true`);
-
-(async () => {
-  /* ---------- 登录（材料 spend / 装备 saveItem 都要登录态） ---------- */
-  const li = await Q(`Supabase.signIn('player@test.com', 'x')`);
-  A(li && !li.error, '测试账号已登录（材料扣减/装备存档需要登录态）');
-
-  /* ---------- 准备：一只 Lv1 出战宠（新号选宠后状态） ---------- */
-  C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,40,'腐噜兽');Pet.addPet(p);Pet.setActive(p.id);return true})()`);
-  A(C(`Pet.getPets().length`) === 1, '账号下 1 只宠（Lv1 出战宠）');
-
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-  /* ---------- 门闩：云端进度没拉完 → 不发放 ---------- */
-  await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('初阶经验包')`) === 0, '云端未就绪：checkGuide 不发钥匙（门闩生效）');
-  A(!C(`TutorialMode.ledgerOf()['keys:g1']`), '云端未就绪：账本无 keys:g1 记录');
-
-  /* ---------- 按关发放（v2 奖励即钥匙）：当前 g1 → 只发 g1 的钥匙 ---------- */
-  await Q(`Quest.loadCloudProgress()`);
-  A(C(`Quest.isCloudLoaded()`) === true, '云端进度已拉取（isCloudLoaded 门闩放行）');
-  A(C(`(Quest.getGuideQuest() || {}).id`) === 'g1', '引导条当前指向 g1');
-  await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('初阶经验包')`) === 1, 'g1 钥匙到账：初阶经验包 ×1（真实道具，不再是隐式顶等级）');
-  A(C(`Pet.getActivePet().level`) === 1, '经验包发放 ≠ 自动升级：宠还是 Lv1，等玩家自己用');
-  A(C(`__matQty('重铸石')`) === 0, '按关发：g4 的钥匙 重铸石 现在还没到手（v1 整箱会提前给）');
-  A(C(`Drop.getEggCountOf ? Drop.getEggCountOf('腐噜兽') : 0`) === 0, '按关发：g6 的钥匙 腐噜兽蛋 现在还没到手');
-  A(C(`Pet.getPets().length`) === 1, '按关发：不再凭空补素材宠（G7 的副宠由 G6 孵化产出）');
-
-  /* ---------- 核心回归：花掉钥匙后重跑 checkGuide → 不再补（旧版在这里无限刷） ---------- */
-  await Q(`Materials.spend('初阶经验包', 1)`);
-  A(C(`__matQty('初阶经验包')`) === 0, '玩家把初阶经验包用掉了（模拟已消耗）');
-  await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('初阶经验包')`) === 0, '重跑 checkGuide 不再补发（账本 keys:g1 已记账，差量补齐已退役）');
-  await Q(`Materials.gain('初阶经验包', 1)`);
-
-  /* ---------- 奖励即钥匙：交完 g1 → g2 的钥匙立刻到手 ---------- */
-  const ur = await Q(`TutorialMode.useExpPack('初阶经验包')`);
-  A(ur && ur.ok, '使用初阶经验包成功');
-  A(C(`Pet.getPets().every(p => p.level >= 10)`), '全宠直升 Lv10（档位锁死：≤10 的顶到 10，不超）');
-  A(C(`__matQty('初阶经验包')`) === 0, '经验包用掉即消耗（真实道具语义）');
-  const r1 = await Q(`Quest.completeQuest('g1')`);
-  A(r1 && r1.ok, '提交 g1 成功（等级达标）');
-  A(C(`(Quest.getGuideQuest() || {}).id`) === 'g2', '引导条推进到 g2');
-  await sleep(120);  // completeQuest 里 checkGuide 是 fire-and-forget，等它落地
-  A(!!C(`TutorialMode.ledgerOf()['keys:g2']`), 'g1 完成 → g2 钥匙已记账（keys:g2）');
-  A(C(`__matQty('进化素材')`) >= 1, 'g1 完成 → g2 钥匙到账：进化素材 ×1（上一关奖励 = 下一关钥匙）');
-
-  /* ---------- 手动补发：只补当前关缺的钥匙，每关每种限 1 次 ---------- */
-  // g2 需要 进化素材 ×1：把它花光制造缺口
-  await Q(`Materials.spend('进化素材', Materials.getQuantity('进化素材'))`);
-  A(C(`TutorialMode.missingKeysFor('g2').length`) >= 1, 'missingKeysFor 只读检测：g2 缺 进化素材');
-  const ri1 = await Q(`TutorialMode.reissueKeys('g2')`);
-  A(ri1 && ri1.ok && ri1.granted && ri1.granted.length > 0, '手动补发成功：' + ((ri1.granted || []).join('、') || ''));
-  A(C(`__matQty('进化素材')`) >= 1, '补发到账：进化素材 ×1');
-  const ri2 = await Q(`TutorialMode.reissueKeys('g2')`);
-  A(!(ri2 && ri2.ok && ri2.granted && ri2.granted.length), '同一把钥匙第二次补发被账本拦下（每关每种限 1 次）');
-  A(C(`__matQty('进化素材')`) === 1, '补发被拦后材料不增加（不能靠补钥匙刷）');
-  const ri3 = await Q(`TutorialMode.reissueKeys('g9')`);
-  A(ri3 && ri3.error, '非当前引导关拒绝补发（g9 不是当前关）');
-
-  /* ---------- 后续关的钥匙不会提前到手 ---------- */
-  await Q(`TutorialMode.checkGuide()`);
-  A(C(`__matQty('初阶经验包')`) === 0, '进 g2：初阶经验包不再发（g2 的钥匙表里没有它）');
-  A(C(`__matQty('重铸石')`) === 0, '进 g2：g4 的钥匙 重铸石 仍未提前发放');
-  A(C(`__matQty('传说进化素材')`) === 0, '进 g2：g9 的钥匙 传说进化素材 仍未提前发放');
-
-  /* ---------- 钥匙表守恒（改配置必挂） ---------- */
-  const box = C(`Config.tutorialMode.supplyBox.items`);
-  const sum = (tid, name) => box.filter(i => i.taskIds.indexOf(tid) >= 0 && i.name === name).reduce((s, i) => s + (i.qty || 0), 0);
-  A(sum('g9', '传说进化素材') >= 5, 'G9 钥匙守恒：传说进化素材 ≥5（终阶 extra 3 个已算在内）');
-  A(sum('g9', '精粹进化素材') >= 1, 'G9 钥匙守恒：精粹进化素材 ≥1');
-  A(sum('g10', '凝魂晶石') >= C(`Config.soulCast.materialCount`), 'G10 钥匙守恒：凝魂晶石 ≥ soulCast.materialCount（给少了 G10 魂铸必卡）');
-  A(C(`(Config.drop.quests||[]).filter(q=>q.category==='tutorial'&&q.isGuide&&q.reward).length`) === 0, '引导关 reward 已清空（钥匙统一走 supplyBox，两套并行会重复到手）');
-
-  /* ---------- 分档配置与使用守卫 ---------- */
-  A(C(`TutorialMode.expPackFor(10).name`) === '初阶经验包' && C(`TutorialMode.expPackFor(60).cap`) === 60, '档位映射正确：boostLevel 10/40/60 → 初/中/终阶');
-  const again = await Q(`(async()=>{ await Materials.gain('初阶经验包',1); return TutorialMode.useExpPack('初阶经验包'); })()`);
-  A(again && !again.ok && /≥ Lv10|别浪费/.test(again.error || ''), '档位锁死守卫：全宠已 ≥ Lv10 时使用被拒（' + ((again && again.error) || '') + '）');
-  const nope = await Q(`TutorialMode.useExpPack('中阶经验包')`);
-  A(nope && !nope.ok, '没有该档道具时使用被拒');
-
-  /* ---------- 账本：幂等查重 + 严格写失败不发货 ---------- */
-  C(`globalThis.__ran = 0`);
-  const g1r = await Q(`TutorialMode.grantOnce('ledger-test', async () => { globalThis.__ran++; })`);
-  A(g1r && g1r.ok && C(`globalThis.__ran`) === 1, 'grantOnce 首次发放成功');
-  const g1r2 = await Q(`TutorialMode.grantOnce('ledger-test', async () => { globalThis.__ran++; })`);
-  A(g1r2 && !g1r2.ok && C(`globalThis.__ran`) === 1, 'grantOnce 幂等：同 keyId 第二次被拒，发货函数未执行');
-  C(`globalThis.__qpFail = true`);
-  const g2r = await Q(`TutorialMode.grantOnce('ledger-fail', async () => { globalThis.__ran += 10; })`);
-  A(g2r && !g2r.ok && C(`globalThis.__ran`) === 1, '云端写失败（strict）→ 不发货（宁可少拿，不可重发）');
-  C(`globalThis.__qpFail = false`);
-  // 失败未落云端 → 同会话内存仍挡（保守），重载后（以云端为准）可自愈再发
-  const g2r2 = await Q(`TutorialMode.grantOnce('ledger-fail', async () => { globalThis.__ran += 10; })`);
-  A(g2r2 && !g2r2.ok, '同会话仍拦截（内存记账保守挡重发）');
-  await Q(`(async()=>{ Quest.reset(); globalThis.__qp = null; await Quest.loadCloudProgress(); })()`);
-  const g3r = await Q(`TutorialMode.grantOnce('ledger-fail', async () => { globalThis.__ran += 10; })`);
-  A(g3r && g3r.ok && C(`globalThis.__ran`) === 11, '重载后自愈：云端确实没有这条账 → 可再发');
-
-  /* ---------- 根因回归：经验包顶等级必须 update，不得 INSERT 复制宠 ---------- */
-  C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,40,'腐噜兽');Pet.addPet(p);globalThis.__fodder=p;return true})()`);
-  await Q(`(async()=>{ const r = await Supabase.savePet(globalThis.__fodder); if (r.data && r.data.id) globalThis.__fodder.cloudId = r.data.id; })()`);
-  const rowsAfterInsert = C(`petsTable.length`);
-  const br2 = await Q(`TutorialMode.boostGuidePetToLevel(10)`);
-  A(br2 && br2.ok, 'boostGuidePetToLevel 把 Lv1 素材宠顶到 Lv10');
-  A(C(`petsTable.length`) === rowsAfterInsert, '顶等级后云端行数不变（update 而非 INSERT——2026-09-08 复制宠根因回归）');
-  A(C(`petsTable.find(x => x.id === __fodder.cloudId).level`) === 10, '云端该宠等级已更新为 10（同一行）');
-
-  /* ---------- resetGuideChain 管理员鉴权 ---------- */
-  const deny = C(`Quest.resetGuideChain()`);
-  A(deny && deny.error, '非管理员调用 resetGuideChain 被拒（' + ((deny && deny.error) || '') + '）');
-  C(`UI.getAuthUser = () => ({ email: '776492620@qq.com', id: 'admin' })`);
-  const allow = C(`Quest.resetGuideChain()`);
-  A(allow === true, '管理员账号放行（与 grant_gems 同一套 adminEmails）');
-
-  console.log('\nALL GUIDE GRANT TESTS PASSED');
-})().catch(e => { console.error('FAIL: 测试异常', e); process.exit(1); });
+window.UI = { getAuthUser: () => ({ email: 'player@test.com', id: 'u1' }), addLog() {}, showToast() {}, renderAll() {}, renderQuestTracker() { globalThis.__trackerRefreshes = (globalThis.__trackerRefreshes || 0) + 1; } };`);
+ (async () => {
+await Q(`Supabase.signIn('player@test.com', 'x')`);
+C(`(function(){const p=Pet.createPet('腐噜兽','🐸',5,110,22,11,40,'腐噜兽');Pet.addPet(p);Pet.setActive(p.id);})()`);
+await Q(`TutorialMode.checkGuide()`);
+A(!C(`TutorialMode.ledgerOf()['keys:n1']`), 'cloud gate blocks grants before load');
+await Q(`Quest.loadCloudProgress()`); await Q(`TutorialMode.checkGuide()`);
+A(C(`Quest.getGuideQuest().id`) === 'n1', 'new account starts at N1');
+A(C(`TutorialMode.ledgerOf()['keys:n1']`), 'N1 key grant is idempotently recorded');
+await Q(`TutorialMode.checkGuide()`);
+A(C(`Materials.getQuantity('重铸石')`) === 0, 'future keys are not pre-granted');
+C(`Quest.reportType('kill', 3, { areaId: 'corrupted-forest' })`);
+A(C(`Quest.getGuideQuest().done`), 'N1 requires three real kills');
+await new Promise(r => setTimeout(r, 0));
+A(C(`globalThis.__trackerRefreshes > 0`), 'task tracker refreshes after an action report');
+await Q(`Quest.completeQuest('n1')`); await new Promise(r => setTimeout(r, 30));
+A(C(`Quest.getGuideQuest().id`) === 'n2', 'N1 advances to N2');
+A(C(`Equipment.getInventory().length`) >= 2, 'N2 receives two comparison bases');
+C(`Quest.reportType('equip', 1)`); await Q(`Quest.completeQuest('n2')`); await new Promise(r => setTimeout(r, 30)); A(C(`Quest.getGuideQuest().id`) === 'n3', 'N2 requires a real equip action');
+A(C(`Materials.getQuantity('重铸石')`) === 1, 'N3 key is granted only after N2');
+C(`Materials.spend('重铸石', 1); Quest.reportType('craft', 1, { action: 'reforge' })`); await Q(`Quest.completeQuest('n3')`); await new Promise(r => setTimeout(r, 30)); A(C(`Quest.getGuideQuest().id`) === 'n4', 'N3 requires one reforge spend/report');
+A(C(`Materials.getQuantity('进化素材')`) === 1, 'N4 receives only basic evolution material');
+C(`Quest.reportType('evolve', 1)`); A(!C(`Quest.getGuideQuest().done`), 'N4 ignores evolution reports below Lv10');
+C(`Pet.getActivePet().level = 10; Quest.reportType('evolve', 1)`); await Q(`Quest.completeQuest('n4')`); await new Promise(r => setTimeout(r, 30)); A(C(`Quest.getGuideQuest().id`) === 'n5', 'N4 advances after first evolution at Lv10');
+A(C(`Quest.reportType('salvage', 1, {})`), 'N5 accepts a successful salvage report');
+A(C(`Quest.getGuideQuest().parts.disposed === 1 && Quest.getGuideQuest().parts.second === 0`), 'N5 shows disposal complete before the second condition');
+// 第二条件 = 在图1再击败 5 只（Boss 是 200 场冷却的稀有事件，新手见不到 → 曾把引导卡死）
+C(`Quest.reportType('kill', 4, { areaId: 'corrupted-forest' })`);
+A(!C(`Quest.getGuideQuest().done`), 'N5 is not done after only 4 kills');
+C(`Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`);
+A(C(`Quest.getGuideQuest().done`), 'N5 completes on disposal plus five kills in the first map');
+C(`Quest.reportType('kill', 3, { areaId: 'shadow-mountains' })`);
+A(C(`Quest.getGuideQuest().parts.second === 5`), 'N5 only counts kills inside its own area');
+await Q(`Quest.completeQuest('n5')`); await new Promise(r => setTimeout(r, 30));
+A(C(`Quest.getGuideQuest().id`) === 'n6', 'N5 advances to N6');
+const choice = await Q(`Quest.chooseGuideDirection('trial')`); A(choice && choice.ok, 'N6 accepts one explicit direction');
+const finish = await Q(`(async()=>{ Quest.chooseGuideDirection('map'); return Quest.completeQuest('n6'); })()`); A(finish && finish.ok, 'N6 completion exits guide');
+A(!C(`Quest.getGuideQuest()`), 'guide is empty after N6');
+const skip = C(`Quest.skipGuide()`); A(skip === true, 'skip remains available');
+C(`UI.getAuthUser = () => ({ email: 'player@test.com', id: 'u1' })`);
+const deny = C(`Quest.resetGuideChain()`); A(deny && deny.error, 'non-admin reset is denied');
+C(`UI.getAuthUser = () => ({ email: '776492620@qq.com', id: 'admin' })`);
+A(C(`Quest.resetGuideChain()`) === true, 'developer reset remains available');
+C(`globalThis.__qpFail = true`); const once = await Q(`TutorialMode.grantOnce('test-ledger', async () => { globalThis.__ran = (globalThis.__ran || 0) + 1; })`); A(once && !once.ok, 'failed ledger write does not grant');
+console.log('\nALL N1-N6 GUIDE GRANT TESTS PASSED');
+})().catch(e => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

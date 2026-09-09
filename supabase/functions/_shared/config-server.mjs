@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-07T09:35:39.757Z
+// 生成时间：2026-09-08T14:18:52.485Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1370,6 +1370,41 @@ const serverConfig = {
       "spd": 4
     }
   },
-  "awakenSkillDamage": 0.2
+  "awakenSkillDamage": 0.2,
+  "resourceTrials": {
+    "enabled": true,
+    "ticketName": "资源试炼门票",
+    "rounds": 5,
+    "hitRatio": 0.045,
+    "roundRatio": 0.15,
+    "roundDelayMs": 420,
+    "ticketSources": "完成地图委托（每轮 1 张）",
+    "routes": [
+      {
+        "id": "metamorph",
+        "name": "蜕变试炼",
+        "desc": "定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。",
+        "minLevel": 1,
+        "difficulty": 1,
+        "reward": "evolution"
+      },
+      {
+        "id": "nirvana",
+        "name": "涅槃试炼",
+        "desc": "定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。",
+        "minLevel": 25,
+        "difficulty": 1.35,
+        "reward": "phoenix"
+      },
+      {
+        "id": "temper",
+        "name": "淬炼试炼",
+        "desc": "定向获得重铸、增缀、剥离等打造通货。",
+        "minLevel": 1,
+        "difficulty": 1.1,
+        "reward": "craft"
+      }
+    ]
+  }
 };
 export default serverConfig;

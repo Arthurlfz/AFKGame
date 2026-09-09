@@ -75,11 +75,17 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   const keys = Object.keys(mw).map(Number).sort((a, b) => a - b);
   A(keys.length === areas.length, `materialWeightsByTier 覆盖 ${keys[0]}~${keys[keys.length - 1]}（${keys.length} 档，与地图一致）`);
   const has = (t, k) => !!(mw[t] && mw[t][k] > 0);
-  // 出现时机（2026-09-06 手册 2.4：打造石跟图阶挂钩）：涅磐兽 图8-10；合成之石/神圣石 图4-7 解锁
-  A([1, 2, 3, 4, 5, 6, 7].every(t => !has(t, '涅磐兽')), '涅磐兽 图1-7 不出现（毕业期 图8 起出现）');
-  A([8, 9, 10].every(t => has(t, '涅磐兽')), '涅磐兽 图8-10 都出现');
+  // 最新资源边界：涅槃材料由资源试炼·涅槃承担，普通地图不稳定生产。
+  A(Object.keys(mw).every(t => !has(t, '涅磐兽') && !has(t, '涅槃丹')), '普通地图不稳定产出涅槃材料');
   A([1, 2, 3].every(t => !has(t, '合成之石') && !has(t, '神圣石')), '合成之石/神圣石 图1-3 不出现（成长期 图4 才解锁）');
   A([4, 5, 6, 7, 8, 9, 10].every(t => has(t, '合成之石') && has(t, '神圣石')), '合成之石/神圣石 图4-10 都出现');
+  const evoTiers = JSON.parse(C('JSON.stringify(Config.drop.areaEvolutionTiers)'));
+  A(evoTiers['echo-cliffs'].includes('传说进化素材') && evoTiers['ember-hollow'].includes('传说进化素材')
+    && !evoTiers['soul-abyss'].length && !evoTiers['blight-heart'].length,
+    '传说进化素材稳定来源收束到图6-8，图9-10不再稳定掉落');
+  const loops = JSON.parse(C('JSON.stringify(Config.drop.quests || [])')).filter(q => q.type === 'collect_loop');
+  A(loops.every(q => !q.reward || (!q.reward['涅槃丹'] && !q.reward['涅磐兽'] && !q.reward['百变魔石'])),
+    '地图循环任务不发放涅槃材料或稀有合成道具');
   // 手册 2.4 三阶段打造石权重：图1-3 重铸主导、图8-10 神圣/合成主导
   A(mw[1]['重铸石'] > (mw[1]['神圣石'] || 0) && mw[10]['神圣石'] > mw[10]['重铸石'], '重铸石前期主导 / 神圣石后期主导');
   // 早期打造石深处淡出：重铸石 图1 有、图10 权重最低

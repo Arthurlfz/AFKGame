@@ -61,6 +61,7 @@
       // 历史已到手，之后的写入才可信：紧接着的 ensureDailyReset() 若触发保存，
       // 写的必须是刚恢复的这份状态，而不是空内存。
       cloudLoaded = true;
+      if (migrateLegacyGuide()) saveProgress();
       ensureDailyReset();
     } catch (e) {
       // 读云端失败不能阻断登录：任务进度拉不到，最坏是玩家看到进度为空，
@@ -69,6 +70,18 @@
     } finally {
       cloudLoaded = true;
     }
+  }
+  // Old G1-G10 accounts must never be forced through the replacement chain.
+  function migrateLegacyGuide() {
+    const old = ['g1','g2','g3','g4','g5','g6','g7','g8','g9','g10'];
+    if (!old.some(id => completed[id]) && !old.every(id => completed[id])) return false;
+    const hasLegacyCompletion = !!completed.g10 || old.every(id => completed[id]);
+    if (!hasLegacyCompletion) return false;
+    let changed = false;
+    (Config.drop.quests || []).forEach(q => {
+      if (q.category === 'tutorial' && q.isGuide && !completed[q.id]) { completed[q.id] = true; changed = true; }
+    });
+    return changed;
   }
   /* ---------- 写云端：串行队列 + 内存快照 ----------
    * quest_progress 是整行 JSON 覆盖写（upsert），两条写并发飞就会互相覆盖：
@@ -191,7 +204,37 @@
         .some(p => p && p.name === q.petName);
       return own ? Math.max(1, progress[q.id] || 0) : (progress[q.id] || 0);
     }
+    /* 组合任务（2026-09-09）：处置 + 第二个条件。
+     * secondType 默认由 type 推导：disposeKill → kill，disposeBoss → boss。
+     * 两个条件各自累计、各自有 need（secondNeed 缺省 = need），取「短板」作为总进度。 */
+    if (isComboQuest(q)) {
+      const disposed = Number(progress[q.id]) || 0;
+      const second = Number(progress[secondKey(q)]) || 0;
+      // 两个条件按各自 need 取完成度，短板决定总进度（不能直接 min(两者)：
+      // need=1 / secondNeed=5 时，处置 1 次 + 击杀 1 只就会算出 1 → 误判达标）
+      const ratio = Math.min(disposed / Math.max(1, Number(q.need) || 1), second / secondNeedOf(q));
+      return Math.floor(ratio * Math.max(1, Number(q.need) || 1));
+    }
     return progress[q.id] || 0;
+  }
+
+  /* ---------- 组合任务（处置 + 第二个条件）----------
+   * 背景：N5 原为「处置装备 + 击败 Boss」，Boss 是 200 场冷却的服务器权威稀有事件，
+   * 新手根本见不到 → 引导卡死。改造成通用组合类型后，第二个条件可以是 kill 也可以是 boss，
+   * 换条件只改配置（secondType / secondNeed），不用再动本文件。 */
+  function isComboQuest(q) { return !!q && (q.type === 'disposeBoss' || q.type === 'disposeKill'); }
+  function secondTypeOf(q) { return q.secondType || (q.type === 'disposeKill' ? 'kill' : 'boss'); }
+  function secondKey(q) { return q.id + ':' + secondTypeOf(q); }
+  function secondNeedOf(q) { return Math.max(1, Number(q.secondNeed) || Number(q.need) || 1); }
+
+  function progressParts(q) {
+    if (!isComboQuest(q)) return null;
+    return {
+      disposed: Math.min(Number(progress[q.id]) || 0, q.need),
+      second: Math.min(Number(progress[secondKey(q)]) || 0, secondNeedOf(q)),
+      secondNeed: secondNeedOf(q),
+      secondLabel: secondTypeOf(q) === 'kill' ? '击杀' : 'Boss'
+    };
   }
 
   // 一次性任务看 completed，日常看当天是否交过
@@ -209,7 +252,9 @@
         area: q.area, matName: q.matName, petName: q.petName, name: q.name, need: q.need,
         reward: q.reward, rewardGear: q.rewardGear || null, unlockLevel: q.unlockLevel, requires: q.requires,
         repeat: !!q.repeat, repeatable: !!q.repeatable, expReward: q.expReward, guide: q.guide,
+        options: q.options || null, action: q.action || null, minLevel: q.minLevel || 0, disposeTypes: q.disposeTypes || null,
         have, progress: Math.min(have, q.need), done: have >= q.need,
+        parts: progressParts(q),
         unlocked: isUnlocked(q), finished: isFinished(q),
         accepted: q.category === 'tutorial' || accepted.has(q.id)
       };
@@ -237,9 +282,12 @@
         id: q.id, name: q.name, type: q.type, need: q.need,
         area: q.area || null,   // 目标地图：引导条跳转时用来自动选图
         have, progress: Math.min(have, q.need), done: have >= q.need,
+        parts: progressParts(q),
         guide: q.guide || null, reward: q.reward, rewardGear: q.rewardGear || null,
         // 叙事层：引路人台词（为什么做）/ hotspot 锚点 / 引导经验包等级（透给 tutorial_mode 顶等级）
-        npc: q.npc || '', hint: q.hint || '', target: q.target || '', boostLevel: q.boostLevel || 0,
+        npc: q.npc || '', hint: q.hint || '', target: q.target || '', options: q.options || null, action: q.action || null, minLevel: q.minLevel || 0,
+        disposeTypes: q.disposeTypes || null,
+        guideStep: list.indexOf(q) + 1, guideTotal: list.length, boostLevel: q.boostLevel || 0,
         isGuide: true
       };
     }
@@ -262,21 +310,79 @@
     return { tracked: tracked.slice(), on: tracked.indexOf(id) >= 0 };
   }
 
+  // 动作模块只负责上报一次；任务 UI 在同一帧合并刷新，避免挂机批量结算时反复重绘。
+  let questUiRefreshQueued = false;
+  function refreshQuestUi() {
+    const ui = window.UI;
+    if (!ui || (typeof ui.renderQuestTracker !== 'function' && typeof ui.renderQuestPanel !== 'function')) return;
+    if (questUiRefreshQueued) return;
+    questUiRefreshQueued = true;
+    const flush = function () {
+      questUiRefreshQueued = false;
+      try {
+        if (typeof ui.renderQuestTracker === 'function') ui.renderQuestTracker();
+        const panel = typeof document !== 'undefined' && document.getElementById
+          ? document.getElementById('quest-panel') : null;
+        const open = panel && panel.style && panel.style.display !== 'none' &&
+          (!panel.classList || panel.classList.contains('is-open'));
+        if (open && typeof ui.renderQuestPanel === 'function') ui.renderQuestPanel();
+      } catch (e) { /* 任务检测不能阻断战斗/装备动作 */ }
+    };
+    if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(flush);
+    else if (typeof queueMicrotask === 'function') queueMicrotask(flush);
+    else Promise.resolve().then(flush);
+  }
+
   // 按类型上报：自动匹配所有该类型的未完成任务（各动作模块统一调用这个）
   // ctx.areaId 用于 kill 类限定地图（任务没配 area 的表示任意图都算）
   // ctx.petName 用于宠物专属任务：只算「指定宠物」出战时的上报（没配 petName 的任务不受影响）
   function reportType(type, amount, ctx) {
     if (!type || type === 'collect') return; // collect 用背包材料数，不需要上报
     ctx = ctx || {};
+    if (type === 'kill' && !(window.Pet && window.Pet.getActivePet && window.Pet.getActivePet())) return;
     let changed = false;
     for (const q of (Config.drop.quests || [])) {
+      if (q.category === 'tutorial' && !isUnlocked(q)) continue;
+      if (isComboQuest(q)) {
+        if (q.disposeTypes && q.disposeTypes.indexOf(type) >= 0 && !completed[q.id]) {
+          progress[q.id] = (progress[q.id] || 0) + (amount || 1);
+          changed = true;
+        } else if (type === secondTypeOf(q) && !completed[q.id] &&
+                   (!q.area || !ctx.areaId || q.area === ctx.areaId)) {
+          const key = secondKey(q);
+          progress[key] = (progress[key] || 0) + (amount || 1);
+          changed = true;
+        }
+        continue;
+      }
       if (q.type !== type || completed[q.id]) continue;
+      if (q.action && ctx.action !== q.action) continue;
+      if (q.minLevel) {
+        const pet = window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null;
+        if (!pet || Number(pet.level) < Number(q.minLevel)) continue;
+      }
       if ((type === 'kill' || type === 'boss') && q.area && ctx.areaId && q.area !== ctx.areaId) continue;
       if (q.petName && ctx.petName !== q.petName) continue;
       progress[q.id] = (progress[q.id] || 0) + (amount || 1);
       changed = true;
     }
-    if (changed) saveProgressThrottled();
+    if (changed) {
+      saveProgressThrottled();
+      refreshQuestUi();
+    }
+    return changed;
+  }
+
+  function chooseGuideDirection(direction) {
+    const q = getGuideQuest();
+    if (!q || q.type !== 'direction') return { error: '当前没有方向选择' };
+    const cfg = (Config.drop.quests || []).find(x => x.id === q.id);
+    const option = (cfg.options || []).find(x => x.id === direction);
+    if (!option) return { error: '无效的引导方向' };
+    progress[q.id] = 1;
+    extra.n6Direction = option.id;
+    saveProgress();
+    return { ok: true, direction: option.id, label: option.label };
   }
 
   /* ---------- 任务送装备（新手链专用） ----------
@@ -454,6 +560,8 @@
       if (q.category !== 'tutorial') return;
       delete completed[q.id];
       delete progress[q.id];
+      delete progress[q.id + ':boss'];
+      delete progress[q.id + ':kill'];
       delete dailyDone[q.id];
     });
     saveProgress();
@@ -486,6 +594,6 @@
     getExtra, setExtra, resetGuideChain,
     saveProgressStrict, isCloudLoaded,
     isFinished, isUnlocked, isAreaCleared,
-    questExpOf, QUEST_EXP_FIXED
+    questExpOf, QUEST_EXP_FIXED, chooseGuideDirection
   };
 })();

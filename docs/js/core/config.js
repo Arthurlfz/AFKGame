@@ -397,19 +397,19 @@ window.Config = {
      * 新结构：每场只摇 1 次，从一张合并权重总池里抽 1 件结果，四选一：
      *   none(无掉落) / material(普通材料·单件) / equipment(装备) / egg(宠物蛋)。
      *   一场最多给 1 件；材料与装备/蛋互斥。装备/蛋仍为低概率"惊喜档"，不抬高通胀。
-     * 权重为【相对权重】，代码归一化；下表目标概率：material≈21% / equipment≈1.5% / egg≈1.5% / none≈76%。
+     * 权重为【相对权重】，代码归一化；当前目标概率：material≈19% / equipment≈2% / egg≈2% / none≈76%。
      *   material 子权重按改造前各材料独立概率等比例设定 → 各材料吞吐≈改造前（不饿死打造/进化/涅槃）。
      *   evo/区域材料的实际名字由 areaEvolutionTiers / areaMaterials 决定；其权重并入下方固定项，不再读 chance。
      */
-    pool: { none: 700, material: 250, equipment: 25, egg: 20 },
+     pool: { none: 700, material: 180, equipment: 25, egg: 20 },
     /* 掉落率总盘·按阶段（2026-09-06 手册 2.3）：装备掉落率 新手期2% / 成长期2.5% / 毕业期3%，
-     * 空气 70%、材料 25%、蛋 ~2%。drop.js 按「图序号」选阶段池（图1-3→1、图4-7→2、图8-10→3），
+     * 普通战斗有效掉落约 24-25%（材料约 19-20%、装备约 2-3%、蛋约 2%）。drop.js 按「图序号」选阶段池（图1-3→1、图4-7→2、图8-10→3），
      * 取不到时回退上面的全局 pool。权重为相对值，代码归一化：
-     *   阶段1：装备 20/990≈2.0% / 阶段2：25/995≈2.5% / 阶段3：30/1000=3.0% */
-    poolByStage: {
-      1: { none: 700, material: 250, equipment: 20, egg: 20 },
-      2: { none: 700, material: 250, equipment: 25, egg: 20 },
-      3: { none: 700, material: 250, equipment: 30, egg: 20 }
+     *   阶段1：装备 20/920≈2.2% / 阶段2：25/925≈2.7% / 阶段3：30/930≈3.2% */
+     poolByStage: {
+       1: { none: 700, material: 180, equipment: 20, egg: 20 },
+       2: { none: 700, material: 180, equipment: 25, egg: 20 },
+       3: { none: 700, material: 180, equipment: 30, egg: 20 }
     },
     /* 材料子权重·按图档（low→high，2026-08-31 重做）：
      * 旧版是【全图一个全局权重】——图 1 与图 17 掉同一套比例，深处毫无"农场感"。
@@ -438,9 +438,9 @@ window.Config = {
       5:  { '区域材料': 110, '进化素材': 62, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 38, '强化丹A': 12, '强化丹B': 6, '越龙之石': 8 },
       6:  { '区域材料': 110, '进化素材': 68, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 34, '强化丹A': 12, '强化丹B': 7, '越龙之石': 8 },
       7:  { '区域材料': 115, '进化素材': 74, '重铸石': 30, '增缀石': 45, '剥离石': 30, '合成之石': 20, '神圣石': 10, '鉴定石': 30, '强化丹A': 12, '强化丹B': 7, '越龙之石': 8 },
-      8:  { '区域材料': 115, '进化素材': 80, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 22, '强化丹A': 10, '强化丹B': 7, '天仙玉露': 4, '涅槃丹': 15, '越龙之石': 15 },
-      9:  { '区域材料': 120, '进化素材': 87, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 18, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 5, '涅槃丹': 15, '越龙之石': 15 },
-      10: { '区域材料': 125, '进化素材': 94, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '涅磐兽': 25, '鉴定石': 14, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 6, '涅槃丹': 15, '越龙之石': 15 }
+       8:  { '区域材料': 115, '进化素材': 80, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '鉴定石': 22, '强化丹A': 10, '强化丹B': 7, '天仙玉露': 4, '越龙之石': 15 },
+       9:  { '区域材料': 120, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '鉴定石': 18, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 5, '越龙之石': 15 },
+       10: { '区域材料': 125, '重铸石': 15, '增缀石': 30, '剥离石': 35, '合成之石': 45, '神圣石': 40, '鉴定石': 14, '强化丹A': 10, '强化丹B': 8, '天仙玉露': 6, '越龙之石': 15 }
     },
     // 进化素材档位权重（仅在本图 areaEvolutionTiers 允许的档位里生效）：
     // 高档相对权重更高 → 深处"只掉传说"的图传说频率拉满，中段多档图传说也偏多（出现时机的梯度）。
@@ -448,8 +448,8 @@ window.Config = {
     phoenixName: '涅磐兽',
     synthesizeName: '合成之石',
     // 每图允许掉的进化素材档位：key=区域 id，value=该图可掉的素材名数组（掉落时随机选一个）
-    // 档位按「图等级段」递进（2026-08-30 地图重排后同步）：图1-2 普通 / 图3-4 普通+精粹 /
-    // 图5 三档 / 图6-8 精粹+传说 / 图9-10 传说。图9 魂渊与图10 腐变之源同档（都是最终段）。
+     // 档位按「图等级段」递进：图1-2 普通 / 图3-4 普通+精粹 /
+     // 图5 三档 / 图6-8 精粹+传说。图9-10 不稳定生产进化素材，终局资源转由资源试炼承担。
     areaEvolutionTiers: {
       'corrupted-forest': ['进化素材'],
       'plague-swamp':    ['进化素材'],
@@ -459,8 +459,8 @@ window.Config = {
       'echo-cliffs':     ['精粹进化素材', '传说进化素材'],
       'rotfen-bog':      ['精粹进化素材', '传说进化素材'],
       'ember-hollow':    ['精粹进化素材', '传说进化素材'],
-      'soul-abyss':      ['传说进化素材'],
-      'blight-heart':    ['传说进化素材']
+       'soul-abyss':      [],
+       'blight-heart':    []
       /* 2026-09-06：图 11-17 的 7 条目随地图精简删除 */
     },
     // 每图专属材料：key=区域 id，value={ name 材料名 }
@@ -622,10 +622,10 @@ window.Config = {
       { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 50, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 6 }, expReward: 1650 },
       { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 剥离石: 6 }, expReward: 2010 },
       { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 7 }, expReward: 2370 },
-      /* 图 8-10 的委托额外给涅槃丹（手册 2.6：涅槃丹来源之一 = 循环任务兑换） */
-      { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5, 涅槃丹: 1, 百变魔石: 1 }, expReward: 2730 },
-      { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6, 涅槃丹: 1, 百变魔石: 1 }, expReward: 3090 },
-      { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8, 涅槃丹: 1, 百变魔石: 1 }, expReward: 3450 },
+       /* 循环任务只发打造通货与经验；涅槃材料由资源试炼·涅槃承担。 */
+       { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5 }, expReward: 2730 },
+       { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6 }, expReward: 3090 },
+       { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8 }, expReward: 3450 },
       { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
       { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },
       { id: 'd3', category: 'daily', type: 'collect', matName: '枯荣种荚', need: 20, repeat: true, name: '晨间采集·种荚', reward: { 剥离石: 1 } },
@@ -1299,3 +1299,95 @@ window.Config = {
     adminEmails: ['776492620@qq.com']
   }
 };
+
+/* 2026-09-08 N1-N6 onboarding override.
+ * Keep the legacy G1-G10 records above for old save compatibility, but expose
+ * one short, action-first chain to new accounts. Rewards are issued only by
+ * tutorial_mode.js via task-keyed, idempotent grants.
+ */
+window.Config.drop.quests = window.Config.drop.quests.filter(q => q.category !== 'tutorial');
+window.Config.drop.quests.push(
+  { id: 'n1', category: 'tutorial', type: 'kill', need: 3, name: '\u9009\u62e9\u51fa\u6218\u5ba0\u7269\u5e76\u5f00\u59cb\u6302\u673a', isGuide: true,
+    guide: { page: 'worldmap', btn: '\u5f00\u59cb\u6302\u673a' }, target: '.sb-btn[data-page="worldmap"]',
+    hint: '\u9009\u4e00\u53ea\u51fa\u6218\u5ba0\u7269\uff0c\u5728\u5730\u56fe\u6302\u673a 3 \u573a\u3002\u6302\u673a\u4f1a\u6389\u7ecf\u9a8c\u3001\u88c5\u5907\u548c\u5730\u533a\u6750\u6599\uff1b\u4e0b\u4e00\u6b65\u67e5\u770b\u88c5\u5907\u3002',
+    npc: '\u5148\u8ba9\u4e00\u53ea\u5ba0\u7269\u771f\u6b63\u4e0a\u573a\u3002\u6302\u673a\u7684\u6389\u843d\u5c31\u662f\u4f60\u7684\u7b2c\u4e00\u6279\u9009\u62e9\u3002' },
+  { id: 'n2', category: 'tutorial', type: 'equip', need: 1, requires: 'n1', name: '\u4ece\u4e24\u4ef6\u88c5\u5907\u4e2d\u9009\u4e00\u4ef6', isGuide: true,
+    guide: { page: 'pet', tab: 'equip', btn: '\u53bb\u67e5\u770b\u5e76\u7a7f\u6234' }, target: '.pet-tab[data-pet-tab="equip"]',
+    hint: '\u67e5\u770b\u4e24\u4ef6\u4e0d\u540c\u5e95\u6750\u7684\u90e8\u4f4d\u548c\u5929\u751f\u8bcd\u7f00\uff0c\u81ea\u5df1\u9009\u4e00\u4ef6\u7a7f\u4e0a\u3002\u88c5\u5907\u4f1a\u5f71\u54cd\u6302\u673a\u6548\u7387\u4e0a\u9650\u3002',
+    npc: '\u8fd9\u4e24\u4ef6\u6ca1\u6709\u7edd\u5bf9\u7684\u597d\u574f\u3002\u5148\u770b\u65b9\u5411\uff0c\u518d\u51b3\u5b9a\u8c01\u8ddf\u4f60\u51fa\u6218\u3002' },
+  { id: 'n3', category: 'tutorial', type: 'craft', action: 'reforge', need: 1, requires: 'n2', name: '\u7528\u4e00\u6b21\u91cd\u94f8\u77f3', isGuide: true,
+    guide: { page: 'pet', tab: 'equip', btn: '\u91cd\u94f8\u5df2\u9009\u88c5\u5907' }, target: '.pet-tab[data-pet-tab="equip"]',
+    hint: '\u6d88\u8017 1 \u679a\u91cd\u94f8\u77f3\u3002\u8bcd\u7f00\u548c Roll \u503c\u4f1a\u968f\u673a\u53d8\u5316\uff0c\u4e0d\u4fdd\u8bc1\u51fa\u76ee\u6807\u8bcd\u7f00\uff1b\u88c5\u5907\u7b49\u7ea7\u4f1a\u9650\u5236\u8bcd\u7f00\u7b49\u7ea7\u3002',
+    npc: '\u91cd\u94f8\u662f\u968f\u673a\u6253\u9020\uff0c\u4f60\u4e70\u7684\u662f\u53ef\u80fd\u6027\uff0c\u4e0d\u662f\u4fdd\u8bc1\u3002' },
+  { id: 'n4', category: 'tutorial', type: 'evolve', minLevel: 10, need: 1, requires: 'n3', name: '\u7b2c\u4e00\u6b21\u8fdb\u5316', isGuide: true,
+    guide: { page: 'pet', tab: 'evolve', btn: '\u53bb\u8fdb\u5316' }, target: '.pet-tab[data-pet-tab="evolve"]',
+    hint: '\u8ba9\u51fa\u6218\u5ba0\u7269\u5728 Lv10 \u5de6\u53f3\u5b8c\u6210\u7b2c\u4e00\u6b21\u8fdb\u5316\u3002\u8fdb\u5316\u4f1a\u6539\u53d8\u9636\u6bb5\u548c\u5916\u89c2\uff0c\u6210\u957f\u503c\u4e3b\u8981\u51b3\u5b9a\u8d44\u683c\u548c\u57fa\u7840\u6548\u7387\u3002',
+    npc: '\u8fdb\u5316\u662f\u9636\u6bb5\u8df3\u53d8\uff0c\u4e0d\u662f\u65e0\u9650\u653e\u5927\u6218\u529b\u3002' },
+  /* N5：原为「处置 + 击败 Boss」，但守关 Boss 是 200 场冷却 / 1-1600 概率 / 2400 场保底
+   * （battle-sim 的 BOSS_* 常数，服务器权威），新手要挂几百场才见得到 —— 引导直接卡死。
+   * 改为「处置 + 在图1再击败 5 只怪」：同样教「不用的掉落也有出路 + 继续挂机会滚雪球」，
+   * 但几分钟内能完成。Boss 是图首通的长线目标（主线 boss1），不进新手引导。 */
+  { id: 'n5', category: 'tutorial', type: 'disposeKill', disposeTypes: ['salvage', 'list'], need: 1, secondNeed: 5, requires: 'n4', area: 'corrupted-forest', name: '处理另一件装备并继续推进', isGuide: true,
+    guide: { page: 'equip', btn: '上架或分解，再回图1刷 5 场' }, target: '#btn-salvage',
+    hint: '把没有选的那件装备上架或分解，然后回到第一张地图再击败 5 只怪。不需要的掉落也有出口：分解换打造材料，上架换别人手里的资源。',
+    npc: '一件留下来提效，另一件就用来换资源。挂机久了还会遇到守关 Boss，那是这张图的首通目标，不急。' },
+  { id: 'n6', category: 'tutorial', type: 'direction', need: 1, requires: 'n5', name: '\u9009\u62e9\u4e0b\u4e00\u6b65\u65b9\u5411', isGuide: true,
+    guide: { page: 'worldmap', btn: '\u9009\u62e9\u65b9\u5411' }, target: '.sb-btn[data-page="worldmap"]',
+    options: [{ id: 'map', label: '\u666e\u901a\u5730\u56fe\u6302\u673a', desc: '\u79ef\u7d2f\u5730\u533a\u6750\u6599\u548c\u88c5\u5907' }, { id: 'trial', label: '\u5c1d\u8bd5\u8d44\u6e90\u8bd5\u70bc', desc: '\u5b9a\u5411\u83b7\u53d6\u8fdb\u5316\u3001\u6d85\u69c3\u6216\u6253\u9020\u8d44\u6e90' }],
+    hint: '\u9009\u4e00\u4e2a\u65b9\u5411\u5e76\u5f00\u59cb\u6b63\u5e38\u6e38\u620f\u3002\u5b75\u5316\u3001\u5408\u6210\u3001\u6d85\u69c3\u3001\u5e02\u573a\u548c\u9b42\u94f8\u90fd\u662f\u4e4b\u540e\u7684\u957f\u671f\u76ee\u6807\u3002',
+    npc: '\u73b0\u5728\u4f60\u5df2\u7ecf\u7406\u89e3\u4e86\u4e3b\u5faa\u73af\u3002\u4eca\u5929\u60f3\u5237\u88c5\u5907\uff0c\u8fd8\u662f\u60f3\u5b9a\u5411\u5237\u8d44\u6e90\uff0c\u7531\u4f60\u51b3\u5b9a\u3002' }
+);
+window.Config.tutorialMode.supplyBox = {
+  name: '\u65b0\u624b\u5f15\u5bfc\u8865\u7ed9',
+  items: [
+    { type: 'mat', name: '\u533a\u57df\u6750\u6599', qty: 1, taskIds: ['n1'] },
+    { type: 'gear', rarity: 'blue', areaTier: 1, materialTier: 2, count: 1, identified: true, baseName: '\u8f7b\u76d4', tutorialSlot: '\u5934\u76d4', taskIds: ['n2'] },
+    { type: 'gear', rarity: 'blue', areaTier: 1, materialTier: 2, count: 1, identified: true, baseName: '\u91cd\u7532', tutorialSlot: '\u62a4\u7532', taskIds: ['n2'] },
+    { type: 'mat', name: '\u91cd\u94f8\u77f3', qty: 1, taskIds: ['n3'] },
+    { type: 'mat', name: '\u8fdb\u5316\u7d20\u6750', qty: 1, taskIds: ['n4'] },
+    { type: 'mat', name: '\u8d44\u6e90\u8bd5\u70bc\u95e8\u7968', qty: 1, taskIds: ['n6'] }
+  ]
+};
+window.Config.tutorialMode.expPacks = [];
+window.Config.tutorialMode.disableBlessing = true;
+window.Config.tutorialMode.starterPack = { gear: [], mats: [], expItems: [], pet: null };
+
+/* 2026-09-09 resource trial MVP.
+ * A trial is a short, ticketed choice inside the world-map page. It does not
+ * replace ordinary maps and it does not introduce a new currency.
+ */
+window.Config.resourceTrials = {
+  enabled: true,
+  ticketName: '资源试炼门票',
+  rounds: 5,
+  /* 难度参数（2026-09-09）：旧模型全等级 100% 通关，试炼没有风险也没有强度区分度。
+   * 现在每回合掉最大生命的 hitRatio，比例随轮次 ×(1 + round×roundRatio)：
+   *   攻击高 → 回合少 → 挨打少；轮次深 → 掉血快 → 后段可能撑不住。
+   * 实测（成长 3 起步宠裸装，剩血）：Lv10 蜕变 28% / 淬炼 15%；Lv15 蜕变 42% / 淬炼 29%；
+   *   Lv25 蜕变 42% / 涅槃 11% / 淬炼 36%；Lv60 蜕变 57% / 涅槃 21% / 淬炼 35%。
+   *   裸装最低配也能过但很紧张，穿装备 / 高成长 / 进化后明显轻松 —— 强度与打造都能体现。 */
+  hitRatio: 0.045,
+  roundRatio: 0.15,
+  roundDelayMs: 420,      // 每场之间的演出间隔（5 场约 2 秒，太快会看不出过程）
+  /* 门票来源：地图委托（collect_loop）每交一轮给 1 张（见 drop.quests 的 loop_* 奖励）。
+   * 走既有委托链，不新增货币、不改掉落表 —— 「挂机攒材料 → 交委托换门票 → 定向补资源」。 */
+  ticketSources: '完成地图委托（每轮 1 张）',
+  routes: [
+    { id: 'metamorph', name: '蜕变试炼', desc: '定向获得当前阶段的进化素材（按等级给进化/精粹/传说档）。', minLevel: 1, difficulty: 1, reward: 'evolution' },
+    { id: 'nirvana', name: '涅槃试炼', desc: '定向获得涅槃丹（涅槃时可选消耗，吸收 ×1.2）。', minLevel: 25, difficulty: 1.35, reward: 'phoenix' },
+    { id: 'temper', name: '淬炼试炼', desc: '定向获得重铸、增缀、剥离等打造通货。', minLevel: 1, difficulty: 1.1, reward: 'craft' }
+  ]
+};
+
+/* 门票的稳定来源（2026-09-09）：地图委托每交一轮给 1 张。
+ * 之前门票只在 N6 引导发 1 张 —— 用完即止，资源试炼变成一次性演示，循环是断的。
+ * 挂在 collect_loop 上而不是掉落表：不新增货币、不改掉落与战斗公式，
+ * 且「挂机攒材料 → 交委托 → 换门票 → 定向补资源」正好是要验证的主循环。
+ * 统一注入而非逐条改奖励表：以后加新图委托自动跟上。 */
+(function () {
+  const ticket = window.Config.resourceTrials.ticketName;
+  (window.Config.drop.quests || []).forEach(q => {
+    if (q.type !== 'collect_loop') return;
+    q.reward = Object.assign({}, q.reward, { [ticket]: 1 });
+  });
+})();

@@ -18,7 +18,8 @@
   const TYPE_LABEL = {
     collect: '收集', collect_loop: '地图委托', kill: '击败', evolve: '进化', nirvana: '涅槃',
     synth: '合成', soulcast: '魂铸', hatch: '孵化', craft: '打造', salvage: '分解',
-    equipDrop: '获得装备', equip: '穿装备', list: '上架', trade: '成交'
+    equipDrop: '获得装备', equip: '穿装备', list: '上架', trade: '成交', disposeBoss: '处置 + Boss',
+    disposeKill: '处置 + 推进', direction: '选方向'
   };
   const TRACK_MAX = 3;          // 追踪栏最多钉几条（与 quest.js 的 TRACK_MAX 一致）
 
@@ -59,9 +60,23 @@
       case 'equip': return `穿装备 ${q.need} 件`;
       case 'list': return `上架 ${q.need} 次`;
       case 'trade': return `市场成交 ${q.need} 次`;
+      case 'disposeBoss': return `上架或分解 1 件，再击败 ${areaName(q.area)} Boss`;
+      case 'disposeKill': {
+        const need2 = (q.parts && q.parts.secondNeed) || q.need;
+        return `上架或分解 1 件，再在「${areaName(q.area)}」击败 ${need2} 只`;
+      }
+      case 'direction': return '在普通挂机和资源试炼中选一条';
       case 'level': return `出战宠物达到 Lv${q.need}`;
       default: return `进度 ${q.need}`;
     }
+  }
+
+  function progressText(q) {
+    if (q && q.parts) {
+      const need = q.parts.secondNeed || q.need;
+      return `处置 ${q.parts.disposed}/${q.need} · ${q.parts.secondLabel || '目标'} ${q.parts.second}/${need}`;
+    }
+    return `${q.progress} / ${q.need}`;
   }
 
   // 状态：未解锁 / 已完成 / 可提交 / 进行中 / 未接取
@@ -101,7 +116,7 @@
           <div class="quest-detail-text">${escapeHtml(taskDesc(q))}</div>
           ${q.petName ? `<div class="quest-detail-text" style="color:var(--accent-hi)">绑定宠物：${escapeHtml(q.petName)}</div>` : ''}
           <div class="quest-progress"><div class="quest-progress-bar" style="width:${pct}%"></div></div>
-          <div class="quest-detail-text">进度 ${q.progress} / ${q.need}</div>
+          <div class="quest-detail-text">进度 ${progressText(q)}</div>
           <div class="quest-detail-row">${escapeHtml(TYPE_LABEL[q.type] || q.type)}类任务 · ${escapeHtml(cat.label)}</div>
         </div>
         <div class="quest-detail-sec">
@@ -156,7 +171,7 @@
         <div class="quest-card-desc">${escapeHtml(taskDesc(q))}</div>
         <div class="quest-progress"><div class="quest-progress-bar" style="width:${pct}%"></div></div>
         <div class="quest-card-meta">
-          <span class="quest-card-prog">${q.progress} / ${q.need} · ${st.text}</span>
+          <span class="quest-card-prog">${progressText(q)} · ${st.text}</span>
           ${btn}
         </div>
         <div class="quest-card-rewards">${rewards}</div>
@@ -346,6 +361,9 @@
       case 'equip': return { page: 'pet', tab: 'equip', btn: '去穿装备' };
       case 'list': return { page: 'market-sell', btn: '去上架' };
       case 'trade': return { page: 'market', btn: '去交易' };
+      case 'disposeBoss': return { page: 'equip', btn: '先处理装备' };
+      case 'disposeKill': return { page: 'equip', btn: '先处理装备，再回图刷怪' };
+      case 'direction': return { page: 'worldmap', btn: '选择方向' };
       default: return { page: 'battle', btn: '去做' };
     }
   }
@@ -460,7 +478,10 @@
       const reissueBtn = (missing.length && T && T.reissueKeys)
         ? `<button class="btn-mini ghost qt-reissue" data-id="${it.id}" title="${escapeHtml('钥匙弄丢了？补一次（每关每种限 1 次）：' + missing.map(m => m.name || m.key).join('、'))}">补钥匙</button>`
         : '';
-      const acts = it.isTutorial
+      const choiceActs = it.isTutorial && it.type === 'direction' && !it.done && Array.isArray(it.options)
+        ? `<div class="qt-choices">${it.options.map(o => `<button class="btn-mini ${o.id === 'map' ? 'primary' : 'ghost'} qt-direction" data-id="${escapeHtml(o.id)}" title="${escapeHtml(o.desc || '')}">${escapeHtml(o.label)}</button>`).join('')}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button></div>`
+        : '';
+      const acts = choiceActs || (it.isTutorial
         // 引导任务已达标 → 主按钮变「领取奖励」（G1 领资粮这类"等级即目标"的任务靠它交）
         ? (it.done
             ? `<button class="btn-mini primary qt-submit" data-id="${it.id}">领取奖励</button>
@@ -468,17 +489,19 @@
             : `<button class="btn-mini primary qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
                ${reissueBtn}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
         : `<button class="btn-mini ghost qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
-           <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`;
+           <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`);
       // 奖励即钥匙：引导条上常驻一行"完成可得什么、下一步是谁要用的"
       const pv = it.isTutorial ? rewardPreviewOf(it) : null;
       const rewardRow = pv
         ? `<div class="qt-reward">完成可得 ${escapeHtml(pv.labels.join('、'))} <span class="quest-next-use">→ 下一步「${escapeHtml(pv.next.name)}」要用</span></div>`
-        : '';
+        : (it.isTutorial && it.id === 'n6' ? '<div class="qt-reward">完成后：引导结束，进入正常游戏节奏</div>' : '');
       return `<div class="qt-item${it.done ? ' qt-done' : ''}" data-id="${it.id}">
+        <span class="qt-step">引导 ${it.guideStep || '?'} / ${it.guideTotal || '?'}</span>
         <span class="qt-tag">${escapeHtml(it.tag)}</span>
         <span class="qt-name">${escapeHtml(it.name)}</span>
-        <span class="qt-prog">${Math.min(it.progress, it.need)} / ${it.need}</span>
+        <span class="qt-prog">${progressText(it)}</span>
         <div class="qt-bar"><div class="qt-bar-fill" style="width:${pct}%"></div></div>
+        ${it.isTutorial ? `<div class="qt-hint"><b>现在：</b>${it.hint || escapeHtml(taskDesc(it))}</div><div class="qt-why"><b>为什么：</b>${it.npc || '理解这一环，下一环会更清楚。'}</div>` : ''}
         ${acts}
         ${rewardRow}
       </div>`;
@@ -490,6 +513,18 @@
         if (!it) return;
         guideHint(it);                  // 先弹引路人的"为什么"，再跳到该去的页
         goGuide(guideOf(it), it.area);
+      };
+    });
+    bar.querySelectorAll('.qt-direction').forEach(b => {
+      b.onclick = async () => {
+        const r = Quest.chooseGuideDirection ? Quest.chooseGuideDirection(b.dataset.id) : { error: '方向选择不可用' };
+        if (!r || r.error) { if (UI.showToast) UI.showToast('方向未选择', r && r.error); return; }
+        const done = await Quest.completeQuest('n6');
+        if (done && done.error) { if (UI.showToast) UI.showToast('引导未结束', done.error); return; }
+        if (UI.showToast) UI.showToast('引导完成', '已进入正常游戏节奏');
+        if (UI.renderAll) UI.renderAll();
+        renderQuestTracker();
+        if (b.dataset.id === 'trial' && UI.openResourceTrial) UI.openResourceTrial();
       };
     });
     // 引导任务达标后：直接在引导条领奖（G1 领资粮这类任务没有"去某页"的操作）

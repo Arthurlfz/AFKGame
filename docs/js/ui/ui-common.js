@@ -258,6 +258,7 @@
     UI.renderTradeRecords();
     UI.renderMergeHint();
     UI.renderEvolveHint();
+    UI.renderResourceTrial && UI.renderResourceTrial();
     $('phoenix-num').textContent = String(Materials.getQuantity(Config.drop.phoenixName));
     $('reforge-num').textContent = String(Materials.getQuantity(Config.craft.reforge.name));
     $('strip-num').textContent = String(Materials.getQuantity(Config.craft.strip.name));

@@ -108,6 +108,12 @@
     // 「返回战斗」只在已选地图（有正在看的战斗）时显示，没选图时隐藏
     const rb = $('btn-return-battle');
     if (rb) rb.hidden = !(window.Battle && window.Battle.getCurrentArea && window.Battle.getCurrentArea());
+    const trialBtn = $('btn-resource-trial');
+    if (trialBtn && !trialBtn._boundResourceTrial) {
+      trialBtn._boundResourceTrial = true;
+      trialBtn.onclick = () => window.UI && window.UI.openResourceTrial && window.UI.openResourceTrial();
+    }
+    if (window.UI && window.UI.renderResourceTrial) window.UI.renderResourceTrial();
     if (!rendered) {
       // 底图拉伸填满整个 canvas：点位百分比 = 画布百分比，无换算、无黑边、点位永不裁出
       canvas.style.backgroundImage = 'url("' + window.WorldMap.img + '")';
@@ -246,7 +252,7 @@
           <div class="nd-card-title" style="margin-top:14px">掉落预览<span class="hint">挂机收益</span></div>
           <div class="nd-drop">
             <div class="nd-drop-cell"><div class="k">金装</div><div class="v">${gold}</div></div>
-            <div class="nd-drop-cell"><div class="k">材料</div><div class="v">≈25%</div></div>
+            <div class="nd-drop-cell"><div class="k">材料</div><div class="v">≈19%</div></div>
             <div class="nd-drop-cell"><div class="k">宠物蛋</div><div class="v">≈2%</div></div>
           </div>
         </div>

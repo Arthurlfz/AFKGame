@@ -43,7 +43,7 @@
   //  1. 本地先行：改词缀 + 本地扣材料（界面立即生效）
   //  2. 云端并行：cloudSpend（RPC 扣材料）+ updateCloudItem（单条更新词缀）
   //  3. 任一失败 → 回滚本地（词缀还原 + 材料加回）并提示
-  async function applyCraft(eq, stoneName, stoneAmount, apply, onApplied, extraStone) {
+  async function applyCraft(eq, stoneName, stoneAmount, apply, onApplied, extraStone, actionType) {
     const user = await Supabase.getCurrentUser();
     if (!user) return { error: '请先登录账号' };
     if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
@@ -94,7 +94,7 @@
       return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
     }
     // 任务进度上报：所有 type=craft 的任务 +1（重铸/剥离/神圣/增缀四种石头都算打造）
-    if (window.Quest && window.Quest.reportType) window.Quest.reportType('craft', 1);
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('craft', 1, actionType ? { action: actionType } : undefined);
 
     return { ok: true, changed: applied.changed, stone: stoneName };
   }
@@ -147,7 +147,7 @@
       delete eq.lockPrefix;
       delete eq.lockSuffix;
       return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; eq.lockPrefix = oldLockPrefix; eq.lockSuffix = oldLockSuffix; } };
-    }, onApplied);
+    }, onApplied, undefined, 'reforge');
   }
 
   /* ---------- 剥离：随机移除一条词缀（仅剩 1 条时不可用） ---------- */

@@ -252,6 +252,7 @@
   }
   // 开局发 1 个引导祝福（账号幂等，走发放账本）+ 明确提示用途与绑定属性
   async function grantInitialBlessing() {
+    if (TM().disableBlessing) return { ok: false, skipped: true };
     const M = window.Materials;
     if (!M || !M.gain) return;
     // 老档兼容：旧 blessingGiven 标记发过的 → 只补账不发货，防账本缺失导致重送
@@ -292,7 +293,7 @@
     if (it.type === 'gear') {
       if (!E || !E.getInventory) return 0;
       const rid = it.rarity || 'white';
-      return (E.getInventory() || []).filter(eq => eq && eq.rarity && eq.rarity.id === rid).length;
+      return (E.getInventory() || []).filter(eq => eq && eq.rarity && eq.rarity.id === rid && (!it.baseName || eq.tutorialBase === it.baseName)).length;
     }
     if (it.type === 'egg') return (D && D.getEggCountOf) ? (D.getEggCountOf(it.baseName || '腐噜兽') || 0) : 0;
     if (it.type === 'fodder') return (Pet && Pet.getPets) ? (Pet.getPets() || []).length : 0;
@@ -331,6 +332,11 @@
       for (let i = 0; i < n; i++) {
         const eq = E.generateEquipment(rarity, it.areaTier || 1, it.materialTier || 1);
         eq.identified = it.identified === false ? false : true;
+        if (it.baseName) eq.tutorialBase = it.baseName;
+        if (it.tutorialSlot && eq.slot !== it.tutorialSlot) {
+          eq.slot = it.tutorialSlot;
+          eq.name = it.baseName || eq.name;
+        }
         E.addToInventory(eq);
         got.push(((eq.rarity && eq.rarity.label) || '') + '装备「' + eq.name + '」');
         if (I && I.saveItem) { const r = await I.saveItem(eq); if (r && r.error) console.warn('[guide] 补给装备云端存档失败', r.error); }
@@ -627,6 +633,11 @@
     const pack = t.starterPack || {};
     const Pet = window.Pet, E = window.Equipment, I = window.Items, Materials = window.Materials;
     if (!Materials) return;
+    /* N1-N6 引导把 starterPack 清空了（毕业礼包内容待定）。空包不能照样走完流程 ——
+     * 玩家会看到「新手礼包已发放！打开背包查看」，结果背包什么都没有。空包直接不说话。 */
+    const emptyPack = !(pack.expItems || []).length && !(pack.gear || []).length &&
+      !(pack.mats || []).length && !pack.pet;
+    if (emptyPack) return;
     // 经验包
     for (const ei of (pack.expItems || [])) await Materials.gain(ei.name, ei.qty || 1);
     // 装备三件套
