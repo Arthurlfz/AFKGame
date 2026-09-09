@@ -196,7 +196,7 @@
     const { enemy: ENEMY, area } = picked;
     const enemyStats = scaleEnemyStats(ENEMY, area);
     state.petRef = pet; // 本场战斗的宠物对象：血量写回/属性快照以此为准（切换出战不串宠）
-    state.pet = { name: pet.name, icon: pet.icon, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
+    state.pet = { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
     state.enemy = enemyStats;
     // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
     // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
@@ -215,10 +215,12 @@
     state.petAction = 0;
     state.enemyAction = 0;
     // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
+    // 名字在技能表 = 曾经到过终形态（进化到终阶才改名；合成继承 / 涅槃名字不回退）
+    // → 技能永久保留，涅槃后 Lv1 也能放（2026-09-10 拍板：曾经到过终形态就激活）
     const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
       ? Config.pet.evolution.skillOf(pet.name)
       : Config.pet.evolution.activeSkills?.[pet.name];
-    state.activeSkill = skill && state.pet.level >= skill.minLevel ? skill : null;
+    state.activeSkill = skill || null;
     state.skillCooldown = 0;
     state.skillQueued = false;
     // 血统被动初始化
@@ -230,7 +232,7 @@
     fightEnded = false;
     const petLabel = `${state.pet.name} 等级：${state.pet.level || getPlayerLevel()}级`;
     const enemyLabel = `${state.enemy.name} 等级：${state.enemy.level || 1}级`;
-    window.UI.resetBattle(petLabel, state.pet.icon, enemyLabel, state.enemy.icon, state.pet.maxHp, state.enemy.maxHp);
+    window.UI.resetBattle(petLabel, enemyLabel, state.pet.maxHp, state.enemy.maxHp);
     window.UI.updateBattleArea(area);
     window.UI.updateStatus('fighting', fightCount);
     window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);

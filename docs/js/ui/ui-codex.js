@@ -17,9 +17,9 @@
   const escapeHtml = (UI && UI.escapeHtml) || (s => String(s == null ? '' : s));
 
   /* ---------- 小工具 ---------- */
-  function petIconHtml(name, emoji) {
+  function petIconHtml(name) {
     const p = PetSprites && PetSprites.avatarOf(name);
-    return p ? `<img class="pet-avatar-sprite inline" src="${p}" alt="">` : emoji;
+    return p ? `<img class="pet-avatar-sprite inline" src="${p}" alt="">` : '';
   }
   const pct = v => Math.round((v || 0) * 100) + '%';
   function table(headers, rows) {
@@ -65,7 +65,7 @@
         `怪类型强度：普通 ×${tm.normal != null ? tm.normal : 1} / 进化 ×${tm.evolved != null ? tm.evolved : 1} / 变异 ×${tm.mutant != null ? tm.mutant : 1}`,
         `怪数值按等级缩放，倍率钳制在 ${clampCfg[0]} 到 ${clampCfg[1]} 之间`,
         '守关 Boss：每场 1/1600 概率出现（连续 2400 场未出必出，出后 200 场内不再出）；它是该图怪池里等级最高的怪，等级取图段上限，血 ×5、攻 ×1.5，名字带「霸主·」前缀',
-        `主动技能：终形态达到 Lv.${skillLv} 后可在战斗中手动释放，释放后冷却 ${cd} 回合`,
+        `主动技能：进化到终形态后永久拥有，战斗中按概率自动释放（冷却 ${cd} 回合），涅槃/转生不掉`,
         '血统被动：每只基宠天生一条，战斗中自动生效（见宠物成长板块）'
       ]);
   }
@@ -199,7 +199,7 @@
     const rows1 = (P.starters || []).map(s => {
       const p = profOf(s.name);
       return [
-        `${petIconHtml(s.name, s.icon)} ${escapeHtml(s.name)}`,
+        `${petIconHtml(s.name)} ${escapeHtml(s.name)}`,
         escapeHtml(p.role || '均衡型'),
         s.baseHp, s.baseAtk, s.baseDef,
         Number(s.growth).toFixed(1),
@@ -223,7 +223,8 @@
     });
     const passiveRows = Object.keys(Config.bloodlinePassive || {}).map(n => {
       const b = Config.bloodlinePassive[n] || {};
-      return [`${escapeHtml(b.icon || '')} ${escapeHtml(n)}`, escapeHtml(b.name || ''), escapeHtml(b.desc || '')];
+      // 被动 key = 基宠名 → 直接取真实头像（2026-09-10 移除 emoji 占位）
+      return [`${petIconHtml(n)} ${escapeHtml(n)}`, escapeHtml(b.name || ''), escapeHtml(b.desc || '')];
     });
     const G = P.godPets || {};
     const godRows = (G.list || []).map(g => {

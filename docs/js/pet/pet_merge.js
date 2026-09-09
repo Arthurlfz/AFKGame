@@ -215,7 +215,7 @@
     main.growth = newGrowth;
     // 涅槃植入：主宠特质全保留；副宠每条 30% 概率植入（同类型取高 T，不叠加）
     main.traits = implantNirvanaTraits(main, sub);
-    main.awaken_trait = null;   // 涅槃重置等级 → 觉醒（Lv60）失效，清掉避免残留
+    // 觉醒（pet.awakened）是觉醒石激活的永久标记：涅槃/转生不清除（2026-09-10 v2 拍板）
 
     // 涅槃 = 突破：重置进化次数 + 累计涅槃/转生次数 + 等级重置
     main.evolveTimes = 0;
@@ -316,14 +316,12 @@
     const mutated = rollMutation(S);
     let newGrowth = calcSynthesizeGrowth(main, sub, mutated, itemId);
     let newName = mutated ? mutatedName(main.name) : main.name;
-    let newIcon = main.icon;
     let bHp = main.baseHp, bAtk = main.baseAtk, bDef = main.baseDef;
     let lineId = main.lineId || main.name;
     let godStatCoeffBonus = 0;
     if (isGod && gi.god) {
       // 神级宠是【单独的宠物】：自己的名字、基础值、成长系数（普通宠 ×1.5），生而为终阶
       newName = gi.god.name;
-      newIcon = gi.god.sprite || main.icon;
       bHp = gi.god.baseHp; bAtk = gi.god.baseAtk; bDef = gi.god.baseDef;
       lineId = gi.god.name;
       // 第二版手册 2.2：神级宠出生上限 birthGrowthCap（满神60），超过部分折算 statCoeff 永久加成
@@ -337,8 +335,8 @@
         newGrowth = cap;
       }
     }
-    // 新宠继承主宠形态基础值（图标/基底），等级回 1
-    const baby = createPet(newName, newIcon, newGrowth, bHp, bAtk, bDef, main.baseSpd, lineId);
+    // 新宠继承主宠形态基础值，等级回 1（头像/立绘按名字由 PetSprites 解析）
+    const baby = createPet(newName, null, newGrowth, bHp, bAtk, bDef, main.baseSpd, lineId);
     if (isGod) { baby.isGodPet = true; baby.evolveStage = 5; baby.statCoeffBonus = godStatCoeffBonus; }
     baby.level = 1;
     baby.exp = 0;

@@ -240,7 +240,7 @@
       ? `<div class="nd-boss-row"><span class="k">委托</span><span class="v">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>`
       : '';
 
-    // 怪物列表（普通/进化/变异分档）：真实头像图（PetSprites.avatarOf），无图回退 emoji。
+    // 怪物列表（普通/进化/变异分档）：真实头像图（PetSprites.avatarOf），无素材留空（不回退 emoji）。
     // 2026-09-09 补全介绍：类型 + 强度倍率 + 战斗定位（复用宠物的 petProfiles 定位，变异/进化剥「·异变」后缀查基宠）。
     const spriteOf = name => (window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(name) : null;
     const typeMultCfg = ((window.Config && window.Config.battle) || {}).typeMult || {};
@@ -257,7 +257,7 @@
       const isBoss = !!(boss && m.id === boss.id);
       const av = spriteOf(m.name);
       return `<div class="nd-mob${m.enemyType === 'evolved' ? ' evolved' : ''}${m.enemyType === 'mutant' ? ' mutant' : ''}${isBoss ? ' is-boss' : ''}">
-        <span class="ic">${av ? '<img src="' + av + '" alt="">' : (m.icon || '🐾')}</span>
+        <span class="ic">${av ? '<img src="' + av + '" alt="">' : ''}</span>
         <div class="tx">
           <div class="nm">${esc(m.name)}${isBoss ? '<span class="boss-tag">霸主</span>' : ''}<span class="lv">Lv.${m.level || '—'}</span></div>
           <div class="ds">${role ? esc(role) + ' · ' : ''}${typeTxt} · 强度 ×${mult}</div>
@@ -296,7 +296,7 @@
       const godTxt = god ? '<div class="p-god">★ 神级</div>' : '';
       const pAv = spriteOf(p.name);
       return `<div class="nd-pet${active && active.id === p.id ? ' active' : ''}${god ? ' god' : ''}" data-pid="${p.id}">
-        <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : (p.icon || '🐾')}</div>
+        <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : ''}</div>
         <div class="p-nm">${esc(p.name)}</div>${meta}${godTxt}
       </div>`;
     }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
@@ -328,7 +328,7 @@
         </div>
         <div class="nd-card">
           <div class="nd-card-title">守关领主<span class="hint">挂机按小时现身</span></div>
-          <div class="nd-boss-art">${boss ? (((window.PetSprites && window.PetSprites.pathOf) && window.PetSprites.pathOf(boss.name)) ? '<img src="' + window.PetSprites.pathOf(boss.name) + '" alt="">' : (boss.icon || '👹')) : '👹'}</div>
+          <div class="nd-boss-art">${boss && (window.PetSprites && window.PetSprites.pathOf) && window.PetSprites.pathOf(boss.name) ? '<img src="' + window.PetSprites.pathOf(boss.name) + '" alt="">' : ''}</div>
           <div class="nd-boss-name">霸主 · ${esc(boss ? boss.name : '？？？')}</div>
           <div class="nd-boss-rows">
             <div class="nd-boss-row"><span class="k">等级</span><span class="v warn">Lv.${boss ? (boss.level || '—') : '—'}</span></div>

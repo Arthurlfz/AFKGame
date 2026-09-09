@@ -45,7 +45,7 @@ function petFromRow(row, equipItemsById, config) {
     baseDef: num(row.defense),
     baseSpd: num(row.speed) || 40,
     traits: Array.isArray(row.traits) ? row.traits : [],
-    awaken_trait: row.awaken_trait || null,
+    awakened: !!row.awaken_trait,   // 永久觉醒标记（awaken_trait='1'，与等级无关）
     equipment: {},
     curHp: num(row.cur_hp),
     exp: num(row.exp)

@@ -12,7 +12,8 @@
   const PetSprites = window.PetSprites;
   const PetUI = window.PetUI || (window.PetUI = {});
   const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
-  const routeIcon = (nm) => iconHtml(nm, ((getPets().find(p => p.name === nm) || {}).icon) || '🐾');
+  // 路线目标形态头像：直接按名字取真实素材，无素材留空（不回退 emoji）
+  const routeIcon = (nm) => iconHtml(nm);
 
   let evolveMainId = null;
   let evolvePreview = null;
@@ -42,7 +43,7 @@
       card.className = 'pet-card'+ (pet.id === evolveMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
       const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
       const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
-      card.innerHTML = `<div class="icon">${iconHtml(pet.name, pet.icon)}</div>
+      card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
         <div class="card-info">
           <div class="pname">${pet.name}</div>
           <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶 · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>
@@ -84,7 +85,7 @@
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
     mb.innerHTML = `<div class="evo-card">
-      <div class="avatar">${iconHtml(main.name, main.icon)}</div>
+      <div class="avatar">${iconHtml(main.name)}</div>
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
       <div class="pmeta">Lv.${main.level} · ${window.Pet && window.Pet.stageLabel ? window.Pet.stageLabel(main) : '第' + ((main.evolveTimes || 0) + 1) + '阶'} · 进化 ${times}/${maxTimes} · 转生 ${main.rebornCount || 0}</div>
     </div>`;
@@ -230,7 +231,7 @@
   function renderEvolveHint() {
     const el = $('evolve-hint-text');
     const E = Config.pet.evolution;
-    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1 + 额外×3，觉醒+主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
+    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1 + 额外×3，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
   }
 
 

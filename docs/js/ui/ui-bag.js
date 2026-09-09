@@ -397,6 +397,12 @@
     const r = await window.Materials.spend('鉴定石', 1);
     if (!r || !r.ok) { addLog('鉴定失败：' + ((r && r.error) || '鉴定石不足')); return; }
     eq.identified = true;
+    // 鉴定状态同步云端（不同步 → 刷新后 fromCloud 读回 false，又变回未鉴定且白扣鉴定石）
+    if (eq.cloudId && window.Items) {
+      window.Items.updateCloudItem(eq, { identified: true })
+        .then(({ error } = {}) => { if (error && window.UI && window.UI.addLog) window.UI.addLog('⚠️ 鉴定状态云端同步失败：' + (error.message || '未知错误')); })
+        .catch(e => { if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 鉴定状态云端同步失败：' + ((e && e.message) || e)); });
+    }
     const s = document.createElement('div'); s.className = 'bc-scan'; card.appendChild(s);
     setTimeout(() => {
       renderBag();
@@ -489,7 +495,7 @@
         const res = await hatchEgg(baseName);
         if (!res) return;
         if (res.error) { showToast('❌ 无法孵化', res.error); return; }
-        showToast('🐣 孵化成功！', `${res.baby.icon} ${res.baby.name}`);
+        showToast('🐣 孵化成功！', escapeHtml(res.baby.name));
         closeEggDetail();
         UI.renderAll();
       };

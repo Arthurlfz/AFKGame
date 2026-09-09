@@ -116,14 +116,13 @@
     if (!screen || !list) return;
     if (app) app.style.display = 'none';
     const B = Config.pet.legacyBase || { hp: 100, atk: 20, def: 10, spd: 40 };
-    // 立绘优先（与图鉴/战斗同一套 PetSprites），拉不到才退回 emoji
-    const artHtml = (name, icon) => {
+    // 立绘优先（与图鉴/战斗同一套 PetSprites），无素材留空（不回退 emoji，2026-09-10 移除占位头像）
+    const artHtml = (name) => {
       const p = window.PetSprites && PetSprites.pathOf ? PetSprites.pathOf(name) : null;
-      return p ? `<span class="starter-art"><img src="${p}" alt="${name}" onerror="this.parentNode.innerHTML='&lt;span class=\\'starter-icon\\'&gt;${icon}&lt;/span&gt;'"></span>`
-               : `<span class="starter-icon">${icon}</span>`;
+      return p ? `<span class="starter-art"><img src="${p}" alt="${name}"></span>` : '';
     };
     // 开局宠物是"还没建档"的预览对象，属性/定位照样走真实公式与 config，避免展示与实际不符
-    const previewOf = (s) => createPet(s.name, s.icon, s.growth,
+    const previewOf = (s) => createPet(s.name, null, s.growth,
       s.baseHp || B.hp, s.baseAtk || B.atk, s.baseDef || B.def,
       Config.pet.speeds[s.name] || B.spd || 40, s.name);
     list.innerHTML = `<div class="starter-tip">这是你冒险的第一只伙伴，挑一只顺眼的就行。<b>成长</b>越高后期越强；<b>速度</b>快能先出手；肉（生命/防御高）更耐打。<span class="hint">鼠标悬停看完整属性</span></div>` +
@@ -131,7 +130,7 @@
       // 定位标签直接读 config.petProfiles（每只基宠都写了 role/description），
       // 不要用规则现猜——曾导致 8 只里 6 只都显示「先手刺客 · 速度快」，选宠标签毫无信息量
       const profile = (Config.pet.petProfiles && Config.pet.petProfiles[s.name]) || Config.pet.defaultPetProfile;
-      return `<button class="starter-card" data-index="${i}">${artHtml(s.name, s.icon)}<b>${s.name}</b>
+      return `<button class="starter-card" data-index="${i}">${artHtml(s.name)}<b>${s.name}</b>
         <small>成长 ${Number(s.growth).toFixed(1)}</small>
         <small class="starter-role">${profile.role || '均衡型'}</small></button>`;
     }).join('');
@@ -147,7 +146,7 @@
         list.querySelectorAll('.starter-card').forEach(b => { b.disabled = true; });
         const S = Config.pet.starters[Number(btn.dataset.index)];
         const B = Config.pet.legacyBase || { hp: 100, atk: 20, def: 10 };
-        const pet = addPet(createPet(S.name, S.icon, S.growth, S.baseHp || B.hp, S.baseAtk || B.atk, S.baseDef || B.def, Config.pet.speeds[S.name] || B.spd || 40, S.name));
+        const pet = addPet(createPet(S.name, null, S.growth, S.baseHp || B.hp, S.baseAtk || B.atk, S.baseDef || B.def, Config.pet.speeds[S.name] || B.spd || 40, S.name));
         setActive(pet.id);
         const user = await Supabase.getCurrentUser();
         if (user) {

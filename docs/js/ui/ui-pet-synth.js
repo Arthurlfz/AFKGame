@@ -44,7 +44,7 @@
       card.className = 'pet-card'+ (pet.id === synthMainId ? ' active': '') + (isGod ? ' pet-card--god': '');
       const stg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
       const gbar = Math.max(4, Math.min(100, Math.round((pet.growth || 0))));
-      card.innerHTML = `<div class="icon">${iconHtml(pet.name, pet.icon)}</div>
+      card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
         <div class="card-info">
           <div class="pname">${pet.name}</div>
           <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶${isGod ? ' · 神级' : ''}</div>
@@ -90,7 +90,7 @@
     mb.innerHTML = `<div class="pet-card2 main${mainIsGod ? ' god': ''}">
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
       <div class="pmeta">Lv.${main.level} · ${mainStage}/5阶 · 消耗 ${matAmt} 颗${matName}（持有 ${haveMat}）</div>
-      <div class="avatar">${iconHtml(main.name, main.icon)}</div>
+      <div class="avatar">${iconHtml(main.name)}</div>
       <div class="growline"><b>${main.growth.toFixed(1)}</b><span class="gbar"><i style="width:${gbar}%"></i></span></div>
       <div class="stats">${statRows(main)}</div>
       ${godNote}</div>`;
@@ -110,13 +110,13 @@
     sb.innerHTML = `<div class="pet-card2 sub-card">
       <div class="pname">${sub.name}</div>
       <div class="pmeta">副宠 · Lv.${sub.level} · ${sstg}/5阶</div>
-      <div class="avatar">${iconHtml(sub.name, sub.icon)}</div>
+      <div class="avatar">${iconHtml(sub.name)}</div>
       <div class="growline"><b>${sub.growth.toFixed(1)}</b><span class="gbar"><i style="width:${sgbar}%"></i></span></div>
       <div class="stats">${statRows(sub)}</div>
     </div>
     <div class="sub-options">${subs.map(s => {
       const sel = s.id === synthSubId ? ' on': '';
-      return `<div class="sub-opt${sel}" data-sub="${s.id}"><span class="ic">${iconHtml(s.name, s.icon)}</span><span>${s.name}<small>Lv.${s.level} · 成长 ${s.growth.toFixed(1)}</small></span></div>`;
+      return `<div class="sub-opt${sel}" data-sub="${s.id}"><span class="ic">${iconHtml(s.name)}</span><span>${s.name}<small>Lv.${s.level} · 成长 ${s.growth.toFixed(1)}</small></span></div>`;
     }).join('')}</div>`;
     sb.querySelectorAll('.sub-opt').forEach(btn => {
       btn.onclick = () => {

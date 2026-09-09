@@ -810,6 +810,8 @@ body {
   border-radius:4px;
 }
 .bloodline-icon { font-size:1.4rem; flex:none; }
+/* 图标位放真实宠物头像（2026-09-10 移除 emoji 占位）：固定小尺寸，圆形裁切 */
+.bloodline-icon img.pet-avatar-sprite { width:22px; height:22px; margin:0; vertical-align:middle; border-radius:50%; object-fit:contain; }
 .bloodline-info { flex:1; min-width:0; }
 .bloodline-name { font-weight:700; color:#f2b632; font-size:0.917rem; margin-bottom:2px; }
 .bloodline-desc { font-size:0.792rem; color:var(--text-dim); line-height:1.5; }

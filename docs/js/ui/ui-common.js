@@ -166,13 +166,16 @@
     }
   }
 
-  /* ---------- 血统被动卡片渲染（金色主题：图标+名称+描述） ---------- */
+  /* ---------- 血统被动卡片渲染（金色主题：宠物头像+名称+描述） ----------
+   * 2026-09-10 移除 emoji 占位：图标位放该宠的真实头像（PetSprites 按名字解析），无素材留空。 */
   function bloodlineHtml(pet) {
     if (!pet || !window.Pet || !window.Pet.getBloodline) return '';
     const bl = window.Pet.getBloodline(pet);
     if (!bl) return '';
+    const PS = window.PetSprites;
+    const av = (PS && PS.avatarOf) ? PS.avatarOf(pet.name) : null;
     return '<div class="bloodline-card">' +
-      '<span class="bloodline-icon">' + (bl.icon || '✨') + '</span>' +
+      '<span class="bloodline-icon">' + (av ? '<img class="pet-avatar-sprite" src="' + av + '" alt="">' : '') + '</span>' +
       '<div class="bloodline-info">' +
         '<div class="bloodline-name">血统 · ' + escapeHtml(bl.name) + '</div>' +
         '<div class="bloodline-desc">' + escapeHtml(bl.desc || '') + '</div>' +
@@ -243,6 +246,7 @@
     UI.renderMergeTab && UI.renderMergeTab();
     UI.renderSynthTab && UI.renderSynthTab();
     UI.renderEvolveTab && UI.renderEvolveTab();
+    UI.renderAwakenTab && UI.renderAwakenTab();
     UI.renderBag && UI.renderBag();
     UI.renderEquipSlots();
     UI.renderPetEquipInv && UI.renderPetEquipInv();

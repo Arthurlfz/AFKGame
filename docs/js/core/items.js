@@ -24,6 +24,7 @@
       base_stat: eq.base, affixes: { ...eq.affixes, _ilvl: eq.ilvl ?? null },
       tier: eq.tier, rarity: eq.rarity.id,
       locked: !!eq.locked,
+      identified: eq.identified !== false, // 掉落未鉴定(false)持久化；undefined/true 一律按已鉴定存（旧调用兜底）
       soul_affix: eq.soulAffix || null
     }).select().single();
     if (!error && data && data.id) eq.cloudId = data.id; // 回写云端 id，供上架
@@ -73,7 +74,9 @@
       lockPrefix: !!(row.affixes && row.affixes._lockPrefix),
       lockSuffix: !!(row.affixes && row.affixes._lockSuffix),
       // 魂铸词缀（DB 列 soul_affix → 内存字段 soulAffix 驼峰；旧库无列则 null）
-      soulAffix: row.soul_affix || null
+      soulAffix: row.soul_affix || null,
+      // 未鉴定状态（DB 列 identified，默认 true；undefined 视为已鉴定，兼容迁移前的旧行）
+      identified: row.identified !== false
     };
     syncRarity(eq); // 颜色一律按词缀条数推导（单一来源），覆盖旧数据或任何写入偏差，刷新页面也不回退
     const dTier = DEFAULT_AFFIX_TIER[eq.rarity.id] || 4;

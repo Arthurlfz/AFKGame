@@ -22,10 +22,11 @@
   const pets = [];
   let activePetId = null;
 
+  // 蛋池只配品种名（2026-09-10 移除 emoji 占位：头像/立绘一律由 PetSprites 按名字解析）
   const PET_POOL = [
-    { name: '腐噜兽', icon: '🐹' }, { name: '疫毛兽', icon: '🐱' }, { name: '尸犬', icon: '🐶' },
-    { name: '血狐', icon: '🦊' }, { name: '骨狼', icon: '🐺' }, { name: '幽影兔', icon: '🐰' },
-    { name: '瘟熊', icon: '🐻' }, { name: '毒沼蛙', icon: '🐸' }
+    { name: '腐噜兽' }, { name: '疫毛兽' }, { name: '尸犬' },
+    { name: '血狐' }, { name: '骨狼' }, { name: '幽影兔' },
+    { name: '瘟熊' }, { name: '毒沼蛙' }
   ];
 
   /* ---------- 数据模型 ---------- */
@@ -44,9 +45,9 @@
       baseHp, baseAtk, baseDef, baseSpd,
       curHp: baseHp, // 持久血量：跨场战斗延续，非战斗时自动恢复
       cloudId: null, // 云端 pets.id（存档/市场上架用；本地孵化后由 savePet 回写）
-      // 血脉特质 [{id, tier}]（T1~T3，T1 最强最稀有）；觉醒特质 Lv60 终形态解锁；source 预留氪金来源
+      // 血脉特质 [{id, tier}]（T1~T3，T1 最强最稀有）；awakened 永久觉醒标记（觉醒石激活）；source 预留氪金来源
       traits: [],
-      awaken_trait: null,
+      awakened: false,   // 永久觉醒标记（云端存 pets.awaken_trait = '1'）
       source: 'normal',
       // 12 部位装备槽；旧存档缺失部位会按空槽处理
       equipment: Object.fromEntries((window.Equipment && window.Equipment.SLOTS ||
@@ -234,10 +235,11 @@
     return Config.bloodlinePassive[baseName] || null;
   }
 
-  /* ---------- 血脉特质 + 觉醒（2026-09-01 设计 v1） ---------- */
-  // 觉醒状态：Lv60 终形态（名字在 evolution.activeSkills 表里）→ 觉醒特质 = 对应主动技能伤害 +20% + 血统定位加成
+  /* ---------- 血脉特质 + 觉醒（2026-09-01 设计 v1 / 2026-09-10 v2 任务+觉醒石改版） ---------- */
+  // 觉醒状态：永久标记 pet.awakened（觉醒页用觉醒石激活），与等级无关，涅槃/转生不清除。
+  // 觉醒加成 = 对应主动技能伤害 +20% + 血统线定位加成（Config.awakenBonus）
   function getAwakenState(pet) {
-    if (!pet || Number(pet.level) < 60) return null;
+    if (!pet || !pet.awakened) return null;
     const skills = (Config.pet && Config.pet.evolution && Config.pet.evolution.activeSkills) || {};
     // 变异宠（名字带 ·异变）继承本体主动技能：剥离后缀查找
     // 神级宠继承该线终形态的主动技能（用 sprite 名查表）
@@ -492,7 +494,7 @@
     const st = (Config.pet.starters || []).find(x => x.name === tmpl.name) || {};
     const baseHp = st.baseHp || base.hp, baseAtk = st.baseAtk || base.atk, baseDef = st.baseDef || base.def;
     const k = g / base.growth;
-    const baby = createPet(tmpl.name, tmpl.icon, g,
+    const baby = createPet(tmpl.name, null, g,
       Math.round(baseHp * k), Math.round(baseAtk * k), Math.round(baseDef * k),
       Config.pet.speeds[tmpl.name] || 40, tmpl.name);
     rollPetTraits(baby, {});   // 孵化 roll 血脉特质
@@ -544,9 +546,9 @@
     pet.rebornCount = Math.max(0, Math.floor(num(row.reborn_count)));
     pet.curHp = num(row.cur_hp);
     pet.isActive = !!row.is_active; // 出战标记（DB 权威，刷新后据此还原出战宠物）
-    // 血脉特质（旧库无列/无数据 → 空数组兜底）；觉醒特质；来源标记
+    // 血脉特质（旧库无列/无数据 → 空数组兜底）；永久觉醒标记；来源标记
     pet.traits = Array.isArray(row.traits) ? row.traits : [];
-    pet.awaken_trait = row.awaken_trait || null;
+    pet.awakened = !!row.awaken_trait;   // 云端 awaken_trait = '1' 即永久觉醒（2026-09-10 v2）
     pet.source = row.source || 'normal';
     // 装备槽：云端存 {部位: 装备cloudId}，先保存引用，等背包加载后用 restoreEquipment 填回装备对象
     if (row.equipment && typeof row.equipment === 'object') {

@@ -549,7 +549,7 @@
     const pet = (window.Pet && window.Pet.getActivePet) ? window.Pet.getActivePet() : null;
     const startLv = pet ? pet.level : 1;
     const startGr = (pet && typeof pet.growth === 'number') ? pet.growth.toFixed(1) : '5';
-    const petOpts = ((Config.pet && Config.pet.starters) || []).map(ps => '<option value="' + ps.name + '"' + (ps.name === '腐噕兽' ? ' selected' : '') + '>' + (ps.icon || '') + ' ' + ps.name + '</option>').join('');
+    const petOpts = ((Config.pet && Config.pet.starters) || []).map(ps => '<option value="' + ps.name + '"' + (ps.name === '腐噕兽' ? ' selected' : '') + '>' + ps.name + '</option>').join('');
     return groupHtml('掉落 / 战斗模拟器',
       '<div class="dev-row"><div class="dev-row-head"><span class="dev-label">模拟地图</span></div>' +
         '<select class="dev-input" id="sim-area">' + areaOpts + '</select></div>' +

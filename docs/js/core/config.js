@@ -23,17 +23,18 @@ window.Config = {
      *   trade-off 立住：单场掉血 兔 36%（打 2 场就得回血）↔ 熊 10%（能连打 7 场）。
      */
     starters: [
-      { name: '腐噜兽', icon: '🐹', growth: 5, baseHp: 110, baseAtk: 22, baseDef: 11, statCoeff: { hp: 4.9, atk: 2.38, def: 1.02 } }, // 均衡（spd 80）
-      { name: '血狐',   icon: '🦊', growth: 5, baseHp: 85,  baseAtk: 30, baseDef: 8,  statCoeff: { hp: 3.22, atk: 2.22, def: 0.92 } }, // 暴击爆发（最脆，spd 96）
-      { name: '瘟熊',   icon: '🐻', growth: 5, baseHp: 160, baseAtk: 18, baseDef: 18, statCoeff: { hp: 5.7, atk: 2.42, def: 1.12 } }, // 坦克（最慢最肉，spd 70）
-      { name: '疫毛兽', icon: '🐱', growth: 5, baseHp: 95,  baseAtk: 26, baseDef: 9,  statCoeff: { hp: 4, atk: 2.28, def: 0.96 } },   // 敏捷输出（spd 92）
-      { name: '骨狼',   icon: '🐺', growth: 5, baseHp: 105, baseAtk: 25, baseDef: 10, statCoeff: { hp: 4.3, atk: 2.24, def: 0.99 } }, // 攻击均衡（spd 88）
-      { name: '毒沼蛙', icon: '🐸', growth: 5, baseHp: 130, baseAtk: 20, baseDef: 14, statCoeff: { hp: 5.2, atk: 2.36, def: 1.08 } }, // 耐久坦克（spd 75）
-      { name: '尸犬',   icon: '🐶', growth: 5, baseHp: 120, baseAtk: 21, baseDef: 13, statCoeff: { hp: 4.6, atk: 2.25, def: 1.05 } }, // 均衡偏坦（spd 84）
-      { name: '幽影兔', icon: '🐰', growth: 5, baseHp: 70,  baseAtk: 24, baseDef: 7,  statCoeff: { hp: 3.35, atk: 2.34, def: 0.90 } }  // 极速闪避（最快，spd 100）
+      // ⚠️ 不配 emoji icon（2026-09-10 移除占位头像）：头像/立绘一律由 PetSprites 按名字解析真实素材
+      { name: '腐噜兽', growth: 5, baseHp: 110, baseAtk: 22, baseDef: 11, statCoeff: { hp: 4.9, atk: 2.38, def: 1.02 } }, // 均衡（spd 80）
+      { name: '血狐',   growth: 5, baseHp: 85,  baseAtk: 30, baseDef: 8,  statCoeff: { hp: 3.22, atk: 2.22, def: 0.92 } }, // 暴击爆发（最脆，spd 96）
+      { name: '瘟熊',   growth: 5, baseHp: 160, baseAtk: 18, baseDef: 18, statCoeff: { hp: 5.7, atk: 2.42, def: 1.12 } }, // 坦克（最慢最肉，spd 70）
+      { name: '疫毛兽', growth: 5, baseHp: 95,  baseAtk: 26, baseDef: 9,  statCoeff: { hp: 4, atk: 2.28, def: 0.96 } },   // 敏捷输出（spd 92）
+      { name: '骨狼',   growth: 5, baseHp: 105, baseAtk: 25, baseDef: 10, statCoeff: { hp: 4.3, atk: 2.24, def: 0.99 } }, // 攻击均衡（spd 88）
+      { name: '毒沼蛙', growth: 5, baseHp: 130, baseAtk: 20, baseDef: 14, statCoeff: { hp: 5.2, atk: 2.36, def: 1.08 } }, // 耐久坦克（spd 75）
+      { name: '尸犬',   growth: 5, baseHp: 120, baseAtk: 21, baseDef: 13, statCoeff: { hp: 4.6, atk: 2.25, def: 1.05 } }, // 均衡偏坦（spd 84）
+      { name: '幽影兔', growth: 5, baseHp: 70,  baseAtk: 24, baseDef: 7,  statCoeff: { hp: 3.35, atk: 2.34, def: 0.90 } }  // 极速闪避（最快，spd 100）
     ],
     // 旧莱姆只作为历史存档/孵化兼容基准，不再作为新玩家默认初始宠物
-    legacyBase: { name: '莱姆', icon: '🟢', growth: 5, hp: 100, atk: 20, def: 10, spd: 40 },
+    legacyBase: { name: '莱姆', growth: 5, hp: 100, atk: 20, def: 10, spd: 40 },
     // 属性公式（《游戏设计理念》5.2）：
     //   生命 = 基础生命 + 等级 × 成长值 × 生命系数（攻击/防御同理）
     // 系数集中在此；以后新宠物只需写 3 个基础值（baseHp/baseAtk/baseDef）
@@ -108,7 +109,7 @@ window.Config = {
         { stage: 2, label: '一阶', minLevel: 10, material: '进化素材',     amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '初次蜕变（引导任务 G2）' },
         { stage: 3, label: '二阶', minLevel: 25, material: '精粹进化素材', amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '中期进化' },
         { stage: 4, label: '三阶', minLevel: 40, material: '传说进化素材', amount: 1, growthBoost: [0.3, 0.4], form: false, desc: '淬体：形态不变，成长大幅提升（合成解锁）' },
-        { stage: 5, label: '终阶', minLevel: 60, material: '传说进化素材', amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '最终形态：觉醒 + 主动技能', extra: { name: '传说进化素材', amount: 3 } }
+        { stage: 5, label: '终阶', minLevel: 60, material: '传说进化素材', amount: 1, growthBoost: [0.1, 0.2], form: true,  desc: '最终形态：主动技能（觉醒改由宠物页·觉醒页用觉醒石激活）', extra: { name: '传说进化素材', amount: 3 } }
       ],
       materialName: '进化素材',
       // 进化道具（2026-09-06 第二版手册 2.0）：可选增强。进化页下拉框选一颗消耗，
@@ -128,7 +129,7 @@ window.Config = {
         return (E.stages || []).find(s => s.stage === cur + 1) || null;
       },
       /* 2026-09-06 重排：10 / 25 / 40 / 60（原 10/35/60）
-       * Lv60 = 终形态 + 学主动技能 + 觉醒（毕业）；神级宠合成的「终阶」门槛就是这一阶。 */
+       * Lv60 = 终形态 + 学主动技能（毕业）；神级宠合成的「终阶」门槛就是这一阶。 */
       // 主动技能：终形态且达到 60 级时解锁；每次施放后按后续我方行动冷却 3 回合。
       activeSkills: {
         '腐烂之母': { id: 'corrosion-spit', name: '腐蚀喷吐', minLevel: 60, cooldownTurns: 3, triggerChance: 0.2, damageMultiplier: 1.5 },
@@ -154,47 +155,48 @@ window.Config = {
         const baseName = String(name || '').replace(/·异变$/, '');
         return skills[baseName] || null;
       },
+      // 路线只配「进化到哪 / 几级解锁」；目标形态头像由 PetSprites.avatarOf(to) 按名字取真实素材（2026-09-10 移除 emoji 占位）
       tree: {
-        '腐噜兽': [ { to: '腐沼兽', icon: '🐸', minLevel: 10 }, { to: '毒噜兽', icon: '🐹', minLevel: 10 } ],
-        '血狐': [ { to: '血牙狐', icon: '🦷', minLevel: 10 }, { to: '幽火狐', icon: '🔥', minLevel: 10 } ],
-        '瘟熊': [ { to: '瘟甲熊', icon: '🛡', minLevel: 10 }, { to: '血瘟熊', icon: '🩸', minLevel: 10 } ],
-        '疫毛兽': [ { to: '疫刺兽', icon: '🌵', minLevel: 10 }, { to: '冥毛兽', icon: '🌑', minLevel: 10 } ],
-        '骨狼': [ { to: '骨刃狼', icon: '🗡', minLevel: 10 }, { to: '冥霜狼', icon: '❄', minLevel: 10 } ],
-        '毒沼蛙': [ { to: '毒沼王', icon: '👑', minLevel: 10 }, { to: '咒沼蛙', icon: '🌀', minLevel: 10 } ],
-        '尸犬': [ { to: '尸牙犬', icon: '🦷', minLevel: 10 }, { to: '幽灵犬', icon: '👻', minLevel: 10 } ],
-        '幽影兔': [ { to: '影刃兔', icon: '🌙', minLevel: 10 }, { to: '霜影兔', icon: '🧊', minLevel: 10 } ],
-        '腐沼兽': [ { to: '腐沼王', icon: '🐸', minLevel: 25 } ],
-        '毒噜兽': [ { to: '毒沼霸主', icon: '🐹', minLevel: 25 } ],
-        '腐沼王': [ { to: '腐烂之母', icon: '👑', minLevel: 60 } ],
-        '毒沼霸主': [ { to: '剧毒魔君', icon: '☠', minLevel: 60 } ],
-        '血牙狐': [ { to: '血灾领主', icon: '🦷', minLevel: 25 } ],
-        '幽火狐': [ { to: '幽火王', icon: '🔥', minLevel: 25 } ],
-        '血灾领主': [ { to: '血月魔狐', icon: '🌕', minLevel: 60 } ],
-        '幽火王': [ { to: '幽火魔狐', icon: '🌑', minLevel: 60 } ],
-        '瘟甲熊': [ { to: '瘟神巨熊', icon: '🛡', minLevel: 25 } ],
-        '血瘟熊': [ { to: '血疫暴君', icon: '🩸', minLevel: 25 } ],
-        '瘟神巨熊': [ { to: '瘟疫之主', icon: '☠', minLevel: 60 } ],
-        '血疫暴君': [ { to: '血瘟暴君', icon: '🩸', minLevel: 60 } ],
-        '疫刺兽': [ { to: '疫魔刺龙', icon: '🌵', minLevel: 25 } ],
-        '冥毛兽': [ { to: '冥幽兽', icon: '🌑', minLevel: 25 } ],
-        '疫魔刺龙': [ { to: '刺骨魔兽', icon: '🦴', minLevel: 60 } ],
-        '冥幽兽': [ { to: '幽冥疫君', icon: '🌒', minLevel: 60 } ],
-        '骨刃狼': [ { to: '骨刃王', icon: '⚔', minLevel: 25 } ],
-        '冥霜狼': [ { to: '霜狼祭司', icon: '🧙', minLevel: 25 } ],
-        '骨刃王': [ { to: '骸骨君主', icon: '💀', minLevel: 60 } ],
-        '霜狼祭司': [ { to: '霜寒领主', icon: '❄', minLevel: 60 } ],
-        '毒沼王': [ { to: '毒沼魔君', icon: '👑', minLevel: 25 } ],
-        '咒沼蛙': [ { to: '咒毒蛙王', icon: '🌀', minLevel: 25 } ],
-        '毒沼魔君': [ { to: '剧毒魔神', icon: '🧪', minLevel: 60 } ],
-        '咒毒蛙王': [ { to: '深渊蛙帝', icon: '🕳', minLevel: 60 } ],
-        '尸牙犬': [ { to: '尸魔犬王', icon: '🦷', minLevel: 25 } ],
-        '幽灵犬': [ { to: '幽冥猎犬', icon: '👻', minLevel: 25 } ],
-        '尸魔犬王': [ { to: '尸界狱主', icon: '⚰', minLevel: 60 } ],
-        '幽冥猎犬': [ { to: '幽魂犬皇', icon: '👻', minLevel: 60 } ],
-        '影刃兔': [ { to: '影舞者', icon: '🌙', minLevel: 25 } ],
-        '霜影兔': [ { to: '霜影魔兔', icon: '🧊', minLevel: 25 } ],
-        '影舞者': [ { to: '影蚀魔君', icon: '✨', minLevel: 60 } ],
-        '霜影魔兔': [ { to: '霜魂兔皇', icon: '❄', minLevel: 60 } ]
+        '腐噜兽': [ { to: '腐沼兽', minLevel: 10 }, { to: '毒噜兽', minLevel: 10 } ],
+        '血狐': [ { to: '血牙狐', minLevel: 10 }, { to: '幽火狐', minLevel: 10 } ],
+        '瘟熊': [ { to: '瘟甲熊', minLevel: 10 }, { to: '血瘟熊', minLevel: 10 } ],
+        '疫毛兽': [ { to: '疫刺兽', minLevel: 10 }, { to: '冥毛兽', minLevel: 10 } ],
+        '骨狼': [ { to: '骨刃狼', minLevel: 10 }, { to: '冥霜狼', minLevel: 10 } ],
+        '毒沼蛙': [ { to: '毒沼王', minLevel: 10 }, { to: '咒沼蛙', minLevel: 10 } ],
+        '尸犬': [ { to: '尸牙犬', minLevel: 10 }, { to: '幽灵犬', minLevel: 10 } ],
+        '幽影兔': [ { to: '影刃兔', minLevel: 10 }, { to: '霜影兔', minLevel: 10 } ],
+        '腐沼兽': [ { to: '腐沼王', minLevel: 25 } ],
+        '毒噜兽': [ { to: '毒沼霸主', minLevel: 25 } ],
+        '腐沼王': [ { to: '腐烂之母', minLevel: 60 } ],
+        '毒沼霸主': [ { to: '剧毒魔君', minLevel: 60 } ],
+        '血牙狐': [ { to: '血灾领主', minLevel: 25 } ],
+        '幽火狐': [ { to: '幽火王', minLevel: 25 } ],
+        '血灾领主': [ { to: '血月魔狐', minLevel: 60 } ],
+        '幽火王': [ { to: '幽火魔狐', minLevel: 60 } ],
+        '瘟甲熊': [ { to: '瘟神巨熊', minLevel: 25 } ],
+        '血瘟熊': [ { to: '血疫暴君', minLevel: 25 } ],
+        '瘟神巨熊': [ { to: '瘟疫之主', minLevel: 60 } ],
+        '血疫暴君': [ { to: '血瘟暴君', minLevel: 60 } ],
+        '疫刺兽': [ { to: '疫魔刺龙', minLevel: 25 } ],
+        '冥毛兽': [ { to: '冥幽兽', minLevel: 25 } ],
+        '疫魔刺龙': [ { to: '刺骨魔兽', minLevel: 60 } ],
+        '冥幽兽': [ { to: '幽冥疫君', minLevel: 60 } ],
+        '骨刃狼': [ { to: '骨刃王', minLevel: 25 } ],
+        '冥霜狼': [ { to: '霜狼祭司', minLevel: 25 } ],
+        '骨刃王': [ { to: '骸骨君主', minLevel: 60 } ],
+        '霜狼祭司': [ { to: '霜寒领主', minLevel: 60 } ],
+        '毒沼王': [ { to: '毒沼魔君', minLevel: 25 } ],
+        '咒沼蛙': [ { to: '咒毒蛙王', minLevel: 25 } ],
+        '毒沼魔君': [ { to: '剧毒魔神', minLevel: 60 } ],
+        '咒毒蛙王': [ { to: '深渊蛙帝', minLevel: 60 } ],
+        '尸牙犬': [ { to: '尸魔犬王', minLevel: 25 } ],
+        '幽灵犬': [ { to: '幽冥猎犬', minLevel: 25 } ],
+        '尸魔犬王': [ { to: '尸界狱主', minLevel: 60 } ],
+        '幽冥猎犬': [ { to: '幽魂犬皇', minLevel: 60 } ],
+        '影刃兔': [ { to: '影舞者', minLevel: 25 } ],
+        '霜影兔': [ { to: '霜影魔兔', minLevel: 25 } ],
+        '影舞者': [ { to: '影蚀魔君', minLevel: 60 } ],
+        '霜影魔兔': [ { to: '霜魂兔皇', minLevel: 60 } ]
       }
     },
     /* ================= 神级宠（2026-09-06 新增，《系统重设计·落地执行手册_v1》2.6） =================
@@ -251,14 +253,15 @@ window.Config = {
    * 8个类型：allStatBonus / onCritExtraHit / onHitReflect / speedAspd / killDamageBuff / corruptionStack / lifestealTrueDamage / onDodgeCounter
    * ==================================================== */
   bloodlinePassive: {
-    '腐噜兽': { type: 'allStatBonus', name: '适应力', icon: '🐹', desc: '暴击率/闪避/命中各+8%，全场景稳定发挥。', params: { critRate: 0.08, dodge: 0.08, hit: 0.08 } },
-    '血狐':   { type: 'onCritExtraHit', name: '猎杀本能', icon: '🦊', desc: '暴击时25%概率追加一次普攻（100%伤害）。', params: { chance: 0.25, damageMult: 1.0 } },
-    '瘟熊':   { type: 'onHitReflect', name: '重甲反冲', icon: '🐻', desc: '受击时反弹防御力30%的伤害给敌人。', params: { defRatio: 0.3 } },
-    '疫毛兽': { type: 'speedAspd', name: '疾风步', icon: '🐱', desc: '速度超100后，每10点速度+5%攻速，上限+30%。', params: { threshold: 100, perPoint: 10, bonusPer: 0.05, cap: 0.30 } },
-    '骨狼':   { type: 'killDamageBuff', name: '嗜血追击', icon: '🐺', desc: '击杀敌人后，下次攻击伤害+50%。', params: { damageMult: 1.5 } },
-    '毒沼蛙': { type: 'corruptionStack', name: '腐蚀毒液', icon: '🐸', desc: '攻击叠加腐蚀层数，每层使敌人受伤+5%，最多5层。', params: { perStack: 0.05, maxStacks: 5 } },
-    '尸犬':   { type: 'lifestealTrueDamage', name: '噬魂咬', icon: '🐶', desc: '吸血时附加吸血量100%的真实伤害。', params: { ratio: 1.0 } },
-    '幽影兔': { type: 'onDodgeCounter', name: '影袭', icon: '🐰', desc: '闪避后立即反击，造成80%伤害。', params: { damageMult: 0.8 } }
+    // ⚠️ 不配 emoji icon（2026-09-10 移除）：展示处用 PetSprites.avatarOf(基宠名) 取真实头像
+    '腐噜兽': { type: 'allStatBonus', name: '适应力', desc: '暴击率/闪避/命中各+8%，全场景稳定发挥。', params: { critRate: 0.08, dodge: 0.08, hit: 0.08 } },
+    '血狐':   { type: 'onCritExtraHit', name: '猎杀本能', desc: '暴击时25%概率追加一次普攻（100%伤害）。', params: { chance: 0.25, damageMult: 1.0 } },
+    '瘟熊':   { type: 'onHitReflect', name: '重甲反冲', desc: '受击时反弹防御力30%的伤害给敌人。', params: { defRatio: 0.3 } },
+    '疫毛兽': { type: 'speedAspd', name: '疾风步', desc: '速度超100后，每10点速度+5%攻速，上限+30%。', params: { threshold: 100, perPoint: 10, bonusPer: 0.05, cap: 0.30 } },
+    '骨狼':   { type: 'killDamageBuff', name: '嗜血追击', desc: '击杀敌人后，下次攻击伤害+50%。', params: { damageMult: 1.5 } },
+    '毒沼蛙': { type: 'corruptionStack', name: '腐蚀毒液', desc: '攻击叠加腐蚀层数，每层使敌人受伤+5%，最多5层。', params: { perStack: 0.05, maxStacks: 5 } },
+    '尸犬':   { type: 'lifestealTrueDamage', name: '噬魂咬', desc: '吸血时附加吸血量100%的真实伤害。', params: { ratio: 1.0 } },
+    '幽影兔': { type: 'onDodgeCounter', name: '影袭', desc: '闪避后立即反击，造成80%伤害。', params: { damageMult: 0.8 } }
   },
 
   /* ================= 经验 =================
@@ -646,6 +649,12 @@ window.Config = {
        /* 循环任务只发打造通货与经验；涅槃材料由资源试炼·涅槃承担。 */
        { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5 }, expReward: 2730 },
        { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6 }, expReward: 3090 },
+      /* ---- 觉醒之路（2026-09-10 v2 觉醒改版）----
+       * 觉醒不再 Lv60 自动生效：图 1~10 十种区域材料**每种 888** → 奖励觉醒石 → 宠物页·觉醒页用石头觉醒。
+       * repeatable：每只宠觉醒都要一颗石头，任务可反复交。觉醒石不进 Config.trade.materials（天然不可上架）。 */
+      { id: 'awaken_road', category: 'pet', type: 'collect', need: 888, repeatable: true, name: '觉醒之路',
+        matList: ['枯荣种荚', '泣腐之泪', '白骨残片', '幽影魂丝', '血潮凝晶', '腐变之心', '回响之羽', '腐沼黏液', '余烬残灰', '魂渊之尘'],
+        reward: { 觉醒石: 1 }, expReward: 600, unlockLevel: 40 },
        { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8 }, expReward: 3450 },
       { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
       { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },

@@ -111,7 +111,7 @@
       const godTxt = god ? '<div class="p-god">★ 神级</div>' : '';
       const pAv = spriteOf(p.name);
       return `<div class="nd-pet${active && active.id === p.id ? ' active' : ''}${god ? ' god' : ''}" data-pid="${p.id}">
-        <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : (p.icon || '🐾')}</div>
+        <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : ''}</div>
         <div class="p-nm">${esc(p.name)}</div>${meta}${godTxt}
       </div>`;
     }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
@@ -232,14 +232,14 @@
       </div>
       <div class="tb-stage" id="tb-stage">
         <div class="tb-side">
-          <div class="tb-sprite" id="tb-pet-sprite">${petSprite ? '<img src="' + petSprite + '" alt="">' : '<span class="tb-fallback">🐾</span>'}</div>
+          <div class="tb-sprite" id="tb-pet-sprite">${petSprite ? '<img src="' + petSprite + '" alt="">' : ''}</div>
           <div class="tb-label" id="tb-pet-name">${esc(pet ? pet.name : '出战宠物')}</div>
           <div class="tb-hp-track"><div class="tb-hp-fill tb-hp-fill--pet" id="tb-pet-hp"></div></div>
           <div class="tb-hp-num" id="tb-pet-hp-text"></div>
         </div>
         <div class="tb-vs">VS</div>
         <div class="tb-side">
-          <div class="tb-sprite" id="tb-enemy-sprite">${gSprite ? '<img src="' + gSprite + '" alt="">' : '<span class="tb-fallback">💀</span>'}</div>
+          <div class="tb-sprite" id="tb-enemy-sprite">${gSprite ? '<img src="' + gSprite + '" alt="">' : ''}</div>
           <div class="tb-label" id="tb-enemy-name">${esc(gName)}</div>
           <div class="tb-hp-track"><div class="tb-hp-fill tb-hp-fill--enemy" id="tb-enemy-hp"></div></div>
           <div class="tb-hp-num" id="tb-enemy-hp-text"></div>

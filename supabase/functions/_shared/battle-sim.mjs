@@ -178,7 +178,8 @@ function flattenAffixes(affixes) {
   return out;
 }
 function getAwakenState(pet, config) {
-  if (!pet || Number(pet.level) < 60) return null;
+  // 永久觉醒标记（觉醒石激活）：与等级无关，涅槃/转生不清除（2026-09-10 v2）
+  if (!pet || !pet.awakened) return null;
   const skills = (config.pet && config.pet.evolution && config.pet.evolution.activeSkills) || {};
   const baseName = String(pet.name || '').replace(/·异变$/, '');
   const skill = skills[baseName];
@@ -357,9 +358,9 @@ function simulateFight(input) {
     critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge,
     lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0
   };
-  // 主动技能（skillOf 档位缩放）
+  // 主动技能（skillOf 档位缩放）——名字查得到 = 曾到过终形态，永久激活（涅槃后 Lv1 也能放）
   const skillDef = skillOf(pet, config);
-  const activeSkill = skillDef && P.level >= skillDef.minLevel ? skillDef : null;
+  const activeSkill = skillDef || null;
   const awakenMult = (getAwakenState(pet, config) || {}).damage || 0;
   let skillCooldown = 0, skillQueued = false;
   // 血统

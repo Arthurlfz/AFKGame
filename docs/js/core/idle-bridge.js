@@ -394,8 +394,8 @@
     if (!pet || !UI || !UI.resetBattle) return;
     const maxHp = Pet.getStats(pet).hp;
     UI.resetBattle(
-      pet.name + ' 等级：' + (pet.level || 1) + '级', pet.icon,
-      showEnemy.name + ' 等级：' + (showEnemy.level || 1) + '级', showEnemy.icon,
+      pet.name + ' 等级：' + (pet.level || 1) + '级',
+      showEnemy.name + ' 等级：' + (showEnemy.level || 1) + '级',
       maxHp, showEnemy.maxHp || 100
     );
     if (UI.updateBars) UI.updateBars(Math.round(showHp), maxHp, showEnemy.maxHp, showEnemy.maxHp || 100);

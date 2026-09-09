@@ -196,7 +196,13 @@
       const p = (window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null);
       return p ? Math.max(1, Number(p.level) || 1) : 0;
     }
-    if (q.type === 'collect' || q.type === 'collect_loop') return Materials.getQuantity(q.matName);
+    if (q.type === 'collect' || q.type === 'collect_loop') {
+      // matList（2026-09-10 觉醒之路）：多种材料**每种都要够 need**，取最短板做进度
+      if (q.type === 'collect' && Array.isArray(q.matList)) {
+        return q.matList.reduce((min, name) => Math.min(min, Materials.getQuantity(name)), Infinity) || 0;
+      }
+      return Materials.getQuantity(q.matName);
+    }
     // 宠物养成链的「孵化」任务：玩家已经拥有该宠（含开局选择）→ 视为 1/1 已完成，
     // 否则开局选的那只宠的孵化任务永远做不了（开局选择不算 hatch）。
     if (q.type === 'hatch' && q.petName) {
@@ -249,7 +255,7 @@
       const have = currentProgress(q);
       return {
         id: q.id, category: q.category || 'main', type: q.type || 'collect',
-        area: q.area, matName: q.matName, petName: q.petName, name: q.name, need: q.need,
+        area: q.area, matName: q.matName, matList: q.matList || null, petName: q.petName, name: q.name, need: q.need,
         reward: q.reward, rewardGear: q.rewardGear || null, unlockLevel: q.unlockLevel, requires: q.requires,
         repeat: !!q.repeat, repeatable: !!q.repeatable, expReward: q.expReward, guide: q.guide,
         options: q.options || null, action: q.action || null, minLevel: q.minLevel || 0, disposeTypes: q.disposeTypes || null,
@@ -457,7 +463,8 @@
     if (!isUnlocked(q)) return { error: '任务尚未解锁' };
     if (currentProgress(q) < q.need) {
       const left = q.need - currentProgress(q);
-      return { error: `还差 ${left} ${q.type === 'collect' ? q.matName : ''}` };
+      const matLabel = (q.type === 'collect' && Array.isArray(q.matList)) ? '图 1~10 区域材料' : q.matName;
+      return { error: `还差 ${left} ${q.type === 'collect' ? matLabel : ''}` };
     }
 
     submitting.add(id);
@@ -465,10 +472,24 @@
     try {
       // 收集类先扣材料：扣失败说明没货，此时奖励一份未发，回滚是安全的
       if (q.type === 'collect' || q.type === 'collect_loop') {
-        const spent = await Materials.spend(q.matName, q.need);
-        if (!spent.ok) {
-          unmarkFinished(q);
-          return { error: spent.error || '材料扣减失败' };
+        // matList：每种都要扣 need 个；中途失败把已扣的补回来（宁多还不少扣）
+        if (q.type === 'collect' && Array.isArray(q.matList)) {
+          const spentList = [];
+          for (const name of q.matList) {
+            const sp = await Materials.spend(name, q.need);
+            if (!sp.ok) {
+              for (const [n, amt] of spentList) Materials.gain(n, amt);
+              unmarkFinished(q);
+              return { error: sp.error || '材料不足' };
+            }
+            spentList.push([name, q.need]);
+          }
+        } else {
+          const spent = await Materials.spend(q.matName, q.need);
+          if (!spent.ok) {
+            unmarkFinished(q);
+            return { error: spent.error || '材料扣减失败' };
+          }
         }
       }
       const pairs = Object.entries(q.reward || {});

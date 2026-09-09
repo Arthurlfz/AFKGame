@@ -280,7 +280,7 @@
 | 全部数值（唯一源） | `docs/js/core/config.js`（pet/evolution/battle/drop/equipment/craft/synthesize/nirvana/marketBot/tutorialMode…） |
 | 玩法决策账本 | 根目录 `PROJECT_CONSTITUTION.md` |
 | AI 经济策划 | `docs/AI假人经济系统策划_v1.md` |
-| 代码现状体检 | `docs/Forge_of_Souls_现状地图_v1.md`（2026-09-03，部分技术结论已过时但结构有效） |
+| 代码现状体检 | `archive/notes/Forge_of_Souls_现状地图_v1.md`（已归档 2026-09-10；2026-09-03，部分技术结论已过时但结构有效） |
 | 运行代码 | `docs/游戏.html` + `docs/js/`（core 数值逻辑 / ui 界面 / pet 宠物 / equipment 装备） |
 | 测试 | `docs/tests/`（`node vtest_*.js`，2026-09-05 起约 47 绿 + 3 基线红） |
 | 借鉴参考（只读） | `docs/玩法文档/`（口袋精灵2 攻略 docx ×8） |

@@ -21,8 +21,11 @@ C(`(function(){
   return true;
 })()`);
 
+const aw0 = C('Pet.getAwakenState(globalThis.__p)');
+A(aw0 === null, '变异宠未觉醒（awakened=false）→ 觉醒状态为空');
+C('globalThis.__p.awakened = true');
 const aw = C('Pet.getAwakenState(globalThis.__p)');
-A(aw !== null && aw !== undefined, `「霜魂鬼皇·异变」觉醒状态非空（${aw ? 'form=' + aw.form : 'null'}）`);
+A(aw !== null && aw !== undefined, `「霜魂兔皇·异变」觉醒后状态非空（2026-09-10 v2：觉醒石永久觉醒）`);
 const skill = C(`Config.pet.evolution.skillOf(globalThis.__p.name)`);
 A(!!skill && skill.name === '霜魂月刃', `变异宠继承本体技能 ${skill ? skill.name : 'null'}`);
 

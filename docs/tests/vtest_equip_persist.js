@@ -58,6 +58,14 @@ const inv0 = await C(`(async()=>{
 })()`);
 A(inv0 > 0, `掉落装备已入库（背包 ${inv0} 件）`);
 
+// —— 未鉴定状态持久化（2026-09-10 修复：saveItem 漏写 identified 列 → 刷新后全员变已鉴定）——
+A(C('Equipment.getInventory()[0].identified === false') === true, '掉落装备默认未鉴定（identified=false）');
+A(C(`(function(){
+  const eq=Equipment.getInventory()[0];
+  const row=itemsTable.find(r=>r.id===eq.cloudId);
+  return !!row && row.identified === false;
+})()`) === true, '未鉴定状态已写入云端 equip_items.identified');
+
 // —— 穿到身上 ——
 // ⚠️ 2026-09-08：掉落即未鉴定（drop.js "PoE 式鉴定流"），未鉴定不能穿（equipment.equipItem 拦截）。
 // 本测试守的是"穿→F5→还在"，不是鉴定流 → 先把这件鉴定掉再穿，与玩家真实操作一致。
@@ -80,6 +88,10 @@ A(!!cloudEq, '装备槽已写入云端 pets.equipment');
 A(!!(cloudEq && cloudEq[equipInfo.slot] === equipInfo.cloudId),
   `云端槽位记录正确（${equipInfo.slot} → ${cloudEq && cloudEq[equipInfo.slot]}）`);
 
+// —— 模拟玩家在 UI 里用鉴定石（走新的云端同步路径）——
+await C(`(async()=>{ await Items.updateCloudItem({ cloudId: '${equipInfo.cloudId}' }, { identified: true }); })()`);
+await S(100);
+
 // —— 模拟 F5：重新拉宠物 + 重新拉背包 + 恢复装备槽 ——
 await C('(async()=>{ await Game.refreshPets(); await Game.refreshItems(); await Game.restorePetEquipment(); })()');
 await S(300);
@@ -97,6 +109,11 @@ A(r.slots === 12, `12 个装备槽结构完整（实际 ${r.slots}）`);
 A(r.hasEq === true, `刷新后装备仍在身上（${r.eqName}）`);
 A(r.eqCloudId === equipInfo.cloudId, '刷新后装备 cloudId 一致（是同一件）');
 A(r.inBag === false, '装备没有同时留在背包里（无重复）');
+A(C(`(function(){
+  const p=Pet.getActivePet();
+  const eq=(p.equipment && p.equipment['${equipInfo.slot}']) || Equipment.getInventory().find(e=>e.cloudId==='${equipInfo.cloudId}');
+  return !!eq && eq.identified === true;
+})()`) === true, '刷新后已鉴定状态从云端还原（fromCloud 不再丢 identified）');
 console.log('ALL EQUIP PERSIST TESTS PASSED');
 process.exit(0);
 })();

@@ -20,17 +20,17 @@
   const Market = window.Market;
   const PetSprites = window.PetSprites;
 
-  // 宠物头像 HTML（小尺寸用头像版）：有头像图则 <img>，否则回退 emoji。
+  // 宠物头像 HTML（小尺寸用头像版）：有头像图则 <img>，否则留空（不回退 emoji，2026-09-10 移除占位头像）。
   // inline=true → 行内小头像（跟文字齐平，用于「路线：<头像> 名字」这类文案里）；
   // 不传 → 块级，尺寸由所在容器的 CSS 决定（img.pet-avatar-sprite 有兜底尺寸，不会按原图炸开）。
-  function iconHtml(name, emoji, inline) {
+  function iconHtml(name, inline) {
     let p = PetSprites && PetSprites.avatarOf(name);
-    // 神级宠：名字不在立绘表里 → 用 godPets.sprite（该线终形态立绘）兜底，绝不回退 emoji
+    // 神级宠：名字不在立绘表里 → 用 godPets.sprite（该线终形态立绘）兜底
     if (!p && window.Pet && window.Pet.godInfoOf) {
       const g = window.Pet.godInfoOf({ name: name });
       if (g && g.sprite && PetSprites) p = PetSprites.avatarOf(g.sprite);
     }
-    return p ? `<img class="pet-avatar-sprite${inline ? ' inline' : ''}" src="${p}" alt="">` : emoji;
+    return p ? `<img class="pet-avatar-sprite${inline ? ' inline' : ''}" src="${p}" alt="">` : '';
   }
 
   /* ---------- 宠物 Tooltip（与装备 .bag-tooltip 同款：body 层共享浮层，悬停显示属性） ----------
@@ -108,7 +108,7 @@
     if (pa) {
       if (PetSprites && PetSprites.mountAnimated(pa, pet.name)) {}
       else if (PetSprites && PetSprites.mountAvatar(pa, pet.name)) {}
-      else pa.textContent = pet.icon;
+      else pa.textContent = '';
     }
     $('pet-name').textContent = pet.name;
     $('pet-level').textContent = 'Lv.' + pet.level;
@@ -122,7 +122,7 @@
       const skill = Config.pet.evolution.activeSkills[pet.name];
       const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}%伤害${skill.maxHpDamageRate ? ` + 目标最大生命${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
       skillInfo.textContent = skill
-        ? `主动技能：${skill.name} · ${pet.level >= skill.minLevel ? `${effect} · ${skill.cooldownTurns} 回合冷却` : `Lv.${skill.minLevel} 解锁`}`
+        ? `主动技能：${skill.name} · ${effect} · ${skill.cooldownTurns} 回合冷却`
         : '主动技能：终形态 Lv.60 解锁';
     }
     // 血脉特质胶囊（出战面板常驻；空态显示"无血脉特质"）
@@ -131,7 +131,7 @@
       const th = PetUI.traitsHtml(pet);
       traitsEl.innerHTML = th || '<span class="trait-none">无血脉特质</span>';
     }
-    // 觉醒徽标（Lv60 终形态解锁）
+    // 觉醒徽标（觉醒页用觉醒石激活后永久亮起，与等级无关）
     const awEl = $('pet-awaken');
     if (awEl) {
       const aw = window.Pet.getAwakenState(pet);
@@ -236,7 +236,7 @@
     if (av) {
       if (PetSprites && PetSprites.mountAnimated(av, pet.name)) {}
       else if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {}
-      else av.textContent = pet.icon;
+      else av.textContent = '';
     }
     const nm = $id('name'); if (nm) nm.textContent = pet.name;
     const lv = $id('level'); if (lv) lv.textContent = 'Lv.' + pet.level;
@@ -289,9 +289,9 @@
       card.className = 'pet-card' + (isActive ? ' active' : '') + (isGod ? ' pet-card--god' : '');
       card.innerHTML = `${isActive ? '<div class="pet-card-badge">出战</div>' : ''}
         ${isGod ? '<div class="pet-card-god-badge">神</div>' : ''}
-        <div class="icon">${iconHtml(pet.name, pet.icon)}</div>
+        <div class="icon">${iconHtml(pet.name)}</div>
         <div class="pname">${pet.name}</div>
-        ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">'+bl.icon+' '+bl.name+'</div>':'';})()}
+        ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">血统 · '+bl.name+'</div>':'';})()}
         <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${window.Pet&&window.Pet.stageLabel?' · '+window.Pet.stageLabel(pet):''}</div>
         <div class="meta">装备${equipCount}/3</div>`;
       card.onclick = () => {
@@ -362,7 +362,7 @@
     if (art) {
       if (typeof PetSprites !== 'undefined' && PetSprites.mountAnimated(art, pet.name)) {}
       else if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {}
-      else art.textContent = pet.icon || '未知';
+      else art.textContent = '';
     }
   }
 
@@ -525,11 +525,11 @@
         if (!res) return;
         if (res.error) { showToast('❌ 无法孵化', res.error); return; }
         addLog(`🐣 孵化成功！获得新宠物 ${res.baby.name}（成长值 ${res.baby.growth}）！`);
-        showToast('🐣 孵化成功！', `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}｜成长值 ${res.baby.growth}｜已出战`);
+        showToast('🐣 孵化成功！', `${iconHtml(res.baby.name)} ${res.baby.name}｜成长值 ${res.baby.growth}｜已出战`);
         const traitBlock = (res.baby && Array.isArray(res.baby.traits) && res.baby.traits.length)
           ? PetUI.traitsHtml(res.baby)
           : '<span class="trait-none">无血脉特质</span>';
-        if (UI.showDialog) UI.showDialog({ icon: '🐣', speaker: '孵化', text: `${iconHtml(res.baby.name, res.baby.icon)} ${res.baby.name}<br>成长值 ${res.baby.growth} · 已出战<br>${traitBlock}` });
+        if (UI.showDialog) UI.showDialog({ icon: '🐣', speaker: '孵化', text: `${iconHtml(res.baby.name)} ${res.baby.name}<br>成长值 ${res.baby.growth} · 已出战<br>${traitBlock}` });
         if (res.saveError) addLog('⚠️ 云端存档失败，宠物仅保存在本地');
         UI.renderAll();
       };

@@ -94,16 +94,18 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
   A(Math.abs(s3.def - Math.round(core * 1.08 + growthInc)) <= 1, '铁壁 T2 → 防御 +8%（作用于底座，成长增量不放大）');
 }
 
-/* ================= 3. 觉醒特质 ================= */
+/* ================= 3. 觉醒特质（2026-09-10 v2：觉醒石永久觉醒，与等级无关） ================= */
 {
-  const p = baby(); p.name = '血月魔狐'; p.lineId = '血狐'; p.level = 60;
+  const p = baby(); p.name = '血月魔狐'; p.lineId = '血狐'; p.level = 60; p.awakened = true;
   const aw = ctx.Pet.getAwakenState(p);
-  A(aw && aw.bonus && aw.bonus.stat === 'critDamage' && aw.bonus.value === 10, 'Lv60 终形态血狐 → 觉醒暴伤+10%');
+  A(aw && aw.bonus && aw.bonus.stat === 'critDamage' && aw.bonus.value === 10, '觉醒终形态血狐 → 觉醒暴伤+10%');
   A(Math.abs(aw.skillDamageMult - 1.2) < 1e-9, '觉醒技能伤害 +20%');
   const p2 = baby(); p2.name = '血月魔狐'; p2.lineId = '血狐'; p2.level = 30;
-  A(ctx.Pet.getAwakenState(p2) === null, 'Lv<60 终形态不觉醒');
-  const p3 = baby(); p3.name = '腐噜兽'; p3.lineId = '腐噜兽'; p3.level = 60;
-  A(ctx.Pet.getAwakenState(p3) === null, '非终形态不觉醒');
+  A(ctx.Pet.getAwakenState(p2) === null, '未觉醒（哪怕终形态）→ 觉醒状态为空');
+  const p3 = baby(); p3.name = '腐噜兽'; p3.lineId = '腐噜兽'; p3.level = 60; p3.awakened = true;
+  A(ctx.Pet.getAwakenState(p3) === null, '非终形态即使标记觉醒 → 仍为空（无技能可挂）');
+  const p4 = baby(); p4.name = '血月魔狐'; p4.lineId = '血狐'; p4.level = 1; p4.awakened = true;
+  A(ctx.Pet.getAwakenState(p4) !== null, '觉醒后 Lv1 也生效（永久，涅槃/转生不清）');
   // 觉醒加成进入 getStats
   const s = ctx.Pet.getStats(p);
   // 血狐 profile 暴伤基线 1.9（critDamage=190），觉醒 +10% → 2.0
@@ -203,7 +205,7 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
 
   await (async () => {
     const eq = { name: 't', slot: '武器', rarity: { id: 'white' }, affixes: { prefix: [], suffix: [] } };
-    const pet = baby(); pet.id = 'p3'; pet.name = '血月魔狐'; pet.lineId = '血狐'; pet.level = 60; pet.growth = 60;
+    const pet = baby(); pet.id = 'p3'; pet.name = '血月魔狐'; pet.lineId = '血狐'; pet.level = 60; pet.growth = 60; pet.awakened = true;
     const r = await ctx.Craft.soulCast(eq, pet, 'legend', 0);
     A(r.ok && r.soulAffix.awaken === true && r.soulAffix.tier === 1 && r.soulAffix.stat === 'critDamage' && r.soulAffix.value === 10, '魂铸·传承：觉醒特质固定 T1（暴伤+10）');
   })();
@@ -213,7 +215,7 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
     const row = { id: 'c1', name: '腐噜兽', icon: 'x', growth: 30, level: 10, base_hp: 100, base_atk: 20, base_def: 10, base_spd: 40, cur_hp: 100, evolve_times: 0, reborn_count: 0 };
     const p = ctx.Pet.petFromRow(row);
     A(Array.isArray(p.traits) && p.traits.length === 0, 'petFromRow：旧库无 traits 列 → 兜底空数组');
-    A(p.awaken_trait === null && p.source === 'normal', 'petFromRow：旧库无 awaken/source 列 → 兜底默认值');
+    A(p.awakened === false && p.source === 'normal', 'petFromRow：旧库无 awaken/source 列 → 兜底默认值（未觉醒）');
   }
 
   console.log('\n全部通过 ✅');

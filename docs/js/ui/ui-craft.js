@@ -255,7 +255,7 @@
     const tiers = [
       { k: 'normal', label: '普通', desc: 'Lv40+ / 成长≥10 · 铸血脉 T=原阶' },
       { k: 'elite', label: '精锐', desc: 'Lv40+ / 成长≥40 · 血脉 T+1' },
-      { k: 'legend', label: '传承', desc: 'Lv60终形态 / 成长≥60 · 铸觉醒 T1' }
+      { k: 'legend', label: '传承', desc: '已觉醒终形态 / 成长≥60 · 铸觉醒 T1' }
     ];
     const tierBtns = tiers.map(t => {
       const cur = Config.soulCast && Config.soulCast.tiers && Config.soulCast.tiers[t.k];

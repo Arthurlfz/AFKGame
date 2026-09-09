@@ -1,7 +1,7 @@
 /* 宠物形态名 -> 立绘/头像路径（由 meowa 生成素材，勿手改） */
 window.PetSprites = {
   // 素材版本号：每次替换素材图片后递增，防止浏览器缓存旧图
-  V: '20260830e',
+  V: '20260910a',
   // 立绘（全身透明图）路径：查不到时自动去掉「·异变」后缀回退到基础形态
   pathOf: function (name) {
     if (!name) return null;
@@ -158,7 +158,25 @@ window.PetSprites = {
   "尸魔犬王": "assets/pets/pack8-corpsehound/monster-02.png",
   "幽冥猎犬": "assets/pets/pack8-corpsehound/monster-03.png",
   "尸界狱主": "assets/pets/pack8-corpsehound/monster-04.png",
-  "幽魂犬皇": "assets/pets/pack8-corpsehound/monster-05.png"
+  "幽魂犬皇": "assets/pets/pack8-corpsehound/monster-05.png",
+  /* 变异立绘（mut1-rotten：腐噜兽家族 7 个异变形态，manifest.json 对号入座） */
+  "腐噜兽·异变": "assets/pets/mut1-rotten/mut-00.png",
+  "腐沼兽·异变": "assets/pets/mut1-rotten/mut-01.png",
+  "毒噜兽·异变": "assets/pets/mut1-rotten/mut-02.png",
+  "腐沼王·异变": "assets/pets/mut1-rotten/mut-03.png",
+  "毒沼霸主·异变": "assets/pets/mut1-rotten/mut-04.png",
+  "腐烂之母·异变": "assets/pets/mut1-rotten/mut-05.png",
+  "剧毒魔君·异变": "assets/pets/mut1-rotten/mut-06.png",
+  /* 神级宠（外观复用该线终形态立绘，config.godPets.sprite 同源；接进映射表让战斗页/地图页等
+   * 所有按名字取图的路径统一解析，不必每处单独写 godInfoOf 兜底） */
+  "腐界母神": "assets/pets/pack5-rotten/monster-04.png",
+  "血月神狐": "assets/pets/pack1-bloodfox/monster-04.png",
+  "疫神巨像": "assets/pets/pack4-plaguebear/monster-04.png",
+  "万刺冥神": "assets/pets/pack6-plaguecat/monster-04.png",
+  "骸骨神狼": "assets/pets/pack2-bonewolf/monster-04.png",
+  "毒渊神蟾": "assets/pets/pack7-bogfrog/monster-04.png",
+  "狱门神犬": "assets/pets/pack8-corpsehound/monster-04.png",
+  "霜月神兔": "assets/pets/pack3-shadowrabbit/monster-04.png"
 },
   /* 逐帧动画素材：meowa animate-run 生成的 spritesheet（网格帧），帧尺寸 256×256、6 帧 3×2
    * 只有具备动画素材的形态才会动，其余形态回退静态立绘（mount/mountAvatar）。 */
@@ -232,6 +250,23 @@ window.PetSprites = {
   "尸魔犬王": "assets/pets/avatars/pack8-corpsehound/尸魔犬王.png",
   "幽冥猎犬": "assets/pets/avatars/pack8-corpsehound/幽冥猎犬.png",
   "尸界狱主": "assets/pets/avatars/pack8-corpsehound/尸界狱主.png",
-  "幽魂犬皇": "assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png"
+  "幽魂犬皇": "assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png",
+  /* 变异头像（mut1-rotten） */
+  "腐噜兽·异变": "assets/pets/avatars/mut1-rotten/腐噜兽·异变.png",
+  "腐沼兽·异变": "assets/pets/avatars/mut1-rotten/腐沼兽·异变.png",
+  "毒噜兽·异变": "assets/pets/avatars/mut1-rotten/毒噜兽·异变.png",
+  "腐沼王·异变": "assets/pets/avatars/mut1-rotten/腐沼王·异变.png",
+  "毒沼霸主·异变": "assets/pets/avatars/mut1-rotten/毒沼霸主·异变.png",
+  "腐烂之母·异变": "assets/pets/avatars/mut1-rotten/腐烂之母·异变.png",
+  "剧毒魔君·异变": "assets/pets/avatars/mut1-rotten/剧毒魔君·异变.png",
+  /* 神级宠头像（同上：复用该线终形态） */
+  "腐界母神": "assets/pets/avatars/pack5-rotten/腐烂之母.png",
+  "血月神狐": "assets/pets/avatars/pack1-bloodfox/血月魔狐.png",
+  "疫神巨像": "assets/pets/avatars/pack4-plaguebear/瘟疫之主.png",
+  "万刺冥神": "assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png",
+  "骸骨神狼": "assets/pets/avatars/pack2-bonewolf/骸骨君主.png",
+  "毒渊神蟾": "assets/pets/avatars/pack7-bogfrog/剧毒魔神.png",
+  "狱门神犬": "assets/pets/avatars/pack8-corpsehound/尸界狱主.png",
+  "霜月神兔": "assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png"
 }
 };

@@ -47,7 +47,7 @@
   function taskDesc(q) {
     const pn = q.petName;
     switch (q.type) {
-      case 'collect': return `收集「${q.matName}」×${q.need}`;
+      case 'collect': return Array.isArray(q.matList) ? `收集「图 1~10 区域材料」每种 ×${q.need}（共 ${q.matList.length} 种）` : `收集「${q.matName}」×${q.need}`;
       case 'collect_loop': return `在「${areaName(q.area)}」收集「${q.matName}」×${q.need}，交完继续下一轮`;
       case 'kill': return pn ? `带「${pn}」击败 ${q.need} 只` : (q.area ? `在「${areaName(q.area)}」击败 ${q.need} 只` : `击败 ${q.need} 只`);
       case 'evolve': return pn ? `「${pn}」进化 ${q.need} 次` : `进化 ${q.need} 次`;
@@ -106,6 +106,14 @@
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
     if (gearCount > 0) rewardRows.push(`🎁 装备 ×${gearCount}`);
     if (expVal > 0) rewardRows.unshift(`经验 +${expVal}`);
+    // matList 多材料任务：逐种列出材料名 + 背包持有量（够 888 标绿，差的标红提示还缺多少）
+    const matRows = Array.isArray(q.matList)
+      ? q.matList.map(n => {
+          const have = (window.Materials && window.Materials.getQuantity) ? window.Materials.getQuantity(n) : 0;
+          const ok = have >= q.need;
+          return `<div class="quest-detail-text" style="color:${ok ? '#8fae8f' : '#c88a6a'}">${escapeHtml(n)}　${have} / ${q.need}${ok ? ' ✓' : '（还差 ' + (q.need - have) + '）'}</div>`;
+        }).join('')
+      : '';
 
     return `
       <div class="quest-detail">
@@ -114,6 +122,7 @@
         <div class="quest-detail-sec">
           <div class="quest-detail-head">任务需求</div>
           <div class="quest-detail-text">${escapeHtml(taskDesc(q))}</div>
+          ${matRows}
           ${q.petName ? `<div class="quest-detail-text" style="color:var(--accent-hi)">绑定宠物：${escapeHtml(q.petName)}</div>` : ''}
           <div class="quest-progress"><div class="quest-progress-bar" style="width:${pct}%"></div></div>
           <div class="quest-detail-text">进度 ${progressText(q)}</div>

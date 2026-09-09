@@ -287,7 +287,7 @@
   }
 
   /* ---------- 魂铸：把宠物血脉/觉醒特质铸进装备（独立词缀，永久不可剥离/重铸/神圣石洗） ----------
-   * 档位（config.soulCast.tiers）：普通（Lv40+/成长≥10 铸血脉 T=原阶）｜精锐（Lv40+/成长≥40 铸血脉 T+1 封顶 T1）｜传承（Lv60 终形态/成长≥60 铸觉醒 固定 T1）
+   * 档位（config.soulCast.tiers）：普通（Lv40+/成长≥10 铸血脉 T=原阶）｜精锐（Lv40+/成长≥40 铸血脉 T+1 封顶 T1）｜传承（已觉醒/成长≥60 铸觉醒 固定 T1）
    * 消耗：装备（任意稀有度）+ 1 只宠物（消失）+ 10 凝魂晶石；每件装备最多 1 条；上架后不可打造；随装备走可交易
    * 流程：本地先行（词缀+扣晶石）→ 云同步（晶石 RPC + equip_items.soul_affix）→ 成功才 removePet+deletePet
    */
@@ -305,7 +305,7 @@
     if (pet.growth < (T.minGrowth != null ? T.minGrowth : T.growth)) return { ok: false, error: T.label + '魂铸需要宠物成长 ' + (T.minGrowth != null ? T.minGrowth : T.growth) + ' 以上（当前 ' + pet.growth + '）' };
     if (T.needFinal) {
       const aw = window.Pet.getAwakenState(pet);
-      if (!aw) return { ok: false, error: '传承魂铸需要 Lv60 终形态宠物（且已解锁主动技能）' };
+      if (!aw) return { ok: false, error: '传承魂铸需要已觉醒的终形态宠物（去宠物页·觉醒页用觉醒石觉醒）' };
     }
     const haveCrystal = Materials.getQuantity(S.material);
     if (haveCrystal < C) return { ok: false, error: '需要 ' + C + ' 颗' + S.material + '（当前 ' + haveCrystal + ' 颗）：满级魂兽挂机会自动凝聚，走完新手引导也会送一份' };

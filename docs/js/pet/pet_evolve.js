@@ -40,7 +40,7 @@
     const next = nextStageOf(pet);
     if (!next) return [];   // 已到终阶，没有下一阶
     if (!next.form) {
-      return [{ to: pet.name, icon: pet.icon, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
+      return [{ to: pet.name, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
     }
     const routes = (cfg.tree && cfg.tree[pet.name]) || [];
     if (routes.length) {
@@ -49,7 +49,7 @@
       }));
     }
     // 形态树到头（终形态被重复进化等异常）：降级成淬体，保证阶段链能走完
-    return [{ to: pet.name, icon: pet.icon, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
+    return [{ to: pet.name, minLevel: next.minLevel, keepForm: true, stage: next.stage, label: next.label, desc: next.desc }];
   }
   // 当前形态是否有进化路线（不管等级/次数，用于显示进化入口）
   function hasRoute(pet) {
@@ -167,7 +167,6 @@
     const newGrowth = Math.round((oldGrowth + boost) * 10) / 10;
     const keepForm = !!route.keepForm;
     const nextName = keepForm ? pet.name : route.to;
-    const nextIcon = keepForm ? pet.icon : route.icon;
     const nextEvolveTimes = (pet.evolveTimes || 0) + 1;
 
     // ---- 同步云端（含新阶段 evolve_stage，旧库缺列时 Supabase 层自动剔除）；失败则退还素材 ----
@@ -184,7 +183,6 @@
     // ---- 云端成功后提交本地状态 ----
     pet.growth = newGrowth;
     pet.name = nextName;
-    pet.icon = nextIcon;
     pet.evolveTimes = nextEvolveTimes;
     pet.evolveStage = next.stage;
     pet.curHp = getStats(pet).hp;

@@ -19,13 +19,13 @@
   const { getActivePet, getPets, getStats, setActive, getBonusText } = window.Pet;
   const PetSprites = window.PetSprites;
 
-  // 从战斗标签（"血狐 等级：9级"）里提取纯名字，用于匹配立绘
+  // 从战斗标签（"血狐 等级：9级"）里提取纯名字，用于匹配立绘；Boss 带「霸主·」前缀也要剥掉
   function pureName(name) {
     if (!name) return '';
-    return String(name).split(' 等级：')[0].trim();
+    return String(name).replace(/^霸主·/, '').split(' 等级：')[0].trim();
   }
-  // 图标挂载：优先逐帧动画立绘 → 静态立绘 <img> → 回退 emoji。返回 true=已用立绘 / false=回退 emoji。
-  function mountIcon(el, name, fallbackEmoji) {
+  // 图标挂载：优先逐帧动画立绘 → 静态立绘 <img> → 空（不回退 emoji，2026-09-10 移除占位头像）。
+  function mountIcon(el, name) {
     if (!el) return false;
     const n = pureName(name);
     el.dataset.pet = n;
@@ -41,14 +41,14 @@
       }
       return true;
     }
-    el.textContent = fallbackEmoji != null ? fallbackEmoji : '';
+    el.textContent = '';
     return false;
   }
-  // 小尺寸图标用头像版（从立绘裁出的头部），无头像则回退 emoji
-  function mountIconAvatar(el, name, fallbackEmoji) {
+  // 小尺寸图标用头像版（从立绘裁出的头部），无素材则留空
+  function mountIconAvatar(el, name) {
     if (!el) return false;
     if (PetSprites && PetSprites.mountAvatar(el, pureName(name))) return true;
-    el.textContent = fallbackEmoji != null ? fallbackEmoji : '';
+    el.textContent = '';
     return false;
   }
 
@@ -228,14 +228,14 @@
   }
 
   /* ---------- 战斗视觉（battle.js 调用） ---------- */
-  function resetBattle(petName, petIcon, enemyName, enemyIcon, petMaxHp, enemyMaxHp) {
+  function resetBattle(petName, enemyName, petMaxHp, enemyMaxHp) {
     const enemyFighter = document.getElementById('enemy-fighter');
     if (enemyFighter) enemyFighter.style.display = '';
     bindEnemyTip();
     renderEnemyTip(getBattleEnemy());
-    mountIcon($('pet-icon'), petName, petIcon);
+    mountIcon($('pet-icon'), petName);
     $('pet-icon-name').textContent = petName;
-    mountIcon($('enemy-icon'), enemyName, enemyIcon);
+    mountIcon($('enemy-icon'), enemyName);
     $('enemy-icon-name').textContent = enemyName;
     $('enemy-hp-bar').style.width = '100%';
     $('pet-hp-bar').style.width = '100%';
@@ -243,8 +243,8 @@
     $('enemy-hp-text').textContent = `${enemyMaxHp}/${enemyMaxHp}`;
     updateEnemyTipHp(getBattleEnemy());
     // 行动条小头像同步本场图标（用头像版，小尺寸更清晰）
-    mountIconAvatar($('at-racer-pet'), petName, petIcon);
-    mountIconAvatar($('at-racer-enemy'), enemyName, enemyIcon);
+    mountIconAvatar($('at-racer-pet'), petName);
+    mountIconAvatar($('at-racer-enemy'), enemyName);
     // 敌人差异化表现：变异怪挂 is-mutant（名字血红+体型大）；上一场的击败淡出还原
     const stage = document.querySelector('#tab-battle .battle-stage');
     if (stage && stage.querySelector) {
@@ -494,7 +494,7 @@
     if (!pet) return;
     if (window.Battle && window.Battle.isRunning()) return; // 战斗中：立绘由 beginFight 快照维护
     if (window.IdleBridge && window.IdleBridge.isActive()) return; // 服务器托管挂机：敌方立绘由演出循环维护，不能藏（藏了 = 宠物打空气）
-    mountIcon($('pet-icon'), pet.name, pet.icon);
+    mountIcon($('pet-icon'), pet.name);
     $('pet-icon-name').textContent = `${pet.name} 等级：${pet.level || 1}级`;
     // 未开战：隐藏敌方（避免显示占位怪）
     const enemyFighter = document.getElementById('enemy-fighter');
@@ -517,7 +517,7 @@
       btn.dataset.id = pet.id;
       // 出战竖列用头像版（小尺寸更清晰）
       const avatarSrc = PetSprites && PetSprites.avatarOf(pet.name);
-      const iconHtml = avatarSrc ? '<img class="pet-avatar-sprite" src="' + avatarSrc + '" alt="">' : `<span>${pet.icon}</span>`;
+      const iconHtml = avatarSrc ? '<img class="pet-avatar-sprite" src="' + avatarSrc + '" alt="">' : '';
       btn.innerHTML = `<span class="roster-pet-icon">${iconHtml}</span><span class="rp-lv">${pet.level}</span>`;
       btn.onclick = () => {
         if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {
@@ -543,7 +543,7 @@
         // 复用怪物悬浮框同款结构（.enemy-tip-*），只保留宠物该有的信息，不照搬怪物"掉落信息"
         tipBox.className = 'roster-tooltip enemy-tip';
         tipBox.innerHTML = `<div class="enemy-tip-title">
-            <strong>${escapeHtml(pet.icon)} ${escapeHtml(pet.name)}</strong>
+            <strong>${escapeHtml(pet.name)}</strong>
             <span>Lv.${pet.level}</span>
             ${active && pet.id === active.id ? '<b class="enemy-type evolved">出战</b>' : ''}
           </div>

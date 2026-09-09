@@ -116,9 +116,9 @@
     // 进化阶段 / 神级宠标记（缺列时由 savePet 剔除，迁移前的旧库不受影响）
     row.evolve_stage = Math.min(5, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
     row.is_god_pet = !!pet.isGodPet;
-    // 血脉特质 / 觉醒特质 / 来源（缺列时由 savePet 剔除）
+    // 血脉特质 / 永久觉醒标记 / 来源（缺列时由 savePet 剔除）
     if (Array.isArray(pet.traits) && pet.traits.length) row.traits = pet.traits;
-    if (pet.awaken_trait) row.awaken_trait = pet.awaken_trait;
+    if (pet.awakened) row.awaken_trait = '1';   // 复用 awaken_trait 列（2026-09-10 v2：'1' = 永久觉醒）
     if (pet.source) row.source = pet.source;
     return row;
   }
