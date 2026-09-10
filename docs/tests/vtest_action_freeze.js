@@ -33,6 +33,7 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
 ctx.Config.battle.areas = [{ id: 'a', levelRange: [1, 100], enemyIds: ['e'], difficulty: 1, recGrowth: 3 }];
 ctx.Config.battle.areaEnemyStats = { a: { hp: 99999, atk: 1, def: 0 } };
+vm.runInContext(fs.readFileSync('../js/core/battle-session.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/core/battle.js', 'utf8'), ctx);
 const A = (ok, m) => { if (!ok) { console.error('FAIL: ' + m); process.exit(1); } console.log('PASS: ' + m); };
 const S = () => ctx.Battle.state;

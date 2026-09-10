@@ -225,6 +225,7 @@
       item_rarity: eq.rarity.id, item_tier: eq.tier,
       item_affixes: Equipment.flattenAffixes(eq.affixes),
       material_type, material_qty,
+      created_at: Date.now(), // 上架时间（缺了会让「最新上架」排序把假单全甩到最后、时长显示为空）
       eq                     // 完整装备对象：购买时直接入买家背包
     };
   }
@@ -284,7 +285,8 @@
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
       kind: 'material', good_id: soldMat.id, good_name: soldMat.name, good_qty: 1, good_icon: soldMat.icon || '📦',
-      material_type: payMat.name, material_qty: payQty
+      material_type: payMat.name, material_qty: payQty,
+      created_at: Date.now(), // 缺了会让「最新上架」把它们全甩到最后
     };
   }
   function makeEggListing(persona) {
@@ -301,7 +303,8 @@
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
       kind: 'egg', egg_type: base.name, egg_icon: base.icon || '🥚',
-      material_type: payMat.name, material_qty: payQty
+      material_type: payMat.name, material_qty: payQty,
+      created_at: Date.now(), // 同上：缺了排序会错乱
     };
   }
   function restockMaterials(n) {
@@ -372,9 +375,40 @@
     // 防刷材料洞：AI 只买「别人」的挂单——自己的单永远轮不到（云端 bot_buy 对自挂同样返回 self/拒收）
     const realItems = (Market.getRealItemListings ? Market.getRealItemListings() : [])
       .filter(l => !(l.seller_id && String(l.seller_id) === String(user.id)));
-    if (!realItems.length) return { bought: false };
+    const realMats = (Market.getRealMaterialListings ? Market.getRealMaterialListings() : [])
+      .filter(l => !(l.seller_id && String(l.seller_id) === String(user.id)));
+    if (!realItems.length && !realMats.length) return { bought: false };
     const ps = randomPersona();
     if (!ps) return { bought: false };
+
+    /* ---------- 材料收购（2026-09-10 万物皆可交易） ----------
+     * 玩家上架的材料也得有人买，否则「能卖」只是摆设。材料是刚需但量大，
+     * 所以用独立概率（默认 35%）而不是每轮都收，并按「标价 ÷ 份数」挑单价最低的那单。 */
+    if (realMats.length && Math.random() < (B.materialBuyChance != null ? B.materialBuyChance : 0.35)) {
+      const pick = realMats.slice().sort((a, b) =>
+        (a.material_qty / Math.max(1, a.good_qty)) - (b.material_qty / Math.max(1, b.good_qty)))[0];
+      const resMat = await Market.buyAsBotMaterial(pick.id);
+      if (!resMat.ok) {
+        const code = guardKeyOf(resMat.error);
+        if (code) pauseBuyer(code, String(resMat.error));
+      } else {
+        await Market.refresh();
+        const { data: md } = await Materials.loadCloudMaterials();
+        if (md) Materials.setCloudMaterials(md);
+        if (window.UI && UI.consoleLog) {
+          const nm = pick.good_name + ' ×' + pick.good_qty;
+          const pay = pick.material_qty + ' ' + pick.material_type;
+          if (String(pick.seller_id) === String(user.id)) {
+            UI.consoleLog('social', '🛒 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
+          } else {
+            UI.consoleLog('social', '🛒 ' + ps.nickname + ' 收购了 <b>' + nm + '</b>（' + pay + '）');
+          }
+        }
+        if (window.UI && UI.renderAll) UI.renderAll();
+        return { bought: true, itemName: pick.good_name };
+      }
+    }
+
     const items = realItems.map(x => ({ ...x, kind: 'item' }));
     const cheap = items.filter(isCheap); // 合理价判定：只收低于参考价的
     if (!cheap.length) return { bought: false }; // 不追高（patient 的 AI 尤其如此）

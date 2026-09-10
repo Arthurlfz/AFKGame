@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * ui/ui-battle.js —— 战斗页 UI
  * 职责：
  *  1. 累计统计（战斗场数 / 获得装备数）
@@ -56,6 +56,15 @@
   function updateBattleArea(area) {
     const box = $('battle-area-info');
     if (!box) return;
+    /* 爬塔进行中（副本 trial / 通天塔 tower）：顶部信息条由对应引擎写（"第 N/M 层 · 第 k/5 只"）。
+     * 这里必须让位 —— 否则任何一次 renderAll / 切页都会把它冲成野图口径
+     * （2026-09-10 浏览器实测：塔战斗时顶部显示"请先到世界地图选择一张地图"）。
+     * 用 BattleSession 判定（它覆盖整局、含层间空隙）；不能用 Battle.state.mode——层间会复位成 'wild'。 */
+    if (window.BattleSession && (window.BattleSession.is('tower') || window.BattleSession.is('trial'))) return;
+    /* 战斗页被副本/塔占用时，顶部信息条是它们在写（副本层数 / 塔层阶）；
+     * 野图这边任何一次刷新（renderAll 每隔几秒就会走到这里）都不许把它覆盖成"当前地图"。 */
+    const S = window.BattleSession;
+    if (S && !S.isIdle() && !S.is('wild')) return;
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
       : '🐣 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
@@ -420,7 +429,10 @@
   }
   // battle.js 结算时调用（伤害/暴击/吸血实际生效那一刻）→ 转飘字；业务计算零改动
   function showDamage(target, damage, type, label) {
-    if (type === 'crit') flashStage('stage-shake', 300); // 暴击：舞台震屏
+    if (type === 'crit') {
+      flashStage('stage-shake', 300); // 暴击：舞台震屏
+      flashStage('crit-impact', 400); // 暴击：屏幕边缘红脉冲
+    }
     // label：自定义飘字标签（如主动技能名"腐蚀喷吐：-1500"）；吸血固定右侧错位
     showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : (label ? { label: label } : null));
   }
@@ -451,6 +463,11 @@
     }
     btn.disabled = cooldown > 0 || queued;
     btn.textContent = queued ? `${skill.name} · 待释放` : cooldown > 0 ? `${skill.name} · 冷却 ${cooldown}` : skill.name;
+    // 悬停给出完整口径（触发概率以前 UI 全项目不展示，玩家只看到技能名）
+    btn.title = `${Math.round((skill.triggerChance || 0) * 100)}% 概率替代普攻`
+      + ` · ${Math.round(skill.damageMultiplier * 100)}% 伤害`
+      + (skill.maxHpDamageRate ? ` + 目标最大生命 ${Math.round(skill.maxHpDamageRate * 100)}%` : '')
+      + ` · ${skill.cooldownTurns} 回合冷却`;
   }
   (function bindActiveSkill() {
     const btn = $('btn-active-skill');
@@ -492,8 +509,12 @@
   function syncCombatantSnapshot() {
     const pet = getActivePet();
     if (!pet) return;
-    if (window.Battle && (window.Battle.isRunning() || (window.Battle.isTrialMode && window.Battle.isTrialMode()))) return; // 战斗中/副本进行中：立绘由开场快照维护
-    if (window.IdleBridge && window.IdleBridge.isActive()) return; // 服务器托管挂机：敌方立绘由演出循环维护，不能藏（藏了 = 宠物打空气）
+    /* 战斗页被任何一方占用（本地挂机 / 托管演出 / 副本 / 塔，含层间空隙）时，立绘与敌方显隐
+     * 由正在打的那一方维护 —— 这里再同步一次就等于把台上正在打的怪抹掉。
+     * 判定用占用权这一个事实源，不再拼 isRunning/isTrialMode/IdleBridge 三个状态
+     *（以前市场轮询每 5 秒触发一次 renderAll，层间空隙正好漏判 → 守关者立绘闪没）。 */
+    const S = window.BattleSession;
+    if (S && !S.isIdle()) return;
     mountIcon($('pet-icon'), pet.name);
     $('pet-icon-name').textContent = `${pet.name} 等级：${pet.level || 1}级`;
     // 未开战：隐藏敌方（避免显示占位怪）
@@ -526,7 +547,7 @@
         }
         setActive(pet.id);
         if (UI.addLog) UI.addLog(`🐾 ${pet.name} 出战！`);
-        if (!(window.Battle && window.Battle.isRunning())) syncCombatantSnapshot();
+        syncCombatantSnapshot(); // 战斗页被占用时它自己会让位（见函数内说明）
         renderRoster();
         if (UI.renderAll) UI.renderAll();
       };
@@ -615,7 +636,18 @@
   UI.attackRecoverMs = attackRecoverMs;
   UI.animateHit = animateHit;
   UI.animateVictory = animateVictory;
+
+  // 升级金色光环：宠物立绘脚下金色光环扩散
+  function showLevelUp() {
+    const petIcon = pet-icon;
+    if (!petIcon) return;
+    petIcon.classList.remove('level-up');
+    void petIcon.offsetWidth;
+    petIcon.classList.add('level-up');
+    setTimeout(() => petIcon.classList.remove('level-up'), 1600);
+  }
   UI.showDamage = showDamage;
+  UI.showLevelUp = showLevelUp;
   UI.showFloatingText = showFloatingText;
   UI.updateStatus = updateStatus;
   UI.renderBattleButton = renderBattleButton;

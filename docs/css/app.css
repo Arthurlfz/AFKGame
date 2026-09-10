@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * css/app.css —— 界面外壳样式（登录页 / 顶栏 / 侧边栏 / 页面容器 / 对话气泡）
  * 说明：只定义外壳与新增组件的样式，不覆盖游戏原有组件类（.panel/.btn/.tab-page 等）。
  * 所有颜色/尺寸/字体引用 css/vars.css 变量；布局为弹性结构，便于后续移动端适配。
@@ -17,7 +17,7 @@
   z-index: var(--z-login);
   display: flex; align-items: center; justify-content: center;
   overflow-y: auto; /* 极矮视口下登录面板可滚动 */
-  background: var(--bg);
+  background: var(--bg) url("../assets/login-bg.jpg") center / cover no-repeat;
 }
 /* CSS 装饰背景：无图片，用低对比色块模拟金属氛围 */
 .login-screen::before {
@@ -110,7 +110,8 @@
   color: var(--accent-hi); background: var(--inset);
   border-left-color: var(--accent); border-top-color: var(--line); border-bottom-color: var(--line);
 }
-.sb-btn .sb-icon { font-size: 1.167rem; flex: none; }
+.sb-btn .sb-icon { font-size: 1.167rem; flex: none; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; }
+.sb-btn .sb-icon img { width: 18px; height: 18px; object-fit: contain; }
 /* 侧边栏分隔线（把主导航和任务/设置隔开） */
 .sb-btn.sb-divider { border-top:1px solid var(--line); margin-top:8px; padding-top:10px; }
 

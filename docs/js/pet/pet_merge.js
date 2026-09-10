@@ -342,12 +342,20 @@
     baby.exp = 0;
     baby.traits = inheritSynthTraits(main, sub, mutated);   // 血脉特质继承（合成）
     addPet(baby);
-    // 新宠云端建档（合成是新增一只，不是改主宠）。失败必须上报调用方：
-    // 本地有、云端没有 → 刷新页面这只新宠直接消失（材料已扣、素材宠已删，玩家白亏）
+    // 新宠云端建档（合成是新增一只，不是改主宠）。
+    // 顺序铁律（2026-09-10）：建档【确认成功】之前，素材宠和材料一律不动。
+    // 事故复盘：旧代码建档失败只 console.warn，后面照样删两只素材宠 → 新宠只存在本地，
+    // 刷新即凭空消失（玩家白亏两只素材 + 材料；云端 0 条「·异变」行可证）。
+    // 现在建档失败 = 整单回滚：新宠不入列、合成之石/道具全退、素材宠原地不动，可原样重试。
     const saved = await Supabase.savePet(baby);
     if (saved.data && saved.data.id) baby.cloudId = saved.data.id;
-    const cloudWarn = saved.error ? ('新宠云端建档失败：' + saved.error.message) : null;
-    if (cloudWarn) console.warn(cloudWarn);
+    if (!baby.cloudId) {
+      const why = (saved.error && saved.error.message) || '未知错误';
+      removePet(baby.id);
+      Materials.gain(S.material.name, S.material.amount);
+      if (synthItem) Materials.gain(synthItem.name, 1);
+      return { error: '新宠云端建档失败，材料与素材宠已原样退还，请稍后重试（' + why + '）' };
+    }
 
     // 两只素材宠都消失。顺序铁律（2026-09-08）：先删云端、成功才删本地——
     // 反过来时云端删除失败（网络抖动）素材宠会在刷新后"复活"，看起来就是"合成一次却多出一只"。
@@ -374,7 +382,7 @@
     // 任务进度上报：所有 type=synth 的任务 +1
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('synth', 1);
 
-    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, cloudWarn, isGod, synthItem, godStatCoeffBonus, resurrected };
+    return { ok: true, baby, mainName: main.name, subName: sub.name, mutated, newGrowth, isGod, synthItem, godStatCoeffBonus, resurrected };
   }
 
   /* ---------- 血脉特质继承 / 植入（设计 v1） ---------- */

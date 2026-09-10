@@ -89,7 +89,10 @@ begin
   for update;
   if not found then return 'notfound'; end if;
 
-  if v_listing.seller_id = v_buyer or v_listing.seller_id::text = v_buyer::text then
+  -- ⚠️ 必须转 text 比较：egg_listings.seller_id 是 text、v_buyer 是 uuid，
+  -- Postgres 没有 text = uuid 操作符。原写法 `v_listing.seller_id = v_buyer or ...`
+  -- 会让【每次买蛋都抛 42883】—— 2026-09-10 实测确认并修复，别再写回去。
+  if v_listing.seller_id::text = v_buyer::text then
     return 'self';
   end if;
 
@@ -101,8 +104,9 @@ begin
     and quantity >= v_listing.material_qty;
   if not found then return 'insufficient'; end if;
 
+  -- ⚠️ materials.user_id 是 uuid：text 变量不能直接插，必须 ::uuid（否则 42804）
   insert into public.materials (user_id, name, quantity)
-  values (v_listing.seller_id, v_listing.material_type, v_net)
+  values (v_listing.seller_id::uuid, v_listing.material_type, v_net)
   on conflict (user_id, name) do update
     set quantity = public.materials.quantity + excluded.quantity;
 
@@ -110,10 +114,11 @@ begin
   insert into public.pet_egg (owner_id, egg_type, status) values (v_buyer::text, v_listing.egg_type, '未孵化');
   update public.egg_listings set status = 'sold' where id = p_listing_id;
 
-  insert into public.trade_records (player_id, role, item_name, material_type, price_qty, tax_qty, net_qty)
+  insert into public.trade_records
+    (player_id, role, item_name, material_type, price_qty, tax_qty, net_qty, listing_id, counterparty)
   values
-    (v_buyer::text,             'buy',  v_listing.egg_type || '蛋', v_listing.material_type, v_listing.material_qty, 0,    v_listing.material_qty),
-    (v_listing.seller_id::text, 'sell', v_listing.egg_type || '蛋', v_listing.material_type, v_listing.material_qty, v_tax, v_net);
+    (v_buyer::text,             'buy',  v_listing.egg_type || '蛋', v_listing.material_type, v_listing.material_qty, 0,    v_listing.material_qty, p_listing_id, v_listing.seller_id),
+    (v_listing.seller_id,       'sell', v_listing.egg_type || '蛋', v_listing.material_type, v_listing.material_qty, v_tax, v_net,                 p_listing_id, v_buyer::text);
 
   return 'ok';
 end;

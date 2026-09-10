@@ -63,4 +63,15 @@ docs/css/ui-onboarding.css
 docs/AI假人经济系统策划_v1.md
 docs/游戏UI体检报告.md
 
+# ===== 本地垃圾（2026-09-10 整理：以前没盖住，`git add -A` 会误入库）=====
+# 事故背景：2026-09-04 `git add -A` 把误删文件一起提交过（commit 26f8f6c），
+# 所以凡是「本地产物 / 快照 / CLI 状态」一律在这里挡掉，别指望下次记得手挑。
+.tmp-cli/
+_backup_rollback*/
+supabase/.temp/
+$null
+docs/tests/_*.txt
+docs/tests/out_*.txt
+docs/tests/result.txt
+
 

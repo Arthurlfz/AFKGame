@@ -120,3 +120,59 @@
 /* 装备页顶部：宠物蛋提示条 / 筛选 / 工具栏 紧凑对齐 */
 #tab-equip .inv-filter{margin-bottom:6px;}
 #tab-equip .inv-toolbar{padding:4px 2px 8px;}
+
+/* ============================================================
+ * 交易行补强（2026-09-10）：捡漏/比价标签 · 分页 · 挂单额度 · 上架查价
+ * 参考 POE 交易站（价格区间/分页/比价）与火炬之光交易行（查价/挂单格子/税后到手）
+ * ============================================================ */
+/* 捡漏 / 低于市价 / 高于市价 标签（市场捡漏 = 三爽点之一） */
+.mk-deal{
+  display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;
+  font-size:.7rem;font-weight:600;white-space:nowrap;
+  color:#6fd08c;background:rgba(111,208,140,.14);border:1px solid rgba(111,208,140,.34);
+}
+.mk-deal--leak{color:#d7a64a;background:rgba(215,166,74,.16);border-color:rgba(215,166,74,.42);}
+.mk-deal--high{color:#d08a6f;background:rgba(208,138,111,.14);border-color:rgba(208,138,111,.34);}
+/* 卡片底行 [价格][标签][按钮]：把标签右侧空间吃掉，保证价格+标签靠左、按钮靠右 */
+.mk-card-foot > .mk-deal{margin-right:auto;}
+
+/* 分页：显示更多（POE 翻页 / 火炬翻页的等价物） */
+.mk-more{
+  display:block;width:100%;margin:2px 0 10px;padding:7px;
+  font-family:inherit;font-size:.82rem;
+  color:var(--text-dim);background:rgba(255,255,255,.04);
+  border:1px dashed var(--line);border-radius:10px;cursor:pointer;
+  transition:border-color .15s ease,color .15s ease;
+}
+.mk-more:hover{border-color:var(--accent);color:var(--text);}
+
+/* 挂单额度条（Config.trade.maxListings 落地后的可视反馈） */
+.mk-quota{
+  padding:8px 12px;margin-bottom:10px;border-radius:10px;font-size:.84rem;color:var(--text-dim);
+  background:rgba(255,255,255,.035);border:1px solid var(--line);
+}
+.mk-quota b{color:var(--text);}
+.mk-quota.is-full{color:#d08a6f;border-color:rgba(208,138,111,.34);background:rgba(208,138,111,.1);}
+
+/* 上架弹窗：查价 + 税后到手 */
+.sell-ref{
+  padding:9px 11px;border-radius:9px;font-size:.82rem;line-height:1.6;
+  background:rgba(255,255,255,.035);border:1px solid var(--line);color:var(--text-dim);
+}
+.sell-ref b{color:var(--accent-hi);}
+.sell-ref-good{color:#6fd08c;}
+.sell-ref-bad{color:#d08a6f;}
+
+/* 上架弹窗：收款物分组 tab 上的数量徽标（腐印 12 这类大类要一眼看到） */
+.pay-tab-num{
+  display:inline-block;margin-left:4px;padding:0 5px;border-radius:6px;
+  font-size:.7rem;opacity:.75;background:rgba(0,0,0,.25);
+}
+
+/* 离线成交汇总（弹在对话气泡里） */
+.mo-title{font-size:.9rem;margin-bottom:6px;}
+.mo-row{display:flex;gap:8px;align-items:baseline;font-size:.82rem;line-height:1.75;}
+.mo-time{color:var(--text-faint);flex:none;font-variant-numeric:tabular-nums;}
+.mo-name{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mo-price{flex:none;color:#d7a64a;}
+.mo-sum{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:.85rem;color:var(--text-dim);}

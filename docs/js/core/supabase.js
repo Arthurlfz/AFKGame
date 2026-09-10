@@ -106,12 +106,17 @@
   // 宠物对象 → 云端行；includeExp=false 时不带 exp（旧库缺列场景）
   function petToRow(pet, includeExp) {
     const row = {
-      name: pet.name, icon: pet.icon,
+      name: pet.name,
+      // icon 列是 NOT NULL 且有默认 '🟢'；2026-09-10 起客户端不再用 emoji（立绘走 PetSprites），
+      // 新宠物 icon 为 null → 显式发 null 会撞 23502（PostgREST 400）→ 建档永远失败 →
+      // 宠物拿不到 cloudId，30 秒补建档自愈又不停重试（控制台刷屏 400）。
+      // 空 icon 就不带这一列，让 DB 走默认值。
       growth: pet.growth, level: pet.level,
       evolve_times: pet.evolveTimes || 0, reborn_count: pet.rebornCount || 0,
       hp: pet.baseHp, attack: pet.baseAtk, defense: pet.baseDef, speed: pet.baseSpd,
       cur_hp: Math.round(pet.curHp)
     };
+    if (pet.icon) row.icon = pet.icon;
     if (includeExp) row.exp = Math.max(0, Math.round(pet.exp || 0));
     // 进化阶段 / 神级宠标记（缺列时由 savePet 剔除，迁移前的旧库不受影响）
     row.evolve_stage = Math.min(5, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
@@ -335,6 +340,41 @@
   // 取回蛋挂单：撤销自己的 active 挂单，蛋退回
   async function cancelEggListing(listingId) {
     return client.rpc('cancel_egg_listing', { p_listing_id: listingId });
+  }
+
+  /* ---------- 材料交易（material_listings 表 + list_material / buy_material / cancel / bot_buy）
+   * 万物皆可交易（2026-09-10）：玩家材料也能上架（此前只能买 AI 的货）。
+   * 未跑 migrate_material_listings.sql 的库：这里会返回表不存在的错误，
+   * UI 侧按「材料上架未开通」降级提示，不影响宠物/装备/蛋交易。 ---------- */
+  async function listMaterial(goodName, goodQty, materialType, materialQty) {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: new Error('请先登录') };
+    return client.rpc('list_material', {
+      p_good: goodName, p_good_qty: goodQty,
+      p_material_type: materialType, p_material_qty: materialQty
+    });
+  }
+  async function fetchMaterialMarket() {
+    return client.from('material_listings')
+      .select('id,seller_id,good_name,good_qty,material_type,material_qty,created_at')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+  }
+  async function fetchMyListedMaterialIds() {
+    const user = await getCurrentUser();
+    if (!user) return { data: [], error: null };
+    return client.from('material_listings')
+      .select('id,good_name,good_qty').eq('seller_id', user.id).eq('status', 'active');
+  }
+  async function buyMaterial(listingId) {
+    return client.rpc('buy_material', { p_listing_id: listingId });
+  }
+  async function cancelMaterialListing(listingId) {
+    return client.rpc('cancel_material_listing', { p_listing_id: listingId });
+  }
+  // 流浪商人（系统假买家）收购玩家材料挂单
+  async function botBuyMaterial(listingId) {
+    return client.rpc('bot_buy_material', { p_listing_id: listingId });
   }
 
   /* ---------- 交易记录（trade_records 表） ---------- */
@@ -568,6 +608,7 @@
     consumeEgg, loadEggCount, addEgg,
     getMyWallet, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
+    listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
     fetchQuestProgress, saveQuestProgress,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
     loadMyProfile, setMyNickname, getMyProfile

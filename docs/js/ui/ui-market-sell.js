@@ -16,20 +16,39 @@
   /* ---------- 定价弹窗（点「上架」弹出：选收款物 + 数量 + 确认） ---------- */
   let sellModalState = null; // { kind: 'pet'|'item'|'egg', payload, selectedMat }
 
+  /* ---------- 上架可选收款物（唯一来源 = Config.trade.materials 白名单） ----------
+   * 2026-09-10 修：旧写法手写 3 组，其中「进化素材」硬编码 `name === '进化素材'`
+   * （精粹 / 传说进化素材被剔掉），而通天塔新增的 12 个「腐印」（category='affix'）
+   * 不属于任何一组 —— config 里明明能交易，界面上永远选不到。
+   * 现在按 category 自动归组：只要进了 Config.trade.materials 白名单，这里就一定选得到。 */
+  const PAY_GROUP_ORDER = [
+    { cat: 'stone', key: 'stone', label: '通货' },
+    { cat: 'evo', key: 'evo', label: '进化素材' },
+    { cat: 'evolve', key: 'evolve', label: '进化丹' },
+    { cat: 'synth', key: 'synth', label: '合成石' },
+    { cat: 'affix', key: 'affix', label: '腐印' },
+    { cat: 'beast', key: 'beast', label: '兽类素材' },
+    { cat: 'egg', key: 'egg', label: '宠物蛋' },
+    { cat: 'soul', key: 'soul', label: '魂石' },
+  ];
   function buildPaymentPanel() {
-    const evoMatName = (Config.pet.evolution && Config.pet.evolution.materialName) || '进化素材';
-    const evolutionItems = Config.trade.materials
-      .filter(m => m.category === 'evo'&& m.name === evoMatName)
-      .map(m => ({ id: m.id, name: m.name, icon: m.icon, category: 'evo'}));
-    const paymentGroups = [
-      { key: 'currency', label: '通货', items: Config.trade.materials.filter(m => m.category === 'stone'&& Market.isPaymentMaterial(m.name)) },
-      { key: 'evo', label: '进化素材', items: evolutionItems },
-      { key: 'other', label: '其他', items: Config.trade.materials.filter(m => ['egg', 'beast', 'soul'].includes(m.category) && Market.isPaymentMaterial(m.name)) },
-    ];
-    return paymentGroups;
+    const mats = (Config.trade.materials || []).filter(m => Market.isPaymentMaterial(m.name));
+    const groups = [];
+    const push = (key, label, items) => { if (items.length) groups.push({ key, label, items }); };
+    for (const g of PAY_GROUP_ORDER) push(g.key, g.label, mats.filter(m => (m.category || 'other') === g.cat));
+    // 兜底：config 以后新增了没登记过的 category，也不会在界面上凭空消失
+    const known = PAY_GROUP_ORDER.map(g => g.cat);
+    push('misc', '其他', mats.filter(m => known.indexOf(m.category || 'other') < 0));
+    return groups;
   }
 
   function openSellModal(kind, payload) {
+    // 挂单额度校验（Config.trade.maxListings 以前只写在配置和百科里，从没拦过人）
+    const quota = Market.listQuota ? Market.listQuota() : null;
+    if (quota && !quota.ok) {
+      showToast('❌ 挂单已满', `最多同时挂 ${quota.max} 单（宠物 / 装备 / 蛋共用），先取回一件再挂`);
+      return;
+    }
     const paymentGroups = buildPaymentPanel();
     let mask = $('mk-sell-modal');
     if (!mask) {
@@ -51,19 +70,23 @@
     sellModalState = { kind, payload, selectedMat: ''};
 
     const title = kind === 'pet'? `${payload.name}（成长${payload.growth} · Lv.${payload.level}）`
-      : kind === 'item'? `${payload.name}` : `${window.Drop.makeEggName(payload)}`;
+      : kind === 'item'? `${payload.name}`
+        : kind === 'material'? `${payload.name} ×${payload.qty}`
+          : `${window.Drop.makeEggName(payload)}`;
     const avatar = (kind === 'pet'&& window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(payload.name) : null;
     const body = $('mk-sell-body');
     body.innerHTML = `
       <div class="mk-sell-target">
         ${kind === 'pet'
-          ? (avatar ? `<img class="mk-avatar" src="${avatar}">` : '<div class="mk-avatar mk-avatar--item="></div>')
-          : kind === 'item'? '<div class="mk-avatar mk-avatar--item="></div>': '<div class="mk-egg-icon"></div>'}
+          ? (avatar ? `<img class="mk-avatar" src="${avatar}">` : '<div class="mk-avatar mk-avatar--item"></div>')
+          : kind === 'item'? '<div class="mk-avatar mk-avatar--item"></div>'
+            : kind === 'material'? `<div class="mk-egg-icon">${Market.findMaterial(payload.name).icon || '📦'}</div>`
+              : '<div class="mk-egg-icon">🥚</div>'}
         <div class="mk-card-info"><div class="mk-name">${escapeHtml(title)}</div><div class="mk-meta">选择收款物并定价</div></div>
       </div>
       <div class="sell-payment">
         <div class="sell-payment-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-          ${paymentGroups.map((g, gi) => `<button class="btn-mini ${gi === 0 ? 'primary': 'ghost'} pay-tab" data-pay-tab="${g.key}">${g.label}</button>`).join('')}
+          ${paymentGroups.map((g, gi) => `<button class="btn-mini ${gi === 0 ? 'primary': 'ghost'} pay-tab" data-pay-tab="${g.key}">${g.label}<span class="pay-tab-num">${g.items.length}</span></button>`).join('')}
         </div>
         ${paymentGroups.map((g, gi) => `
           <div class="sell-payment-group" data-pay-group="${g.key}" style="${gi === 0 ? '': 'display:none'}">
@@ -72,10 +95,16 @@
             </div>
           </div>`).join('')}
       </div>
+      ${kind === 'material' ? `
       <div class="mk-sell-price-row">
-        <label>上架数量（≥1）</label>
+        <label>出售数量（持有 ${payload.qty}）</label>
+        <input type="number" class="mk-sell-qty-input" id="mk-sell-good-qty" min="1" max="${payload.qty}" value="${payload.qty}">
+      </div>` : ''}
+      <div class="mk-sell-price-row">
+        <label>要收多少份（≥1）</label>
         <input type="number" class="mk-sell-qty-input" id="mk-sell-qty" min="1" value="1">
       </div>
+      <div class="sell-ref" id="mk-sell-ref"></div>
       <div class="hint" style="line-height:1.6">每满 <b>${Config.trade.taxPer}</b> 个材料收 <b>${Config.trade.taxAmount}</b> 个税（不满不收），税由卖家承担。</div>`;
 
     // 收款物 tab 切换
@@ -90,35 +119,79 @@
         });
       };
     });
+
+    /* 查价 + 税后到手（参考火炬之光交易行的「上架查价」）：
+     * 参考价 = 同类商品 + 同收款材料 的在售标价中位数；随收款物/数量实时刷新。
+     * 只改这个容器的内容，不重渲染面板，所以输入时不会丢焦点。 */
+    const readQty = () => Number(($('mk-sell-qty') || {}).value) || 0;
+    const refreshRef = () => {
+      const refBox = $('mk-sell-ref');
+      if (!refBox) return;
+      const matName = sellModalState.selectedMat;
+      const qty = readQty();
+      const info = (UI.marketRefPrice && matName) ? UI.marketRefPrice(kind, payload, matName) : null;
+      const tax = Market.calcTax(qty);
+      const lines = [];
+      if (info && info.median) {
+        let s = `同类在售 ${info.samples} 件，中位价 <b>${Math.round(info.median * 10) / 10}</b> ${matName}`;
+        if (qty > 0) {
+          const diff = (info.median - qty) / info.median;
+          if (diff >= (Config.trade.dealDiscount || 0.2)) s += ` · <span class="sell-ref-good">比市价低 ${Math.round(diff * 100)}%，好卖</span>`;
+          else if (diff <= -(Config.trade.overpriceMarkup || 0.25)) s += ` · <span class="sell-ref-bad">比市价高 ${Math.round(-diff * 100)}%，可能滞销</span>`;
+        }
+        lines.push(s);
+      } else {
+        lines.push(`<span class="hint">同类在售样本不足${info ? '（仅 ' + info.samples + ' 件）' : ''}，暂无参考价</span>`);
+      }
+      lines.push(`税 ${tax}，你实收 <b>${Math.max(0, qty - tax)}</b> ${matName || ''}`);
+      refBox.innerHTML = lines.map(t => '<div class="sell-ref-line">' + t + '</div>').join('');
+    };
+
     // 收款物选择
     body.querySelectorAll('.pay-item').forEach(btn => {
       btn.onclick = () => {
         body.querySelectorAll('.pay-item').forEach(x => x.classList.remove('primary'));
         btn.classList.add('primary');
         sellModalState.selectedMat = btn.dataset.payName || '';
+        refreshRef();
       };
     });
     // 默认选第一个收款物
     const firstPay = body.querySelector('.pay-item');
     if (firstPay) { firstPay.classList.add('primary'); sellModalState.selectedMat = firstPay.dataset.payName || ''; }
+    const qtyEl = $('mk-sell-qty');
+    if (qtyEl) qtyEl.oninput = refreshRef;
+    refreshRef();
 
     $('mk-sell-cancel').onclick = () => { mask.style.display = 'none'; };
-    $('mk-sell-ok').onclick = async () => {
+    // 上架是多次云端往返：按钮锁 + 载入态，防连点重复挂单（铁律：异步写操作必须闸门）
+    const okBtn = $('mk-sell-ok');
+    const readGoodQty = () => Number(($('mk-sell-good-qty') || {}).value);
+    okBtn.onclick = () => UI.runWithLoading(okBtn, '上架中…', async () => {
       const qty = Number($('mk-sell-qty').value);
       if (!sellModalState.selectedMat) { showToast('上架失败', '请选择收款物'); return; }
       if (!Number.isInteger(qty) || qty < 1) { showToast('上架失败', '请填正整数数量'); return; }
       const mat = sellModalState.selectedMat;
       let res = null;
-      if (kind === 'pet') res = await Market.listPet(payload, mat, qty);
-      else if (kind === 'item') res = await Market.listItem(payload, mat, qty);
-      else res = await Market.listEgg(payload, mat, qty);
+      let name = '';
+      if (kind === 'pet') { res = await Market.listPet(payload, mat, qty); name = payload.name; }
+      else if (kind === 'item') { res = await Market.listItem(payload, mat, qty); name = payload.name; }
+      else if (kind === 'material') {
+        const gq = readGoodQty();
+        if (!Number.isInteger(gq) || gq < 1) { showToast('上架失败', '请填正整数出售数量'); return; }
+        if (gq > payload.qty) { showToast('上架失败', `最多只能卖 ${payload.qty} 份`); return; }
+        res = await Market.listMaterial(payload.name, gq, mat, qty);
+        name = `${payload.name} ×${gq}`;
+      }
+      else { res = await Market.listEgg(payload, mat, qty); name = window.Drop.makeEggName(payload); }
       if (res.error) { showToast('上架失败', res.error); return; }
-      const name = kind === 'pet'? payload.name : kind === 'item'? payload.name : window.Drop.makeEggName(payload);
+      // 材料：云端 list_material 已原子扣库存，本地同步减（与购买流程同口径）
+      if (kind === 'material') Materials.spendLocal(payload.name, readGoodQty() || 0);
       showToast('上架成功', `${name} 已挂到市场，收 ${qty} ${mat}`);
       mask.style.display = 'none';
       sellModalState = null;
       UI.renderAll();
-    };
+    });
     mask.style.display = 'flex';
   }
 
@@ -136,11 +209,15 @@
       return;
     }
 
-    // 与级联筛选联动：按当前市集「类型」过滤上架分区（全部/宠物/装备；筛装备时隐藏宠物蛋）
+    /* 与级联筛选联动：按当前市集「类型」过滤上架分区。
+     * 「材料」不是玩家可上架的品类（能卖的是宠物/装备/蛋，材料只当收款物），
+     * 所以 kind='material' 时不过滤，否则「我的上架」会看起来一片空白。 */
     const mf = (UI.getMarketFilters ? UI.getMarketFilters() : null) || {};
-    const showPet = !mf.kind || mf.kind === 'all' || mf.kind === 'pet';
-    const showItem = !mf.kind || mf.kind === 'all' || mf.kind === 'item';
-    const showEgg = mf.kind !== 'item';
+    const k = mf.kind || 'all';
+    const showAll = k === 'all' || k === 'material';
+    const showPet = showAll || k === 'pet';
+    const showItem = showAll || k === 'item';
+    const showEgg = k !== 'item';
 
     const pets = getPets().filter(p => p.cloudId && showPet);
     const equips = getInventory().filter(e => e.cloudId && showItem);
@@ -148,9 +225,37 @@
     const eggMap = (Drop && Drop.getEggs) ? Drop.getEggs() : {};
     const eggEntries = Object.entries(eggMap).filter(([, n]) => n > 0 && showEgg);
 
-    const total = pets.length + equips.length + eggEntries.length;
+    /* 材料上架（2026-09-10「万物皆可交易」）：列出手里有的、在白名单里的材料。
+     * 以前只有 AI 能卖材料 —— 玩家从通天塔/守关 Boss 打出来的高价值材料完全没有出口。 */
+    const showMat = showAll || k === 'material';
+    const held = (Materials.getLocal ? Materials.getLocal() : {});
+    const matEntries = showMat
+      ? Object.keys(held)
+        .filter(n => held[n] > 0 && Market.isPaymentMaterial(n))
+        .map(n => ({ name: n, qty: held[n] }))
+        .sort((a, b) => b.qty - a.qty)
+      : [];
+
+    const total = pets.length + equips.length + eggEntries.length + matEntries.length;
     const cnt = $('rpCount');
     if (cnt) cnt.textContent = '我的 ' + total + ' 件';
+
+    // 挂单额度条：宠物 + 装备 + 蛋 共用 Config.trade.maxListings
+    const quota = Market.listQuota ? Market.listQuota() : null;
+    if (quota) {
+      const bar = document.createElement('div');
+      bar.className = 'mk-quota' + (quota.ok ? '' : ' is-full');
+      bar.innerHTML = `挂单额度 <b>${quota.used}/${quota.max}</b>`
+        + (quota.ok ? `　还可挂 ${quota.left} 单` : '　已满，先取回一件再挂');
+      target.appendChild(bar);
+    }
+    // 「材料」类型下的说明：材料不是可上架品类，别让玩家以为这里该有材料卡
+    if (k === 'material') {
+      const tip = document.createElement('div');
+      tip.className = 'mk-quota';
+      tip.innerHTML = '材料不是可上架的品类：能卖的是宠物 / 装备 / 宠物蛋；材料只在「定价」弹窗里作为收款物出现。';
+      target.appendChild(tip);
+    }
 
     // ---- 宠物上架（卡片） ----
     if (pets.length) {
@@ -188,8 +293,24 @@
       target.appendChild(grid);
     }
 
-    if (!pets.length && !equips.length && !eggEntries.length) {
-      target.innerHTML = '<div class="mk-empty">还没有可上架的物品（宠物/装备/蛋）</div>';
+    // ---- 材料上架（以物易物：卖 N 份某材料，收 M 份某材料） ----
+    if (matEntries.length) {
+      const sec = document.createElement('div');
+      sec.className = 'mk-section';
+      sec.innerHTML = '材料上架<span class="mk-count">' + matEntries.length + ' 种</span>';
+      target.appendChild(sec);
+      const grid = document.createElement('div');
+      grid.className = 'mk-grid';
+      for (const entry of matEntries) grid.appendChild(buildSellMaterialCard(entry));
+      target.appendChild(grid);
+    }
+
+    if (!pets.length && !equips.length && !eggEntries.length && !matEntries.length) {
+      // 用 append 而不是 innerHTML：否则会把上面的「挂单额度」条一起覆盖掉
+      const empty = document.createElement('div');
+      empty.className = 'mk-empty';
+      empty.textContent = '还没有可上架的物品（宠物/装备/蛋）';
+      target.appendChild(empty);
     }
   }
 
@@ -273,6 +394,30 @@
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${window.Drop.makeEggName(baseName)} 已下架`); UI.renderAll(); }
     } : () => openSellModal('egg', baseName);
+    return div;
+  }
+
+  /* ---- 上架用材料卡（以物易物：卖 N 份某材料 ←→ 收 M 份某材料） ---- */
+  function buildSellMaterialCard(entry) {
+    const div = document.createElement('div');
+    div.className = 'mk-card';
+    const mat = Market.findMaterial(entry.name);
+    const listed = Market.getMaterialListing ? Market.getMaterialListing(entry.name) : null;
+    div.innerHTML = `
+      <div class="mk-card-top">
+        <div class="mk-egg-icon">${mat.icon || '📦'}</div>
+        <div class="mk-card-info">
+          <div class="mk-name">${escapeHtml(entry.name)}</div>
+          <div class="mk-meta">持有 ×${entry.qty}${listed ? ' · 已挂 ×' + (listed.goodQty || 0) : ''}</div>
+        </div>
+      </div>
+      <div class="mk-card-foot"><button class="mk-btn ${listed ? 'recall' : 'buy'}">${listed ? '取回' : '上架'}</button></div>`;
+    const btn = div.querySelector('.mk-btn');
+    btn.onclick = listed ? async () => {
+      const res = await Market.cancelMaterial(listed.listingId);
+      if (res.error) showToast('取回失败', res.error);
+      else { showToast('已取回', `${entry.name} ×${listed.goodQty || 0} 已回到背包`); UI.renderAll(); }
+    } : () => openSellModal('material', entry);
     return div;
   }
 

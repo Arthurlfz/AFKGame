@@ -62,6 +62,8 @@ ctx.Materials = {
   gain: (name, qty) => gained.push([name, qty])
 };
 ctx.Battle = battleStub;
+// 战斗页占用权（副本 claim('trial') 依赖它）：与浏览器同序，在引擎之前加载
+vm.runInContext(fs.readFileSync('../js/core/battle-session.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-access.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-rewards.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-engine.js', 'utf8'), ctx);

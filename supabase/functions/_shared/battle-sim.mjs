@@ -349,7 +349,9 @@ function simulateFight(input) {
     lifesteal: enemy.lifesteal != null ? enemy.lifesteal : 0,
     pen: enemy.pen != null ? enemy.pen : 0,
     dmgBonus: enemy.dmgBonus != null ? enemy.dmgBonus : 0,
-    dr: enemy.dr != null ? enemy.dr : 0
+    dr: enemy.dr != null ? enemy.dr : 0,
+    // 塔怪主动技（2026-09-10）：只有塔怪会带；野图怪 undefined → 下方判定一个随机数都不消耗
+    skill: enemy.skill
   };
   const P = {
     name: pet.name, icon: pet.icon, level: lv,
@@ -363,6 +365,7 @@ function simulateFight(input) {
   const activeSkill = skillDef || null;
   const awakenMult = (getAwakenState(pet, config) || {}).damage || 0;
   let skillCooldown = 0, skillQueued = false;
+  let enemySkillCd = 0, enemySkillQueued = null;   // 塔怪技能（野图怪恒 0/null）
   // 血统
   const bl = getBloodline(pet, config);
   let killBuffActive = !!input.pendingKillBuff;
@@ -392,13 +395,25 @@ function simulateFight(input) {
     const atkData = isPet ? P : E;
     const defData = isPet ? E : P;
     // 主动技能概率触发（只消耗一次 random；伤害 random 在 hitAt 后才消耗）
-    if (isPet && activeSkill && skillCooldown <= 0 && !skillQueued && rnd() < (activeSkill.triggerChance || 0.30)) {
-      skillQueued = true;
+    if (isPet) {
+      if (activeSkill && skillCooldown <= 0 && !skillQueued && rnd() < (activeSkill.triggerChance || 0.30)) {
+        skillQueued = true;
+      }
+    } else if (E.skill) {
+      // 塔怪主动技：野图怪 E.skill 为 undefined → 不消耗随机数（与 battle.js 同序）
+      if (enemySkillCd <= 0 && !enemySkillQueued && rnd() < (E.skill.triggerChance || 0.25)) {
+        enemySkillQueued = E.skill;
+      }
     }
-    const skill = isPet && skillQueued ? activeSkill : null;
+    const skill = isPet ? (skillQueued ? activeSkill : null) : (enemySkillQueued || null);
     if (skill) {
-      skillQueued = false;
-      skillCooldown = skill.cooldownTurns;
+      if (isPet) {
+        skillQueued = false;
+        skillCooldown = skill.cooldownTurns;
+      } else {
+        enemySkillQueued = null;
+        enemySkillCd = skill.cooldownTurns;
+      }
     }
     // 冻结出手方（hitAt+backMs）
     freeze[attacker] = true;
@@ -456,6 +471,7 @@ function simulateFight(input) {
     });
     // 冷却递减（前端同序：doTurn 末尾，仅未放技能回合）
     if (isPet && skillCooldown > 0 && !skill) skillCooldown--;
+    if (!isPet && enemySkillCd > 0 && !skill) enemySkillCd--;
   };
   const step = () => {
     t += 100;

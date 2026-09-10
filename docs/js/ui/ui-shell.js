@@ -36,6 +36,15 @@
   // 真正渲染目标页（只做 display 显隐，DOM 常驻，数据不丢）
   function renderPage(page) {
     page = resolveMarketPage(page); // market-sell → 市集页 + 我的上架视图
+    /* 背包 / 装备不是独立 tab，而是浮窗（#bag-window），DOM 里根本没有 #tab-bag / #tab-equip。
+     * 以前 switchPage('bag'/'equip') 找不到目标页 → 所有 .tab-page 都被摘掉 active = 整页空白
+     * （主城「鉴定」「铸造」两栋建筑，点了就白屏）。现在改成「打开浮窗 + 留在当前页」。 */
+    if (page === 'bag' || page === 'equip') {
+      if (UI.openBagWindow) UI.openBagWindow();
+      const sub = document.querySelector('.bag-subtab[data-bag-subtab="' + (page === 'equip' ? 'equip' : 'bag') + '"]');
+      if (sub && sub.click) sub.click();
+      return;
+    }
     const pages = document.querySelectorAll('.tab-page');
     pages.forEach(p => p.classList.remove('active'));
     const target = document.getElementById('tab-' + page);

@@ -12,7 +12,8 @@
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
   const Config = window.Config;
-  const { getInventory, equipItem, rarityOf, flattenAffixes } = window.Equipment;
+  // ⚠️ describeItem 必须一起解构：showEquipDetail 里是裸标识符调用（漏了它 = 点装备详情直接 ReferenceError，2026-09-10 浏览器实测）
+  const { getInventory, equipItem, rarityOf, flattenAffixes, describeItem } = window.Equipment;
   const { getEggCount, getEggs, hatchEgg } = window.Drop;
   const { getActivePet } = window.Pet;
   const Materials = window.Materials;
@@ -284,6 +285,7 @@
         card.onclick = e => {
           if (identifyMode && unid) { identifyEquip(eq, card); return; }
           if (e.ctrlKey || e.altKey) { quickSalvage(eq); return; }
+          showEquipDetail(eq);
         };
         bindTip(card, equipTipHtml(eq, unid));
         bagItems.push(card);
@@ -420,6 +422,7 @@
       modal.className = 'equip-detail-modal';
       document.body.appendChild(modal);
     }
+    const unid = eq.identified === false;
     const pfx = (eq.affixes && eq.affixes.prefix) || [];
     const sfx = (eq.affixes && eq.affixes.suffix) || [];
     const affix = (arr, cls) => arr.length
@@ -429,19 +432,22 @@
       <div class="ed-overlay" data-close="1"></div>
       <div class="ed-card" style="border-color:${rarityOf(eq).color}">
         <div class="ed-head" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}
-          <span class="ed-sub">${rarityOf(eq).label}装 · T${eq.tier} · ${eq.slot}</span></div>
-        <div class="ed-base">${describeItem(eq)}</div>
-        <div class="craft-affix-group">
-          <div class="grp-title">前缀（${pfx.length}/3）</div>
-          ${affix(pfx, 'prefix')}
-          <hr class="craft-affix-divider">
-          <div class="grp-title">后缀（${sfx.length}/3）</div>
-          ${affix(sfx, 'suffix')}
-        </div>
-        <div class="craft-affixcount">前缀 ${pfx.length}/3 · 后缀 ${sfx.length}/3</div>
+          <span class="ed-sub">${rarityOf(eq).label}装 · T${eq.tier ?? 4} · ${eq.slot}</span></div>
+        ${unid
+          ? `<div class="ed-base">未鉴定的 ${escapeHtml(eq.slot)} · 词缀封印</div>
+             <div class="craft-affix-group"><div class="tip-empty">词缀已封印，需鉴定石揭晓后查看与穿戴</div></div>`
+          : `<div class="ed-base">${describeItem(eq)}</div>
+             <div class="craft-affix-group">
+               <div class="grp-title">前缀（${pfx.length}/3）</div>
+               ${affix(pfx, 'prefix')}
+               <hr class="craft-affix-divider">
+               <div class="grp-title">后缀（${sfx.length}/3）</div>
+               ${affix(sfx, 'suffix')}
+             </div>
+             <div class="craft-affixcount">前缀 ${pfx.length}/3 · 后缀 ${sfx.length}/3</div>`}
         <div class="ed-actions">
-          <button class="btn-mini alt" data-wear="1">穿上</button>
-          <button class="btn-mini" data-lock="1">${eq.locked ? '🔓 解锁' : '🔒 锁定'}</button>
+          <button class="btn-mini alt" data-wear="1" ${unid ? 'disabled title="未鉴定 · 先用鉴定石揭晓"' : ''}>穿上</button>
+          <button class="btn-mini" data-lock="1" ${unid ? 'disabled' : ''}>${eq.locked ? '🔓 解锁' : '🔒 锁定'}</button>
           <button class="btn-mini" data-close="1">关闭</button>
         </div>
       </div>`;
@@ -599,4 +605,9 @@
 
   UI.renderBag = renderBag;
   UI.showEquipDetail = showEquipDetail;
+  /* 2026-09-10：暴露背包悬停 tooltip 机制，供市集等页面直接复用（不重写） */
+  UI.showBagTip = showBagTip;
+  UI.hideBagTip = hideBagTip;
+  UI.bindTip = bindTip;
+  UI.equipTipHtml = equipTipHtml;
 })();

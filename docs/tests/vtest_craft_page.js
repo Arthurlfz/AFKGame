@@ -23,10 +23,23 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   let threw = null;
   try { C('UI.openCraftPanel(globalThis.__eq)'); } catch (e) { threw = e; }
   A(threw === null, `打造面板渲染无异常${threw ? '（' + threw.message + '）' : ''}`);
-  // 魂铸区块由 UI.renderCraftInto 直接写入容器，直接测它（不依赖桩的 querySelector 缓存）
-  const html = C(`(function(){const h={innerHTML:'',querySelector:function(){return {innerHTML:''}},querySelectorAll:function(){return []},addEventListener:function(){}};UI.renderCraftInto(h,globalThis.__eq);return h.innerHTML})()`);
+  // renderCraftInto 直接写容器（不依赖桩的 querySelector 缓存）。打造/魂铸已分 tab，
+  // 桩容器要带 .craft-tab 按钮才能验证切页。
+  const renderHost = () => C(`(function(){
+    globalThis.__tabs=[{dataset:{ctab:'craft'}},{dataset:{ctab:'soul'}}];
+    globalThis.__host={innerHTML:'',querySelector:function(){return {innerHTML:''}},
+      querySelectorAll:function(s){return s==='.craft-tab'?globalThis.__tabs:[]},addEventListener:function(){}};
+    UI.renderCraftInto(globalThis.__host, globalThis.__eq);
+    return globalThis.__host.innerHTML;
+  })()`);
+  const html = renderHost();
   A(html.length > 0, '打造页有输出内容');
-  A(html.indexOf('craft-soul') >= 0, '打造页含魂铸区块');
+  A(html.indexOf('craft-actions') >= 0, '打造 tab 显示打造操作按钮');
+  A(html.indexOf('craft-soul') < 0, '打造 tab 不再混入魂铸区块（已拆独立 tab）');
+  // 右栏头部必须能看到 底材 / 物品等级 / 底材词缀（2026-09-10 玩家报"看不到"；同日按玩家反馈改 PoE 式紧凑头部）
+  A(html.indexOf('物品等级') >= 0, '打造右栏显示物品等级');
+  A(html.indexOf('底材 T') >= 0, '打造右栏显示底材 T 阶');
+  A(html.indexOf('生命 +80') >= 0, '底材词缀数值与装备基底一致（生命 +80）');
   // 下拉选项应包含出战宠标记
   const opts = C(`(function(){const s=document.getElementById('soul-pet');return s?s.innerHTML:''})()`);
   A(opts.indexOf('⚔出战') >= 0 || opts.length === 0, `魂铸下拉渲染（出战标记 ${opts.indexOf('⚔出战') >= 0 ? '有' : '无'}/${opts.length}字）`);
@@ -42,9 +55,13 @@ const S = ms => new Promise(r => setTimeout(r, ms));
 
   // ---- 魂铸词缀显示回归 ----
   // 给装备打上魂铸词缀，验证背包卡 + tooltip 都渲染
+  // 切到魂铸 tab 再看
+  const soulTabHtml = C('globalThis.__tabs[1].onclick(); globalThis.__host.innerHTML');
+  A(soulTabHtml.indexOf('craft-soul') >= 0, '魂铸 tab 显示魂铸区块');
+  A(soulTabHtml.indexOf('craft-actions') < 0, '魂铸 tab 不再混入打造操作按钮');
   C(`(function(){const eq=globalThis.__eq;eq.soulAffix={type:'lifesteal',awaken:false,traitId:'嗜血',tier:2,stat:'lifesteal',value:5,source:'soulcast',label:'魂·嗜血 T2'};return true})()`);
-  const bodyHtml = C(`(function(){const h={innerHTML:'',querySelector:function(){return {innerHTML:''}},querySelectorAll:function(){return []},addEventListener:function(){}};UI.renderCraftInto(h,globalThis.__eq);return h.innerHTML})()`);
-  A(bodyHtml.indexOf('魂·嗜血') >= 0, '打造页已铸入区显示魂铸词缀');
+  const bodyHtml = C('UI.renderCraftInto(globalThis.__host, globalThis.__eq); globalThis.__host.innerHTML');
+  A(bodyHtml.indexOf('魂·嗜血') >= 0, '魂铸 tab 已铸入区显示魂铸词缀');
 
   /* ---- 魂铸：特质按钮必须真能点（2026-09-08 修复） ----
    * 血泪：bindSoulCast 漏绑 .soul-trait 的 onclick → 宠有 ≥2 条特质时选不上特质

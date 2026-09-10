@@ -61,6 +61,7 @@ function buildFrontendEnv(seed, overrides) {
       Pet.setCurHp = (p, hp) => { p.curHp = Math.max(0, Math.min(hp, Pet.getStats(p).hp)); };
     `, ctx);
   }
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/core/battle-session.js'), 'utf8'), ctx);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/core/battle.js'), 'utf8'), ctx);
   // UI 桩：动画时长与模拟器固定值一致（320 / 300）
   vm.runInContext(`

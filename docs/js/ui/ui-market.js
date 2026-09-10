@@ -23,23 +23,31 @@
 
   const MARKET_FILTER_KEY = 'marketFilters';
   const MARKET_FILTER_DEFAULT = {
-    kind: 'all',
+    kind: 'all',          // 'all' | 'pet' | 'item' | 'material' | 'egg'（参考火炬之光的分类筛选）
     slot: 'all',
     rarity: 'all',
     tier: 'all',
     baseTier: 'all',      // 底材T阶 all/'1'~'5'（词缀T阶筛选：最高词缀T ≤ 目标）
-    growth: 'desc',
-    sort: 'latest',
+    growth: 'desc',       // 宠物排序：'desc' 成长高→低 / 'asc' / 'level-desc' 等级高→低
+    sort: 'latest',       // 通用排序：latest / price-asc / price-desc / rarity-desc（装备）
     affixFilters: [],     // POE式词缀条件：[{type, min, max}]，可与/或组合（默认与）
     trait: 'all',         // 宠物血脉特质筛选：'all' / 特质 id / 'none'（无特质捡漏）
+    priceMin: null,       // 价格区间（按标价的收款材料数量筛选，POE「价格区间」的等价物）
+    priceMax: null,
   };
 
   let marketFilters = loadMarketFilters();
   let marketView = 'all'; // 'all' 全部在售 | 'mine' 我的上架（并入市集）
+  // 分页：每个分区各自记「已展开多少条」，切换筛选/视图时归零（POE 翻页 / 火炬翻页的等价物）
+  let marketShown = { pet: 0, item: 0, material: 0, egg: 0 };
+  function resetMarketPaging() { marketShown = { pet: 0, item: 0, material: 0, egg: 0 }; }
 
   function loadMarketFilters() {
     try {
-      return Object.assign({}, MARKET_FILTER_DEFAULT, JSON.parse(localStorage.getItem(MARKET_FILTER_KEY) || '{}'));
+      const merged = Object.assign({}, MARKET_FILTER_DEFAULT, JSON.parse(localStorage.getItem(MARKET_FILTER_KEY) || '{}'));
+      // 老存档兜底：affixFilters 曾被「✕ 清除」写成字符串 'all'，非数组会让 .some 直接抛错
+      if (!Array.isArray(merged.affixFilters)) merged.affixFilters = [];
+      return merged;
     } catch {
       return { ...MARKET_FILTER_DEFAULT };
     }
@@ -62,17 +70,20 @@
     }
     marketFilters = next;
     saveMarketFilters();
+    resetMarketPaging();
     UI.renderAll();
   }
 
   function resetMarketFilters() {
     marketFilters = { ...MARKET_FILTER_DEFAULT };
     saveMarketFilters();
+    resetMarketPaging();
     UI.renderAll();
   }
 
   function setMarketView(v) {
     marketView = (v === 'mine') ? 'mine' : 'all';
+    resetMarketPaging();
     UI.renderMarket();
   }
   UI.setMarketView = setMarketView;
@@ -85,15 +96,49 @@
     return listing.created_at || listing.createdAt || listing.createdAtMs || listing.updated_at || 0;
   }
 
+  /* 挂单归类：一张挂单只属于一类（宠物 / 装备 / 材料 / 蛋）。
+   * 之前只判 pet_id / item_id，材料与蛋在「全部」里能看见、却筛不出来，也搜不到。 */
+  function listingKind(l) {
+    if (!l) return 'unknown';
+    // 真实材料挂单没有 good_id / kind（那是 AI 假单的字段），靠 good_name 认；漏了这条会归到 unknown，
+    // 结果就是「筛材料时真实单全被过滤掉」
+    if (l.good_name || l.good_id || l.kind === 'material') return 'material';
+    if (l.egg_type || l.kind === 'egg') return 'egg';
+    if (l.pet_id) return 'pet';
+    if (l.item_id) return 'item';
+    return 'unknown';
+  }
+  const KIND_LABEL = { pet: '宠物', item: '装备', material: '材料', egg: '宠物蛋' };
+
+  // 搜索文本：名称 + 词缀 + 特质名（参考 POE 交易站的词缀搜索、火炬的条件组搜索）
+  function listingHaystack(l) {
+    const parts = [l.item_name, l.pet_name, l.good_name, l.egg_type,
+      l.egg_type ? window.Drop.makeEggName(l.egg_type) : ''];
+    for (const a of flattenAffixes(l.item_affixes || l.affixes || [])) parts.push(a.label || a.type);
+    if (l.item_soul) parts.push(l.item_soul.label);
+    for (const t of (l.pet_traits || [])) {
+      parts.push(t && t.id);
+      const cfg = t && Config.petTraits && Config.petTraits[t.id];
+      if (cfg && cfg.label) parts.push(cfg.label);
+    }
+    return parts.filter(Boolean).join(' ').toLowerCase();
+  }
+
+  // 价格区间（按标价的收款材料数量；POE 交易站的 price range 等价物）
+  function priceInRange(l) {
+    const q = Number(l.material_qty || 0);
+    if (marketFilters.priceMin != null && marketFilters.priceMin !== '' && q < Number(marketFilters.priceMin)) return false;
+    if (marketFilters.priceMax != null && marketFilters.priceMax !== '' && q > Number(marketFilters.priceMax)) return false;
+    return true;
+  }
+
   function matchMarketListing(l) {
-    if (marketFilters.kind === 'pet' && !l.pet_id) return false;
-    if (marketFilters.kind === 'item' && !l.item_id) return false;
+    const kind = listingKind(l);
+    if (marketFilters.kind !== 'all' && marketFilters.kind !== kind) return false;
+    if (!priceInRange(l)) return false;
     if (marketFilters.keyword) {
       const kw = String(marketFilters.keyword).trim().toLowerCase();
-      if (kw) {
-        const hay = String(l.item_name || l.pet_name || '').toLowerCase();
-        if (!hay.includes(kw)) return false;
-      }
+      if (kw && !listingHaystack(l).includes(kw)) return false;
     }
     if (l.pet_id && marketFilters.trait !== 'all') {
       const tids = (l.pet_traits || []).map(t => t && t.id);
@@ -126,19 +171,78 @@
     return true;
   }
 
+  const RARITY_RANK = { gold: 3, blue: 2, white: 1 };
   function sortMarketListings(list) {
     const arr = list.slice();
+    const priceOf = l => Number(l.material_qty || 0);
+    const timeOf = l => new Date(getListingTime(l)).getTime() || 0;
     if (marketFilters.kind === 'pet') {
-      // 宠物只按成长排序（成长是宠物核心价值）
+      // 宠物：成长（核心价值）或等级排序
       if (marketFilters.growth === 'asc') arr.sort((a, b) => Number(a.pet_growth || 0) - Number(b.pet_growth || 0));
-      else if (marketFilters.growth === 'desc') arr.sort((a, b) => Number(b.pet_growth || 0) - Number(a.pet_growth || 0));
+      else if (marketFilters.growth === 'level-desc') arr.sort((a, b) => Number(b.pet_level || 0) - Number(a.pet_level || 0));
+      else arr.sort((a, b) => Number(b.pet_growth || 0) - Number(a.pet_growth || 0));
       return arr;
     }
-    // 装备 / 混合视图：价格或最新
-    if (marketFilters.sort === 'price-asc') arr.sort((a, b) => Number(a.material_qty || 0) - Number(b.material_qty || 0));
-    else if (marketFilters.sort === 'price-desc') arr.sort((a, b) => Number(b.material_qty || 0) - Number(a.material_qty || 0));
-    else arr.sort((a, b) => new Date(getListingTime(b)).getTime() - new Date(getListingTime(a)).getTime());
+    const s = marketFilters.sort;
+    if (s === 'price-asc') arr.sort((a, b) => priceOf(a) - priceOf(b));
+    else if (s === 'price-desc') arr.sort((a, b) => priceOf(b) - priceOf(a));
+    else if (s === 'rarity-desc') arr.sort((a, b) => (RARITY_RANK[b.item_rarity] || 0) - (RARITY_RANK[a.item_rarity] || 0) || priceOf(b) - priceOf(a));
+    else if (s === 'growth-desc') arr.sort((a, b) => Number(b.pet_growth || 0) - Number(a.pet_growth || 0));
+    else arr.sort((a, b) => timeOf(b) - timeOf(a));
     return arr;
+  }
+
+  /* ---------- 参考价 / 比价标签 ----------
+   * 「同类、同收款材料」的挂单标价中位数 = 参考价（火炬之光的「查价」、宪法 B3 的市场价）。
+   * 跨材料不可比（10 重铸石 ≠ 10 神圣石），所以必须同 material_type 才算同组。 */
+  function peerGroupKey(l) {
+    const kind = listingKind(l);
+    if (kind === 'item') return 'item:' + (l.item_slot || '?') + ':' + (l.item_rarity || '?');
+    if (kind === 'pet') {
+      const nm = l.pet_name || '';
+      const root = (window.Pet && window.Pet.resolveLineId) ? (window.Pet.resolveLineId(nm) || nm) : nm;
+      return 'pet:' + root;
+    }
+    if (kind === 'material') return 'material:' + (l.good_id || l.good_name || '?');
+    if (kind === 'egg') return 'egg:' + (l.egg_type || '?');
+    return 'other';
+  }
+  function medianQty(list, keyOf) {
+    const vals = list.map(l => Number(l.material_qty || 0)).filter(v => v > 0).sort((a, b) => a - b);
+    if (!vals.length) return null;
+    const mid = Math.floor(vals.length / 2);
+    return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+  }
+  // 同组同收款材料的标价中位数（样本不足返回 null）
+  function refQty(l, pool) {
+    const T = Config.trade || {};
+    const key = peerGroupKey(l);
+    const peers = (pool || []).filter(x => x !== l && x.material_type === l.material_type && peerGroupKey(x) === key);
+    if (peers.length < (T.refPriceMinSamples || 3)) return null;
+    return medianQty(peers);
+  }
+  // 捡漏 / 比价标签（市场捡漏 = 三爽点之一，AI 的 isLeak 标记也在这里落地）
+  function dealBadge(l, pool) {
+    if (l.isLeak) return '<span class="mk-deal mk-deal--leak">💎 捡漏</span>';
+    const ref = refQty(l, pool);
+    const q = Number(l.material_qty || 0);
+    if (!ref || !q) return '';
+    const T = Config.trade || {};
+    const diff = (ref - q) / ref;
+    if (diff >= (T.dealDiscount || 0.2)) return `<span class="mk-deal">低于市价 ${Math.round(diff * 100)}%</span>`;
+    if (diff <= -(T.overpriceMarkup || 0.25)) return `<span class="mk-deal mk-deal--high">高于市价 ${Math.round(-diff * 100)}%</span>`;
+    return '';
+  }
+  // 挂单挂了多久（POE/火炬都要看时效，我们只展示不强制下架）
+  function ageLabel(l) {
+    const t = new Date(getListingTime(l)).getTime();
+    if (!t) return '';
+    const mins = Math.floor((Date.now() - t) / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return mins + ' 分钟前';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + ' 小时前';
+    return Math.floor(hours / 24) + ' 天前';
   }
 
   /* ============================================================
@@ -151,14 +255,16 @@
       return o ? o.label : v;
     }
     if (st.key === 'trait' && v === 'none') return '无特质';
-    if (st.key === 'kind') return v === 'pet' ? '宠物' : v === 'item' ? '装备' : v;
+    if (st.key === 'kind') return KIND_LABEL[v] || v;
     return v;
   }
 
   function renderFilterPath(box) {
     const chips = [];
     const push = (key, label) => chips.push({ key, label });
-    if (marketFilters.kind !== 'all') push('kind', marketFilters.kind === 'pet' ? '宠物' : '装备');
+    if (marketFilters.kind !== 'all') push('kind', KIND_LABEL[marketFilters.kind] || marketFilters.kind);
+    const hasPrice = (marketFilters.priceMin != null && marketFilters.priceMin !== '') || (marketFilters.priceMax != null && marketFilters.priceMax !== '');
+    if (hasPrice) push('price', '价格 ' + (marketFilters.priceMin != null && marketFilters.priceMin !== '' ? marketFilters.priceMin : '不限') + '–' + (marketFilters.priceMax != null && marketFilters.priceMax !== '' ? marketFilters.priceMax : '不限'));
     if (marketFilters.kind === 'pet') {
       if (marketFilters.trait !== 'all') {
         const t = marketFilters.trait === 'none' ? '无特质' : ((Config.petTraits || {})[marketFilters.trait]?.label || marketFilters.trait);
@@ -184,7 +290,15 @@
       el.dataset.anim = '1';
       el.setAttribute('aria-label', '移除筛选 ' + c.label);
       el.innerHTML = c.label + '<span class="cf-chip-x">✕</span>';
-      el.onclick = () => setMarketFilter(c.key, 'all');
+      el.onclick = () => {
+        // 价格是两个字段、词缀条件是数组，不能一律按 'all' 清（曾把数组清成字符串 'all' → 之后 .some 报错）
+        if (c.key === 'price') {
+          marketFilters = Object.assign({}, marketFilters, { priceMin: null, priceMax: null });
+          saveMarketFilters(); resetMarketPaging(); syncPriceInputs(); UI.renderAll(); return;
+        }
+        if (c.key === 'affixFilters') { setMarketFilter('affixFilters', []); return; }
+        setMarketFilter(c.key, 'all');
+      };
       box.appendChild(el);
     });
   }
@@ -258,6 +372,8 @@
         { id: 'all', label: '全部' },
         { id: 'pet', label: '宠物' },
         { id: 'item', label: '装备' },
+        { id: 'material', label: '材料' },
+        { id: 'egg', label: '宠物蛋' },
       ],
     });
 
@@ -277,6 +393,7 @@
         opts: [
           { id: 'desc', label: '成长高→低' },
           { id: 'asc', label: '成长低→高' },
+          { id: 'level-desc', label: '等级高→低' },
         ],
       });
     } else if (kind === 'item') {
@@ -312,6 +429,7 @@
           { id: 'latest', label: '最新上架' },
           { id: 'price-asc', label: '价格低→高' },
           { id: 'price-desc', label: '价格高→低' },
+          { id: 'rarity-desc', label: '稀有度金→白' },
         ],
       });
     } else {
@@ -402,7 +520,15 @@
     bindMarketControls();
   }
 
-  // 搜索框 / 清空 / 视图切换 / 交易信息折叠（每次渲染都会刷新绑定，幂等）
+  // 价格区间输入框与筛选状态同步（输入框在静态 HTML 里，不随面板重建，所以焦点不会丢）
+  function syncPriceInputs() {
+    const pMin = $('market-price-min');
+    const pMax = $('market-price-max');
+    if (pMin && document.activeElement !== pMin) pMin.value = marketFilters.priceMin != null ? marketFilters.priceMin : '';
+    if (pMax && document.activeElement !== pMax) pMax.value = marketFilters.priceMax != null ? marketFilters.priceMax : '';
+  }
+
+  // 搜索框 / 价格区间 / 清空 / 视图切换 / 交易信息折叠（每次渲染都会刷新绑定，幂等）
   function bindMarketControls() {
     const kwInput = $('market-keyword');
     if (kwInput) {
@@ -410,12 +536,29 @@
       kwInput.oninput = () => {
         marketFilters = Object.assign({}, marketFilters, { keyword: kwInput.value });
         saveMarketFilters();
+        resetMarketPaging();
         UI.renderMarket();
         UI.renderTradeRecords();
       };
     }
+    // 价格区间（用 change 而非 input：输入过程中不重建列表，回车/失焦才生效）
+    const bindPrice = (el, key) => {
+      if (!el) return;
+      el.onchange = () => {
+        const raw = String(el.value || '').trim();
+        const val = raw === '' ? null : Math.max(0, Number(raw));
+        marketFilters = Object.assign({}, marketFilters, { [key]: Number.isFinite(val) ? val : null });
+        saveMarketFilters();
+        resetMarketPaging();
+        UI.renderMarket();
+      };
+    };
+    bindPrice($('market-price-min'), 'priceMin');
+    bindPrice($('market-price-max'), 'priceMax');
+    syncPriceInputs();
+
     const resetBtn = $('cfReset');
-    if (resetBtn) resetBtn.onclick = () => resetMarketFilters();
+    if (resetBtn) resetBtn.onclick = () => { resetMarketFilters(); syncPriceInputs(); };
 
     const vtBox = $('viewToggle');
     if (vtBox) {
@@ -450,7 +593,7 @@
   }
 
   /* ---------- 装备卡片 ---------- */
-  function buildItemCard(l, RARITY_LABEL) {
+  function buildItemCard(l, RARITY_LABEL, pool) {
     const div = document.createElement('div');
     div.className = 'mk-card';
     const color = Config.equipment.rarities.find(r => r.id === l.item_rarity)?.color || '#d8d8d8';
@@ -460,29 +603,30 @@
     const legacy = !l.material_type;
     const mine = Market.isItemListed(l.item_id);
     const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
+    const deal = legacy ? '' : dealBadge(l, pool);
     const priceHtml = legacy
       ? '<span class="mk-price">旧版挂单</span>'
-      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
+      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>${deal}`;
     const btnText = mine ? '取回' : legacy ? '不可购买' : '购买';
+    const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
         <div class="mk-avatar mk-avatar--item">⚔️</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
-          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
+          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       <div class="mk-affix">${affixText ? escapeHtml(affixText) : '<span style="color:var(--text-faint)">无词缀</span>'}</div>
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${btnText}</button></div>`;
-    // 装备详情 tooltip（hover 显示完整词缀）
-    const marketTip = document.createElement('div');
-    marketTip.className = 'equip-tip';
+    // 装备详情 tooltip（hover 显示完整词缀）：直接复用背包悬停浮层机制（UI.bindTip → #bag-tooltip，不重写）
     const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
     const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
     const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
     const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + color + '"><span class="emoji">' + (ICONS[l.item_slot] || '🛡') + '</span></span></div>';
-    marketTip.innerHTML = iconHtml + `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<hr class="tip-divider">${detailLine(detailAffixes.suffix, 'tip-suffix')}<div class="tip-section">魂铸</div>${l.item_soul ? `<div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : '<div class="tip-empty">无</div>'}`;
-    div.appendChild(marketTip);
+    const tipHtml = iconHtml + `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<hr class="tip-divider">${detailLine(detailAffixes.suffix, 'tip-suffix')}<div class="tip-section">魂铸</div>${l.item_soul ? `<div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : '<div class="tip-empty">无</div>'}`;
+    if (window.UI && UI.bindTip) UI.bindTip(div, tipHtml);
+
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
@@ -500,7 +644,7 @@
   }
 
   /* ---------- 宠物卡片 ---------- */
-  function buildPetCard(l) {
+  function buildPetCard(l, pool) {
     const div = document.createElement('div');
     div.className = 'mk-card';
     const avatar = window.PetSprites && window.PetSprites.avatarOf ? window.PetSprites.avatarOf(l.pet_name) : null;
@@ -508,20 +652,41 @@
     const legacy = !l.material_type;
     const mine = Market.isListed(l.pet_id);
     const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
+    const deal = legacy ? '' : dealBadge(l, pool);
     const priceHtml = legacy
       ? '<span class="mk-price">旧版挂单</span>'
-      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>`;
+      : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>${deal}`;
     const traitsHtml = (UI.traitsHtml && l.pet_traits && l.pet_traits.length) ? `<div class="mk-traits">${UI.traitsHtml({ traits: l.pet_traits })}</div>` : '';
+    const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item">🐾</div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
-          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
+          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       ${traitsHtml}
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${mine ? '取回' : legacy ? '不可购买' : '购买'}</button></div>`;
+    // 宠物属性 tooltip：直接复用宠物共享 tooltip（PetUI.bindPetTip + petTipHtml，不重写）。
+    // 挂单快照只有名字/等级/成长/特质，血统与基础三围按名字从配置解析（与 pet.js 同源口径：resolveLineId / godInfoOf / starters / speeds）。
+    const pName = l.pet_name || '';
+    const rootName = (window.Pet && window.Pet.resolveLineId) ? (window.Pet.resolveLineId(pName) || pName) : pName;
+    const pGod = (window.Pet && window.Pet.godInfoOf) ? window.Pet.godInfoOf({ name: pName }) : null;
+    const pStarter = (Config.pet.starters || []).find(s => s.name === rootName);
+    const pBase = pGod || pStarter || {};
+    const petView = {
+      name: pName,
+      level: Number(l.pet_level) || 1,
+      growth: Number(l.pet_growth) || 0,
+      lineId: rootName,
+      baseHp: pBase.baseHp != null ? pBase.baseHp : 100,
+      baseAtk: pBase.baseAtk != null ? pBase.baseAtk : 20,
+      baseDef: pBase.baseDef != null ? pBase.baseDef : 10,
+      baseSpd: (pGod && pGod.speed) ? pGod.speed : ((Config.pet.speeds && Config.pet.speeds[rootName]) || 40),
+      traits: Array.isArray(l.pet_traits) ? l.pet_traits : []
+    };
+    if (window.PetUI && PetUI.bindPetTip) PetUI.bindPetTip(div, petView);
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
@@ -539,20 +704,22 @@
   }
 
   /* ---------- 宠物蛋卡片 ---------- */
-  function buildEggCard(l) {
+  function buildEggCard(l, pool) {
     const div = document.createElement('div');
     div.className = 'mk-card';
     // 假卖家蛋单不标"我的"（isMyEggListed 按蛋品种判，AI 蛋不该命中玩家上架标记）
     const mine = !l.isBot && (Market.isMyEggListed ? Market.isMyEggListed(l.egg_type) : false);
     const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
     const mat = Market.findMaterial(l.material_type);
-    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
+    const deal = dealBadge(l, pool);
+    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>${deal}` : '<span class="mk-price"></span>';
+    const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
         <div class="mk-egg-icon">${l.egg_icon || '🥚'}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
-          <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
+          <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
@@ -572,26 +739,47 @@
   }
 
   /* ---------- 材料商品卡片（AI 假卖家挂单，2026-09-03 二阶段） ---------- */
-  function buildMaterialCard(l) {
+  function buildMaterialCard(l, pool) {
     const div = document.createElement('div');
     div.className = 'mk-card';
     const mat = Market.findMaterial(l.material_type);
-    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>` : '<span class="mk-price"></span>';
+    const deal = dealBadge(l, pool);
+    const goodQty = Number(l.good_qty || 1);
+    const goodIcon = l.good_icon || Market.findMaterial(l.good_name).icon || '📦';
+    // 真实玩家挂单带 seller_id，AI 假单不带（只有 seller 昵称）→ 用它判定「我的」
+    const myId = (UI.getAuthUser && UI.getAuthUser() || {}).id;
+    const mine = !l.isBot && !!(l.seller_id && myId && String(l.seller_id) === String(myId));
+    const mineTag = mine ? '<span class="mk-tag-mine">我的</span>' : '';
+    const priceHtml = mat ? `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>${deal}` : '<span class="mk-price"></span>';
+    const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">${l.good_icon || '📦'}</div>
+        <div class="mk-egg-icon">${goodIcon}</div>
         <div class="mk-card-info">
-          <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.good_name)}</div></div>
-          <div class="mk-meta">材料 ×${l.good_qty || 1}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}</div>
+          <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.good_name)}</div>${mineTag}</div>
+          <div class="mk-meta">材料 ×${goodQty}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
-      <div class="mk-card-foot">${priceHtml}<button class="mk-btn buy">购买</button></div>`;
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
+      if (mine) {
+        const res = await Market.cancelMaterial(l.id);
+        if (res.error) { showToast('❌ 取回失败', res.error); return; }
+        showToast('↩️ 已取回', `${l.good_name} ×${goodQty} 已回到背包`);
+        UI.renderAll();
+        return;
+      }
       if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买'); return; }
-      const res = await Market.buyBotMaterial(l.id);
-      if (res.error) showToast('❌ 购买失败', res.error);
-      else { showToast('🎉 购买成功', `获得 ${l.good_qty || 1} × ${l.good_name}`); UI.renderAll(); }
+      const res = l.isBot ? await Market.buyBotMaterial(l.id) : await Market.buyMaterial(l.id);
+      if (res.error) { showToast('❌ 购买失败', res.error); return; }
+      // 真实单：云端已把货写进 materials，本地同步（加货 / 扣收款材料）；AI 假单内部已处理
+      if (!l.isBot) {
+        Materials.gainLocal(l.good_name, goodQty);
+        Materials.spendLocal(l.material_type, l.material_qty || 0);
+      }
+      showToast('🎉 购买成功', `获得 ${goodQty} × ${l.good_name}`);
+      UI.renderAll();
     };
     return div;
   }
@@ -636,6 +824,31 @@
     return g;
   }
 
+  /* 单个分区渲染：按 Config.trade.pageSize 分页，超出给「显示更多」
+   * （POE 交易站 / 火炬之光交易行的翻页等价物：市场几十上百条时不再一口气全铺出来） */
+  function renderMarketSection(box, key, title, list, buildCard, pool) {
+    const size = Number((Config.trade && Config.trade.pageSize) || 12);
+    const shown = marketShown[key] || 0;
+    const visible = list.slice(0, Math.max(size, shown + size));
+    const sec = document.createElement('div');
+    sec.className = 'mk-section';
+    sec.innerHTML = title + '<span class="mk-count">' + list.length + ' 件'
+      + (visible.length < list.length ? '（已显示 ' + visible.length + '）' : '') + '</span>';
+    box.appendChild(sec);
+    const grid = document.createElement('div');
+    grid.className = 'mk-grid';
+    for (const l of visible) grid.appendChild(buildCard(l, pool));
+    box.appendChild(grid);
+    if (visible.length < list.length) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'mk-more';
+      more.innerHTML = '显示更多（还剩 ' + (list.length - visible.length) + ' 件）';
+      more.onclick = () => { marketShown[key] = visible.length; renderMarket(); };
+      box.appendChild(more);
+    }
+  }
+
   function renderMarket() {
     renderMarketFilterPanel();
     const box = $('market-list');
@@ -652,65 +865,57 @@
       return;
     }
 
-    // 全部在售：宠物 + 装备 + 蛋
-    const list = sortMarketListings(Market.getListings().filter(matchMarketListing));
-    const items = sortMarketListings(Market.getItemListings().filter(matchMarketListing));
-    const eggList = Market.getEggListings ? Market.getEggListings() : [];
-    const mats = Market.getBotMaterialListings ? Market.getBotMaterialListings() : [];
-    const pets = list.filter(l => l.pet_id);
+    /* 全部在售：宠物 / 装备 / 材料 / 宠物蛋。
+     * 四类挂单都过同一套筛选（材料与蛋以前完全不筛：关键词、价格区间对它们无效）。
+     * pool = 未筛选的原池，用来算「同类在售中位价」这个参考价 —— 样本不该被当前筛选砍掉。 */
+    const petPool = Market.getListings();
+    const itemPool = Market.getItemListings();
+    const eggPool = Market.getEggListings ? Market.getEggListings() : [];
+    const matPool = Market.getMaterialListings ? Market.getMaterialListings() : [];
     const RARITY_LABEL = { white: '白装', blue: '蓝装', gold: '金装' };
 
+    const pets = sortMarketListings(petPool.filter(matchMarketListing)).filter(l => l.pet_id);
+    const items = sortMarketListings(itemPool.filter(matchMarketListing));
+    const mats = sortMarketListings(matPool.filter(matchMarketListing));
+    const eggs = sortMarketListings(eggPool.filter(matchMarketListing));
+
+    const total = pets.length + items.length + mats.length + eggs.length;
     const cnt = $('rpCount');
-    if (cnt) cnt.textContent = '共 ' + (pets.length + items.length + eggList.length + mats.length) + ' 件';
+    if (cnt) cnt.textContent = '共 ' + total + ' 件';
 
-    if (pets.length) {
-      const sec = document.createElement('div');
-      sec.className = 'mk-section';
-      sec.innerHTML = '🐾 宠物<span class="mk-count">' + pets.length + ' 件</span>';
-      box.appendChild(sec);
-      const grid = document.createElement('div');
-      grid.className = 'mk-grid';
-      for (const l of pets) grid.appendChild(buildPetCard(l));
-      box.appendChild(grid);
-    }
+    if (pets.length) renderMarketSection(box, 'pet', '🐾 宠物', pets, (l, pool) => buildPetCard(l, pool), petPool);
+    if (items.length) renderMarketSection(box, 'item', '⚔️ 装备', items, (l, pool) => buildItemCard(l, RARITY_LABEL, pool), itemPool);
+    if (mats.length) renderMarketSection(box, 'material', '🧪 材料', mats, (l, pool) => buildMaterialCard(l, pool), matPool);
+    if (eggs.length) renderMarketSection(box, 'egg', '🥚 宠物蛋', eggs, (l, pool) => buildEggCard(l, pool), eggPool);
 
-    if (items.length) {
-      const sec = document.createElement('div');
-      sec.className = 'mk-section';
-      sec.innerHTML = '⚔️ 装备<span class="mk-count">' + items.length + ' 件</span>';
-      box.appendChild(sec);
-      const grid = document.createElement('div');
-      grid.className = 'mk-grid';
-      for (const l of items) grid.appendChild(buildItemCard(l, RARITY_LABEL));
-      box.appendChild(grid);
-    }
-
-    if (mats.length) {
-      const sec = document.createElement('div');
-      sec.className = 'mk-section';
-      sec.innerHTML = '🧪 材料<span class="mk-count">' + mats.length + ' 件</span>';
-      box.appendChild(sec);
-      const grid = document.createElement('div');
-      grid.className = 'mk-grid';
-      for (const l of mats) grid.appendChild(buildMaterialCard(l));
-      box.appendChild(grid);
-    }
-
-    if (eggList.length) {
-      const sec = document.createElement('div');
-      sec.className = 'mk-section';
-      sec.innerHTML = '🥚 宠物蛋<span class="mk-count">' + eggList.length + ' 件</span>';
-      box.appendChild(sec);
-      const grid = document.createElement('div');
-      grid.className = 'mk-grid';
-      for (const l of eggList) grid.appendChild(buildEggCard(l));
-      box.appendChild(grid);
-    }
-
-    if (!pets.length && !items.length && !eggList.length && !mats.length) {
+    if (!total) {
       box.innerHTML = '<div class="mk-empty">没有符合条件的商品</div>';
     }
   }
+
+  /* ---------- 查价（上架弹窗用） ----------
+   * 同类商品 + 同收款材料的在售标价中位数 = 参考价（火炬之光交易行的「查价」）。
+   * 跨收款材料不可比：10 个重铸石和 10 个神圣石不是一回事，所以必须同 material_type。 */
+  function pseudoListing(kind, payload, matName) {
+    if (kind === 'pet') return { pet_id: 'ref', pet_name: payload.name, material_type: matName, material_qty: 0 };
+    if (kind === 'item') return { item_id: 'ref', item_slot: payload.slot, item_rarity: (payload.rarity && payload.rarity.id) || payload.rarity, material_type: matName, material_qty: 0 };
+    if (kind === 'egg') return { egg_type: payload, material_type: matName, material_qty: 0 };
+    return { good_id: payload, material_type: matName, material_qty: 0 };
+  }
+  function marketRefPrice(kind, payload, matName) {
+    if (!matName) return null;
+    const pool = kind === 'pet' ? Market.getListings()
+      : kind === 'item' ? Market.getItemListings()
+        : kind === 'egg' ? (Market.getEggListings ? Market.getEggListings() : [])
+          : (Market.getBotMaterialListings ? Market.getBotMaterialListings() : []);
+    const pseudo = pseudoListing(kind, payload, matName);
+    const key = peerGroupKey(pseudo);
+    const peers = (pool || []).filter(x => x.material_type === matName && peerGroupKey(x) === key);
+    const min = Number((Config.trade && Config.trade.refPriceMinSamples) || 3);
+    if (peers.length < min) return { median: null, samples: peers.length };
+    return { median: medianQty(peers), samples: peers.length };
+  }
+  UI.marketRefPrice = marketRefPrice;
 
   /* ---------- 购买确认框（显示商品价格 / 交易税 / 买家需支付 / 卖家将收到） ---------- */
   // kind: 'pet' | 'item'；l: 挂单行（pet_listings / equip_listings）

@@ -48,10 +48,11 @@
     if (!user) return { error: '请先登录账号' };
     if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
     if (Market.isItemListed(eq.cloudId)) return { error: '装备正在市场出售，先取回再打造' };
+    if (eq.identified === false) return { error: '装备尚未鉴定，使用鉴定石揭晓后才能打造' };
     if (Materials.getQuantity(stoneName) < stoneAmount) return { error: `需要 ${stoneAmount} 颗${stoneName}，去挂机刷吧` };
     // 锁定石附加消耗（2026-09-03）：reforge/reroll 时每条已锁定词缀额外扣 1 颗锁定石（方案 B 持续消耗）
     if (extraStone && Materials.getQuantity(extraStone.name) < extraStone.amount) {
-      return { error: `需要 ${extraStone.amount} 颗${extraStone.name}（已锁定 ${extraStone.amount} 条词缀），去图 16/17 挂机刷吧` };
+      return { error: `需要 ${extraStone.amount} 颗${extraStone.name}（已锁定 ${extraStone.amount} 条词缀），去副本·淬炼试炼（20 层）刷吧` };
     }
 
     // 本地先行：改词缀 + 本地扣材料
@@ -275,6 +276,7 @@
     if (!user) return { error: '请先登录账号' };
     if (!eq.cloudId) return { error: '这件装备还没同步云端，刷新后再试' };
     if (Market.isItemListed(eq.cloudId)) return { error: '装备正在市场出售，先取回再操作' };
+    if (eq.identified === false) return { error: '装备尚未鉴定，鉴定后才能操作' };
     const oldP = eq.lockPrefix, oldS = eq.lockSuffix;
     if (side === 'prefix') delete eq.lockPrefix; else delete eq.lockSuffix;
     if (onApplied) { try { onApplied({ ok: true }); } catch (e) {} }
@@ -296,6 +298,7 @@
     const T = (S.tiers && S.tiers[tierKey]) || (S.tiers && S.tiers.normal) || {};
     const C = S.materialCount || 10;
     if (!eq || !pet) return { ok: false, error: '缺少装备或宠物' };
+    if (eq.identified === false) return { ok: false, error: '装备尚未鉴定，鉴定后才能魂铸' };
     // 上架中装备不可魂铸（仅在市场模块存在时校验）
     if (window.Market && typeof window.Market.isItemListed === 'function' && window.Market.isItemListed(eq.cloudId)) {
       return { ok: false, error: '装备正在市场出售，先取回再魂铸' };

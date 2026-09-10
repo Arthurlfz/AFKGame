@@ -55,7 +55,9 @@ ctx.Battle = {
 ctx.IdleBridge = {
   isActive: () => managed,
   settleNow: async () => { calls.settle++; return { ok: true }; },
-  stop: arg => { calls.stop.push(arg); managed = false; }
+  // 换图走 handoff：结算最后一段 + 只拆本地（不发 stop，服务器侧由下一次 start 停旧建新）
+  handoff: async () => { calls.settle++; managed = false; },
+  shutdown: async () => { calls.settle++; calls.stop.push(true); managed = false; }
 };
 ctx.UI = {
   showToast() {},
@@ -115,7 +117,7 @@ function openDetail(areaId) {
   await ndBtn('nd-idle').onclick();
   ok(JSON.stringify(calls.setActive) === '[2]', 'A3 点开始挂机后 setActive(2)（字符串 pid 归一成数字）');
   ok(calls.settle === settle0 + 1, 'A4 旧托管会话先结算（收益不丢）');
-  ok(JSON.stringify(calls.stop) === JSON.stringify([...Array(stop0)].map(() => undefined).concat([true])) || calls.stop[calls.stop.length - 1] === true, 'A5 托管会话 stop(true) 只拆本地（服务器侧由 start 停旧建新，避免乱序）');
+  ok(calls.stop.length === stop0, 'A5 交棒不发 stop（服务器侧由下一次 start「停旧建新」，避免乱序停掉新会话）');
   ok(calls.selectArea[calls.selectArea.length - 1] === 'plague-swamp', 'A6 已切到新图');
   ok(calls.switchPage[calls.switchPage.length - 1] === 'battle', 'A8 进入战斗页');
   await new Promise(r => setTimeout(r, 250)); // 主按钮点击有 150ms 延时

@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * pet.js —— 宠物系统
  * 职责：
  *  1. 宠物数据模型与列表/出战状态（pets、activePetId 仅本模块持有）
@@ -602,6 +602,8 @@
     baseStats, getStats, getBonusText, getStatCoeff, grantExp, expNeed, expFromBattle, expRange, createBaby, setCloudPets,
     getCurHp, setCurHp, regenTick, getBaseSpeed, restoreEquipment, addExpPool, getBloodline,
     rollPetTraits, getAwakenState, statParts,
+    // resolveLineId：2026-09-10 暴露「宠物名 → 根源基宠名」解析，供市集挂单 tooltip 复用（不重写）
+    resolveLineId,
     // 神级宠 + 进化阶段（手册 2.5 / 2.6）
     isGodPet, godInfoOf, spriteNameOf, getEvolveStage, stageLabel
   };

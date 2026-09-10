@@ -21,6 +21,7 @@
   let listings = [];         // 宠物在售列表（真实玩家挂单）
   let itemListings = [];     // 装备在售列表（真实玩家挂单）
   let eggListings = [];      // 宠物蛋在售列表（真实玩家挂单）
+  let materialListings = []; // 材料在售列表（真实玩家挂单，2026-09-10「万物皆可交易」）
   let botListings = [];      // 假卖家（流浪商人）装备挂单：纯前端内存，不落库、不占玩家账号
   let botPetListings = [];   // 假卖家（流浪商人）宠物挂单：纯前端内存，不落库、不占玩家账号
   let botMaterialListings = []; // 假卖家（流浪商人）材料挂单：纯前端内存（2026-09-03 二阶段）
@@ -28,6 +29,7 @@
   let myListedPets = [];     // 我上架的宠物 [{listingId, petId}]
   let myListedItems = [];    // 我上架的装备 [{listingId, itemId}]
   let myListedEggs = [];     // 我上架的蛋 [{listingId, eggType}]
+  let myListedMaterials = []; // 我上架的材料 [{listingId, goodName, goodQty}]
   let tradeRecords = [];     // 我的交易记录（买入+卖出，云端权威）
 
   /* ---------- 交易税 ----------
@@ -56,10 +58,12 @@
 
   /* ---------- 刷新（登录后 / 上架购买后 / 轮询调用） ---------- */
   async function refresh() {
-    const [p, pi, it, ii, eg, ei, tr] = await Promise.all([
+    const [p, pi, it, ii, eg, ei, mt, mi, tr] = await Promise.all([
       Supabase.fetchMarket(), Supabase.fetchMyListedIds(),
       Supabase.fetchItemMarket(), Supabase.fetchMyListedItemIds(),
       Supabase.fetchEggMarket(), Supabase.fetchMyListedEggIds(),
+      Supabase.fetchMaterialMarket ? Supabase.fetchMaterialMarket() : Promise.resolve({ data: [], error: null }),
+      Supabase.fetchMyListedMaterialIds ? Supabase.fetchMyListedMaterialIds() : Promise.resolve({ data: [], error: null }),
       Supabase.loadTradeRecords()
     ]);
     if (!p.error) listings = p.data || [];
@@ -68,8 +72,11 @@
     if (!ii.error) myListedItems = (ii.data || []).map(r => ({ listingId: r.id, itemId: r.item_id }));
     if (!eg.error) eggListings = eg.data || [];
     if (!ei.error) myListedEggs = (ei.data || []).map(r => ({ listingId: r.id, eggType: r.egg_type }));
+    // 材料表不存在（未跑 migrate_material_listings.sql）时 mt.error 有值 → 保持空数组，不影响其它交易
+    if (mt && !mt.error) materialListings = mt.data || [];
+    if (mi && !mi.error) myListedMaterials = (mi.data || []).map(r => ({ listingId: r.id, goodName: r.good_name, goodQty: r.good_qty }));
     if (!tr.error) tradeRecords = tr.data || [];
-    return { listings, itemListings, eggListings, tradeRecords };
+    return { listings, itemListings, eggListings, materialListings, tradeRecords };
   }
   // 在售宠物 = 真实玩家挂单 + 假卖家（流浪商人）挂单（假单排前面，市场打开就有货）
   const getListings = () => [...botPetListings, ...listings];
@@ -87,7 +94,15 @@
   const isItemListed = itemId => myListedItems.some(x => x.itemId === itemId);
   const getPetListing = petId => myListedPets.find(x => x.petId === petId);
   const getItemListing = itemId => myListedItems.find(x => x.itemId === itemId);
-  const getListedCount = () => myListedPets.length + myListedItems.length;
+  // 我的挂单总数（宠物 + 装备 + 蛋，共用 Config.trade.maxListings 上限）
+  const getListedCount = () => myListedPets.length + myListedItems.length + myListedEggs.length + myListedMaterials.length;
+  /* 上架额度（2026-09-10 落地）：Config.trade.maxListings 以前只写在配置和百科里，
+   * 上架流程完全不校验 → 挂单上限形同虚设。上架前统一问这里。 */
+  function listQuota() {
+    const max = Number((Config.trade && Config.trade.maxListings) || 5);
+    const used = getListedCount();
+    return { ok: used < max, used, max, left: Math.max(0, max - used) };
+  }
 
   /* ---------- 假卖家（流浪商人）挂单 ----------
    * 由 market_bot.js 定时生成/补货；假单只存前端内存，不落库、不占玩家账号。
@@ -245,6 +260,13 @@
   const getEggListings = () => [...botEggListings, ...eggListings];
   const getBotMaterialListings = () => botMaterialListings;
   const getBotEggListings = () => botEggListings;
+  /* ---------- 材料挂单（2026-09-10「万物皆可交易」） ----------
+   * 在售材料 = AI 假卖家 + 真实玩家挂单。以前只有 AI 那一半 —— 玩家能买不能卖。 */
+  const getMaterialListings = () => [...botMaterialListings, ...materialListings];
+  const getRealMaterialListings = () => materialListings;
+  const getMyListedMaterials = () => myListedMaterials;
+  const isMyMaterialListed = goodName => myListedMaterials.some(m => m.goodName === goodName);
+  const getMaterialListing = goodName => myListedMaterials.find(m => m.goodName === goodName);
   function addBotMaterialListing(l) { botMaterialListings.unshift(l); }
   function addBotEggListing(l) { botEggListings.unshift(l); }
   const getMyListedEggs = () => myListedEggs;
@@ -272,6 +294,44 @@
     return { ok: true };
   }
 
+  /* ---------- 材料上架 / 购买 / 取回（2026-09-10） ---------- */
+  // 上架：云端 list_material 原子扣卖家库存 → 建挂单；成功后本地标记（材料本地计数由调用方 spendLocal 同步）
+  async function listMaterial(goodName, goodQty, materialType, materialQty) {
+    const { data, error } = await Supabase.listMaterial(goodName, goodQty, materialType, materialQty);
+    if (error) return { error: error.message };
+    if (data && data.id) {
+      myListedMaterials.push({ listingId: data.id, goodName: data.good_name || goodName, goodQty: data.good_qty || goodQty });
+    }
+    await refresh();
+    // 任务进度上报：所有 type=list 的任务 +1（上架材料也算）
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
+    return { ok: true, data };
+  }
+  async function buyMaterial(listingId) {
+    const { data, error } = await Supabase.buyMaterial(listingId);
+    if (error) return { error: error.message };
+    const err = buyResultError(data);
+    if (err) return { error: err };
+    materialListings = materialListings.filter(x => x.id !== listingId); // 本地移除，等轮询兜底
+    if (window.Quest && window.Quest.reportType) window.Quest.reportType('trade', 1);
+    return { ok: true };
+  }
+  async function cancelMaterial(listingId) {
+    const { data, error } = await Supabase.cancelMaterialListing(listingId);
+    if (error) return { error: error.message };
+    if (data !== 'ok') return { error: '取回失败：挂单不存在或已售出' };
+    await refresh();
+    return { ok: true };
+  }
+  // 假买家（流浪商人）收购玩家材料挂单
+  async function buyAsBotMaterial(listingId) {
+    const { data, error } = await Supabase.botBuyMaterial(listingId);
+    if (error) return { error: error.message };
+    if (data !== 'ok') return { error: '流浪商人未购买成功（' + data + '）' };
+    materialListings = materialListings.filter(x => x.id !== listingId);
+    return { ok: true };
+  }
+
   /* ---------- 购买 RPC 返回值转错误文案 ---------- */
   // buy_pet / buy_equip 返回 'ok' | 'nologin' | 'notfound' | 'self' | 'insufficient'
   function buyResultError(data) {
@@ -288,6 +348,8 @@
 
   /* ---------- 假买家统一购买入口 ---------- */
   async function buyAsBotAny(listing) {
+    // 材料挂单（good_name 是材料的特征字段）走 bot_buy_material，别落到宠物分支
+    if (listing && (listing.good_name || listing.kind === 'material')) return buyAsBotMaterial(listing.id);
     return listing.item_id ? buyAsBot(listing.id) : (async () => {
       const { data, error } = await Supabase.botBuyPet(listing.id);
       if (error) return { error: error.message };
@@ -300,10 +362,12 @@
   /* ---------- 对外 API ---------- */
   window.Market = {
     refresh, getListings, getItemListings, getRealItemListings, getBotListings, getBotPetListings, getTradeRecords,
-    isListed, isItemListed, getPetListing, getItemListing, getListedCount,
+    isListed, isItemListed, getPetListing, getItemListing, getListedCount, listQuota,
     calcTax, calcNet, findMaterial, isPaymentMaterial,
     listPet, buy, cancelPet, listItem, buyItem, cancelItem,
     getEggListings, getMyListedEggs, isMyEggListed, listEgg, buyEgg, cancelEgg,
+    getMaterialListings, getRealMaterialListings, getMyListedMaterials, isMyMaterialListed, getMaterialListing,
+    listMaterial, buyMaterial, cancelMaterial, buyAsBotMaterial,
     addBotListing, buyBotItem, addBotPetListing, buyBotPet, buyAsBot, buyAsBotAny,
     getBotMaterialListings, addBotMaterialListing, buyBotMaterial,
     getBotEggListings, addBotEggListing, buyBotEgg

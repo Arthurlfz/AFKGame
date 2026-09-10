@@ -432,12 +432,20 @@
       if (craftEl) {
         const r2 = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
         const mt = eq.materialTier ?? eq.tier ?? 4;
+        const ilvl = window.Equipment && window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.ilvl != null ? Number(eq.ilvl) : 100);
+        const _gates = (Config.equipment.affixIlvlGates) || {};
+        let _maxT = 5;
+        for (const _k in _gates) { const _t = Number(_k), _g = Number(_gates[_k]); if (ilvl >= _g && _t < _maxT) _maxT = _t; }
         craftEl.innerHTML =
           '<div class="eq-unid-block">' +
             '<div class="eq-unid-icon">🔒</div>' +
             '<div class="eq-unid-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
-            '<div class="eq-unid-line">未鉴定的 ' + escapeHtml(eq.slot || '装备') + ' · T' + mt + '</div>' +
+            '<div class="eq-unid-line">未鉴定的 ' + escapeHtml(eq.slot || '装备') + ' · 底材 T' + mt + '</div>' +
             '<div class="eq-unid-line hint">词缀被封印，鉴定后揭晓</div>' +
+            '<div class="ceh-stats" style="display:flex; gap:14px; margin-top:8px;">' +
+              '<div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">物品等级</span><b style="font-size:14px;">' + ilvl + '</b></div>' +
+              '<div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">词缀 T 阶上限</span><b style="font-size:14px;">T' + _maxT + '</b></div>' +
+            '</div>' +
             '<button class="btn-sm id" id="eq-unid-btn">🔍 鉴定（消耗 1 鉴定石）</button>' +
           '</div>';
         const idBtn = craftEl.querySelector('#eq-unid-btn');

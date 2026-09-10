@@ -28,6 +28,21 @@
   // 服务器托管挂机中：经验/等级/血量由服务器写库，本地不许再写，否则两边互相覆盖
   const serverManaged = () => !!(IdleBridge && IdleBridge.isActive());
 
+  // 战斗页占用权（core/battle-session.js）：谁占着战斗页的唯一事实源。
+  // 挂机按钮文案/可用性、回血时钟是否让位，全看它，不再各自拼 Battle 状态。
+  const BattleSession = window.BattleSession;
+  const ownerText = () => {
+    const h = BattleSession && BattleSession.holder();
+    return (h && h.label) || '其它玩法';
+  };
+  // 托管挂机启动失败 → 玩家看得懂的一句话（占用权失败与网络失败分开说，别都说"刷新重试"）
+  function startIdleErrorText(r) {
+    const err = (r && r.error) || '';
+    if (err === 'BUSY' || err === 'NO_SESSION') return '⚠️ ' + ownerText() + '进行中，先打完再挂机。';
+    if (err === 'DISABLED') return '⚠️ 托管挂机已关闭（URL 带 ?noidle=1），当前走本地挂机。';
+    return '⚠️ 挂机启动失败，请刷新后重试';
+  }
+
   /* ---------- 累计统计（战斗场数/获得装备数） ---------- */
   function refreshStats() {
     // 服务器托管挂机：本地战斗循环不跑 → Battle.getTotalFights() 永远停在进托管前的值，
@@ -232,7 +247,7 @@
   if (window.UI) window.UI.replayOpeningTour = replayOpeningTour;
 
   async function clearAccountState() {
-    if (IdleBridge) IdleBridge.stop(); // 登出 / 换号：服务器托管会话也要停，否则换号后还在算
+    if (IdleBridge) IdleBridge.shutdown(); // 登出 / 换号：结算最后一段并停会话，否则换号后还在算
     stopAutoBattle();
     flushPetProgress();                                // 登出/切账号前把经验补写云端
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
@@ -408,6 +423,12 @@
     if (UI.refreshShop) { try { await UI.refreshShop(); } catch (e) { console.warn('商店数据加载失败：', e && e.message); } }
     // 云装备/蛋/材料/宠物已全部就位 → 现在跑引导例行（经验包+钥匙补给，reconcile 不会误判）
     startGuideOnboarding(true);
+    // 离线成交汇总：比对卖出记录，把"你不在时被买走的东西"一次性讲清楚（延后一点，让引导弹窗先出）
+    if (UI.checkMarketOfflineSales) {
+      window.setTimeout(function () {
+        try { UI.checkMarketOfflineSales(); } catch (e) { console.warn('[market] 离线成交检查失败', e); }
+      }, 1200);
+    }
     return true;
   }
 
@@ -506,13 +527,15 @@
     syncButton();
   }
 
-  /* ---------- 按钮状态机 ---------- */
-  // 挂机中（含等待回血）→「停止挂机」；血量不满→禁用「恢复中 x%」；空闲满血→「开始自动战斗」
+  /* ---------- 按钮状态机 ----------
+   * 文案/可用性只由「战斗页占用者」决定（唯一事实源）：
+   *   副本/塔占用 → 「XX进行中」禁用（点了就是两套战斗抢画面）
+   *   野图占用     → 「停止挂机」
+   *   空闲         → 「开始自动战斗」（血量不满时显示恢复进度） */
   function syncButton() {
-    if (isRunning() || serverManaged()) {
-      renderBattleButton('停止挂机', false);
-      return;
-    }
+    const h = BattleSession && BattleSession.holder();
+    if (h && h.kind !== 'wild') { renderBattleButton(h.label + '进行中', true); return; }
+    if (h) { renderBattleButton('停止挂机', false); return; }
     const pet = getActivePet();
     if (!pet) { renderBattleButton('开始自动战斗', true); return; } // 登出/换号后没有出战宠：按钮禁用，别让 getStats(null) 抛错中断登出流程
     const maxHp = getStats(pet).hp, cur = getCurHp(pet);
@@ -544,15 +567,29 @@
       });
     }
 
+    // 战斗页占用者变化 → 按钮立刻改文案，不用等下一次同步
+    if (BattleSession) {
+      BattleSession.onChange(function (info) {
+        syncButton();
+        // 野图挂机被玩家主动玩法（副本/塔）抢占：说一句，否则玩家以为挂机自己坏了
+        if (info.holder && info.holder.kind !== 'wild' && info.previous && info.previous.kind === 'wild') {
+          addLog('🛑 ' + info.holder.label + '进行中，野图挂机已停止（最后一段收益已结算）。');
+        }
+      });
+    }
+
     const battleBtn = document.getElementById('btn-battle');
     if (battleBtn) battleBtn.addEventListener('click', async () => {
-      if (isRunning() || serverManaged()) {
+      const h = BattleSession && BattleSession.holder();
+      if (h && h.kind !== 'wild') {  // 副本/塔在打：战斗页不归野图管
+        addLog('⚠️ ' + h.label + '进行中，先打完再挂机。');
+        return;
+      }
+      if (h) {                       // 野图挂机中 → 停止
         const wasManaged = serverManaged();
-        // 托管期间先把最后一段战报结算回来，再停
-        if (wasManaged) await IdleBridge.settleNow();
-        if (IdleBridge) IdleBridge.stop();
-        stopAutoBattle();                // 本地模式停止（托管时本地循环本就没跑，no-op）
-        if (!wasManaged) flushPetProgress(); // 托管时经验由服务器写库，本地别再 flush
+        if (wasManaged) await IdleBridge.shutdown();  // 结算最后一段账 + 服务器停会话
+        stopAutoBattle();                              // 本地循环（托管时本就是 no-op）
+        if (!wasManaged) flushPetProgress();           // 托管时经验由服务器写库，本地别再 flush
       /* 2026-09-09 门槛放宽：满血才能开 → 活着就能开。
        * 挂机本身自带「血量见底 → 等待回血 → 自动再战」，低血量开局与打输一场后没有区别；
        * 旧满血门槛的真实效果是：挂过一场血没回满就点开始 = 静默无响应（连提示都没有），
@@ -567,9 +604,10 @@
           // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
           addLog('⏳ 正在开始挂机…');
           const r = await IdleBridge.start(area, getActivePet());
-          if (r && r.error) addLog('⚠️ 挂机启动失败，请刷新后重试');
+          if (r && r.error) addLog(startIdleErrorText(r));
         } else {
-          startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
+          const r = startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
+          if (r && r.ok === false) addLog('⚠️ ' + ownerText() + '进行中，先打完再挂机。');
         }
       } else {
         addLog('💤 出战宠物气血见底，恢复一些后再开始挂机。');
@@ -597,6 +635,11 @@
       const dtSec = Math.min(Math.max(0.1, (now - lastRegenTs) / 1000), 60); // 封顶 60 秒/次
       lastRegenTs = now;
       if (serverManaged()) return;           // 托管时血量/状态由服务器战报管，本地回血时钟不插手
+      /* 战斗页被副本/塔占用：那是另一个战斗实例在打，野图的回血时钟整体让位 ——
+       * 既不回血（爬塔/副本是「整局一管血」，回血会抹平难度），也不写战斗页
+       * （每秒的 updateStatus/renderAll/syncButton 会把爬塔的血条/徽章/按钮覆盖掉）。 */
+      const owner = BattleSession && BattleSession.holder();
+      if (owner && owner.kind !== 'wild') return;
       if (isRunning() && !isWaitingRecover()) return;
       const pet = getActivePet();
       if (!pet) return;
@@ -614,6 +657,26 @@
       const after = Market.getListings().length + Market.getItemListings().length;
       if (after !== before || Market.getTradeRecords().length !== beforeRec) renderAll();
     }, 5000);
+
+    // 补建档自愈（2026-09-10）：孵化/合成/选宠/市场买宠等路径万一云端建档失败（网络抖动），
+    // 宠物会没有 cloudId，而 loadPets 以云端为准 → 刷新后凭空消失（丢变异宠事故的兜底）。
+    // 每 30 秒扫一次名下宠物，给没有 cloudId 的补建档。savePet 是无条件 INSERT，
+    // 用 busy 闸门防并发重入；建档失败的宠下一轮会再试（宁可多一次请求，不可丢一只宠）。
+    let cloudSweepBusy = false;
+    setInterval(async () => {
+      if (cloudSweepBusy || serverManaged()) return;
+      const pending = getPets().filter(p => !p.cloudId);
+      if (!pending.length) return;
+      cloudSweepBusy = true;
+      try {
+        for (const pet of pending) {
+          if (!getPets().includes(pet)) continue; // 扫描期间可能已被移除
+          const { data, error } = await Supabase.savePet(pet);
+          if (!error && data && data.id) pet.cloudId = data.id;
+        }
+      } catch (e) { /* 网络异常：下一轮再试 */ }
+      finally { cloudSweepBusy = false; }
+    }, 30000);
 
     updateStatus('idle', 0);
     renderAll();

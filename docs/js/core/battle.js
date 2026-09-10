@@ -16,6 +16,10 @@
   const Config = window.Config;
   const { pickWeighted } = window.Util;
   const { getActivePet, getStats, getCurHp, setCurHp } = window.Pet;
+  /* 战斗页占用权（core/battle-session.js，必须先加载）：本模块是「本地野图挂机」的
+   * 所有者 —— 开战时申请占用，停止时交还；被副本/塔抢占时自我让位（订阅在文件末尾）。
+   * 缺失即装配错误（游戏.html 少一行 script），提示出来，不静默降级。 */
+  const SESSION = window.BattleSession;
 
   let autoRunning = false; // 挂机中（含等待回血：autoRunning 保持 true，仅 waitingRecover 区分）
   let waitingRecover = false; // 血量见底/战败后等待回血，回满自动继续
@@ -37,7 +41,8 @@
   let lastTickTs = 0;      // 战斗计时基准（tick 按真实流逝时间补步，后台节流不减速）
   let selectedAreaId = null;
   // state.mode：'wild' = 野图挂机（缺省，行为不变）；'trial' = 副本层战斗（见文件末尾副本区块）
-  const state = { mode: 'wild', pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false };
+  // enemySkillCd / enemySkillQueued：塔怪主动技的冷却与"本回合要放"标记（野图怪没有 skill，恒为 0/null）
+  const state = { mode: 'wild', pet: null, petRef: null, enemy: null, petAction: 0, enemyAction: 0, activeSkill: null, skillCooldown: 0, skillQueued: false, healBlock: false, enemySkillCd: 0, enemySkillQueued: null };
   // 血统被动：跨场状态
   let pendingKillBuff = false;  // 骨狼：击杀后下次攻击+伤害（跨场传递）
   let bloodline = null;          // 当前出战宠物的血统被动配置
@@ -45,9 +50,21 @@
   let corruptionStacks = 0;      // 毒沼蛙：敌人腐蚀层数
 
   /* ---------- 开始 / 停止 ---------- */
+  function claimPage() {
+    if (!SESSION) {
+      const msg = '⚠️ 战斗页占用权模块未加载（缺 core/battle-session.js），无法开始挂机。';
+      if (window.UI && window.UI.addLog) window.UI.addLog(msg); else console.warn(msg);
+      return false;
+    }
+    const r = SESSION.claim('wild');
+    if (!r.ok) return false; // 战斗页被副本/塔占着：调用方据此提示玩家
+    return true;
+  }
   // startAutoBattle(callback)：callback({win, fightCount}) 每场结束调用
+  // 返回 { ok, reason }：占用权拿不到（副本/塔在打）时 ok=false，本函数不启动任何循环
   function startAutoBattle(callback) {
-    if (autoRunning) return;
+    if (autoRunning) return { ok: true, already: true };
+    if (!claimPage()) return { ok: false, reason: 'BUSY' };
     autoRunning = true;
     waitingRecover = false;
     fightCount = 0;
@@ -55,9 +72,11 @@
     window.UI.updateStatus('fighting', fightCount);
     window.UI.addLog('🕹 开始自动战斗！');
     beginFight();
+    return { ok: true };
   }
   // 手动停止：立即停下，当前血量写回宠物
   function stopAutoBattle() {
+    if (SESSION) SESSION.release('wild'); // 交还战斗页（被抢占时处于他人名下，释放是空操作）
     if (!autoRunning) return;
     autoRunning = false;
     waitingRecover = false;
@@ -139,9 +158,12 @@
     killBuffActive = pendingKillBuff;
     pendingKillBuff = false;
     corruptionStacks = 0;
+    state.enemySkillCd = 0;         // 塔怪技能：每场战斗重置（野图怪没 skill，不参与）
+    state.enemySkillQueued = null;
   }
   function beginFight() {
-    if (state.mode === 'trial') return; // 副本进行中：野图开战一律拒绝（战斗页被副本占用）
+    // 爬塔进行中（副本 'trial' / 通天塔 'tower'）：野图开战一律拒绝（战斗页被爬塔占用）
+    if (state.mode !== 'wild') return;
     const pet = getActivePet();
     const picked = pickEnemy();
     if (!picked) {
@@ -306,17 +328,35 @@
     const atkData = isPet ? state.pet : state.enemy;
     const defData = isPet ? state.enemy : state.pet;
     // 主动技能概率触发：宠物本回合行动时判定（默认 30%），触发后本回合施放技能
-    if (isPet && state.activeSkill && state.skillCooldown <= 0 && !state.skillQueued && Math.random() < (state.activeSkill.triggerChance || 0.30)) {
-      state.skillQueued = true;
+    if (isPet) {
+      if (state.activeSkill && state.skillCooldown <= 0 && !state.skillQueued && Math.random() < (state.activeSkill.triggerChance || 0.30)) {
+        state.skillQueued = true;
+      }
+    } else if (state.enemy && state.enemy.skill) {
+      /* 塔怪主动技（2026-09-10 用户要求「怪不能是死靶子」）：
+       * 只有带 skill 的怪才走到这里 —— 野图怪 skill 为 undefined，**一个随机数都不消耗**，
+       * 所以 vtest_server_sim（客户端 tick vs 模拟器同种子逐随机数一致）不受影响。 */
+      const es = state.enemy.skill;
+      if (state.enemySkillCd <= 0 && !state.enemySkillQueued && Math.random() < (es.triggerChance || 0.25)) {
+        state.enemySkillQueued = es;
+      }
     }
-    const skill = isPet && state.skillQueued ? state.activeSkill : null;
+    const skill = isPet
+      ? (state.skillQueued ? state.activeSkill : null)
+      : (state.enemySkillQueued || null);
     // 觉醒：Lv60 终形态宠物施放主动技能时伤害 ×(1+awaken.damage)（默认 +20%）
     const awakenMult = (isPet && skill && window.Pet.getAwakenState)
       ? ((window.Pet.getAwakenState(state.pet) || {}).damage || 0) : 0;
     if (skill) {
-      state.skillQueued = false;
-      state.skillCooldown = skill.cooldownTurns;
-      window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+      if (isPet) {
+        state.skillQueued = false;
+        state.skillCooldown = skill.cooldownTurns;
+        window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
+      } else {
+        state.enemySkillQueued = null;
+        state.enemySkillCd = skill.cooldownTurns;
+        window.UI.addLog?.((state.enemy && state.enemy.name ? state.enemy.name + ' ' : '') + '施放「' + skill.name + '」');
+      }
     }
     // 伤害结算对齐"扑到对方脸上"那一刻。时刻由表现层给出：冲刺时长随两只宠的间距自适应，
     // 这里写死一个数字的话，宽屏上血条和飘字会在立绘还没冲到时就跳出来。
@@ -342,14 +382,16 @@
         : 0;
       const damage = Math.floor(result.damage * dmgMult) + bonus;
       defData.hp -= damage;
-      if (result.heal > 0) {
+      // 腐印·禁疗（塔专属）：本局吸血/回血全部失效。野图与副本路径 state.healBlock 恒为 false，行为零变化。
+      if (result.heal > 0 && !state.healBlock) {
         atkData.hp = Math.min(atkData.maxHp, atkData.hp + result.heal);
         window.UI.showDamage(isPet ? 'pet' : 'enemy', result.heal, 'lifesteal');
       }
       const target = isPet ? 'enemy' : 'pet';
       window.UI.animateHit(target, result.isCrit);
       window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal');
-      window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
+      // state.enemy 可能已被 endFight 置空（对方那一刀的延迟结算在 endFight 之后才落地）→ 读它等于崩
+      if (state.enemy) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
 
       // ===== 血统被动触发 =====
       const bl = bloodline;
@@ -384,11 +426,13 @@
         window.UI.showDamage('enemy', counterDmg, 'normal');
       }
       // 被动造成额外伤害后重新更新血条
-      if (bl) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);    }, hitAt);
+      if (bl && state.enemy) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);    }, hitAt);
     if (isPet && state.skillCooldown > 0 && !skill) {
       state.skillCooldown--;
       window.UI.renderActiveSkill?.(state.activeSkill, state.skillCooldown, state.skillQueued);
     }
+    // 塔怪技能冷却递减（只在本回合没放技能时走一格；野图怪恒 0，无额外随机数）
+    if (!isPet && state.enemySkillCd > 0 && !skill) state.enemySkillCd--;
   }
   function useActiveSkill() {
     if (!autoRunning || !state.pet || !state.enemy || state.enemy.hp <= 0) return false;
@@ -441,13 +485,19 @@
     clearInterval(interval);
     interval = null;
     const win = state.pet.hp > 0;
-    if (state.mode === 'trial') {
-      /* 副本层结算：不掉落/不上报/不回血/不连战。
-       * 血量写回后回调 TrialEngine（进下一层或终局结算），野图循环一概不碰。 */
+    if (state.mode === 'trial' || state.mode === 'tower') {
+      /* 爬塔层结算（副本 trial / 通天塔 tower 共用）：不掉落/不上报/不回血/不连战。
+       * 血量写回后回调对应引擎（进下一层或终局结算），野图循环一概不碰。 */
       setCurHp(state.petRef || getActivePet(), state.pet.hp);
       const cb = trialOnEnd; trialOnEnd = null;
       state.mode = 'wild';
+      state.healBlock = false;
       const payload = { win, petHp: Math.max(0, Math.round(state.pet.hp)), petMaxHp: state.pet.maxHp, enemy: state.enemy };
+      /* ⚠️ 必须先把 fightEnded 置真：tick() 是 `for (i<steps && !fightEnded) step()`，
+       * 而 steps 在标签页被节流时可能 >1 —— 不刹车的话，state.enemy 已被置 null，
+       * 循环里的下一轮 step() 还会去读 state.enemy.spd / .hp → 满屏
+       * "Cannot read properties of null"（2026-09-10 浏览器实测踩到）。 */
+      fightEnded = true;
       state.enemy = null;
       if (cb) cb(payload);
       return;
@@ -518,14 +568,16 @@
    * 进入前由 TrialEngine 负责停掉野图挂机（startAutoBattle / IdleBridge），
    * 结束后由 TrialEngine 负责恢复；本区块只管"开一层 / 结一层"。
    * ============================================================ */
-  let trialOnEnd = null; // 当前层的结算回调（TrialEngine 注入，层结束即清空）
-  // 开打副本的一层。占用中/缺宠物/缺敌人返回 false，由 TrialEngine 兜底处理。
+  let trialOnEnd = null; // 当前层的结算回调（TrialEngine / TowerEngine 注入，层结束即清空）
+  // 开打爬塔的一层。占用中/缺宠物/缺敌人返回 false，由调用引擎兜底处理。
+  // floorCtx.mode：'trial'（副本，缺省）| 'tower'（通天塔）；floorCtx.healBlock：本局禁疗（塔腐印）。
   function beginTrialFloor(floorCtx) {
     if (!floorCtx || !floorCtx.enemy || !floorCtx.onEnd) return false;
-    if (state.mode === 'trial' || autoRunning || waitingRecover || interval || nextFightTimer || recoverTimer) return false;
+    if (state.mode !== 'wild' || autoRunning || waitingRecover || interval || nextFightTimer || recoverTimer) return false;
     const pet = getActivePet();
     if (!pet) return false;
-    state.mode = 'trial';
+    state.mode = floorCtx.mode === 'tower' ? 'tower' : 'trial';
+    state.healBlock = !!floorCtx.healBlock;
     trialOnEnd = floorCtx.onEnd;
     state.petRef = pet;
     state.pet = snapshotPet(pet);
@@ -545,6 +597,16 @@
     return true;
   }
   const isTrialMode = () => state.mode === 'trial';
+  const isTowerMode = () => state.mode === 'tower';
 
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage, beginTrialFloor, isTrialMode };
+  /* ---------- 自我让位：战斗页被更高优先级玩法（副本/塔）抢占 ----------
+   * 谁拥有资源谁负责收尾：本模块只管停自己的循环，不需要知道抢占者是谁。
+   * 反向不需要处理：野图起不来时 claimPage 已经拦住了（低优先级抢不到高的）。 */
+  if (SESSION) {
+    SESSION.onChange(function (info) {
+      if (info.holder && info.holder.kind !== 'wild' && autoRunning) stopAutoBattle();
+    });
+  }
+
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage, beginTrialFloor, isTrialMode, isTowerMode };
 })();

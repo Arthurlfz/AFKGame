@@ -13,7 +13,7 @@
   const PetUI = window.PetUI || (window.PetUI = {});
   const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
 
-  let mergeMainId = null, mergeSubId = null, useNirvanaPill = false;
+  let mergeMainId = null, mergeSubId = null, useNirvanaPill = false, useCrystal = false;
 
   function statRows(pet) {
     const s = getStats(pet);
@@ -157,29 +157,38 @@
     const nirPill = Config.itemOf ? Config.itemOf('nir_pill') : null;
     const pillHave = nirPill ? (Materials.getQuantity ? Materials.getQuantity(nirPill.name) : 0) : 0;
     const pillOk = pillHave >= 1;
+    /* 凝魂晶石加成（2026-09-10 补入口）：config.nirvana.crystalBonus 一直只有开发者面板能用，
+     * 玩家在涅槃页看不到也点不到。这里补一个复选框，和涅槃丹一起乘算（后端 nirvana 早就支持 useCrystal）。 */
+    const CB = M.crystalBonus || null;
+    const cryHave = CB ? (Materials.getQuantity ? Materials.getQuantity(CB.material) : 0) : 0;
+    const cryOk = !!CB && cryHave >= CB.amount;
+    if (!pillOk) useNirvanaPill = false;   // 持有不足时自动取消勾选，避免按钮被自己禁用还不知道为什么
+    if (!cryOk) useCrystal = false;
     const pillMult = useNirvanaPill && nirPill ? (nirPill.boostMult || 1.2) : 1;
-    const calcPill = window.Merge && window.Merge.calcNirvanaGrowth ? window.Merge.calcNirvanaGrowth(main, sub, pillMult) : null;
-    const newGrowthPill = calcPill ? calcPill.growth : newGrowth;
-    const finalGrowth = useNirvanaPill ? newGrowthPill : newGrowth;
-    const absorb = calcPill && calcPill.absorb != null ? calcPill.absorb : (Math.round(sub.growth * (M.absorbRatio || 0.5) * pillMult * 10) / 10);
-    const pillMultTxt = `（吸收副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} = +${absorb.toFixed(1)}，不衰减）`;
+    const cryMult = (useCrystal && CB) ? (1 + CB.absorbBonus) : 1;
+    const bonusMult = pillMult * cryMult;
+    const calcBoost = window.Merge && window.Merge.calcNirvanaGrowth ? window.Merge.calcNirvanaGrowth(main, sub, bonusMult) : null;
+    const finalGrowth = calcBoost ? calcBoost.growth : newGrowth;
+    const absorb = calcBoost && calcBoost.absorb != null ? calcBoost.absorb : (Math.round(sub.growth * (M.absorbRatio || 0.5) * bonusMult * 10) / 10);
     const row = (label, a, b) => {
       const cls = b > a ? 'up': b < a ? 'down': '';
       const arrowTxt = b > a ? '▲' : b < a ? '▼' : '—';
       return `<tr><td>${label}</td><td>${a}</td><td class="${cls}">${b} ${arrowTxt}</td></tr>`;
     };
-    const canMerge = !useNirvanaPill || pillOk;
+    const canMerge = (!useNirvanaPill || pillOk) && (!useCrystal || cryOk);
     const footWarns = [];
     if (useNirvanaPill && !pillOk) footWarns.push(`<span class="warn">${matName}不足：需要 1 个，当前持有 ${pillHave}</span>`);
+    if (useCrystal && !cryOk) footWarns.push(`<span class="warn">${CB.material}不足：需要 ${CB.amount} 颗，当前持有 ${cryHave}</span>`);
     pb.innerHTML = `
       <div class="preview-bar">
-        <div class="pv"><div class="k">吸收成长</div><div class="v">+${absorb.toFixed(1)}<small>副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${pillMult > 1 ? ' ×' + pillMult : ''} · 不衰减</small></div></div>
+        <div class="pv"><div class="k">吸收成长</div><div class="v">+${absorb.toFixed(1)}<small>副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${bonusMult > 1 ? ' ×' + bonusMult : ''} · 不衰减</small></div></div>
         <div class="pv"><div class="k">涅槃后成长</div><div class="v">${finalGrowth.toFixed(1)}<small>主宠 ${main.growth.toFixed(1)} → ${finalGrowth.toFixed(1)}</small></div></div>
         <div class="pv"><div class="k">等级</div><div class="v">Lv.${main.level} → ${M.resetLevel ? 'Lv.1' : '不变'}<small>${M.resetLevel ? '重置 · 经验清零' : ''}</small></div></div>
         <div class="pv"><div class="k">涅槃丹</div><div class="v"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> ×${pillMult}（持有 ${pillHave}）</label></div></div>
+        ${CB ? `<div class="pv"><div class="k">${CB.material}</div><div class="v"><label><input type="checkbox" id="nir-crystal-check" ${useCrystal ? 'checked' : ''} ${cryOk ? '' : 'disabled'}> ×${cryMult}（消耗 ${CB.amount}，持有 ${cryHave}）</label></div></div>` : ''}
       </div>
       <div class="preview-foot">
-        <b>${sub.name}</b>（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
+        <b>${sub.name}</b>（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${useCrystal && CB ? ` · 消耗 ${CB.material} ×${CB.amount}（持有 ${cryHave}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
         ${traitInheritLine(main, sub, 'nirvana')}
         ${footWarns.join('')}
       </div>
@@ -191,9 +200,13 @@
     if (pillCheck) {
       pillCheck.onchange = () => { useNirvanaPill = pillCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
     }
+    const cryCheck = document.getElementById('nir-crystal-check');
+    if (cryCheck) {
+      cryCheck.onchange = () => { useCrystal = cryCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
+    }
     cb.querySelector('#merge-ok').onclick = async () => {
-      if (!canMerge) { showToast('无法涅槃', '涅槃丹不足'); return; }
-      const res = await Merge.nirvana(main.id, sub.id, false, useNirvanaPill);
+      if (!canMerge) { showToast('无法涅槃', '道具或材料不足'); return; }
+      const res = await Merge.nirvana(main.id, sub.id, useCrystal, useNirvanaPill);
       if (res.error) { showToast('涅槃失败', res.error); return; }
       addLog(`涅槃成功！${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}，等级重置为 Lv.${res.main.level}`);
       showToast('涅槃成功！', `${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}`);

@@ -18,10 +18,20 @@
   border:1px solid var(--line);border-radius:12px;
 }
 
-/* 顶行：搜索 + 当前路径 + 清空 */
+/* 顶行：搜索 + 价格区间 + 当前路径 + 清空 */
 .cf-toprow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.cf-search{flex:0 0 236px;min-width:180px;}
+.cf-search{flex:0 1 360px;min-width:220px;display:flex;flex-direction:column;gap:6px;}
 .cf-search .market-search{width:100%;}
+/* 价格区间（POE 交易站的 price range 等价物）：按标价里的收款材料数量筛选 */
+.cf-price-range{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--text-faint);}
+.cf-price-label{white-space:nowrap;}
+.cf-price-input{
+  width:60px;padding:4px 6px;font-size:.78rem;font-family:inherit;
+  background-color:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:7px;
+}
+.cf-price-input:focus{border-color:var(--accent);outline:none;}
+.cf-price-sep{color:var(--text-faint);}
+.cf-price-unit{white-space:nowrap;}
 .cf-path-wrap{flex:1 1 220px;min-width:180px;}
 .cf-path-title{font-size:.72rem;letter-spacing:.12em;color:var(--text-faint);margin:0 2px 4px;}
 .cf-path{display:flex;flex-wrap:wrap;gap:5px;min-height:4px;}

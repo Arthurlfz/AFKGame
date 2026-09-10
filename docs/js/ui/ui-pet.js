@@ -119,10 +119,15 @@
     if (reborn) reborn.textContent = `转生 ${pet.rebornCount || 0} 次`;
     const skillInfo = $('pet-active-skill-info');
     if (skillInfo) {
-      const skill = Config.pet.evolution.activeSkills[pet.name];
-      const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}%伤害${skill.maxHpDamageRate ? ` + 目标最大生命${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
+      // 用 skillOf 而不是 activeSkills[名字]：变异宠名字带「·异变」，直接查表必然查不到，
+      // 结果就是"明明有技能却显示未解锁"。skillOf 会剥后缀查本体（config 里现成的）。
+      const evo = Config.pet.evolution || {};
+      const skill = (evo.skillOf ? evo.skillOf(pet.name) : null) || (evo.activeSkills || {})[pet.name];
+      // 触发概率以前全项目 UI 都没有展示（只有战斗逻辑在读），玩家只能看到"有技能"却不知道多强
+      const chanceTxt = skill ? `${Math.round((skill.triggerChance || 0) * 100)}% 概率发动` : '';
+      const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}% 伤害${skill.maxHpDamageRate ? ` + 目标最大生命 ${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
       skillInfo.textContent = skill
-        ? `主动技能：${skill.name} · ${effect} · ${skill.cooldownTurns} 回合冷却`
+        ? `主动技能：${skill.name} · ${chanceTxt} · ${effect} · ${skill.cooldownTurns} 回合冷却`
         : '主动技能：终形态 Lv.60 解锁';
     }
     // 血脉特质胶囊（出战面板常驻；空态显示"无血脉特质"）
@@ -293,7 +298,7 @@
         <div class="pname">${pet.name}</div>
         ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">血统 · '+bl.name+'</div>':'';})()}
         <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${window.Pet&&window.Pet.stageLabel?' · '+window.Pet.stageLabel(pet):''}</div>
-        <div class="meta">装备${equipCount}/3</div>`;
+        <div class="meta">装备${equipCount}/12</div>`;
       card.onclick = () => {
         if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {
           UI.showToast('⚠️ 已上架的宠物不能出战', '请先在市场取回');

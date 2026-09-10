@@ -17,6 +17,8 @@
 
   /* ---------- 装备打造面板（重铸石 / 剥离石 / 神圣石 / 增缀石） ---------- */
   let activeCraftEq = null;
+  // 魂铸独立 tab（2026-09-10）：false=打造 / true=魂铸。两者不再混在同一屏
+  let soulTabActive = false;
 
   /* ---------- 装备打造面板（重铸石 / 剥离石 / 神圣石 / 增缀石 / 锁定词缀） ----------
    * 2026-09-04 主从式：打造内容渲染进「背包页右侧面板」的打造容器（renderCraftInto(el, eq)），
@@ -47,9 +49,9 @@
         ${grpTitle('后缀', sfx.length, lockSuffix)}
         ${sfx.map(affixLine).join('') || '<span class="hint">无</span>'}
       </div>`;
-    const stoneTip = key => {
-      const stone = C[key];
-      return `<span class="craft-stone-tip-wrap"><span class="craft-stone-name">${stone.name}</span><span class="craft-stone-tip" role="tooltip"><b>${stone.name}</b><span>${stone.effect}</span><em>${stone.rule}</em></span></span>`;
+    const stoneTitle = key => {
+      const s = C[key] || {};
+      return `${s.name || ''}：${s.effect || ''}${s.rule ? '（' + s.rule + '）' : ''}`;
     };
     // POE 锁前锁后：锁定侧在重铸/神圣中整组保留，按条数扣锁定石；只能锁一边
     const lockSideBtn = (side, label) => {
@@ -60,37 +62,58 @@
     };
     const lockAreaHtml = `
       <div class="craft-section-label">锁定（锁前 / 锁后）<span class="craft-lock-count">${lockCfg.name} ×${lockStone}</span></div>
-      <div class="craft-lock-sides">${lockSideBtn('prefix', '锁前缀')}${lockSideBtn('suffix', '锁后缀')}</div>
-      <div class="craft-lock-note">锁定消耗 1 ${lockCfg.name} · 只锁一边 · 重铸后自动失效（POE 一次性） · ${lockCfg.name}仅图16/17掉落</div>`;
+      <div class="craft-lock-sides">${lockSideBtn('prefix', '锁前缀')}${lockSideBtn('suffix', '锁后缀')}</div>`;
     const lockActive = lockPrefix || lockSuffix;
     const reforgeSub = lockActive ? '锁定侧重铸后自动失效' : '全部词缀重洗';
-    const soulHtml = soulCastHtml(eq, inSell);
-    const soulFold = eq.soulAffix
-      ? `<div class="craft-section-label">魂铸（宠物 → 装备）</div>${soulHtml}`
-      : `<details class="craft-soul-details"><summary>魂铸（宠物 → 装备）<span class="craft-soul-fold-hint">▸ 点击展开</span></summary><div class="craft-soul-fold-body">${soulHtml}</div></details>`;
-    el.innerHTML = `
+    const esc = window.escapeHtml || (s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])));
+    const eqR = eq.rarity || { label: '白色', color: '#b2aa9c' };
+    const mt = eq.materialTier != null ? eq.materialTier : (eq.tier != null ? eq.tier : 4);
+    const ilvl = window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.ilvl != null ? Number(eq.ilvl) : 100);
+    const _gates = (Config.equipment.affixIlvlGates) || {};
+    let _maxT = 5;
+    for (const _k in _gates) { const _t = Number(_k), _g = Number(_gates[_k]); if (ilvl >= _g && _t < _maxT) _maxT = _t; }
+    // 未鉴定：不泄露词缀，但物品等级(ilvl)掉落时即确定、不涉及词缀内容，
+    // 仍展示等级 + 词缀 T 阶上限，便于判断是否为图10 的 T1 胚子（无需先鉴定）。
+    if (eq.identified === false) {
+      el.innerHTML = `<div class="eq-unid-block"><div class="eq-unid-icon">🔒</div><div class="eq-unid-name" style="color:${eqR.color}">${esc(eq.name || '未知装备')}</div><div class="eq-unid-line">未鉴定的 ${esc(eq.slot || '装备')} · 词缀封印</div><div class="eq-unid-line hint">鉴定后揭晓词缀并开放打造</div><div class="ceh-stats" style="display:flex; gap:14px; margin-top:8px;"><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">物品等级</span><b style="font-size:14px;">${ilvl}</b></div><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">词缀 T 阶上限</span><b style="font-size:14px;">T${_maxT}</b></div></div></div>`;
+      return;
+    }
+    const eqBase = (eq.base && eq.base.label != null) ? eq.base : null;
+    const baseTxt = eqBase ? `${esc(eqBase.label)} +${eqBase.value}` : '—';
+    // PoE 式紧凑头部：名称 → 部位/品质 → 一行底材/等级 → 基底词缀，不再放规则长文（规则看百科）
+    const headHtml = `
+      <div class="craft-eq-head" style="border-bottom:1px solid rgba(184,155,89,.25); padding-bottom:8px; margin-bottom:8px;">
+        <div class="ceh-name" style="font-weight:600; font-size:16px; color:${eqR.color}">${esc(eq.name || '装备')}</div>
+        <div class="ceh-slot" style="font-size:12px; color:#9a9486; margin:2px 0 4px;">${eq.slot} · ${eqR.label}装 · ${pfx.length + sfx.length} 条词缀</div>
+        <div class="ceh-meta" style="font-size:12px; color:#8a8478; margin-bottom:5px;">底材 T${mt} ｜ 物品等级 ${ilvl} ｜ 词缀上限 T${_maxT}</div>
+        <div class="ceh-base" style="font-size:13px; color:#c9a86a;">${baseTxt}</div>
+      </div>`;
+    const tabHtml = `
+      <div class="craft-tabs">
+        <button class="craft-tab${soulTabActive ? '' : ' on'}" data-ctab="craft">⚒ 打造</button>
+        <button class="craft-tab${soulTabActive ? ' on' : ''}" data-ctab="soul">🔥 魂铸${eq.soulAffix ? ' ✓' : ''}</button>
+      </div>`;
+    const craftBody = `
       <div class="craft-eq">
         ${affixGroupHtml}
-      </div>
-      <div class="craft-section-label">打造资源</div>
-      <div class="craft-stones craft-resource-grid">
-        <div class="craft-resource-item"><span class="resource-icon">🎲</span><span>${stoneTip('reforge')}</span><b>×${Materials.getQuantity(C.reforge.name)}</b></div>
-        <div class="craft-resource-item"><span class="resource-icon">✂️</span><span>${stoneTip('strip')}</span><b>×${Materials.getQuantity(C.strip.name)}</b></div>
-        <div class="craft-resource-item holy"><span class="resource-icon">🔮</span><span>${stoneTip('holy')}</span><b>×${Materials.getQuantity(C.holy.name)}</b></div>
-        <div class="craft-resource-item"><span class="resource-icon">➕</span><span>${stoneTip('augment')}</span><b>×${Materials.getQuantity(C.augment.name)}</b></div>
-        <div class="craft-resource-item lock"><span class="resource-icon">🔒</span><span>${stoneTip('lock')}</span><b>×${lockStone}</b></div>
       </div>
       ${lockAreaHtml}
       <div class="craft-section-label">打造操作</div>
       <div class="craft-actions craft-action-grid">
-        <button class="btn-mini primary" id="craft-reforge">🎲 重铸石<span>消耗 1 · ${reforgeSub}</span></button>
-        <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''}>✂️ 剥离石<span>${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '消耗 1 · 移除未锁侧词缀'}</span></button>
-        <button class="btn-mini holy" id="craft-holy">🔮 神圣石<span>消耗 1 · 重 Roll 未锁侧数值（保留锁定）</span></button>
-        <button class="btn-mini augment" id="craft-augment" ${(pfx.length >= 3 && sfx.length >= 3) ? 'disabled' : ''}>➕ 增缀石<span>${(pfx.length >= 3 && sfx.length >= 3) ? '前后缀已满' : '消耗 1 · 新增到未锁侧'}</span></button>
+        <button class="btn-mini primary" id="craft-reforge" title="${esc(stoneTitle('reforge'))}">🎲 重铸石<span>×${Materials.getQuantity(C.reforge.name)} · ${reforgeSub}</span></button>
+        <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''} title="${esc(stoneTitle('strip'))}">✂️ 剥离石<span>×${Materials.getQuantity(C.strip.name)} · ${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '移除未锁侧词缀'}</span></button>
+        <button class="btn-mini holy" id="craft-holy" title="${esc(stoneTitle('holy'))}">🔮 神圣石<span>×${Materials.getQuantity(C.holy.name)} · 重 Roll 未锁侧数值</span></button>
+        <button class="btn-mini augment" id="craft-augment" ${(pfx.length >= 3 && sfx.length >= 3) ? 'disabled' : ''} title="${esc(stoneTitle('augment'))}">➕ 增缀石<span>×${Materials.getQuantity(C.augment.name)} · ${(pfx.length >= 3 && sfx.length >= 3) ? '前后缀已满' : '新增到未锁侧'}</span></button>
       </div>
       ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
-      <div class="craft-result" id="craft-result"></div>
-      ${soulFold}`;
+      <div class="craft-result" id="craft-result"></div>`;
+    const soulBody = `
+      <div class="craft-section-label">魂铸（消耗 1 只魂兽 → 写入 1 条永久词缀）</div>
+      <div class="craft-soul-tab-body">${soulCastHtml(eq, inSell)}</div>`;
+    el.innerHTML = tabHtml + headHtml + (soulTabActive ? soulBody : craftBody);
+    el.querySelectorAll('.craft-tab').forEach(btn => {
+      btn.onclick = () => { soulTabActive = btn.dataset.ctab === 'soul'; renderCraftInto(el, eq); };
+    });
     const resultEl = el.querySelector('#craft-result');
 
     /* 乐观 UI（打造的四种石头共用） */

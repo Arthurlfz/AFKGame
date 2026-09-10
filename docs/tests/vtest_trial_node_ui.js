@@ -73,6 +73,7 @@ ctx.Battle = {
   getCurrentArea: () => null
 };
 ctx.UI = { showToast() {}, addLog() {}, escapeHtml: null, renderAll() {} };
+vm.runInContext(fs.readFileSync('../js/core/battle-session.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-access.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-rewards.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-engine.js', 'utf8'), ctx);

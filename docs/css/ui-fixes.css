@@ -1,0 +1,243 @@
+/* ============================================================
+ * ui-fixes.css — 交互体验修复补丁（2026-09-10 实测后修复）
+ * 覆盖：背包遮罩、关闭按钮尺寸、聊天面板位置、货币tooltip、进化UI层级
+ * ============================================================ */
+
+/* ---------- 1. 背包窗口：打开时背景变暗，避免半透明叠加看不清 ---------- */
+.bag-window-host { pointer-events: auto !important; }
+.bag-window-scrim {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  background: rgb(0 0 0 / .62) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+/* 确保背包窗口在 is-open 时可见（修复 renderBag 报错导致 transition 不触发的问题） */
+.bag-window-host.is-open .bag-window {
+  opacity: 1 !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+  transition: none !important;
+}
+
+/* ---------- 2. 关闭按钮加大到 32×32，加 hover 高亮 ---------- */
+.bag-window-close,
+.chat-drawer-close,
+.quest-drawer-close {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 1.4rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+}
+.bag-window-close:hover,
+.chat-drawer-close:hover,
+.quest-drawer-close:hover {
+  background: rgb(255 80 80 / .15);
+}
+
+/* ---------- 3. 聊天面板：从底部弹层改为右侧抽屉，不遮挡主内容 ---------- */
+.chat-drawer {
+  left: auto !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  top: auto !important;
+  width: 380px !important;
+  max-width: calc(100vw - 32px) !important;
+  height: calc(100vh - 100px) !important;
+  max-height: none !important;
+  border-radius: 10px 0 0 10px !important;
+  border-left: 2px solid var(--accent-hi) !important;
+  border-top: 1px solid rgb(var(--action-gold-rgb) / .55) !important;
+  transform: translateX(calc(100% + 20px)) !important;
+}
+.chat-drawer-host.is-open .chat-drawer {
+  transform: translateX(0) !important;
+}
+.chat-drawer-scrim {
+  background: rgb(0 0 0 / .35) !important;
+}
+
+/* ---------- 4. 货币 chip：加 tooltip 样式 ---------- */
+.gem-chip {
+  cursor: help !important;
+  border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .5);
+}
+
+/* ---------- 5. 进化界面：方向卡片加呼吸动画提示可点击 ---------- */
+.evolve-direction-card,
+#evolve-preview [class*="card"],
+#evolve-preview [class*="option"] {
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.evolve-direction-card:hover,
+#evolve-preview [class*="card"]:hover,
+#evolve-preview [class*="option"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .5);
+}
+
+/* ---------- 6. 背包列表项选中态 ---------- */
+#inv-list .inv-item.selected,
+#inv-list > .selected,
+#inv-list .poe-item.selected {
+  outline: 2px solid var(--accent-hi) !important;
+  box-shadow: 0 0 12px rgb(var(--action-gold-rgb) / .4);
+}
+
+/* ---------- 8. 新手引导结束后的"下一步"卡片 ---------- */
+.next-step-card {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  width: 480px;
+  max-width: 90vw;
+  background: var(--panel, #1a2223);
+  border: 1px solid var(--accent, #c9a84c);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 16px 50px rgba(0,0,0,.8);
+}
+.next-step-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+  color: var(--accent-hi, #f2b632);
+}
+.next-step-card p {
+  margin: 0 0 16px;
+  color: var(--text-dim, #999);
+  font-size: .9rem;
+  line-height: 1.6;
+}
+.next-step-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.next-step-options button {
+  flex: 1;
+  min-width: 130px;
+  padding: 10px 14px;
+  background: var(--inset, #111);
+  border: 1px solid var(--line, #333);
+  border-radius: 6px;
+  color: var(--text, #ccc);
+  cursor: pointer;
+  font-size: .9rem;
+  transition: border-color .15s;
+}
+.next-step-options button:hover {
+  border-color: var(--accent, #c9a84c);
+  color: var(--accent-hi, #f2b632);
+}
+
+/* ---------- 9. 弹窗支持 ESC 关闭 ---------- */
+body.esc-close-ready .bag-window-host.is-open,
+body.esc-close-ready .chat-drawer-host.is-open {
+  /* ESC 由 JS 监听，这里只是标记 */
+}
+
+/* ---------- 10. 引路人弹窗打开时，隐藏追踪栏重复的行动按钮 ---------- */
+#dialog-box.show ~ .quest-tracker,
+body:has(#dialog-box.show) .quest-tracker .qt-choices,
+body:has(#dialog-box.show) .quest-tracker .qt-go,
+body:has(#dialog-box.show) .quest-tracker .qt-submit {
+  /* 弹窗已提供行动按钮时，追踪栏按钮降为次要视觉，避免重复困惑 */
+  opacity: .35;
+  pointer-events: none;
+}
+/* 弹窗关闭时恢复 */
+body:not(:has(#dialog-box.show)) .quest-tracker .qt-go,
+body:not(:has(#dialog-box.show)) .quest-tracker .qt-submit {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* ============================================================
+ * UI 视觉优化（2026-09-10 第二轮：玩家视角反馈）
+ * ============================================================ */
+
+/* ---------- 11. 侧边栏激活态加强 ---------- */
+.sb-btn.active {
+  font-weight: 700 !important;
+  border-left-width: 3px !important;
+  background: linear-gradient(90deg, rgb(var(--action-gold-rgb) / .22), transparent) !important;
+  box-shadow: inset 0 0 20px rgb(var(--action-gold-rgb) / .12), 2px 0 8px rgb(var(--action-gold-rgb) / .15) !important;
+}
+.sb-btn.active .sb-label {
+  color: var(--accent-hi, #f2b632) !important;
+  text-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .5);
+}
+
+/* ---------- 12. 弹窗层级感：加阴影、圆角 ---------- */
+.bag-window {
+  border-radius: 10px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .85), 0 0 0 1px rgb(var(--action-gold-rgb) / .2) !important;
+}
+.dialog-box {
+  border-radius: 10px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .85) !important;
+}
+
+/* ---------- 13. 提高文字可读性（暗金小字对比度） ---------- */
+.qt-hint, .qt-why, .pet-attr-label, .equip-tip .tip-line.hint,
+.bag-window-subtitle, .panel-title .hint, .quest-next-use {
+  color: #b0a890 !important;
+}
+.pet-hero, .equip-slots {
+  color: #d0c8b0;
+}
+
+/* ---------- 14. 主城建筑按钮：新手指引高亮可交互建筑 ---------- */
+.capital-building {
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.capital-building:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgb(var(--action-gold-rgb) / .25);
+}
+
+/* ---------- 16. 宠物数值面板：分组视觉 ---------- */
+.pet-attrs, .attr-list, [class*="pet-stat"] {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 16px;
+}
+
+/* ---------- 17. 按钮统一：所有 .btn-mini 和 .top-btn 统一圆角 ---------- */
+.btn-mini, .top-btn {
+  border-radius: 6px !important;
+  transition: border-color .12s, background .12s, transform .1s;
+}
+.btn-mini:hover, .top-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------- 18. 品质色 vs 强调色：金色按钮和金色装备区分 ---------- */
+/* 强调色按钮用金色渐变，装备品质金用更饱和的金色框 */
+.btn-mini.primary, .top-btn.primary {
+  background: linear-gradient(180deg, #c9a84c, #9a7a2e) !important;
+  color: #1a1408 !important;
+  font-weight: 700;
+}
+
+/* ---------- 19. 主城建筑按钮加呼吸光效提示新玩家 ---------- */
+.capital-building {
+  position: relative;
+}
+.capital-building::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.capital-building:hover::after {
+  opacity: 1;
+  box-shadow: inset 0 0 20px rgb(var(--action-gold-rgb) / .15);
+}
