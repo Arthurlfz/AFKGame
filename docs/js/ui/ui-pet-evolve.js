@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
@@ -17,6 +17,9 @@
 
   let evolveMainId = null;
   let evolvePreview = null;
+
+  // 阶段总数（从 config 推导；别再硬写 5 —— 改阶段表时界面要跟着走）
+  const stageCount = () => (((Config.pet && Config.pet.evolution && Config.pet.evolution.stages) || []).length) || 5;
 
   function evoStatRows(s) {
     return `<div><span>生命</span><b>${s.hp}</b></div><div><span>攻击</span><b>${s.atk}</b></div><div><span>防御</span><b>${s.def}</b></div><div><span>速度</span><b>${s.spd}</b></div>`;
@@ -46,7 +49,7 @@
       card.innerHTML = `<div class="icon">${iconHtml(pet.name)}</div>
         <div class="card-info">
           <div class="pname">${pet.name}</div>
-          <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/5阶 · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>
+          <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)} · ${stg}/${stageCount()}阶 · 进化${(pet.evolveTimes || 0)}/${maxTimes}</div>
           <div class="growth-bar"><i style="width:${gbar}%"></i></div>
         </div>`;
       card.onclick = () => {
@@ -79,7 +82,10 @@
     const routes = Evolve.getEvolutionRoutes(main);
     const maxTimes = E.maxEvolveTimes || 10;
     const times = main.evolveTimes || 0;
-    const maxed = times >= maxTimes;
+    /* 2026-09-10 修：上限判定改为「还有没有下一阶」（原来用 times >= maxTimes）。
+     * 次数是历史累计值、会和阶段脱钩 —— 老存档会出现"次数已满但没到终阶"，
+     * 用次数当闸门会把宠物永久卡在中间阶（用户实测：三阶 Lv58 / 次数 4 → 永远到不了终阶）。 */
+    const maxed = !Evolve.nextStageOf(main);
     const rm = (routes.length && Evolve.getRouteMaterial(main, 0)) || null;
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
@@ -91,13 +97,13 @@
     </div>`;
 
     if (maxed) {
-      tb.innerHTML = `<div class="warn"> 进化已达上限(${maxTimes}次)，需通过<b>涅槃</b>重置进化次数后才能继续</div>`;
+      tb.innerHTML = `<div class="warn"> 已登临<b>终阶</b>（${stageCount()} 阶走完）——进化之路到此为止。想再变强：两只<b>终阶宠</b> + 成长 60 可在<b>合成</b>里搏一只神级宠，或走<b>涅槃</b>重置重练。</div>`;
       pb.innerHTML = ''; cb.innerHTML = ''; evolvePreview = null;
       return;
     }
     if (!routes.length) {
-      // 终阶（5 阶走完）：进化链到头，后续变强走合成 → 神级宠 → 涅槃
-      const atFinal = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(main) >= 5 : false;
+      // 兜底（正常走不到：没下一阶时上面的 maxed 已返回）：形态无法再进化
+      const atFinal = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(main) >= stageCount() : false;
       tb.innerHTML = atFinal
         ? '<div class="warn"> 已登临<b>终阶</b>——进化之路到此为止。想再变强：两只终阶宠 + 成长 60 可在<b>合成</b>里搏一只神级宠。</div>'
         : '<div class="hint">该形态无法再进化</div>';

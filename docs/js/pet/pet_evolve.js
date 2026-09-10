@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * pet_evolve.js —— 宠物进化系统
  * 职责：
  *  1. 校验进化条件：基宠达到 minLevel（30）+ 在进化路线内 + 已登录 + 不在售
@@ -55,11 +55,16 @@
   function hasRoute(pet) {
     return getEvolutionRoutes(pet).length > 0;
   }
-  // 是否可进化：次数未满（等级门槛在 evolve 里按具体路线判定）
+  /* 是否可进化：只认「还有下一阶」+ 等级门槛。
+   * ⚠️ 2026-09-10 修（用户实测卡死案例）：不再用 `evolveTimes >= maxEvolveTimes` 当闸门。
+   *   次数是【历史累计值】，会和阶段脱钩 —— 老规则（10 次进化时代）存下来的宠会出现
+   *   「次数已满 4、阶段却只到三阶」，被次数硬卡在中间阶，永远到不了终阶
+   *   （现场数据：血疫暴君 Lv58 / 进化次数 4 / 云端阶段 4 / 下一阶=终阶但"能进化=false"）。
+   *   阶段链本身是有限的（stages 只有 5 阶），所以「没有下一阶」已经是天然上限；
+   *   次数从此只作展示，并在 evolve 里被校准成「阶段 − 1」。 */
   function canEvolve(pet) {
     const cfg = E();
     if (!cfg || !pet) return false;
-    if ((pet.evolveTimes || 0) >= (cfg.maxEvolveTimes || 4)) return false;
     const routes = getEvolutionRoutes(pet);
     if (!routes.length) return false;
     return routes.some(r => pet.level >= (r.minLevel || 1));
@@ -97,14 +102,10 @@
     const pet = getPets().find(p => p.id === petId);
     if (!pet) return { error: '宠物不存在' };
 
-    const maxTimes = cfg.maxEvolveTimes || 4;
     const next = nextStageOf(pet);
     // 条件：还有下一阶（终阶后不能再进化；想继续变强走合成/神级宠/涅槃）
+    // ⚠️ 这里就是唯一的上限判定（阶段链走完）——不再叠加「次数上限」，见 canEvolve 注释。
     if (!next) return { error: '已是终阶，无法继续进化（想再变强请走合成 → 神级宠）' };
-    // 条件：进化次数未满（吃满后需涅槃/转生重置）
-    if ((pet.evolveTimes || 0) >= maxTimes) {
-      return { error: `进化已达上限(${maxTimes}次)，需通过涅槃(转生)重置次数后才能继续进化` };
-    }
 
     const routes = getEvolutionRoutes(pet);
     const route = routes[routeIndex];
@@ -167,7 +168,10 @@
     const newGrowth = Math.round((oldGrowth + boost) * 10) / 10;
     const keepForm = !!route.keepForm;
     const nextName = keepForm ? pet.name : route.to;
-    const nextEvolveTimes = (pet.evolveTimes || 0) + 1;
+    /* 次数 = 阶段 − 1（不变量，2026-09-10）：正常宠两者本来就相等；
+     * 对「次数与阶段脱钩」的老存档，这里顺手校准回规范值 ——
+     * 否则界面会拿错误的次数显示"已达上限"，把玩家挡在终阶门外。 */
+    const nextEvolveTimes = Math.max(0, next.stage - 1);
 
     // ---- 同步云端（含新阶段 evolve_stage，旧库缺列时 Supabase 层自动剔除）；失败则退还素材 ----
     const { error: updErr } = await Supabase.updatePet(pet.cloudId, {

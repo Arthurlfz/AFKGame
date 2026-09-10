@@ -828,7 +828,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260910fix11"></script>
+<script src="js/core/config.js?v=20260910evo5"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -853,9 +853,9 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260910tower2"></script>
-<script src="js/core/supabase.js?v=20260910mt4"></script>
+<script src="js/core/supabase.js?v=20260910evo6"></script>
 <script src="js/equipment/equipment.js?v=20260909ident"></script>
-    <script src="js/pet/pet.js?v=20260910mt1"></script>
+    <script src="js/pet/pet.js?v=20260910evo6"></script>
 <script src="js/core/items.js?v=20260910ident1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=20260909drop1"></script>
@@ -864,20 +864,20 @@ window.PetSprites = {
 <script src="js/equipment/equipment_craft.js?v=20260910awaken1"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260910cloudfix1"></script>
-<script src="js/pet/pet_evolve.js?v=20260910sprite1"></script>
+<script src="js/pet/pet_evolve.js?v=20260910evo6"></script>
 <script src="js/core/quest.js?v=20260910awaken2"></script>
 <script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
 <script src="js/core/battle.js?v=20260910tower4"></script>
-<script src="js/trial/trial-config.js?v=20260910fix11"></script>
+<script src="js/trial/trial-config.js?v=20260910evo5"></script>
 <script src="js/trial/trial-access.js?v=20260910trial1"></script>
 <script src="js/trial/trial-rewards.js?v=20260910trial1"></script>
 <script src="js/trial/trial-engine.js?v=20260910session1"></script>
 <!-- 通天塔（2026-09-10）：一个文件一个职责。顺序 = 依赖方向：
      config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
-<script src="js/tower/tower-config.js?v=20260910fix11"></script>
+<script src="js/tower/tower-config.js?v=20260910evo5"></script>
 <script src="js/tower/tower-affix.js?v=20260910tower2"></script>
 <script src="js/tower/tower-access.js?v=20260910tower2"></script>
 <script src="js/tower/tower-rewards.js?v=20260910tower2"></script>
@@ -906,7 +906,7 @@ window.PetSprites = {
 <script src="js/ui/ui-battle.js?v=20260910tower3"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260910mt2"></script>
-<script src="js/ui/ui-pet-evolve.js?v=20260910awaken1"></script>
+<script src="js/ui/ui-pet-evolve.js?v=20260910evo6"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260910mt2"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260910sprite1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>

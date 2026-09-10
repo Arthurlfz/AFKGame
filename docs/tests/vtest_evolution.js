@@ -127,13 +127,21 @@ await mkPet('尸犬','🐶',10,'ev3',5);
 const ev3Id=C('globalThis.__ev3');
 let r3=await C('Evolve.evolve('+ev3Id+',0)');
 A(r3.ok!==true&&/10/.test(r3.error),'等级不足（Lv.5）：进化失败并提示门槛 10');
-// 次数上限：把宠物次数设为上限 → 不能再进化
-await mkPet('瘟熊','🐻',10,'ev4',10);
+/* ============ 5b. 上限判定 = 阶段走完（2026-09-10 规则修正） ============
+ * 旧规则用「次数 >= maxEvolveTimes」当闸门，会被「次数与阶段脱钩」的老存档永久卡在中间阶。
+ * 现场数据（用户实测）：血疫暴君 Lv58 / 进化次数 4 / 云端阶段 4 / 下一阶=终阶 → "能进化 false"，
+ * 界面显示"进化已达上限(4次)，需涅槃重置" → 永远到不了终阶。
+ * 现在：闸门只看「还有没有下一阶」，并顺手把次数校准成「阶段 − 1」。 */
+await mkPet('瘟熊','🐻',10,'ev4',60);
 const ev4Id=C('globalThis.__ev4');
-await C('Materials.gain("进化素材",1)');await S(80);
-C('Pet.getPets().find(p=>p.id==='+ev4Id+').evolveTimes=4');
-let r4=await C('Evolve.evolve('+ev4Id+',0)');
-A(r4.ok!==true&&/上限/.test(r4.error),'次数已满(4)：进化失败并提示需涅槃重置');
+await C('Materials.gain("传说进化素材",8)');await S(80);
+C('(()=>{const p=Pet.getPets().find(p=>p.id==='+ev4Id+');p.evolveTimes=4;p.evolveStage=4})()'); // 复刻老存档：次数满、阶段卡在三阶
+A(C('Evolve.canEvolve(Pet.getPets().find(p=>p.id==='+ev4Id+'))')===true,'次数已满但阶段没走完 → 仍可进化（不再被次数卡死）');
+const r4=await C('Evolve.evolve('+ev4Id+',0)');
+A(r4.ok===true&&C('Pet.getEvolveStage(Pet.getPets().find(p=>p.id==='+ev4Id+'))')===5,'脱钩的老存档能自救到终阶（阶段 4 → 5）');
+A(C('Pet.getPets().find(p=>p.id==='+ev4Id+').evolveTimes')===4,'次数被校准回「阶段 − 1」= 4（不越界）');
+const r5=await C('Evolve.evolve('+ev4Id+',0)');
+A(r5.ok!==true&&/终阶/.test(r5.error),'阶段链走完才是真上限：终阶后再进化被拒');
 
 /* ============ 6. 进化素材接入战斗掉落（改法一：单池·一场一抽） ============ */
 C('Config.drop.pool = { none:0, material:1, equipment:0, egg:0 }');
