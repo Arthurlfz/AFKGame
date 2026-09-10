@@ -53,7 +53,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   vm.createContext(ctx);
 
   for (const f of ['../js/vendor/supabase.min.js', 'vstub.js', '../js/core/config.js', '../js/core/supabase.js',
-    '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/idle-bridge.js']) {
+    '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/battle-session.js', '../js/core/idle-bridge.js']) {
     VTF.load(ctx, f);
   }
   const C = code => vm.runInContext(code, ctx);
@@ -124,7 +124,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   // 这里再给一次就是第二次跳变。覆盖式应用后 exp = expLeft(10)，重复结算不变（幂等）。
   A(pet().level === 5 && pet().exp === 10, 'G2. 覆盖式应用+补账场不重复给经验（10，重复结算不变）');
 
-  /* ---------- H. 换宠 → 停止不重开 ---------- */
+  /* ---------- H. 换宠 → 收尾停机（结最后一段账 + 服务器停会话），不重开 ---------- */
   C(`(function(){
     const q = Pet.createPet('骨狼','y',5,90,32,9,105);
     q.cloudId = 'pet-222'; Pet.addPet(q); Pet.setActive(q.id);
@@ -132,8 +132,11 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   settleResp = { fights: 1, exp: 10, endHp: 300, petMaxHp: 800, level: 1, expLeft: 5, ok: true };
   await C('IdleBridge.settleNow()');
   A(C('IdleBridge.isActive()') === false, 'H1. 换宠后自动停止（不重开）');
+  A(C('BattleSession.isIdle()') === true, 'H1b. 停机后战斗页占用权已交还（isIdle）');
+  await S(80); // 收尾是异步的（先让出画面，再结算 → stop）：等它跑完再断言请求
   const stopCalls = calls.filter(c => c.action === 'stop').length;
   A(stopCalls === 1, 'H2. 换宠时向服务器发了 stop（' + stopCalls + ' 次）');
+  A(calls.some(c => c.action === 'settle'), 'H3. 停机前先结算（EF 的 stop 只标记停止、不结算，不先结算会丢最后一段收益）');
 
   /* ---------- I. 网络失败不崩 ---------- */
   const r2 = await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
@@ -171,7 +174,46 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(C('globalThis.__dropCalls') === 20, 'L1. 补账按 detail 行数计，展示上限 20 场（50 场只补 20，防止一次性刷垮日志）');
 
-  C('IdleBridge.stop()'); // K/L 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
+  C('IdleBridge.shutdown()'); // K/L 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
+
+  /* ---------- M~O. 野外战斗"卡住/怪消失"三处修复的回归（2026-09-10） ---------- */
+  const SRC = fs.readFileSync('../js/core/idle-bridge.js', 'utf8');
+  // M. settle 冷却的时间基准必须与比较方（rAF 时间戳 = performance.now）一致。
+  //    旧代码写 Date.now()（1.7e12 量级）永远大于 performance.now() → 一次 settle 失败后
+  //    剧本刷新彻底停摆，只能等 120 秒兜底结算 → 症状是"挂机卡死一两分钟又自己好了"。
+  A(/handleSettleError[\s\S]{0,700}performance\.now\(\) \+ SCRIPT_RETRY_MS/.test(SRC),
+    'M1. settle 冷却用 performance.now（与 rAF 时间戳同基准，防冷却永不到期→挂机卡死）');
+  A(SRC.indexOf('Date.now() + SCRIPT_RETRY_MS') < 0, 'M2. 不再有混用 Date.now() 写冷却的写法');
+
+  // N. 上怪失败必须原地重试，不许继续推进（否则 t>=f.t1 会变成"空气击杀"= 宠物对着空气打）
+  A(/if \(!mountShowEnemy\(f\.enemy, f\)\)/.test(SRC), 'N1. mountShowEnemy 失败有显式分支（不再被忽略）');
+  A(SRC.indexOf('mountFailStreak') >= 0 && /MOUNT_FAIL_LIMIT/.test(SRC), 'N2. 连续上怪失败有上限与重新取剧本兜底');
+
+  /* O. 行为验证：演出血条不被服务器"窗尾真值"覆盖（血条跳变 / 回血等待卡死的根因） */
+  C('globalThis.__uiBars = []; window.UI = { addLog(){}, updateStatus(){}, consoleLog(){}, showLoot(){}, resetBattle(){}, updateAction(){}, updateBars(p,pm,e,em){ globalThis.__uiBars.push([p,pm,e,em]); }, animateAttack(){ return 120; }, attackRecoverMs(){ return 80; }, animateHit(){}, animateVictory(){}, showDamage(){} };');
+  await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
+  await S(60);
+  // 用宠物真实上限构造剧本血量（hpStart 必须 ≤ maxHp，否则血条会算出 >100% 的宽度）
+  const mhO = C('Pet.getStats(Pet.getActivePet()).hp');
+  const startHp = Math.round(mhO * 0.5), leftHp = Math.round(mhO * 0.45), tailHp = Math.round(mhO * 0.2);
+  const e0 = { type: 'fight', t0: 0, t1: 8000, win: true, enemy: { name: '腐噜兽', level: 3 }, enemyLevel: 3, enemyName: '腐噜兽', exp: 30, hpStart: startHp, hpLeft: leftHp, petHits: 2, enemyHits: 2, petDmg: [10, 10] };
+  settleResp = { fights: 1, exp: 10, endHp: startHp, petMaxHp: mhO, level: 5, expLeft: 10, totalFights: 300, ok: true,
+    script: { id: 'w-O', events: [e0], endHp: startHp, petMaxHp: mhO, totalExp: 30, level: 5, expLeft: 10, levelBefore: 5, expBefore: 10 } };
+  await C('IdleBridge.settleNow()');
+  await S(120);   // 让 rAF 桩把怪挂上台（t0=0，第一帧即可）
+  const dbg1 = C('IdleBridge.getDebugState()');
+  A(dbg1.showEnemy === '腐噜兽', 'O1. 怪已上台（showEnemy=' + dbg1.showEnemy + '）');
+  A(dbg1.showHp === startHp, 'O2. 上台时血条取本场 hpStart（' + dbg1.showHp + '）');
+
+  // 怪在演时再来一次结算：真账 endHp 是"下一段窗口末尾"的值，绝不覆盖演出血条
+  settleResp = { fights: 1, exp: 10, endHp: tailHp, petMaxHp: mhO, level: 5, expLeft: 10, totalFights: 301, ok: true };
+  await C('IdleBridge.settleNow()');
+  const dbg2 = C('IdleBridge.getDebugState()');
+  A(pet().curHp === tailHp, 'O3. 宠物数据仍是服务器真账（curHp=' + pet().curHp + '）');
+  A(dbg2.showHp === startHp, 'O4. 但演出血条不被窗尾真值覆盖（仍 ' + dbg2.showHp + '，防"血量跳变/回血等待卡死"）');
+  A(dbg2.showEnemy === '腐噜兽', 'O5. 怪没被换剧本抹掉（仍在场）');
+
+  C('IdleBridge.shutdown()');
 
   console.log('\nALL IDLE BRIDGE TESTS PASSED');process.exit(0);
 })().catch(e => { console.error('FAIL: 未捕获异常 ' + (e && e.stack || e)); process.exit(1) });

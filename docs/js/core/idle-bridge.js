@@ -8,7 +8,7 @@
  *   - 剧本事件：每场 {t0 开始, t1 结束, 打谁, 胜负, 经验, 血量从 hpStart 到 hpLeft}
  *   - 玩家看到的每个数字 = 服务器已入账的数字（实时结算，无校准/无补发/无漂移）
  *   - 回放基线：装剧本时把本地经验/等级重置到「窗前真值」（script.expBefore/levelBefore），
- *     演完正好落在服务器 expLeft/level（applyResult 只做兜底校准）
+ *     演完正好落在服务器 expLeft/level（applyAuthoritative 只做兜底校准）
  *   - 客户端刷新/重连 → 服务器幂等重发同一段未播完的录像（script.id 判重）
  *
  * 时间线：点开始挂机 → 一次 settle（补账 + 预结算 30 秒并入账）→ 回放
@@ -30,14 +30,36 @@
 
   const ENABLED = !/[?&]noidle=1\b/.test(location.search);
 
-  // 战斗日志收集器（2026-09-09）：console 之外再存一份到 window.__battleLog，
-  // 方便玩家在控制台敲 copy(__battleLog.join('\n')) 一次性捞出全部战斗日志发回来。
+  /* 战斗页占用权（core/battle-session.js，必须先加载）：本模块是「服务器托管野图挂机」
+   * 的所有者 ——
+   *   ① 起挂机前 claim('wild')：副本/塔占着战斗页就拿不到，直接拒绝（不给玩家添乱）；
+   *   ② 被更高优先级玩法抢占 → 自我收尾（见文件末尾 SESSION.onChange 订阅）；
+   *   ③ 停止 / 让位 / 换图交棒统一走 shutdown() / handoff()：
+   *      先【同步】拆演出让出画面，再【异步】把最后一段账结回来（见 endSession）。 */
+  const SESSION = window.BattleSession;
+  const SESSION_KIND = 'wild';
+  function claimPage() {
+    if (!SESSION) return { ok: false, reason: 'NO_SESSION' };
+    return SESSION.claim(SESSION_KIND);
+  }
+  function releasePage() { if (SESSION) SESSION.release(SESSION_KIND); }
+
+  // 战斗日志收集器（2026-09-09）：始终写入 window.__battleLog 环形缓冲（取证券），
+  // 玩家在控制台敲 copy(__battleLog.join('\n')) 可一次性捞出全部战斗日志。
+  // 2026-09-10 console 输出改开关制：默认不刷屏（用户反馈），调试时二选一打开——
+  //   ① URL 带参数  ?debugidle=1   ② 控制台执行 localStorage.setItem('debugIdle','1') 后刷新
+  const BLOG_ON = (function () {
+    try {
+      if (/[?&]debugidle=1\b/.test(location.search || '')) return true;
+      return window.localStorage && window.localStorage.getItem('debugIdle') === '1';
+    } catch (e) { return false; }
+  })();
   function blog() {
     try {
       var msg = Array.prototype.map.call(arguments, function (x) { return typeof x === 'object' ? JSON.stringify(x) : String(x); }).join(' ');
       (window.__battleLog = window.__battleLog || []).push(new Date().toISOString().slice(11, 23) + ' ' + msg);
       if (window.__battleLog.length > 500) window.__battleLog.shift();
-      console.log(msg);
+      if (BLOG_ON) console.log(msg);
     } catch (e) { /* 忽略 */ }
   }
 
@@ -60,6 +82,10 @@
 
   // 演出状态
   let showHp = 0;           // 我方演出血量（剧本插值）
+  // 吸血偏移量（2026-09-10）：托管挂机的血条走剧本插值（hpStart→hpLeft 线性），
+  // 中间不会"回血跳一下"，玩家只看到飘字 +N 吸血、血条却不动，像没接入。
+  // 这里把本地重算的 heal 先记成偏移、立即顶到血条上，受击时先扣偏移，场末由权威 hpLeft 校准归零。
+  let showHealBonus = 0;
   let showEnemy = null;     // 画面上的怪（演出用）
   const gauge = { pet: 0, enemy: 0 };       // 行动条（出手节奏观感，速度差与原战斗同公式）
   const freezeUntil = { pet: 0, enemy: 0 }; // 出手冻结到收招完毕
@@ -68,6 +94,7 @@
   let lastBarTs = 0;
   let skillCd = 0;          // 技能演出冷却（回合）
   let waitingHeal = false;  // 场前回血等待：血 <30% → 回满 100% 才开打
+  let waitingHealAt = 0;    // 进入回血等待的时刻（超时兜底用，见 HEAL_WAIT_MAX_MS）
   // 本场演出配额（2026-09-09）：剧本给了双方出手刀数，血量按刀均摊（最后一刀兜底归零）。
   // 有了它，行动条、出刀、掉血三者同源 —— 不再是"时间决定血、刀只是好看的数字"。
   let showPlan = null;
@@ -75,6 +102,20 @@
   // 出手期间条是冻住的，不扣这笔账就会"刀还没出手，本场时间已经用完"。
   let lastHitAt = 320, lastBackMs = 0;
   let showEnemyMountedAt = 0; // 本只怪的上台时刻（切后台回来时间轴会快进，别刚露脸就被清掉）
+  let mountFailStreak = 0;    // 连续上怪失败次数（超限就重新取剧本，见 MOUNT_FAIL_LIMIT）
+  let lastStallSig = '';      // 卡死自检：上一帧的进度指纹 + 它首次出现的时刻
+  let lastStallAt = 0;
+
+  /* ---------- 演出层容错常量（2026-09-10 野外战斗排查） ---------- */
+  // 单帧间隔超过它 = 切后台 / 主线程卡顿：时间轴要重锚，否则怪"刚露面就被时间清掉"。
+  const STALL_REANCHOR_MS = 1200;
+  // 连续上怪失败几次后重新取剧本（上怪失败继续往下走 = 空气击杀，见 gaugeTick）。
+  const MOUNT_FAIL_LIMIT = 3;
+  const MOUNT_FAIL_SETTLE_MS = 5000;   // 上怪持续失败时，重新取剧本的冷却（别每帧打服务器）
+  // 回血等待超时：脏值（NaN）或异常状态下不允许永久卡住画面。
+  const HEAL_WAIT_MAX_MS = 20000;
+  // 进度指纹连续不变超过它 → 打一条卡死快照（取证用，正常演出不会触发）
+  const STALL_SNAPSHOT_MS = 10000;
   // 在飞的出手演出（2026-09-09）：伤害飘字是 setTimeout(hitAt) 延迟播的，
   // 而血量按剧本时间轴线性掉 —— 两条时钟各自走，剧本 t1 一到就清场，
   // 于是"最后一刀还没飘出来怪就没了"。切场前把在飞的这一刀就地结算掉。
@@ -143,9 +184,12 @@
     if (!ENABLED) return { error: 'DISABLED' };
     if (active) return { ok: true };
     if (!area || !pet || !pet.cloudId) return { error: 'NO_AREA_OR_PET' };
+    // 战斗页被副本/塔占着 → 不起（占用权在 battle-session，调用方据此提示玩家）
+    const claim = claimPage();
+    if (!claim.ok) return { error: claim.reason || 'BUSY', holder: claim.holder };
 
     const r = await callFn({ action: 'start', areaId: area.id, petId: pet.cloudId });
-    if (r.error) return r;
+    if (r.error) { releasePage(); return r; }
 
     petId = pet.cloudId;
     totalFights = 0;
@@ -171,6 +215,9 @@
     if (B && B.selectArea && session.area_id) B.selectArea(session.area_id);
     const area = B && B.getCurrentArea ? B.getCurrentArea() : null;
     if (!area || area.id !== session.area_id) return { ok: false, error: 'AREA_NOT_FOUND' };
+    // 校验全过才占战斗页：拿不到（副本/塔在打）就不接管画面，也不改任何状态
+    const claim = claimPage();
+    if (!claim.ok) return { ok: false, error: claim.reason || 'BUSY' };
     petId = session.pet_id;
     totalFights = 0;
     active = true;
@@ -181,19 +228,50 @@
     return { ok: true, resumed: true };
   }
 
-  // skipServer=true：只拆本地演出/定时器，不给服务器发 stop ——
-  // 换图重开挂机时用：battle_session('start') 在服务器侧本来就是「停旧建新」一条事务，
-  // 若这里再发 stop，两个请求乱序到达时 stop 会把【刚建好的新会话】停掉（按 started_at 倒序取最新）。
-  function stop(skipServer) {
-    if (!active) return;
+  /* ---------- 生命周期：结束本次挂机会话 ----------
+   * 让位（被副本/塔抢占）、停机（玩家点停止）、交棒（换图重开）共用这一条路径，
+   * 区别只在最后要不要通知服务器停会话。不 await 也能立刻让出画面，因为分两段：
+   *   ① 同步：拆演出 + 清定时器 + 交还战斗页 —— 调用返回时画面已干净
+   *   ② 异步：把最后一段账结回来（只入账，不装剧本、不写战斗页）→ 按需发 stop
+   * notifyServer=false（交棒）：服务器侧由下一次 battle_session('start')「停旧建新」
+   * 一条事务接替；这里再发 stop 会与新会话乱序（stop 取 started_at 最新的那条会话）。
+   * ⚠️ 收尾必须先结算再 stop：EF 的 stop 只把会话置为 stopped，**不结算**未入账的窗口。 */
+  let ending = null; // 收尾闸门：被抢占与玩家点停止同时发生时只收尾一次
+  function endSession(notifyServer) {
+    if (!active) { releasePage(); return Promise.resolve(); }
     active = false;
     clearTimeout(timer); timer = null;
     stopShow();
     petId = null;
-    if (!skipServer) callFn({ action: 'stop' }).catch(function () { /* 忽略 */ });
+    releasePage();
+    if (ending) return ending;
+    ending = (async function () {
+      try {
+        const r = await callFn({ action: 'settle' }); // 结掉 last_settled_at 之后的账
+        if (r && !r.error) applyAuthoritative(r);      // 静默入账：不 present（画面已让出）
+      } catch (e) { /* 收尾失败不阻塞停机 */ }
+      if (notifyServer) {
+        try { await callFn({ action: 'stop' }); } catch (e) { /* 忽略 */ }
+      }
+    })().finally(function () { ending = null; });
+    return ending;
+  }
+  function shutdown() { return endSession(true); }  // 停机 / 让位：结算 + 服务器停会话
+  function handoff() { return endSession(false); }  // 换图交棒：结算，会话交给下一次 start
+  // 会话已不在服务器侧（NO_ACTIVE_SESSION）：只做本地清理，不再发任何请求
+  function stopLocal() {
+    active = false;
+    clearTimeout(timer); timer = null;
+    stopShow();
+    petId = null;
+    releasePage();
+    if (window.UI) window.UI.updateStatus('stopped', totalFights);
   }
 
-  /* ---------- 结算一次（战报 = 真账校准 + 剧本续段） ---------- */
+  /* ---------- 结算：三个职责分开 —— 拉账 / 入账 / 演出 ----------
+   * 拉账 = callFn('settle')；入账 = applyAuthoritative（只写宠物与统计）；
+   * 演出 = presentSettle（剧本续段 + 补账播报 + 战斗页状态）。
+   * 收尾结算（endSession）只走前两步：画面已经让给别人，不该再往战斗页写东西。 */
   let settling = false; // 并发锁：切回前台的立即结算与定时结算可能撞车
   async function settleNow() {
     if (!active || settling) return { error: 'NOT_ACTIVE' };
@@ -206,32 +284,49 @@
   }
   async function doSettle() {
     const r = await callFn({ action: 'settle' });
-    if (r.error) {
-      if (r.error === 'NO_ACTIVE_SESSION') {
-        active = false; clearTimeout(timer); timer = null; stopShow();
-        if (window.UI) window.UI.updateStatus('stopped', totalFights);
-        return r;
-      }
-      /* 失败也要设冷却（2026-09-08 血泪）：gaugeTick 每帧都在等剧本，
-       * 剧本空 + settle 失败 + 无冷却 = 每秒轰炸一次服务器（控制台 500 刷屏就是它）。
-       * 冷却 30s = 正常结算节奏：真账由服务器惰性记账，晚结算不亏。 */
-      nextScriptTryAt = Date.now() + SCRIPT_RETRY_MS;
-      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机暂时没有更新，正在继续运行…');
+    if (r.error) return handleSettleError(r);
+    blog('[战斗·结算] 补账场数=' + (r.fights || 0) + ' | 窗口秒=' + (r.elapsedSec || 0) + ' | endHp=' + r.endHp);
+    // 换了出战宠：本会话绑的是旧宠。最后一段账照结，然后停（玩家要挂新宠自己重开）
+    if (activePetChanged()) {
+      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 换了出战宠物，挂机已停止，请重新点击开始。');
+      shutdown();
       return r;
     }
-    blog('[战斗·结算] 补账场数=' + (r.fights || 0) + ' | 窗口秒=' + (r.elapsedSec || 0) + ' | endHp=' + r.endHp);
-    // 服务器权威剧本（已入账的录像）：
-    //   同一段重发（刷新/切回前台幂等返回）→ 判重忽略，不重播不重复给经验；
-    //   当前这段还在演 → 攒着等演完再装（不抹掉正在打的怪）；
-    //   空场 → 直接装。
     const sc = r.script;
+    // 同一段录像重发（刷新/切回前台幂等返回）→ 判重：跳过经验/等级覆盖，
+    // 本地显示正在按回放基线重演，先被窗后真值覆盖再逐场加 = 经验重复入账。
     const sameScript = !!(sc && sc.id && sc.id === currentScriptId);
-    // 同一段录像重发时跳过经验/等级覆盖：本地显示正在按回放基线重演，
-    // 先被窗后真值覆盖再继续逐场加 = 经验重复入账（第二次跳变）。血量/场数照常同步。
-    applyResult(r, { skipExpLevel: sameScript });
+    applyAuthoritative(r, { skipExpLevel: sameScript });
+    presentSettle(r, sc, sameScript);
+    notifyChange();
+    return r;
+  }
+  /* settle 失败：会话没了 → 本地退场；其它 → 设冷却后继续跑。
+   * 冷却必须有（2026-09-08 血泪）：剧本空 + settle 失败 + 无冷却 = 每帧轰炸服务器
+   * （控制台 500 刷屏的来源）。冷却 30s = 正常结算节奏，真账由服务器惰性记账，晚结算不亏。 */
+  function handleSettleError(r) {
+    if (r.error === 'NO_ACTIVE_SESSION') { stopLocal(); return r; }
+    /* ⚠️ 时间基必须与比较方一致（2026-09-10 修）：判冷却的地方用的是
+     * requestAnimationFrame 的时间戳（= performance.now()），这里原本写 Date.now()
+     * （纪元年毫秒，约 1.7e12，恒大于 performance.now() 的 1e5 量级）
+     * → `now >= nextScriptTryAt` 永远不成立 → 一次 settle 失败后，剧本刷新彻底停摆，
+     * 只能等 120 秒的兜底结算救回来。症状 = 挂机卡死一两分钟、行动条不走、过会儿自己又好了。 */
+    nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS;
+    if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机暂时没有更新，正在继续运行…');
+    return r;
+  }
+  function activePetChanged() {
+    const pet = Pet.getActivePet();
+    return !!(petId && pet && pet.cloudId && petId !== pet.cloudId);
+  }
+
+  /* 演出与展示（只给"还在演"的正常结算用）：补账播报 → 剧本续段 → 战斗页状态 */
+  function presentSettle(r, sc, sameScript) {
     // 补账场（客户端没演到的：切后台/刷新空窗）：只补掉落与任务展示。
-    // 经验不在这里给——它已含在剧本回放基线（expBefore）里，重复给就是第二次"经验跳变"。
+    // 经验不在这里给 —— 它已含在剧本回放基线（expBefore）里，重复给就是第二次"经验跳变"。
     compensateFights(r.detail || []);
+    // 服务器权威剧本（已入账的录像）：
+    //   同一段重发 → 判重忽略；当前这段还在演 → 攒着等演完再装（不抹掉正在打的怪）；空场 → 直接装。
     if (sc && sc.events && sc.events.length) {
       if (sameScript) {
         blog('[战斗·剧本] 同一段录像重发，忽略（id=' + sc.id + '）');
@@ -245,8 +340,13 @@
       nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS; // 冷却，防每帧重试打爆服务器
       blog('[战斗·剧本] 服务器未返回剧本，' + SCRIPT_RETRY_MS / 1000 + 's 后重试');
     }
-    notifyChange();
-    return r;
+    // 战斗页状态同步（真账回来后徽章/血条对齐）
+    const UI = window.UI;
+    const pet = Pet.getActivePet();
+    if (UI && pet) {
+      if (showEnemy && UI.updateBars) UI.updateBars(Math.round(showHp), Pet.getStats(pet).hp, showEnemy.hp, showEnemy.maxHp || 100);
+      if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
+    }
   }
 
   // 装上新剧本（settle 拿到录像且当前没怪在演时 / 上一段演完时经 pendingScript 交棒）
@@ -318,17 +418,27 @@
     if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
   }
 
-  /* ---------- 战报应用（经验/等级/真值血量锚点） ---------- */
-  function applyResult(r, opts) {
+  /* ---------- 战报入账（只写宠物与统计，不碰战斗页） ----------
+   * 战斗页的血条/徽章同步在 presentSettle；这里只负责"服务器真账 → 本地数据"。 */
+  function applyAuthoritative(r, opts) {
     const pet = Pet.getActivePet();
     if (!pet) return;
-    if (petId && pet.cloudId && petId !== pet.cloudId) {
-      stop();
-      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 换了出战宠物，挂机已停止，请重新点击开始。');
-      return;
-    }
     const maxLevel = (window.Config && window.Config.pet && window.Config.pet.maxLevel) || 60;
-    if (r.endHp != null) { Pet.setCurHp(pet, r.endHp); showHp = Math.min(Pet.getCurHp(pet), Pet.getStats(pet).hp); }
+    /* ⚠️ 演出血条（showHp）不能被"窗尾真值"直接覆盖（2026-09-10 修）。
+     * r.endHp 是【服务器下一段窗口末尾】的血量 —— 最多比画面当前进度早 30~60 秒。
+     * 直接写进去会出两种事故（都是用户实测反馈的症状）：
+     *   ① 怪还在打时血条瞬间跳到几十秒后的值 → "血量条跳变、伤害数字对不上"；
+     *   ② 回血等待（waitingHeal）期间被反复重置回窗尾的低血值 → 永远回不满，
+     *      行动条一直不涨 → "怪站着不动"。
+     * showHp 在每场开头（mountShowEnemy 取 hpStart）与每场末尾（finishShowFight 取 hpLeft）
+     * 都有权威锚点，所以只在【画面没怪、也不在回血等待】时才用它对齐（即空场/开场）。 */
+    if (r.endHp != null) {
+      Pet.setCurHp(pet, r.endHp);
+      if (!showEnemy && !waitingHeal) {
+        showHp = Math.min(Pet.getCurHp(pet), Pet.getStats(pet).hp);
+        showHealBonus = 0;
+      }
+    }
     /* 经验/等级以服务器为唯一权威（2026-09-09）：
      * 旧逻辑 `r.level >= pet.level` 才覆盖是单向保护 —— 本地预演提前升级后，
      * 服务器永远追不回来，漂移固化。演出只是预演，等级该涨该降都听真账。
@@ -345,12 +455,8 @@
       if (r.level < maxLevel && r.expLeft != null) pet.exp = r.expLeft;
     }
     totalFights = r.totalFights != null ? r.totalFights : (totalFights + (r.fights || 0));
-    const UI = window.UI;
-    if (UI) {
-      if (showEnemy && UI.updateBars) UI.updateBars(Math.round(showHp), Pet.getStats(pet).hp, showEnemy.hp, showEnemy.maxHp || 100);
-      if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
-    }
     if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
+    // 通知上层刷新账号数据（经验/背包/统计）——与战斗页演出无关
     notifyChange();
   }
 
@@ -362,16 +468,30 @@
   function notifyChange() { if (onChange) { try { onChange(); } catch (e) { /* 忽略 */ } } }
 
   /* ---------- 演出：怪上台 ---------- */
+  // 顺序铁律（2026-09-10）：showEnemy 赋值与 UI 挂载必须同生共死。
+  // 事故：旧代码先设 showEnemy 再查 pet/UI，检查不通过时本场战斗照常推进
+  // （掉血/经验/结算全走），但 resetBattle 没跑 → 立绘没挂 + enemy-fighter 还带着
+  // 上一场 finishShowFight 的 display:none = 玩家看宠物「打空气」。
+  // 现在任一前置不满足就不设 showEnemy（返回 false），tick 下一帧自动重试。
   function mountShowEnemy(enemyData, fightEvt) {
     const B = window.Battle;
-    if (!enemyData) return;
-    const area = B && B.getCurrentArea();
-    // 怪等级只能来自剧本（f.enemyLevel）：不传就会退回怪的静态 level，画面与真账错位
+    if (!enemyData) return false;
     const lv = (fightEvt && fightEvt.enemyLevel) || enemyData.level || 1;
+    const pet = Pet.getActivePet();
+    const UI = window.UI;
+    if (!pet || !UI || !UI.resetBattle) {
+      blog('[战斗·上怪失败] 宠物/UI 未就绪，下帧重试 | 怪=' + (enemyData.name || '?'));
+      return false;
+    }
+    // scaleEnemyOf 依赖当前地图（瞬态：刷新后 area 未恢复完）→ null 时同样下帧重试
+    const scaled = (B && B.scaleEnemyOf) ? B.scaleEnemyOf(enemyData, lv) : Object.assign({}, enemyData);
+    if (!scaled) {
+      blog('[战斗·上怪失败] 当前地图未就绪/缩放失败，下帧重试 | 怪=' + (enemyData.name || '?'));
+      return false;
+    }
     // Align the displayed player HP with the authoritative script at each fight boundary.
     if (fightEvt && Number.isFinite(Number(fightEvt.hpStart))) showHp = Number(fightEvt.hpStart);
-    const scaled = (B && B.scaleEnemyOf) ? B.scaleEnemyOf(enemyData, lv) : Object.assign({}, enemyData);
-    if (!scaled) return;
+    showHealBonus = 0;        // 新的一场：上一场的吸血偏移作废（血量以本场 hpStart 为准）
     scaled.raw = enemyData;   // 自检重挂用未缩放的原始数据（否则会被二次缩放）
     scaled.level = lv;
     dropPendingHits();        // 换怪：上一只在飞的刀一律作废
@@ -389,9 +509,6 @@
       // 等级压制看得见（低级宠每刀 1 点就是飘 1）；老剧本没有则退回血量均摊。
       petDmg: Array.isArray(fightEvt.petDmg) ? fightEvt.petDmg : null
     } : null;
-    const UI = window.UI;
-    const pet = Pet.getActivePet();
-    if (!pet || !UI || !UI.resetBattle) return;
     const maxHp = Pet.getStats(pet).hp;
     UI.resetBattle(
       pet.name + ' 等级：' + (pet.level || 1) + '级',
@@ -403,10 +520,12 @@
       '| 血=' + showEnemy.maxHp,
       '| 刀数(我/敌)=' + (showPlan ? (showPlan.petHits + '/' + showPlan.enemyHits) : '(无计划→时间插值)'),
       '| 本场时长=' + (showPlan ? '-' : '-'));
+    return true;
   }
 
   function enterHealWait(UI) {
     waitingHeal = true;
+    waitingHealAt = performance.now();
     gauge.pet = 0; gauge.enemy = 0;
     if (UI && UI.updateAction) UI.updateAction(0, 0);
     if (UI && UI.addLog) UI.addLog('💔 血量不足 30%，回血后再战…');
@@ -481,6 +600,15 @@
       if (UI.animateHit) UI.animateHit(target, isCrit);
       if (d && !isMiss && d.heal > 0 && UI.showDamage) {
         UI.showDamage(side, d.heal, 'lifesteal');
+        // 吸血实时顶到血条上（剧本插值本身不含"回血跳一下"）；上限封顶，场末由 hpLeft 校准
+        if (isPet) {
+          const maxHp0 = Pet.getStats(pet).hp;
+          showHealBonus = Math.max(0, Math.min(maxHp0 - showHp, showHealBonus + d.heal));
+          if (UI.updateBars && showEnemy) {
+            UI.updateBars(Math.round(Math.min(maxHp0, showHp + showHealBonus)), maxHp0,
+              Math.max(0, showEnemy.hp), showEnemy.maxHp || 100);
+          }
+        }
       }
       const plan = showPlan;
       if (plan) {
@@ -522,7 +650,10 @@
           const drop = plan.enemyLeft <= 1
             ? remain
             : Math.min(remain, Math.max(1, Math.round(plan.petLoss / Math.max(1, plan.enemyLeft) * mult)));
-          showHp = Math.max(floorHp, showHp - drop);
+          // 先扣吸血偏移（回来的血先挨刀），扣完才动真实血条 —— 与"吸血顶高血条"对称
+          const absorbed = Math.min(showHealBonus, drop);
+          showHealBonus -= absorbed;
+          showHp = Math.max(floorHp, showHp - (drop - absorbed));
           plan.enemyLeft = Math.max(0, plan.enemyLeft - 1);
           if (UI.showDamage) UI.showDamage('pet', drop, useSkill ? 'skill' : isCrit ? 'crit' : 'normal', useSkill ? skill.name : null);
           if (UI.updateBars && showEnemy) UI.updateBars(Math.round(showHp), maxHp, Math.max(0, showEnemy.hp), showEnemy.maxHp || 100);
@@ -541,7 +672,8 @@
           const prog = Math.min(1, Math.max(0, (performance.now() - scriptT0 - f.t0) / span));
           const maxHp = Pet.getStats(pet).hp;
           if (isPet && showEnemy) showEnemy.hp = Math.max(0, showEnemy.maxHp * (1 - prog));
-          else if (!isPet) showHp = f.hpStart + (f.hpLeft - f.hpStart) * prog;
+          // 老剧本（无刀数）：插值基线上叠加吸血偏移，血条同样能"跳一下"
+          else if (!isPet) showHp = Math.min(maxHp, f.hpStart + (f.hpLeft - f.hpStart) * prog + showHealBonus);
           if (UI.updateBars && showEnemy) UI.updateBars(Math.round(showHp), maxHp, Math.max(0, showEnemy.hp), showEnemy.maxHp || 100);
         }
       }
@@ -592,6 +724,7 @@
       '| 剩余刀=' + '(已补)',
       '| t/t1=' + Math.round(now - scriptT0) + '/' + Math.round(f.t1));
     if (Number.isFinite(Number(f.hpLeft))) showHp = Number(f.hpLeft);
+    showHealBonus = 0;        // 场末以服务器权威 hpLeft 为准，偏移清空（不累积到下一场）
     if (showEnemy && f.win) showEnemy.hp = 0;
     if (f.win && showEnemy && UI && UI.updateBars) {
       UI.updateBars(Math.round(showHp), maxHp, 0, showEnemy.maxHp || 100);
@@ -616,20 +749,40 @@
     if (needHeal) enterHealWait(UI);
   }
 
-  // 敌方立绘自检：空图自动重挂 + 日志取证
+  // 敌方立绘自检：空图自动重挂 + 日志取证（每帧跑一次）
+  // 2026-09-10 补盲区：旧逻辑只救「有 <img> 但 naturalWidth=0」，mountIcon 彻底失败
+  // （容器无 img，如素材映射缺失）时直接 return 永不自愈 → 怪整场隐身。
+  // 现在两种情况都走 remountShowEnemy：重挂用 raw 防二次缩放，URL 加一次性 cache-bust
+  // 参数防「同 URL 原地复败」，并复位 enemy-fighter 的 display（防上一场遗留 none）。
+  // 同一场怪最多重试 MAX_SPRITE_HEAL 次，超限静默放弃（防每帧重挂刷日志/打爆图片请求）。
+  const MAX_SPRITE_HEAL = 5;
+  function remountShowEnemy(reason) {
+    const raw = showEnemy.raw || showEnemy;
+    raw.__healTries = (Number(raw.__healTries) || 0) + 1;
+    blog('[战斗·立绘自愈] ' + reason + ' 第' + raw.__healTries + '次重挂 | 怪=' + (showEnemy.name || '?'));
+    const keepHp = showHp;
+    // 必须传完整剧本事件（含 petHits）才能重建演出配额；血要保住，不能被退回本场起点。
+    mountShowEnemy(raw, script ? script.events[scriptIdx] : { enemyLevel: showEnemy.level });
+    if (Number.isFinite(Number(keepHp))) showHp = keepHp;
+    // 重挂成功后 enemy-fighter 可能还挂着上一场的 display:none —— 复位
+    const ef = document.getElementById('enemy-fighter');
+    if (ef && showEnemy) ef.style.display = '';
+    // cache-bust：给重挂出来的 img 追加一次性参数，绕开浏览器对失败 URL 的负缓存
+    const el = document.getElementById('enemy-icon');
+    const img = el && el.querySelector('img');
+    if (img && img.src) {
+      img.src += (img.src.indexOf('?') >= 0 ? '&' : '?') + 'r=' + raw.__healTries;
+    }
+  }
   function checkEnemySprite() {
     const el = document.getElementById('enemy-icon');
     if (!el || !showEnemy) return;
+    const tries = Number((showEnemy.raw || showEnemy).__healTries) || 0;
+    if (tries >= MAX_SPRITE_HEAL) return; // 超限：素材真缺，重挂无意义
     const img = el.querySelector('img');
-    if (!img) return;
+    if (!img) { remountShowEnemy('容器无img'); return; }
     if (img.complete && img.naturalWidth === 0) {
-      const src = img.getAttribute('src') || '(无 src)';
-      if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 敌方立绘加载失败：' + showEnemy.name + ' ← ' + src);
-      // 用 raw（未缩放原始怪）+ 当前剧本事件重挂，避免拿已缩放对象二次缩放。
-      // 必须传完整事件（含 petHits）才能重建演出配额；血要保住，不能被退回本场起点。
-      const keepHp = showHp;
-      mountShowEnemy(showEnemy.raw || showEnemy, script ? script.events[scriptIdx] : { enemyLevel: showEnemy.level });
-      if (Number.isFinite(Number(keepHp))) showHp = keepHp;
+      remountShowEnemy('图片加载失败 src=' + (img.getAttribute('src') || '(无src)'));
     }
   }
 
@@ -640,10 +793,54 @@
     const pet = Pet.getActivePet();
     const UI = window.UI;
     if (!pet || !UI || !UI.updateAction) return;
-    const dt = Math.max(0, Math.min(200, now - lastGaugeTs));
+    const rawDt = Math.max(0, now - lastGaugeTs);   // 未钳制的真实帧间隔（判"切后台/主线程卡顿"）
+    const dt = Math.min(200, rawDt);
     lastGaugeTs = now;
     const C = window.Config;
     const maxHp = Pet.getStats(pet).hp;
+    // 脏值兜底：showHp 变 NaN 会让血条宽度、回血等待判定全部永久失效（画面看着就是卡死）
+    if (!Number.isFinite(showHp)) showHp = maxHp;
+
+    /* ---------- 卡死自检（2026-09-10，取证用） ----------
+     * 「挂机卡住」是随机出现的，事后无法复现。这里每帧算一个「进度指纹」
+     *（场序 / 剧本身份 / 是否回血 / 场上怪 / 血量 / 双方行动条），
+     * 连续 STALL_SNAPSHOT_MS 不变就往 __battleLog 打一条快照 ——
+     * 下次卡住时在控制台敲 copy(__battleLog.join('\n')) 就能看到卡在哪一环。 */
+    const stallSig = scriptIdx + '/' + (script ? script.events.length : 0) + '/' + (currentScriptId || '-')
+      + '/' + (waitingHeal ? 'heal' : 'fight') + '/' + (showEnemy ? showEnemy.name : '-')
+      + '/' + Math.round(showHp) + '/' + Math.round(gauge.pet) + '/' + Math.round(gauge.enemy);
+    if (stallSig !== lastStallSig) { lastStallSig = stallSig; lastStallAt = now; }
+    else if (now - lastStallAt > STALL_SNAPSHOT_MS) {
+      lastStallAt = now;   // 每 10 秒最多报一条，不刷屏
+      blog('[战斗·卡死快照] 指纹=' + stallSig,
+        '| settling=' + settling,
+        '| 场上怪=' + (showEnemy ? '有' : '无'),
+        '| 回血等待=' + waitingHeal,
+        '| 攒着的剧本=' + (pendingScript ? '有' : '无'),
+        '| 剧本冷却剩余=' + Math.max(0, Math.round(nextScriptTryAt - now)) + 'ms',
+        '| 帧间隔=' + Math.round(rawDt) + 'ms',
+        '| 上怪连续失败=' + mountFailStreak);
+    }
+
+    /* 场前回血等待：回满 → 遭遇下一事件的新怪。
+     * ⚠️ 必须排在「剧本播完」判断【之前】（2026-09-10 修）：
+     * 旧顺序下剧本一旦播完就 early return，这一分支永远跑不到 ——
+     * 血条与行动条整段冻住不刷新，玩家看到的就是"怪站着不动"。 */
+    if (waitingHeal) {
+      showHp = Math.min(maxHp, showHp + maxHp * ((C.regen || {}).hpPerSecRatio || 0.2) * dt / 1000);
+      // 超时兜底：正常几秒就回满；卡在异常状态（脏值/属性变大）时不许永久卡住画面
+      if (showHp >= maxHp || (now - waitingHealAt) > HEAL_WAIT_MAX_MS) {
+        waitingHeal = false;
+        if (UI.addLog) UI.addLog('💚 恢复完毕，遭遇新的野怪！');
+        if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
+        const ef = document.getElementById('enemy-fighter');
+        if (ef) ef.style.display = '';
+        const nxt = (script && script.events) ? script.events[scriptIdx] : null;
+        if (nxt && nxt.type === 'fight') mountShowEnemy(nxt.enemy, nxt);
+      }
+      if (now - lastBarTs >= 100) { lastBarTs = now; UI.updateBars(Math.round(showHp), maxHp, 0, 1); }
+      return;
+    }
 
     // 剧本播完/未就绪：结算续段（settling 锁防重入 + 冷却，剧本拿不到时不每帧打服务器）
     if (!script || scriptIdx >= script.events.length) {
@@ -654,24 +851,21 @@
     }
     const t = now - scriptT0;
 
-    // 场前回血等待：回满 → 遭遇下一事件的新怪
-    if (waitingHeal) {
-      showHp = Math.min(maxHp, showHp + maxHp * ((C.regen || {}).hpPerSecRatio || 0.2) * dt / 1000);
-      if (showHp >= maxHp) {
-        waitingHeal = false;
-        if (UI.addLog) UI.addLog('💚 恢复完毕，遭遇新的野怪！');
-        if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
-        const ef = document.getElementById('enemy-fighter');
-        if (ef) ef.style.display = '';
-        const nxt = script.events[scriptIdx];
-        if (nxt && nxt.type === 'fight') mountShowEnemy(nxt.enemy, nxt);
-      }
-      if (now - lastBarTs >= 100) { lastBarTs = now; UI.updateBars(Math.round(showHp), maxHp, 0, 1); }
-      return;
-    }
-
     const f = script.events[scriptIdx];
     if (!f || f.type !== 'fight') { scriptIdx++; return; }
+
+    /* ⚠️ 时间轴快进（2026-09-10 修）：rAF 在后台/遮挡时压根不跑，回到前台时 now 一次性
+     * 跳几十秒 → t >= f.t1 立刻成立 → 怪"刚露面就被时间清掉、直接跳下一场"
+     *（用户反馈的"怪突然消失 + 血量跳变"）。旧代码只在"刚上台 300ms 内"救援，
+     * 覆盖不到切后台这种长间隔。这里改成：任何一次长帧间隔都把本场起点重锚到 now，
+     * 让当前这只看得见的怪从头完整演一遍（后续事件顺延，服务器账本不受影响）。 */
+    if (rawDt > STALL_REANCHOR_MS) {
+      scriptT0 = now - f.t0;
+      gauge.pet = 0; gauge.enemy = 0;
+      freezeUntil.pet = now; freezeUntil.enemy = now;
+      blog('[战斗·时间轴] 检测到 ' + Math.round(rawDt) + 'ms 无推进（切后台/主线程卡顿），本场重锚重演');
+      return;
+    }
 
     // 上场衔接优先：怪没上台绝不判这场结束。
     // ⚠️ 顺序铁律：必须先 mount 再判 kill——rAF 卡顿 / 切后台回来时 t 会快进，
@@ -687,7 +881,24 @@
         }
         return;
       }
-      mountShowEnemy(f.enemy, f);
+      /* ⚠️ 上怪失败必须【原地重试】，不能继续往下走（2026-09-10 修）：
+       * 继续走会让下面的 t >= f.t1 把这笔账当"空气击杀" → 宠物对着空气打、没立绘、
+       * 击杀日志连发（用户反馈的症状）。常见诱因：刷新后地图还没恢复
+       * （scaleEnemyOf 依赖 getCurrentArea，null 就返回 null）或宠物/UI 尚未就绪。
+       * 连续失败到上限 → 重新取一段剧本，别让演出层自己空转。 */
+      if (!mountShowEnemy(f.enemy, f)) {
+        if (mountFailStreak < MOUNT_FAIL_LIMIT) {
+          mountFailStreak++;
+          blog('[战斗·上怪失败] 第' + mountFailStreak + '次原地重试 | 怪=' + ((f.enemy && f.enemy.name) || '?'));
+        }
+        if (mountFailStreak >= MOUNT_FAIL_LIMIT && now >= nextScriptTryAt) {
+          nextScriptTryAt = now + MOUNT_FAIL_SETTLE_MS;
+          blog('[战斗·上怪失败] 连续失败，重新取剧本（' + MOUNT_FAIL_SETTLE_MS / 1000 + 's 冷却）');
+          settleNow().catch(function () { /* 忽略 */ });
+        }
+        return;
+      }
+      mountFailStreak = 0;
     }
 
     /* 剧本时间到 —— 这只是【兜底】。正常流程里怪会先被最后一刀打死（见 showTurn），
@@ -777,7 +988,7 @@
     if (pet && Number(f.exp) > 0 && window.Pet && window.Pet.grantExp) {
       window.Pet.grantExp(pet, Number(f.exp));
     }
-    // 经验条/等级要跟着每场击杀即时刷新：renderAll 只在 applyResult（服务器真账回来）
+    // 经验条/等级要跟着每场击杀即时刷新：renderAll 只在 applyAuthoritative（服务器真账回来）
     // 时经 notifyChange 触发，托管期间画面就冻结到结算前 —— 观感 = 经验没有实时结算。
     // 与本地模式 handleFightEnd 每场 renderAll 同一节奏，开销同级。
     notifyChange();
@@ -864,6 +1075,9 @@
     gauge.pet = 0; gauge.enemy = 0;
     freezeUntil.pet = 0; freezeUntil.enemy = 0;
     waitingHeal = false;
+    waitingHealAt = 0;
+    mountFailStreak = 0;
+    lastStallSig = ''; lastStallAt = 0;
     nextScriptTryAt = 0;
     script = null; scriptIdx = -1; pendingScript = null; currentScriptId = null;
     lastGaugeTs = performance.now();
@@ -880,8 +1094,39 @@
     showEnemy = null;
   }
 
+  /* ---------- 自我让位：战斗页被更高优先级玩法（副本/塔）抢占 ----------
+   * 谁拥有资源谁负责收尾：这里只管"把最后一段账结掉 + 停会话"，不需要知道抢占者是谁。
+   * 反向不需要处理：副本/塔在打时 start() 的 claim 已经拦住（低优先级抢不到高的）。 */
+  if (SESSION) {
+    SESSION.onChange(function (info) {
+      if (info.holder && info.holder.kind !== SESSION_KIND && active) shutdown();
+    });
+  }
+
+  /* 演出层体检快照（诊断/测试用）：把"画面为什么不动"需要的全部状态一次给出。
+   * 排查「挂机卡住」时先看它，配合 __battleLog 的「卡死快照」定位卡在哪一环。 */
+  function getDebugState() {
+    return {
+      active: active,
+      scriptId: currentScriptId,
+      scriptIdx: scriptIdx,
+      scriptLen: script ? script.events.length : 0,
+      waitingHeal: waitingHeal,
+      showEnemy: showEnemy ? showEnemy.name : null,
+      showHp: showHp,
+      showHealBonus: showHealBonus,
+      gaugePet: gauge.pet,
+      gaugeEnemy: gauge.enemy,
+      mountFailStreak: mountFailStreak,
+      nextScriptTryAt: nextScriptTryAt,
+      performanceNow: performance.now()
+    };
+  }
+
   window.IdleBridge = {
-    start, resumeActive, stop, settleNow,
+    start, resumeActive, settleNow, getDebugState,
+    shutdown, // 停机 / 让位：结算最后一段账 + 服务器停会话
+    handoff,  // 换图交棒：结算最后一段账，会话交给下一次 start（不发 stop）
     isActive: function () { return active; },
     enabled: ENABLED,
     getTotalFights: function () { return totalFights; },
