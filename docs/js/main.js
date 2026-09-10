@@ -24,6 +24,8 @@
   const Equipment = window.Equipment;
   const MarketBot = window.MarketBot; // 市场冷启动（流浪商人假卖家），可能未加载 → 判空调用
   const IdleBridge = window.IdleBridge; // 服务器权威挂机桥接层（URL 加 ?noidle=1 可整体关闭退回本地挂机）
+  const AuthSession = window.AuthSession; // 跨标签页会话互斥（core/auth-session.js）；可能未加载 → 判空调用
+  const ServerSession = window.ServerSession; // 服务端会话/跨设备互踢（core/server-session.js）；可能未加载 → 判空调用
 
   // 服务器托管挂机中：经验/等级/血量由服务器写库，本地不许再写，否则两边互相覆盖
   const serverManaged = () => !!(IdleBridge && IdleBridge.isActive());
@@ -246,12 +248,29 @@
   }
   if (window.UI) window.UI.replayOpeningTour = replayOpeningTour;
 
-  async function clearAccountState() {
-    if (IdleBridge) IdleBridge.shutdown(); // 登出 / 换号：结算最后一段并停会话，否则换号后还在算
+  /* ---------- 玩法运行时的启停（停运行时 ≠ 清数据，两件事分开放） ----------
+   * keepServerSession=true（被其他标签页接管时用）：只结账、不 stop 会话，
+   *   把服务器挂机会话留给接管的那个标签页 resumeActive() 接着用。
+   *   否则新标签页刚接管就被我们 stop 掉（battle_session 的 stop 取 started_at 最新的那条），
+   *   玩家会看到"新标签页的挂机自己停了"。
+   * keepServerSession=false（登出 / 换号）：结算最后一段并停会话，否则换号后还在算。 */
+  function stopGameRuntime(keepServerSession) {
+    if (IdleBridge) {
+      if (keepServerSession && IdleBridge.handoff) IdleBridge.handoff();
+      else IdleBridge.shutdown();
+    }
     stopAutoBattle();
-    flushPetProgress();                                // 登出/切账号前把经验补写云端
+    flushPetProgress();                                // 停手前把经验补写云端
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
+    if (UI.destroyChat) UI.destroyChat();              // 聊天 Realtime 频道要退订，否则换号后还在用旧身份收消息
     runtimeStarted = false;                            // 允许下次登录重新启动运行时
+  }
+
+  // keepServerSession=true：只清内存数据、把服务器挂机会话留着 —— 仅「在本标签页点继续接管」
+  // 用得到（同号接管时让 resumeActive 接着用同一个会话，玩家不会看到挂机莫名其妙断了）。
+  // 登出 / 换号一律 false。
+  async function clearAccountState(keepServerSession) {
+    stopGameRuntime(!!keepServerSession);
     clearPets();
     Items.setCloudItems([]);
     // 材料要先补报再清空：gain 现在只入队不上传，直接清会把当前号刚掉的收益丢掉。
@@ -262,6 +281,87 @@
     if (window.Quest && window.Quest.reset) window.Quest.reset(); // 清空旧号任务进度
     const starterScreen = document.getElementById('starter-screen');
     if (starterScreen) starterScreen.style.display = 'none';
+  }
+
+  /* ---------- 跨标签页会话互斥（core/auth-session.js） ----------
+   * 同一个浏览器里只允许一个标签页跑玩法运行时：谁最后登录/最后接管，谁持有所有权，
+   * 其他标签页收到 claim 就让位。
+   * 这样"另一个页面登录了、这个页面还在挂机"（两个页面抢同一个 idle_sessions，
+   * 后开的那个一 start 就把前一个的服务端会话停掉、且毫无提示）从根上不再发生。 */
+  // 遮罩（ui-session-guard.js）是可选模块：缺了只是没界面，不许把登出/让位流程带崩。
+  // （测试环境、以及线上少加载一个 js 的情况都会缺 —— 直接调就是 ReferenceError）
+  function hideSessionGuard() { if (UI.hideSessionGuard) UI.hideSessionGuard(); }
+  function showSessionGuard(opts) { if (UI.showSessionGuard) UI.showSessionGuard(opts); }
+
+  // 被别人顶掉：停玩法运行时（服务器会话交棒给对方），盖遮罩；点按钮可以抢回来
+  function onOtherTabTookOver() {
+    if (!UI.isLoggedIn()) return;                              // 未登录：本来就没跑东西
+    if (UI.isSessionGuardShown && UI.isSessionGuardShown()) return;
+    stopGameRuntime(true);
+    showSessionGuard({
+      text: '游戏已在另一个标签页中运行。同一账号同时只能有一个页面挂机，以免存档互相覆盖。',
+      onContinue: takeOverHere
+    });
+    addLog('⏸ 账号已在另一个标签页登录，本页面已停止运行。');
+  }
+
+  // 会话结束（其他标签页登出 / 服务端判定失效）：本标签同步回登录页
+  async function onSessionEnded() {
+    if (!UI.isLoggedIn()) return;                              // 自己发起的登出：本地已经清过了
+    hideSessionGuard();
+    await clearAccountState();
+    setAuthUser(null);
+    addLog('👋 账号已在其他页面退出登录');
+    renderAll();
+    syncButton();
+  }
+
+  // 遮罩上「在此标签页继续」：抢回所有权，并按当前会话重走一遍恢复。
+  // 必须重走而不是简单重启运行时：另一个标签页可能已经切过账号，
+  // localStorage 里的 token 未必还是本页认识的那一个，内存数据也不能信。
+  async function takeOverHere() {
+    if (AuthSession) AuthSession.claim('takeover');
+    try {
+      const user = await Supabase.getCurrentUser(true);
+      setAuthUser(user);
+      if (!user) { if (UI.onAuthChange) UI.onAuthChange(false); return; }
+      await clearAccountState(true);                           // 清掉上一份内存数据再拉云端；挂机会话留着，接管后能接着挂
+      if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 忽略 */ } }
+      if (await blockBannedAccount()) return;
+      const ready = await restoreAllCloudData();
+      if (!ready) return;                                      // 新号：等选宠完成后在 startGameRuntime 里接管
+      startGameRuntime();
+      renderAll();
+    } catch (e) {
+      console.warn('[auth-session] 在本标签页接管失败：', e);
+      if (UI.onAuthChange) UI.onAuthChange(false);
+    }
+  }
+
+  /* ---------- 服务端踢下线（跨设备互斥，core/server-session.js） ----------
+   * 触发源：心跳返回 revoked/banned，或 Realtime 收到自己那一行被撤销。
+   * 与"被其他标签页顶掉"的区别：那一层是本浏览器内的，能给「在此标签页继续」抢回来；
+   * 这一层是账号级判定，没有抢回的说法 —— 只能重新登录。 */
+  async function onKickedByServer(payload) {
+    // 是不是封禁只看 banned 布尔：payload.reason 装的是原因文案（kicked-by-login / 「开挂」之类），
+    // 拿它比对会次次落空 → 封禁被显示成"其他设备登录"
+    const banned = !!(payload && (payload.banned || payload.reason === 'banned'));
+    if (ServerSession) ServerSession.stop();
+    hideSessionGuard();
+    await clearAccountState();
+    setAuthUser(null);
+    await Supabase.signOut().catch(() => {});
+    if (UI.onAuthChange) UI.onAuthChange(false);
+    addLog(banned ? '⛔ 账号已被封禁，已断开连接' : '⚠️ 账号已在其他设备登录，本页已断开');
+    showSessionGuard({
+      title: banned ? '账号已被封禁' : '已在其他设备登录',
+      text: banned
+        ? '本账号已被管理员封禁，如有疑问请联系管理员。'
+        : '该账号已在另一台设备上登录。为避免存档互相覆盖，本页已停止运行；要在本页继续玩，请重新登录。',
+      continueText: '重新登录',
+      // 按钮点击时遮罩已自动隐藏，这里不需要额外动作：露出下面的登录页即可
+      onContinue: function () {}
+    });
   }
 
   /* ---------- 云端宠物恢复 ---------- */
@@ -440,8 +540,11 @@
     const reason = profile.ban_reason ? `（${profile.ban_reason}）` : '';
     addLog(`⛔ 账号已被封禁${reason}，如有疑问请联系管理员`);
     setAuthUser(null);
+    if (ServerSession) ServerSession.stop();
+    if (AuthSession) { AuthSession.markSelfSignOut(); AuthSession.broadcastLogout(); }
     await Supabase.signOut().catch(() => {});
     await clearAccountState();
+    hideSessionGuard();
     if (UI.onAuthChange) UI.onAuthChange(false);
     return true;
   }
@@ -450,6 +553,13 @@
   async function onAuthenticated() {
     // 昵称+封禁态：登录/注册成功后拉一次存内存（后面聊天显示全部读缓存，不再打接口）
     if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 昵称失败不挡进游戏 */ } }
+    // 服务端会话登记：登录 = 撤销该账号其他设备的会话（真互踢）。
+    // 放在封禁拦截之前 —— 服务端在这里就会把封禁号拒掉，连云端数据都不用拉。
+    if (ServerSession) {
+      ServerSession.start(); // 幂等：确保心跳/订阅在登录后是跑着的
+      const s = await ServerSession.login();
+      if (s && s.state === 'banned') { await blockBannedAccount(); return; }
+    }
     // 封禁号在恢复云端数据前就拦下（不读数据、不启动运行时）
     if (await blockBannedAccount()) return;
     // 落地注册时填的昵称：开了邮箱验证的号，注册后没 session 写不进库，登录成功后再补
@@ -518,9 +628,18 @@
     return { error: null };
   }
   async function onLogout() {
+    // 服务端会话注销：必须在 Supabase.signOut() 之前（token 一没，RPC 直接 401）。
+    // 只撤销自己这一条 —— 登出只登出本设备，其他设备不受影响。
+    if (ServerSession) { try { await ServerSession.logout(); } catch (e) { /* 网络问题照常登出 */ } }
+    // 再把登出广播出去：其他标签页立刻回登录页，不用等服务端把 token 真正作废
+    if (AuthSession) {
+      AuthSession.markSelfSignOut();  // 标记：随后触发的 SIGNED_OUT 不再重复上报
+      AuthSession.broadcastLogout();  // 其他标签页同步回登录页
+    }
     const { error } = await Supabase.signOut();
     await clearAccountState();
     setAuthUser(null);
+    hideSessionGuard();
     if (error) addLog('⚠️ 登出失败：' + (error.message || '未知错误'));
     else addLog('👋 已登出');
     renderAll();
@@ -550,6 +669,10 @@
   function startGameRuntime() {
     if (runtimeStarted) return;          // 防重入：会话恢复与 onAuthenticated 都可能会调
     runtimeStarted = true;
+    // 宣示会话所有权：本标签页开始跑玩法运行时 → 其他标签页让位。
+    // 放这里而不是各个调用点，是因为「启动运行时」是所有登录路径的唯一收口
+    // （会话恢复 / 登录 / 注册 / 选宠完成 / 遮罩接管）都必经此处。
+    if (AuthSession) AuthSession.claim('runtime-start');
     if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
     if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
@@ -689,6 +812,13 @@
     // 仅做 Supabase 会话探测与登录页绑定；游戏运行时（市场/挂机/轮询）一律登录后才启动。
     // 离线（无有效会话）时除登录页外不运行任何游戏逻辑，避免“离线游玩”。
     Supabase.init();
+    // 跨标签页会话互斥：先登记事件再做会话探测 —— 探测/恢复这几秒里被别人顶掉也能收到通知。
+    // 所有权不用在这里 claim，startGameRuntime 里统一做（数据就位才接管）。
+    if (AuthSession) {
+      AuthSession.start();
+      AuthSession.on('yield', onOtherTabTookOver);
+      AuthSession.on('logout', onSessionEnded);
+    }
     try {
       // 会话探测是唯一必须问服务器的路径：页面可能开了很久，本地 JWT 看着还在，
       // 实际已被服务端判为失效。这里必须走 getUser() 二次确认（force=true），
@@ -700,6 +830,20 @@
         // 未登录：仅展示登录页，不启动任何游戏循环
         if (UI.onAuthChange) UI.onAuthChange(false);
         return;
+      }
+      // 服务端会话登记：localStorage 里有 id = 页面恢复（不抢别人的会话）；
+      // 没有 id = 新设备 / 清过缓存（撤销该账号其他设备）。
+      // 被判定已撤销时不继续恢复数据 —— onKickedByServer 已经把状态清干净并回到登录页。
+      // ⚠️ 只有服务端明确说 revoked/unregistered/banned 才拦；网络错误（state:'error'）放行，
+      //    绝不能因为一次抖动就让玩家进不去游戏。
+      // ⚠️ 只在这里（拿到 user 之后）才启动服务端会话：未登录时启动心跳，
+      //    就是每 45 秒发一次注定 401 的请求（噪音 + 日志刷屏），而且订阅也建不起来。
+      if (ServerSession) {
+        ServerSession.start();
+        ServerSession.on('revoked', onKickedByServer);
+        ServerSession.on('banned', onKickedByServer);
+        const s = await ServerSession.bootstrap();
+        if (s && (s.state === 'revoked' || s.state === 'unregistered' || s.state === 'banned')) return;
       }
       // 已有会话（刷新/自动恢复）：先拉档案确认没被封禁，再走正常恢复并启动运行时
       if (Supabase.loadMyProfile) { try { await Supabase.loadMyProfile(); } catch (e) { /* 忽略 */ } }

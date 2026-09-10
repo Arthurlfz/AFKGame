@@ -14,10 +14,9 @@ const C=code=>vm.runInContext(code,ctx), S=ms=>new Promise(r=>setTimeout(r,ms));
  A(C('Supabase.loadPets&&Pet.petFromRow'),'云端宠物读写接口存在');
  await C('(async()=>{const p=Pet.createPet("腐噜兽","x",5,100,20,10,55);p.level=60;Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__p=p.id})()');await S(40);
  const id=C('__p');
- // 5 阶（2026-09-06）：4 次进化到终阶；素材按阶（普通/精粹/传说/传说+额外3）；三阶淬体成长 +0.3~0.4
+ // 5 阶（2026-09-06）：4 次进化到终阶；素材按阶（普通/精粹/传说/传说）；三阶淬体成长 +0.3~0.4（终阶额外×3 已于 2026-09-11 取消）
  for(let i=0;i<4;i++){
   const tier=i===0?'进化素材':i===1?'精粹进化素材':'传说进化素材';
-  if(i===3){await C(`Materials.gain("传说进化素材",3)`)} // 终阶额外素材 ×3
   const before=C(`Pet.getPets().find(p=>p.id===${id}).growth`);
   await C(`Materials.gain("${tier}",1)`);
   const r=await C(`Evolve.evolve(${id},0)`);

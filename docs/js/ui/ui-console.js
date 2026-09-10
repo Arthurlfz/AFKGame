@@ -346,4 +346,19 @@
     loadChatHistory();
     initChatRealtime();
   };
+  // 登出 / 被其他标签页接管时调用：退订 Realtime 频道并清掉身份缓存。
+  // 不退订的后果：换号后还在用旧身份收消息，且 chatChannel 非空导致新号永远订阅不上。
+  // seenIds 故意不清：换号后重新拉历史时靠它避免同一批消息重复显示。
+  UI.destroyChat = function () {
+    if (chatChannel) {
+      try { chatChannel.unsubscribe(); } catch (e) { /* 忽略 */ }
+      try {
+        const client = window.Supabase && window.Supabase.getClient && window.Supabase.getClient();
+        if (client && client.removeChannel) client.removeChannel(chatChannel);
+      } catch (e) { /* 忽略 */ }
+      chatChannel = null;
+    }
+    window.__chatMyId = null;
+    myName = '玩家';
+  };
 })();

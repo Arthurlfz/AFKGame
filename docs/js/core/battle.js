@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * battle.js —— 连续挂机战斗系统
  * 职责：
  *  1. 自动战斗循环：一场接一场打怪，无需玩家操作
@@ -360,10 +360,10 @@
     }
     // 伤害结算对齐"扑到对方脸上"那一刻。时刻由表现层给出：冲刺时长随两只宠的间距自适应，
     // 这里写死一个数字的话，宽屏上血条和飘字会在立绘还没冲到时就跳出来。
-    const hitAt = window.UI.animateAttack(attacker) || 320;
+    const skillHoldMs = 0; const hitAt = window.UI.animateAttack(attacker, skillHoldMs) || 320;
     // 命中之后立绘还要收招回位（后摇），这段时间也算演出 —— 归位才算打完这一下
     const backMs = window.UI.attackRecoverMs ? (window.UI.attackRecoverMs(attacker) || 0) : 0;
-    freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs);
+    const skillAnimMs = 0; freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs + skillAnimMs);
     setTimeout(() => {
       const result = calcDamage(atkData, defData);
       // 血统被动：伤害乘算（骨狼击杀增益 / 毒沼蛙腐蚀易伤）
@@ -389,7 +389,8 @@
       }
       const target = isPet ? 'enemy' : 'pet';
       window.UI.animateHit(target, result.isCrit);
-      window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal');
+      window.UI.showDamage(target, damage, result.isMiss ? 'miss' : skill ? 'skill' : result.isCrit ? 'crit' : 'normal', skill ? skill.name : null);
+      // SKILLFX DISABLED: window.SkillFX.play(skill.id, target, skill.name);
       // state.enemy 可能已被 endFight 置空（对方那一刀的延迟结算在 endFight 之后才落地）→ 读它等于崩
       if (state.enemy) window.UI.updateBars(state.pet.hp, state.pet.maxHp, state.enemy.hp, state.enemy.maxHp);
 

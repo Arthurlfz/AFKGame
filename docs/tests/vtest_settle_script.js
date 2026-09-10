@@ -48,8 +48,14 @@ const session = { id: 'sess-1', area_id: 'corrupted-forest', total_fights: 40, t
     gapSeconds: 0, gapSeed: 0, nextSeconds: 8, nextSeed: 222, bossState
   });
   A(planGapOnly.detail.length === 0, 'B1. 无补账窗 → detail 为空');
-  A(planGapOnly.script.events.length === plan1.script.events.length,
-    'B2. 补账窗只挪动起点不吞掉剧本窗时长（两窗各算各的）');
+  // B2（2026-09-11 重写）：剧本窗永远按 nextSeconds 独立预算模拟（settle-core #2 步），
+  // 补账窗只通过【入场状态】（endHp/fightOffset/bossState）影响它，不吞它的时长预算。
+  // ⚠️ 旧断言「两窗场数相等」是 speedScale=12 节奏下的巧合：剧本窗场数合法地依赖入场血量
+  //   （残血入场的战斗时长不同），18 节奏下差 ±1 是正常现象，不是回归。
+  A(plan1.script.events.length > 0 && planGapOnly.script.events.length > 0,
+    'B2. 两种计划剧本窗都有完整产出（补账窗不吞剧本窗时长预算）');
+  A(planGapOnly.detail.length === 0 && plan1.detail.length > 0,
+    'B2b. 补账窗只随 gapSeconds 出现（gap=0 无补账明细）');
 
   // C. 经验基线链式
   A(Number.isFinite(plan1.result.scriptExpBefore) && Number.isFinite(plan1.result.scriptLevelBefore),

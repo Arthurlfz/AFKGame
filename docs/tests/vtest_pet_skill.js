@@ -28,6 +28,22 @@ ctx.Config.battle.areaEnemyStats = { 'test-area': { hp: 1000, atk: 1, def: 10 } 
 vm.runInContext(fs.readFileSync('../js/core/battle-session.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/core/battle.js', 'utf8'), ctx);
 const A = (ok, message) => { if (!ok) { console.error('FAIL: ' + message); process.exit(1); } console.log('PASS: ' + message); };
+// 回归（2026-09-11）：三份战斗核的技能解锁 = 终形态专属。
+// 旧实现沿进化树走到终形态、非终阶也按档位给技能（skillTierScale 未配置 → 满威力），
+// 导致二阶宠在挂机（服务器模拟）里放技能，与「终形态 Lv60 解锁」设计和客户端战斗矛盾。
+vm.runInContext(fs.readFileSync('../js/core/battle-sim.global.js', 'utf8'), ctx);
+const simSkill = name => ctx.BattleSim.skillOf({ name }, ctx.Config);
+A(simSkill('腐噜兽') === null, '模拟器：一阶基宠无主动技能');
+A(simSkill('腐沼兽') === null, '模拟器：二阶宠无主动技能（旧版误给满威力技能）');
+A(simSkill('腐沼王') === null, '模拟器：三阶淬体宠无主动技能');
+A(simSkill('腐烂之母') && simSkill('腐烂之母').id === 'corrosion-spit', '模拟器：终形态解锁主动技能');
+A(simSkill('腐烂之母·异变') && simSkill('腐烂之母·异变').id === 'corrosion-spit', '模拟器：变异终形态剥后缀继承技能');
+A(simSkill('血月魔狐') && simSkill('血月魔狐').triggerChance === 0.13, '模拟器：技能数值原样返回（无档位缩放）');
+// 神级宠（2026-09-11 用户拍板）：继承其 sprite 立绘终形态的主动技，满威力
+A(simSkill('腐界母神') && simSkill('腐界母神').id === 'corrosion-spit', '模拟器：神级宠腐界母神继承腐蚀喷吐');
+A(simSkill('血月神狐') && simSkill('血月神狐').id === 'blood-moon-slash', '模拟器：神级宠血月神狐继承血月斩');
+A(vm.runInContext('Config.pet.evolution.skillOf("腐界母神").id', ctx) === 'corrosion-spit', 'config.skillOf：神级宠继承线主形态技能（客户端/宠物页口径）');
+A(vm.runInContext('Config.pet.evolution.skillOf("莱姆")', ctx) === null, 'config.skillOf：普通非终形态宠无技能');
 ctx.Battle.selectArea('test-area');
 ctx.Battle.startAutoBattle(() => {});
 A(ctx.Battle.state.activeSkill?.id === 'corrosion-spit', 'Lv60 腐烂之母在开战时解锁腐蚀喷吐');

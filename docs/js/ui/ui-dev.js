@@ -976,7 +976,7 @@
       if (!p.cloudId) { toast('❌ 宠物未同步云端', '刷新页面后再试'); return; }
       const ri = Number($('fast-evo-route').value);
       const rm = Evolve.getRouteMaterial(p, ri);
-      if (rm && rm.name) Materials.gain(rm.name, rm.amount || 1); // 免消耗：先补发所需素材
+      if (rm && rm.name) Materials.gain(rm.name, rm.total || rm.amount || 1); // 免消耗：补发所需素材（终阶含同名额外，按合并总量）
       const res = await Evolve.evolve(p.id, ri);
       if (res && res.error) { toast('❌ ' + res.error, ''); return; }
       await savePet(p); if (UI.renderAll) UI.renderAll();

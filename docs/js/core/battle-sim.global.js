@@ -8,7 +8,7 @@
  *   3. **延迟伤害结算**：出手后 hitAt(320ms) 才结算（前端 setTimeout 语义），
  *      前摇期间被打死的对手其 pending 伤害作废 —— random 消耗顺序与前端完全一致
  *   4. 伤害 = 攻防减法(含穿透) → 暴击 → 伤害加成% → 受伤减免% → 吸血
- *   5. 主动技能（skillOf 档位缩放：tree 深度 → skillTierScale）+ 觉醒伤害加成
+ *   5. 主动技能（终形态专属，与 config.skillOf/客户端同源）+ 觉醒伤害加成
  *   6. 血统被动全套（骨狼/毒沼蛙/血狐/尸犬/瘟熊/幽影兔/疫毛兽/腐噜兽）
  *   7. 怪等级 = clamp(宠物等级, 图段)；怪数值 = 图中点基准 × 等级缩放 × typeMult
  *   8. 经验 = coef × 怪等级^exp × 难度 × rate，±jitter（expFromBattle 同源）
@@ -182,24 +182,21 @@ function getBloodline(pet, config) {
   const baseName = pet.lineId || resolveLineId(pet.name, config) || pet.name;
   return config.bloodlinePassive[baseName] || null;
 }
-// 主动技能档位（从 config.js skillOf/formInfoOf 移植，JSON 化后函数丢失需重建）
+// 主动技能：终形态专属（2026-09-11 与 config.skillOf / 客户端 battle.js 统一）。
+// ⚠️ 旧实现沿 tree 走到终形态、非终阶也按档位给技能 —— 但 skillTierScale 从未配置（兜底×1），
+//   实际效果是二阶起挂机里就放满威力技能，与「终形态 Lv60 解锁」设计、副本/塔的客户端战斗直接矛盾。
+// 终形态名字直接查表；变异宠（·异变）剥后缀继承本体技能；
+// 涅槃保留形态 → 名字不变 → 技能永久激活（2026-09-10 拍板）。
 function skillOf(pet, config) {
   const evo = config.pet && config.pet.evolution;
   if (!evo) return null;
   const name = String(pet.name || '').replace(/·异变$/, '');
-  const tree = evo.tree || {};
-  let cur = name, steps = 0;
-  let routes = tree[cur];
-  while (routes && routes.length) { steps++; cur = routes[0].to; routes = tree[cur]; }
-  const info = { final: cur, depth: 3 - steps };
-  const skill = (evo.activeSkills || {})[info.final];
-  if (!skill) return null;
-  if (info.depth <= 0) return null;
-  const tierIdx = Math.max(0, Math.min(2, info.depth - 1));
-  const scale = (evo.skillTierScale && evo.skillTierScale[tierIdx]) || { chance: 1, damage: 1 };
-  const chance = Math.round(((skill.triggerChance || 0) * scale.chance) * 100) / 100;
-  const mult = Math.round((1 + ((skill.damageMultiplier || 1) - 1) * scale.damage) * 100) / 100;
-  return Object.assign({}, skill, { triggerChance: chance, damageMultiplier: mult, tier: tierIdx + 1, tierName: ['I', 'II', 'III'][tierIdx] });
+  const skills = evo.activeSkills || {};
+  if (skills[name]) return Object.assign({}, skills[name]);
+  // 神级宠（2026-09-11）：继承其 sprite 立绘终形态（该线主形态）的主动技，满威力
+  const GP = config.pet && config.pet.godPets;
+  const god = GP && (GP.list || []).find(g => g.name === name);
+  return god && skills[god.sprite] ? Object.assign({}, skills[god.sprite]) : null;
 }
 function addTraitStat(pet, flat, pct, config) {
   const defs = config.petTraits || {};

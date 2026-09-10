@@ -74,20 +74,25 @@
     const next = nextStageOf(pet);
     return (next && next.material) || (E() && E().materialName) || '进化素材';
   }
-  // 取某条路线所需素材信息：{ name, amount, have, enough, extra?, stage, label }
-  // extra = 终阶的额外消耗（手册 2.5「传说进化素材 + 特殊道具」）
+  // 取某条路线所需素材信息：{ name, amount, total, have, enough, extra?, stage, label }
+  // extra = 可选的终阶额外消耗（2026-09-11 起当前 config 未配置；机制保留，配了才收）
+  // ⚠️ extra 与主素材同名时，判定与扣款都按合并总量（total）——
+  //   分开判会“每笔都够、合起来不够”，第二笔原子扣款失败（2026-09-11 修过的真 bug）。
   function getRouteMaterial(pet, routeIndex) {
     const route = getEvolutionRoutes(pet)[routeIndex];
     if (!route) return null;
     const next = nextStageOf(pet);
     const name = (next && next.material) || E().materialName || '进化素材';
     const amount = (next && next.amount) || 1;
-    const have = Materials.getQuantity(name);
     const ex = (next && next.extra) || null;
+    const sameName = !!(ex && ex.name === name);
+    const total = amount + (sameName ? ex.amount : 0);
+    const have = Materials.getQuantity(name);
     const haveExtra = ex ? Materials.getQuantity(ex.name) : 0;
     return {
-      name, amount, have, enough: have >= amount,
-      extra: ex ? { name: ex.name, amount: ex.amount, have: haveExtra, enough: haveExtra >= ex.amount } : null,
+      name, amount, total, have,
+      enough: have >= total,
+      extra: ex ? { name: ex.name, amount: ex.amount, have: haveExtra, enough: haveExtra >= ex.amount, sameName } : null,
       stage: next ? next.stage : null,
       label: (next && next.label) || ''
     };
@@ -123,7 +128,7 @@
     if (!pet.cloudId) return { error: '宠物未同步云端，刷新页面后再试' };
     // 条件：在售中的宠物不能进化（挂单快照会失效）
     if (Market.isListed(pet.cloudId)) return { error: `${pet.name} 正在市场出售，先取回再进化` };
-    // 条件：进化素材足够（终阶还要额外素材）
+    // 条件：进化素材足够（若下一阶配了 extra 还要额外素材）
     if (rm.have < rm.amount) {
       return { error: `需要 ${rm.amount} 个${materialName}，去挂机刷材料吧` };
     }
@@ -139,21 +144,24 @@
     }
 
     // ---- 执行：先扣素材（云端原子扣，成功才继续） ----
-    const spent = await Materials.spend(materialName, rm.amount);
+    // extra 与主素材同名 → 合并成一笔扣（分开扣会“先扣的吃掉余额”导致第二笔失败）
+    const sameNameExtra = !!(rm.extra && rm.extra.name === materialName);
+    const mainTotal = rm.amount + (sameNameExtra ? rm.extra.amount : 0);
+    const spent = await Materials.spend(materialName, mainTotal);
     if (!spent.ok) return { error: spent.error || '素材扣减失败' };
-    // 终阶额外素材：扣失败则把主素材退回去，不让玩家白亏
-    if (rm.extra) {
+    // 异名额外素材：扣失败则把主素材退回去，不让玩家白亏
+    if (rm.extra && !sameNameExtra) {
       const ex = await Materials.spend(rm.extra.name, rm.extra.amount);
       if (!ex.ok) {
-        await Materials.gain(materialName, rm.amount);
+        await Materials.gain(materialName, mainTotal);
         return { error: ex.error || '素材扣减失败' };
       }
     }
     if (boostItem) {
       const itemSpent = await Materials.spend(boostItem.name, 1);
       if (!itemSpent.ok) {
-        await Materials.gain(materialName, rm.amount);
-        if (rm.extra) await Materials.gain(rm.extra.name, rm.extra.amount);
+        await Materials.gain(materialName, mainTotal);
+        if (rm.extra && !sameNameExtra) await Materials.gain(rm.extra.name, rm.extra.amount);
         return { error: itemSpent.error || `${boostItem.name}扣减失败` };
       }
     }
@@ -178,8 +186,8 @@
       name: nextName, growth: newGrowth, evolve_times: nextEvolveTimes, evolve_stage: next.stage
     });
     if (updErr) {
-      await Materials.gain(materialName, rm.amount);
-      if (rm.extra) await Materials.gain(rm.extra.name, rm.extra.amount);
+      await Materials.gain(materialName, mainTotal);
+      if (rm.extra && !sameNameExtra) await Materials.gain(rm.extra.name, rm.extra.amount);
       if (boostItem) await Materials.gain(boostItem.name, 1);
       return { error: `云端存档失败：${updErr.message || '请稍后重试'}` };
     }

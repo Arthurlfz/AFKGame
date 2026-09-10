@@ -170,7 +170,8 @@
     const stageLabel = (rm && rm.label) || '';
     const formText = route.keepForm ? `淬体进阶${stageLabel ? '（' + stageLabel + '）': ''}：形态不变，成长值提升`: `进化后名字变为【${route.to}】${stageLabel ? '（' + stageLabel + '）': ''}`;
     const lvOk = pet.level >= (route.minLevel || 1);
-    const matOk = rm ? (rm.enough && (!ex || ex.enough)) : have >= 1;
+    // 同名素材（若下一阶配了同名 extra）已在 rm.enough 里按合并总量判定；异名才单独看 ex.enough
+    const matOk = rm ? (rm.enough && (!ex || ex.sameName || ex.enough)) : have >= 1;
     const itemOk = !selectedItem || Materials.getQuantity(selectedItem.name) >= 1;
     const canEvolve = lvOk && matOk && itemOk;
     const boostOptions = ['<option value="">不用强化道具</option>'].concat(boostItems.map(item =>
@@ -178,8 +179,8 @@
     )).join('');
     let warnRow = '';
     if (!lvOk) warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
-    if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${matAmt} 个 ${matName}，当前持有 ${rm.have}</div>`;
-    if (ex && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
+    if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${rm.total || matAmt} 个 ${matName}${ex && ex.sameName ? '（含终阶额外 ' + ex.amount + ' 个）' : ''}，当前持有 ${rm.have}</div>`;
+    if (ex && !ex.sameName && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
     if (selectedItem && !itemOk) warnRow += `<div class="es-preview-row warn"> ${selectedItem.name}不足：需要 1 个，当前持有 ${Materials.getQuantity(selectedItem.name)}</div>`;
     // 目标形态卡
     tb.innerHTML = `<div class="evo-card next">
@@ -202,7 +203,7 @@
         ${row('生命', cur.hp, next.hp)}${row('攻击', cur.atk, next.atk)}${row('防御', cur.def, next.def)}${row('速度', cur.spd, next.spd)}
       </table>
       <div class="req-row">
-        <span>消耗 <b>${matName} ×${matAmt}</b>${ex ? ` + <b>${ex.name} ×${ex.amount}</b>` : ''}（持有 ${rm ? rm.have + (ex ? ' / ' + ex.have : '') : have}）</span>
+        <span>消耗 <b>${matName} ×${(rm && ex && ex.sameName) ? rm.total : matAmt}</b>${ex && !ex.sameName ? ` + <b>${ex.name} ×${ex.amount}</b>` : ''}（持有 ${rm ? (ex && !ex.sameName ? rm.have + ' / ' + ex.have : rm.have) : have}）</span>
         <span>强化道具 <select id="evolve-boost-item">${boostOptions}</select></span>
         <span>成长 <b>+${evolvePreview.boost.toFixed(2)}${selectedItem ? ' → +' + boost.toFixed(2) : ''}</b> · ${formText} · 进化 ${pet.evolveTimes || 0}→${(pet.evolveTimes || 0) + 1}</span>
       </div>
@@ -237,7 +238,7 @@
   function renderEvolveHint() {
     const el = $('evolve-hint-text');
     const E = Config.pet.evolution;
-    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1 + 额外×3，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
+    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
   }
 
 

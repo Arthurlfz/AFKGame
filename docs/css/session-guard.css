@@ -1,0 +1,57 @@
+/* ============================================================
+ * css/session-guard.css —— 会话遮罩（同账号多标签互斥时盖住页面）
+ * 独立小文件，只服务"多标签互斥"这一件事（同 market-refresh.css 的路子）。
+ * 复用 design-tokens 的变量与 .fs-btn 组件，不另起一套配色。
+ * ============================================================ */
+.session-guard {
+  position: fixed;
+  inset: 0;
+  z-index: 900;                 /* 高于 .trial-settle(500)，全站最高层：这是"页面已停"的终态 */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gap-xl);
+  background-color: rgb(8 11 12 / .94);
+  background-image: var(--ui-paper-texture);
+}
+.session-guard.show { display: flex; }
+
+.sg-box {
+  width: min(460px, 100%);
+  padding: 30px 28px 26px;
+  text-align: center;
+  background-color: var(--panel);
+  background-image: var(--ui-paper-texture);
+  border: 1px solid rgb(var(--action-gold-rgb) / .35);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+}
+
+/* 朱印：不用图标字体，一个"止"字最贴水墨定调 */
+.sg-seal {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto var(--gap-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 26px/1 var(--font-title);
+  color: var(--danger-hi);
+  border: 2px solid var(--danger);
+  border-radius: var(--radius-xs);
+  transform: rotate(-4deg);
+}
+
+.sg-title {
+  margin: 0 0 var(--gap-sm);
+  font: 700 var(--fs-lg) var(--font-title);
+  color: var(--accent-hi);
+  letter-spacing: 2px;
+}
+.sg-text {
+  margin: 0 0 var(--gap-xl);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+}
+.sg-continue { min-width: 168px; }

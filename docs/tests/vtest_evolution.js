@@ -82,9 +82,9 @@ A(boostMissing.ok!==true&&/强化丹B/.test(boostMissing.error),'未持有强化
 A(C('Materials.getQuantity("进化素材")')===1,'强化道具不足时不扣阶段进化素材');
 C('Materials.spendLocal("进化素材",1)'); // 清理本段特意保留的素材，避免影响后续不足素材用例
 
-/* ============ 4b. 5 阶进化链实际执行（2026-09-06）：
+/* ============ 4b. 5 阶进化链实际执行（2026-09-06；2026-09-11 终阶额外×3 取消）：
  *   Lv10 一阶（进化素材）→ Lv25 二阶（精粹）→ Lv40 三阶·淬体（传说，形态不变）
- *   → Lv60 终阶（传说 ×1 + 终阶额外 ×3） ============ */
+ *   → Lv60 终阶（传说 ×1） ============ */
 const chainId=evId;
 C('Pet.getPets().find(p=>p.id==='+chainId+').level=25');
 await C('Materials.gain("精粹进化素材",1)');await S(80);
@@ -99,11 +99,11 @@ A(chain3.ok===true&&chain3.result==='血灾领主'&&chain3.keepForm===true,'三�
 A(C('Pet.getEvolveStage(Pet.getPets().find(p=>p.id==='+chainId+'))')===4,'三阶后阶段 = 4');
 A(C('Pet.getPets().find(p=>p.id==='+chainId+').growth')>chain2.newGrowth,'淬体阶成长继续提升（+0.3~0.4）');
 C('Pet.getPets().find(p=>p.id==='+chainId+').level=60');
-await C('Materials.gain("传说进化素材",4)');await S(80);
+await C('Materials.gain("传说进化素材",1)');await S(80);
 const chain4=await C('Evolve.evolve('+chainId+',0)');
-A(chain4.ok===true&&chain4.result==='血月魔狐','终阶 Lv.60 进化成功（传说进化素材 ×1 + 终阶额外 ×3）');
+A(chain4.ok===true&&chain4.result==='血月魔狐','终阶 Lv.60 进化成功（传说进化素材 ×1，额外素材已取消）');
 A(C('Pet.getEvolveStage(Pet.getPets().find(p=>p.id==='+chainId+'))')===5,'终阶阶段 = 5');
-A(C('Materials.getQuantity("传说进化素材")')===0,'终阶共消耗 传说进化素材 ×4');
+A(C('Materials.getQuantity("传说进化素材")')===0,'终阶共消耗 传说进化素材 ×1');
 const endRoutes=C('Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id==='+chainId+'))');
 A(endRoutes.length===0,'终阶后没有更多进化路线（5 阶走到头）');
 

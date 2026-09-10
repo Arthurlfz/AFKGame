@@ -21,5 +21,12 @@ async function make(name,tag){await C(`(async()=>{const p=Pet.createPet("${name}
 async function evolve(id,level,index){C(`Pet.getPets().find(p=>p.id===${id}).level=${level}`);await C('Materials.gain("进化素材",1)');await C('Materials.gain("精粹进化素材",1)');await C('Materials.gain("传说进化素材",5)');await S(40);return C(`Evolve.evolve(${id},${index})`)}
 await make('腐噜兽','a');const a=C('globalThis.__a');let r=await evolve(a,10,0);A(r.ok&&r.result==='腐沼兽','腐噜兽→腐沼兽（Lv10 一阶）');r=await evolve(a,25,0);A(r.ok&&r.result==='腐沼王','腐沼兽→腐沼王（Lv25 二阶）');r=await evolve(a,40,0);A(r.ok&&r.result==='腐沼王'&&r.keepForm,'腐沼王→淬体三阶（Lv40 形态不变）');r=await evolve(a,60,0);A(r.ok&&r.result==='腐烂之母','腐沼王→腐烂之母（Lv60 终阶）');A((r=>r.length===0)(C(`Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id===${a}))`)),'第一条路线到终阶后没有更多进化路线');
 await make('腐噜兽','b');const b=C('globalThis.__b');r=await evolve(b,10,1);A(r.ok&&r.result==='毒噜兽','腐噜兽→毒噜兽（Lv10 一阶）');r=await evolve(b,25,0);A(r.ok&&r.result==='毒沼霸主','毒噜兽→毒沼霸主（Lv25 二阶）');r=await evolve(b,40,0);A(r.ok&&r.result==='毒沼霸主'&&r.keepForm,'毒沼霸主→淬体三阶（Lv40 形态不变）');r=await evolve(b,60,0);A(r.ok&&r.result==='剧毒魔君','毒沼霸主→剧毒魔君（Lv60 终阶）');A((r=>r.length===0)(C(`Evolve.getEvolutionRoutes(Pet.getPets().find(p=>p.id===${b}))`)),'第二条路线到终阶后没有更多进化路线');A(C(`Pet.getPets().find(p=>p.id===${a}).name`)!==C(`Pet.getPets().find(p=>p.id===${b}).name`),'选择不同分支得到不同终极宠');
+// 回归（2026-09-11）：终阶只收传说进化素材 ×1（额外×3 已取消）。
+// extra 机制保留：一旦 config 里重新配 extra，判定必须按合并总量（防止同名素材“分开判都够、合起来扣不动”复发）。
+const fakeStage4={name:'腐沼王',level:60,evolveStage:4,id:'t-regression'};
+const rmCheck=n=>{return C(`(function(){const __g=Materials.getQuantity;Materials.getQuantity=()=>${n};try{return Evolve.getRouteMaterial(${JSON.stringify(fakeStage4)},0)}finally{Materials.getQuantity=__g}})()`)};
+let rm1=rmCheck(1);A(rm1&&rm1.total===1&&rm1.extra===null,'终阶只收传说 ×1（额外素材已取消）');
+A(rm1.enough===true,'持有 1 ≥ 总量 1：判定为够料');
+A(rmCheck(0).enough===false,'持有 0：判定为不够料');
 console.log(failures?'TRUE-FORK TESTS FAILED: '+failures:'ALL TRUE-FORK TESTS PASSED');process.exit(failures?1:0)
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

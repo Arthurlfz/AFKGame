@@ -41,8 +41,10 @@ const perFight=(100/secPerFight).toFixed(0);
 const dropPerMin=(((data.inv+data.egg+data.mats)/elapsed)*60).toFixed(1);
 console.log(`  节奏: 约${perFight}场/分钟 | 掉落反馈约${dropPerMin}次/分钟`);
 console.log('===== 结论判断 =====');
-if(data.fights>=8)A(true,`节奏OK：${secPerFight}s/场，有来有回不拖沓`);
-else A(false,`节奏偏慢：<8场/分钟，可能无聊`);
+// 节奏阈值（2026-09-11 用户拍板 speedScale 12→18，战斗整体放慢 1.5 倍）：
+// 实测 18 节奏下新手图 ≈6 场/60s（10s/场）。阈值降到 5，守「别再变慢」的下限，不再用旧 12 节奏的 8。
+if(data.fights>=5)A(true,`节奏OK：${secPerFight}s/场（speedScale=18 的设计节奏，有来有回不拖沓）`);
+else A(false,`节奏偏慢：<5场/分钟，低于 speedScale=18 的设计基准，可能无聊`);
 if(data.fights>=8&&lvGain>=3)A(true,`成长感OK：60秒升了${lvGain}级，有进步反馈`);
 else A(true,`成长反馈尚可（升级${lvGain}级，挂机型正常）`);
 if(dropPerMin>=0.5)A(true,`掉落反馈OK：约${dropPerMin}次/分钟，有惊喜感`);
