@@ -156,13 +156,15 @@
     const god = isGodPet(pet) ? godInfoOf(pet) : null;
     return (god && god.sprite) || pet.name;
   }
-  // 当前进化阶段 1~5（1=初始 … 5=终阶）；旧存档无 evolveStage 时按 evolveTimes+1 兜底
+  // 当前进化阶段 1~N（N = maxEvolveTimes + 1，2026-09-10 起 6 阶 = 5 次进化）；
+  // 旧存档无 evolveStage 时按 evolveTimes+1 兜底（上限跟着 config 走，别硬写数字）
   function getEvolveStage(pet) {
     const E = Config.pet && Config.pet.evolution;
     if (E && E.stageOf) return E.stageOf(pet);
-    return Math.min(5, Math.max(1, ((pet && pet.evolveTimes) || 0) + 1));
+    const max = ((E && E.maxEvolveTimes) || 4) + 1;
+    return Math.min(max, Math.max(1, ((pet && pet.evolveTimes) || 0) + 1));
   }
-  // 阶段标签（初始/一阶/二阶/三阶/终阶）
+  // 阶段标签（初始/一阶/二阶/三阶/四阶/终阶）
   function stageLabel(pet) {
     const E = Config.pet && Config.pet.evolution;
     const s = (E && E.stages || []).find(x => x.stage === getEvolveStage(pet));

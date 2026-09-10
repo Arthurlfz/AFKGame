@@ -119,7 +119,11 @@
     if (pet.icon) row.icon = pet.icon;
     if (includeExp) row.exp = Math.max(0, Math.round(pet.exp || 0));
     // 进化阶段 / 神级宠标记（缺列时由 savePet 剔除，迁移前的旧库不受影响）
-    row.evolve_stage = Math.min(5, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
+    /* ⚠️ 上限必须跟着 Config.pet.evolution 走（2026-09-10：5 阶 → 6 阶，即 5 次进化）。
+     * 这里原本硬写 Math.min(5,…) —— 加了第 6 阶却忘了改这里，第 6 阶永远存不进云端
+     * （本地涨了、刷新后掉回 5 阶），是「改了 config 却看不见效果」的经典坑。 */
+    const maxStage = ((Config.pet && Config.pet.evolution && Config.pet.evolution.maxEvolveTimes) || 4) + 1;
+    row.evolve_stage = Math.min(maxStage, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
     row.is_god_pet = !!pet.isGodPet;
     // 血脉特质 / 永久觉醒标记 / 来源（缺列时由 savePet 剔除）
     if (Array.isArray(pet.traits) && pet.traits.length) row.traits = pet.traits;
