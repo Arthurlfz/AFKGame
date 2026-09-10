@@ -3,7 +3,7 @@
  * 职责：
  *  1. 层数推进：开一层 → 层胜负回调 → 下一层 / 终局（死亡或通关）
  *  2. 层敌人生成：守关者按层等级/层难度曲线缩放（数值公式在此，参数全在 trial-config.js）
- *  3. 野图挂机的暂停与恢复（本地循环 / 服务器托管演出两种形态都处理）
+ *  3. 战斗页占用权：进副本前 claim（抢占野图挂机），终局释放
  * 不负责：进入资格（trial-access.js）、奖励结算（trial-rewards.js）、任何 UI 渲染。
  * 依赖：config、trial-config/access/rewards、battle（beginTrialFloor hook）、pet、materials。
  * ============================================================ */
@@ -16,7 +16,7 @@
   /* ---------- 运行时状态 ---------- */
   const state = {
     running: false, route: null, floor: 0, maxFloor: 0,
-    result: null, timer: null, access: null, wild: null
+    result: null, timer: null, access: null
   };
 
   // 运行事件（UI 订阅：floor/floorClear/floorFail/settle/log）；node 测试可直接注入收集
@@ -74,27 +74,20 @@
     };
   }
 
-  /* ---------- 野图挂机的暂停与恢复 ----------
-   * 服务器托管（默认）：IdleBridge.stop(true) 只拆本地演出与定时器，
-   *   服务器会话继续跑（与玩家去宠物页/市集页一样，野外收益后台照常）；
-   *   结束后 resumeActive() 重连本地演出并补结算。
-   * 纯本地挂机（?noidle=1 调试模式）：stopAutoBattle 停掉；结束后【不自动重启】
-   *   （main.js 的结算回调拿不到），结算面板提示玩家手动继续。 */
-  function pauseWildIdle() {
-    const B = window.Battle, IB = window.IdleBridge;
-    state.wild = {
-      autoRunning: !!(B && B.isRunning && B.isRunning()),
-      idleActive: !!(IB && IB.isActive && IB.isActive())
-    };
-    if (state.wild.autoRunning && B.stopAutoBattle) B.stopAutoBattle();
-    if (state.wild.idleActive && IB.stop) IB.stop(true);
+  /* ---------- 战斗页占用权（core/battle-session.js） ----------
+   * 副本是玩家主动进入的玩法，优先级高于野图挂机：claim 会直接抢占野图，
+   * 野图（本地循环 / 服务器托管演出）订阅到占用变更后自己收尾 —— 结算最后一段账、
+   * 拆演出、停会话。本模块不需要知道野图存在，也不需要管它怎么停。
+   * 拿不到占用（另一个爬塔玩法在跑）就别进，且【不消耗门票/免费次数】。 */
+  function claimPage() {
+    const S = window.BattleSession;
+    if (!S) return { ok: false, error: '战斗页占用权模块未加载（缺 core/battle-session.js）' };
+    const r = S.claim('trial');
+    if (r.ok) return { ok: true };
+    return { ok: false, error: '战斗页被占用：' + ((r.holder && r.holder.label) || '其它玩法') + '进行中' };
   }
-  function resumeWildIdle() {
-    const IB = window.IdleBridge;
-    if (state.wild && state.wild.idleActive && IB && IB.resumeActive) {
-      Promise.resolve(IB.resumeActive()).catch(() => { /* 重连失败不影响副本结算 */ });
-    }
-    state.wild = null;
+  function releasePage() {
+    if (window.BattleSession) window.BattleSession.release('trial');
   }
 
   /* ---------- 层推进 ---------- */
@@ -146,7 +139,7 @@
     });
     state.running = false;
     if (state.timer) { clearTimeout(state.timer); state.timer = null; }
-    resumeWildIdle();
+    releasePage(); // 终局即交出战斗页（结算面板显示时玩家应能重新开始挂机/再打一次）
     emit({ type: 'settle', route, result: state.result });
     return state.result;
   }
@@ -154,7 +147,8 @@
   /* ---------- 入口 ----------
    * start(routeId, { onEvent }) → Promise<result>：
    *   资格/等级守门不过 → { ok:false, error }；
-   *   通过 → 消耗资格、暂停野图挂机、逐层推进，终局 resolve 结算明细。 */
+   *   通过 → 占用战斗页（抢占野图挂机）、消耗资格、逐层推进，终局 resolve 结算明细。
+   *   finally 兜底释放占用：消费资格之后任何异常都不会把战斗页锁死。 */
   async function start(routeId, opts) {
     opts = opts || {};
     eventSink = typeof opts.onEvent === 'function' ? opts.onEvent : eventSink;
@@ -167,19 +161,24 @@
     if (!pet) return { ok: false, error: '请先选择出战宠物' };
     if ((Number(pet.level) || 1) < (route.minLevel || 1)) return { ok: false, error: `需要宠物达到 Lv${route.minLevel}` };
 
-    const access = await window.TrialAccess.consumeEntry(routeId);
-    if (!access.ok) return { ok: false, error: access.error };
+    const page = claimPage();
+    if (!page.ok) return { ok: false, error: page.error };
+    try {
+      const access = await window.TrialAccess.consumeEntry(routeId);
+      if (!access.ok) return { ok: false, error: access.error };
 
-    state.running = true;
-    state.route = route;
-    state.floor = 0;
-    state.maxFloor = 0;
-    state.result = null;
-    state.access = access;
-    emit({ type: 'start', route, total: c.floors || 20 });
-    pauseWildIdle();
-    beginFloor();
-    return await waitUntilDone();
+      state.running = true;
+      state.route = route;
+      state.floor = 0;
+      state.maxFloor = 0;
+      state.result = null;
+      state.access = access;
+      emit({ type: 'start', route, total: c.floors || 20 });
+      beginFloor();
+      return await waitUntilDone();
+    } finally {
+      releasePage(); // 正常终局 finish() 已释放（幂等）；异常路径由这里兜住
+    }
   }
   // 层推进是异步链（setTimeout 驱动），这里轮询等待终局，保持旧 API「await 拿结算」的形态
   function waitUntilDone() {

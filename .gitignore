@@ -73,5 +73,6 @@ $null
 docs/tests/_*.txt
 docs/tests/out_*.txt
 docs/tests/result.txt
+/screenshot*.png
 
 
