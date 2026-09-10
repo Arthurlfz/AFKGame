@@ -81,6 +81,18 @@
     { id: 't-temper', routeId: 'temper', name: '副本·淬炼试炼', type: 'trial', x: 9, y: 82 }
   ];
 
+  /* ---------- 通天塔节点（2026-09-10）：后期内容，独立于野图与副本 ----------
+   * 单独一个节点、不参与 areaId 体系（不经过 Battle.selectArea），与副本节点同构。
+   * 落点取右上角留白：左侧 6~9% 已被三个副本节点占用，野图节点分布在 12~90%，
+   * 右上（x≈88, y≈12）无冲突，视觉上与左侧「试炼群岛」形成左右对称。 */
+  const TOWER_POINT = {
+    id: 'p-tower',
+    name: '通天塔',
+    type: 'tower',
+    x: 88, y: 12,
+    desc: '后期挑战：30 层连续爬塔。白图能通，贴腐印换掉率。'
+  };
+
   /* ---------- 掉落预览（从 Config 推导，纯展示） ---------- */
   // 专属材料名 + 进化素材档位 + 金装概率倾向 + 各图材料掉落分布（materialWeightsByTier）
   function buildPreview(point) {
@@ -141,6 +153,7 @@
     capital: CAPITAL,
     points: WILD_POINTS,
     trialPoints: TRIAL_POINTS,
+    towerPoint: TOWER_POINT,
     buildPreview: buildPreview
   };
 })();

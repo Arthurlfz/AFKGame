@@ -87,6 +87,15 @@
 | 3 | AI 阶段 2（服务端 AI） | 🟡 待做 | 真共享市场需 Worker；当前阶段 1 各浏览器各自市场 |
 | 4 | 毕业图内容（图 11-17） | 🟡 待做 | 当前锁死占位；AI 毕业档 persona 需毕业装需求 |
 | 5 | 云端 bot 交易记录买家昵称 | 🟡 待做 | `bot_buy_equip` RPC 仍硬编码"流浪商人"，阶段 2 改 persona |
+| 6 | **通天塔服务端权威 EF**（塔的奖励与成绩） | ⏸️ 暂停 | 2026-09-10 用户拍板"奖励与成绩都走 EF"；做到一半因「野外战斗经常有问题」**先修野图**而暂停（用户指示先记入本清单）。详见下方备注。 |
+
+> **#6 备注（2026-09-10 暂停时的进度与前置缺陷）**
+>
+> - **已完成**：塔的数值源 / 词缀 / 资格 / 引擎 / UI / 腐印产出 / 契约测试（`docs/js/tower/` 9 个文件，`vtest_tower.js` 86 断言全过）。
+> - **未开始**：`supabase/functions/_shared/tower-core.mjs`（整局 30 层 × 5 只 = 150 只怪的模拟）、`tower-run` EF（资格校验 / 原子发奖 / runId 幂等 / 周榜写入）、`supabase/migrate_tower.sql`、客户端切权威源（回放服务器录像）。
+> - **必须先修的两个前置缺陷**（都已用代码核对）：
+>   1. `supabase/gen_server_config.js` 的提取白名单**缺 `equipment`** → 服务端没有装备生成能力，塔的"高级装备"发奖落不了地。要么把装备生成器搬到 `_shared`，要么按现有 `battle-settle` 口径**先只发材料**。
+>   2. **两份战核已漂移**：神级宠的 `statCoeff` / `speed`，服务器副本 2026-09-06 已修，**前端参考副本（`docs/js/core/battle-sim.mjs`）没同步**；且 `vtest_sim_sync.js` 的函数清单漏了 `getStatCoeff / getBaseSpeed / resolveLineId`，所以漂移一直没报红。塔是"神级宠专属"，这条不修服务端会把神级宠属性算低。
 
 ---
 

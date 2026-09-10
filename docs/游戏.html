@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -9,23 +9,23 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260910sprite1">
+<link rel="stylesheet" href="css/game.css?v=20260910tower5">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260910trial1">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260910tower2">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
-<link rel="stylesheet" href="css/market-refresh.css?v=20260903c">
-<link rel="stylesheet" href="css/market-cascade.css?v=caf34f5e">
+<link rel="stylesheet" href="css/market-refresh.css?v=20260910mt3">
+<link rel="stylesheet" href="css/market-cascade.css?v=20260910mt2">
 <!-- 开发者面板（仅管理员账号可见入口） -->
-<link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
+<link rel="stylesheet" href="css/dev.css?v=8f54dbc5">`n<!-- 交互体验修复补丁（2026-09-10 实测后修复） -->`n<link rel="stylesheet" href="css/ui-fixes.css?v=20260910fix11">
 </head>
 <body>
 
 <!-- ==================== 登录页（全屏，未登录时显示） ==================== -->
 <div id="login-screen" class="login-screen">
   <div class="login-panel">
-    <div class="login-logo">⚒</div>
-    <div class="login-title">宠物养成循环原型</div>
-    <div class="login-sub">登录后数据自动云端存档</div>
+    <div class="login-logo">🔥</div>
+    <div class="login-title">灵魂熔炉</div>
+    <div class="login-sub">Forge of Souls · 登录后数据自动云端存档</div>
     <input id="login-email" type="email" placeholder="邮箱" autocomplete="email">
     <input id="login-pwd" type="password" placeholder="密码" autocomplete="current-password">
     <input id="login-nickname" type="text" placeholder="昵称（注册时需要，留空自动生成）" autocomplete="off" maxlength="12" style="display:none">
@@ -62,16 +62,16 @@
   <div class="app-body">
     <!-- 左侧边栏：主导航 + 任务/设置 -->
     <nav class="sidebar" id="sidebar">
-      <button class="sb-btn active" data-page="capital"><span class="sb-icon">🏯</span><span class="sb-label">主城</span></button>
-      <button class="sb-btn" data-page="worldmap"><span class="sb-icon">🗺️</span><span class="sb-label">世界地图</span></button>
-      <button class="sb-btn" data-page="pet"><span class="sb-icon">🐾</span><span class="sb-label">宠物资料</span></button>
-      <button class="sb-btn" data-page="market"><span class="sb-icon">💰</span><span class="sb-label">市集</span></button>
+      <button class="sb-btn active" data-page="capital"><span class="sb-icon"><img src="assets/ui/nav/capital.png" alt=""></span><span class="sb-label">主城</span></button>
+      <button class="sb-btn" data-page="worldmap"><span class="sb-icon"><img src="assets/ui/nav/worldmap.png" alt=""></span><span class="sb-label">世界地图</span></button>
+      <button class="sb-btn" data-page="pet"><span class="sb-icon"><img src="assets/ui/nav/pet.png" alt=""></span><span class="sb-label">宠物资料</span></button>
+      <button class="sb-btn" data-page="market"><span class="sb-icon"><img src="assets/ui/nav/market.png" alt=""></span><span class="sb-label">市集</span></button>
       <button class="sb-btn" data-page="shop"><span class="sb-icon">🪙</span><span class="sb-label">魔石商店</span></button>
-      <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon">💬</span><span class="sb-label">聊天</span></button>
-      <button class="sb-btn" data-page="codex"><span class="sb-icon">📖</span><span class="sb-label">百科</span></button>
-      <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon">⚙️</span><span class="sb-label">设置</span></button>
+      <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon"><img src="assets/ui/nav/chat.png" alt=""></span><span class="sb-label">聊天</span></button>
+      <button class="sb-btn" data-page="codex"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">百科</span></button>
+      <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon"><img src="assets/ui/nav/settings.png" alt=""></span><span class="sb-label">设置</span></button>
       <!-- 开发者面板入口：默认隐藏，仅管理员账号登录后由 ui-dev.js 显示 -->
-      <button class="sb-btn" id="btn-dev-sidebar" style="display:none" title="开发者"><span class="sb-icon">🛠️</span><span class="sb-label">开发者</span></button>
+      <button class="sb-btn" id="btn-dev-sidebar" style="display:none" title="开发者"><span class="sb-icon"><img src="assets/ui/nav/dev.png" alt=""></span><span class="sb-label">开发者</span></button>
     </nav>
 
     <!-- 页面容器：display 显隐切换（DOM 常驻，不销毁） -->
@@ -99,10 +99,10 @@
             <div class="area-detail" id="area-detail" hidden>
               <div class="nd-page" id="area-detail-body"></div>
             </div>
-            <!-- 试炼结算面板（2026-09-09）：副本战斗结束后弹出，显示结果/奖励/再打一次 -->
-            <div class="trial-settle" id="trial-settle" hidden>
-              <div class="ts-mask"></div>
-              <div class="ts-card" id="trial-settle-card"></div>
+            <!-- 通天塔详情页（2026-09-10）：独立容器，不复用 #area-detail（野图详情页状态会互相覆盖）。
+                 注意：它只从世界地图页打开，所以留在本页内；而【结算面板】必须放 body 层（见文件末尾）。 -->
+            <div class="area-detail tower-detail" id="tower-detail" hidden>
+              <div class="nd-page" id="tower-detail-body"></div>
             </div>
           </div>
           <!-- 可拖拽分隔条：上/下分栏（默认 65/35，比例存 localStorage） -->
@@ -503,7 +503,14 @@
           <aside class="market-filters cascade-filters" id="market-filters">
             <div class="cf-toprow">
               <div class="cf-search">
-                <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 属性" aria-label="搜索商品名或词缀" />
+                <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 词缀 / 特质" aria-label="搜索商品名、词缀或特质" />
+                <div class="cf-price-range">
+                  <span class="cf-price-label">价格</span>
+                  <input id="market-price-min" class="cf-price-input" type="number" min="0" step="1" placeholder="最低" aria-label="最低标价（收款材料数量）" />
+                  <span class="cf-price-sep">–</span>
+                  <input id="market-price-max" class="cf-price-input" type="number" min="0" step="1" placeholder="最高" aria-label="最高标价（收款材料数量）" />
+                  <span class="cf-price-unit">标价数</span>
+                </div>
               </div>
               <div class="cf-path-wrap">
                 <div class="cf-path-title">当前筛选路径</div>
@@ -790,6 +797,21 @@
   </div>
 </div>
 
+<!-- ============ 爬塔结算面板（body 层全局弹层，2026-09-10 修正位置） ============
+     为什么必须放这里：这两个面板是**战斗页**结束时弹出的，而 .trial-settle 用
+     position:fixed + z-index:500 —— fixed 也逃不出 display:none 的祖先。
+     它们原来放在 #tab-worldmap 里（.tab-page{display:none}），所以战斗页时面板根本
+     不渲染，切回世界地图才看得见（用户实测：「结算面板没弹，关掉战斗页能看到」）。
+     ⚠️ 以后凡是「战斗页期间要显示的浮层」，都必须挂在 body 层，不许塞进 tab 页。 -->
+<div class="trial-settle" id="trial-settle" hidden>
+  <div class="ts-mask"></div>
+  <div class="ts-card" id="trial-settle-card"></div>
+</div>
+<div class="trial-settle tower-settle" id="tower-settle" hidden>
+  <div class="ts-mask"></div>
+  <div class="ts-card" id="tower-settle-card"></div>
+</div>
+
 <script>
   // 面板取消按钮 + 新手引导（页面切换由 ui/ui-shell.js 管理；登录页由 ui/ui-login.js 管理）
   document.addEventListener('DOMContentLoaded', () => {
@@ -806,7 +828,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260910trial1"></script>
+<script src="js/core/config.js?v=20260910fix11"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -830,32 +852,43 @@ window.PetSprites = {
 </script>
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
-<script src="js/core/worldmap.js?v=20260909trial"></script>
-<script src="js/core/supabase.js?v=20260910awaken1"></script>
+<script src="js/core/worldmap.js?v=20260910tower2"></script>
+<script src="js/core/supabase.js?v=20260910mt4"></script>
 <script src="js/equipment/equipment.js?v=20260909ident"></script>
     <script src="js/pet/pet.js?v=20260910mt1"></script>
 <script src="js/core/items.js?v=20260910ident1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=20260909drop1"></script>
-<script src="js/core/market.js?v=20260909matrix1"></script>
-<script src="js/core/market_bot.js?v=20260903sec"></script>
+<script src="js/core/market.js?v=20260910mt4"></script>
+<script src="js/core/market_bot.js?v=20260910mt4"></script>
 <script src="js/equipment/equipment_craft.js?v=20260910awaken1"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260910cloudfix1"></script>
 <script src="js/pet/pet_evolve.js?v=20260910sprite1"></script>
 <script src="js/core/quest.js?v=20260910awaken2"></script>
 <script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
-<script src="js/core/battle.js?v=20260910trial1"></script>
-<script src="js/trial/trial-config.js?v=20260910trial1"></script>
+<!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
+     必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
+<script src="js/core/battle-session.js?v=20260910session1"></script>
+<script src="js/core/battle.js?v=20260910tower4"></script>
+<script src="js/trial/trial-config.js?v=20260910fix11"></script>
 <script src="js/trial/trial-access.js?v=20260910trial1"></script>
 <script src="js/trial/trial-rewards.js?v=20260910trial1"></script>
-<script src="js/trial/trial-engine.js?v=20260910trial1"></script>
-<script src="js/core/battle-sim.global.js?v=20260910awaken1"></script>
-<script src="js/core/idle-bridge.js?v=20260910sprite1"></script>
+<script src="js/trial/trial-engine.js?v=20260910session1"></script>
+<!-- 通天塔（2026-09-10）：一个文件一个职责。顺序 = 依赖方向：
+     config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
+<script src="js/tower/tower-config.js?v=20260910fix11"></script>
+<script src="js/tower/tower-affix.js?v=20260910tower2"></script>
+<script src="js/tower/tower-access.js?v=20260910tower2"></script>
+<script src="js/tower/tower-rewards.js?v=20260910tower2"></script>
+<script src="js/tower/tower-preview.js?v=20260910tower2"></script>
+<script src="js/tower/tower-engine.js?v=20260910tower4"></script>
+<script src="js/core/battle-sim.global.js?v=20260910tower4"></script>
+<script src="js/core/idle-bridge.js?v=20260910wild1"></script>
 <script src="js/ui/ui-common.js?v=20260910awaken1"></script>
 <script src="js/ui/ui-console.js?v=fa16bb1d"></script>
-<script src="js/ui/ui-shell.js?v=1e45bd1d"></script>
-<script src="js/ui/ui-worldmap.js?v=20260910sprite1"></script>
+<script src="js/ui/ui-shell.js?v=20260910mt2"></script>
+<script src="js/ui/ui-worldmap.js?v=20260910session1"></script>
 <script src="js/ui/ui-capital.js?v=20260903notab"></script>
 
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
@@ -866,23 +899,30 @@ window.PetSprites = {
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
 <script src="js/trial/ui-trial-battle.js?v=20260910trial1"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
-<script src="js/ui/ui-battle.js?v=20260910trial1"></script>
+<!-- 通天塔 UI（2026-09-10）：详情页 → 整页战斗驱动 → 结算面板 -->
+<script src="js/tower/ui-tower-entry.js?v=20260910tower5"></script>
+<script src="js/tower/ui-tower-battle.js?v=20260910tower4"></script>
+<script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
+<script src="js/ui/ui-battle.js?v=20260910tower3"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260910awaken1"></script>
+<script src="js/ui/ui-pet.js?v=20260910mt2"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260910awaken1"></script>
-<script src="js/ui/ui-pet-merge.js?v=20260910sprite1"></script>
+<script src="js/ui/ui-pet-merge.js?v=20260910mt2"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260910sprite1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
-<script src="js/ui/ui-bag.js?v=20260910mt1"></script>
-<script src="js/ui/ui-equipment.js?v=20260910ident1"></script>
-<script src="js/ui/ui-craft.js?v=20260910awaken1"></script>
-<script src="js/ui/ui-market.js?v=20260910mt1"></script>
+<script src="js/ui/ui-bag.js?v=20260910tower3"></script>
+<script src="js/ui/ui-equipment.js?v=20260910craft4"></script>
+<script src="js/ui/ui-craft.js?v=20260910craft4"></script>
+<script src="js/ui/ui-market.js?v=20260910mt4"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
-<script src="js/ui/ui-market-sell.js?v=d71b40c0"></script>
-<script src="js/ui/ui-codex.js?v=20260910awaken1"></script>
+<script src="js/ui/ui-market-sell.js?v=20260910mt4"></script>
+<script src="js/ui/ui-market-notify.js?v=20260910mt2"></script>
+<script src="js/ui/ui-codex.js?v=20260910tower5"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
 <script src="js/ui/ui-dev.js?v=20260910trial1"></script>
-<script src="js/main.js?v=20260910cloudfix1"></script>
+<script src="js/main.js?v=20260910mt2"></script>
+<!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
+<script src="js/ui-fixes.js?v=20260910fix11"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->
 <div class="bag-tooltip equip-tip" id="bag-tooltip"></div>

@@ -92,8 +92,10 @@
         floorTiers: [
           { floor: 5,  items: [{ name: '重铸石', qty: 3 }] },
           { floor: 10, items: [{ name: '增缀石', qty: 1 }, { name: '剥离石', qty: 1 }] },
-          { floor: 15, items: [{ name: '神圣石', qty: 1 }] },
-          { floor: 20, items: [{ name: '神圣石', qty: 1 }, { name: '锁定石', qty: 1 }] }
+          // 15/20 档各带一枚腐印（通天塔用的词缀道具）：副本是腐印的第二个稳定来源。
+          // 名称必须与 Config.tower.affix.items[].name 一致（tower-affix.js 按名字扣道具）。
+          { floor: 15, items: [{ name: '神圣石', qty: 1 }, { name: '腐印·荆棘', qty: 1 }] },
+          { floor: 20, items: [{ name: '神圣石', qty: 1 }, { name: '锁定石', qty: 1 }, { name: '腐印·屠戮', qty: 1 }] }
         ],
         consolation: [{ name: '重铸石', qty: 1 }]
       }

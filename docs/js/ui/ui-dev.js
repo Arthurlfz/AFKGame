@@ -298,6 +298,10 @@
     push('涅槃道具', byCat('nirvana'));
     push('打造石', Object.keys(C).map(k => C[k] && C[k].name));
     push('进化素材', Object.keys(D.evoMaterialWeights || {}));
+    // 通天塔（2026-09-10）：腐印（进塔词缀，消耗品）+ 重置卡（额外进入次数）
+    const TW = Config.tower || {};
+    push('通天塔·腐印', ((TW.affix && TW.affix.items) || []).map(i => i.name));
+    push('通天塔·门票', [TW.resetCardName]);
     push('区域材料', Object.keys(D.areaMaterials || {}).map(k => D.areaMaterials[k] && D.areaMaterials[k].name));
     // 其余：可作价材料 + 掉落表里出现的任何新材料 + 涅磐兽 / 合成之石 / 凝魂晶石
     const rest = [];

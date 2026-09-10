@@ -120,10 +120,19 @@
         bindTrialPoint(m, p);
         canvas.appendChild(m);
       }
+      // 通天塔节点（2026-09-10）：后期内容的独立节点，右上角留白
+      if (window.WorldMap.towerPoint) {
+        const tp = window.WorldMap.towerPoint;
+        const tm = makeTowerMarker(tp);
+        bindTowerPoint(tm, tp);
+        canvas.appendChild(tm);
+      }
       rendered = true;
     }
     // 副本节点徽标：每次进页刷新今日免费剩余（北京时间 12:00 换日）
     if (window.UI && window.UI.refreshTrialMarkers) window.UI.refreshTrialMarkers();
+    // 塔节点徽标：今日免费次数 / 需重置卡（同一换日点）
+    if (window.UI && window.UI.refreshTowerMarker) window.UI.refreshTowerMarker();
     // 首通状态变化后同步标记（canvas 不重建，只更新 class 与 ✓ 徽标）
     if (window.Quest && window.Quest.isAreaCleared) {
       const markers = canvas.querySelectorAll('.wm-marker');
@@ -197,6 +206,48 @@
       else if (window.UI && window.UI.openResourceTrial) window.UI.openResourceTrial(); // 兜底：老版本无详情页时退回面板
     });
   }
+
+  /* ---------- 通天塔节点（2026-09-10） ----------
+   * 与副本节点同构：没有 areaId（不经过 Battle.selectArea），点击打开塔详情页（#tower-detail）。
+   * 视觉用朱红 + 金与副本节点的青灰区分；节点常驻可见（塔没有「首通」概念，只有历史最高层）。
+   * 徽标显示「今日免费 N」或「需重置卡」。 */
+  function makeTowerMarker(point) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'wm-marker wm-marker--tower';
+    el.style.left = point.x + '%';
+    el.style.top = point.y + '%';
+    el.setAttribute('aria-label', point.name);
+    el.title = (point.desc ? point.desc + ' · ' : '') + point.name;
+    el.dataset.tower = '1';
+    const nameHTML = '<span class="wm-marker-name">' + (UI.escapeHtml ? UI.escapeHtml(point.name) : point.name) + '</span>';
+    const remainHTML = '<span class="wm-marker-remain"></span>';
+    el.innerHTML = '<span class="wm-marker-dot"></span>' + nameHTML + remainHTML;
+    return el;
+  }
+
+  function bindTowerPoint(marker, point) {
+    marker.addEventListener('click', () => {
+      if (window.UI && window.UI.showTowerDetail) window.UI.showTowerDetail(point);
+      else if (window.UI && window.UI.showToast) UI.showToast('通天塔未就绪', '塔详情页未加载（缺 ui-tower-entry.js）');
+    });
+  }
+
+  // 塔节点徽标：今日免费次数 / 需重置卡
+  UI.refreshTowerMarker = () => {
+    const canvas = $('worldmap-canvas');
+    if (!canvas || !window.TowerAccess || !window.TowerAccess.getDailyInfo) return;
+    const marker = canvas.querySelector('.wm-marker--tower');
+    if (!marker) return;
+    const badge = marker.querySelector('.wm-marker-remain');
+    if (!badge) return;
+    const info = window.TowerAccess.getDailyInfo();
+    const left = info.freeLeft || 0;
+    badge.textContent = left > 0 ? ('免费' + left) : '需重置卡';
+    badge.classList.toggle('is-empty', !(left > 0));
+    const best = info.bestFloor || 0;
+    if (best > 0) badge.title = `历史最高 ${best} 层${info.bestHot ? ' / 辣度 ' + info.bestHot : ''}`;
+  };
 
   // 副本节点徽标：显示每个副本今日免费剩余次数（北京时间 12:00 刷新）
   UI.refreshTrialMarkers = () => {
@@ -372,17 +423,17 @@
       if (pid != null && window.Pet && window.Pet.setActive) window.Pet.setActive(pid);
       return pid != null;
     };
-    // 停掉正在跑的挂机（换图进战斗 / 换宠重开才需要）：托管先结算再停，收益不丢。
-    // 托管会话用 stop(true) 只拆本地：服务器侧由紧接着的 battle_session('start')
-    // 「停旧建新」一条事务接替，这里再发 stop 反而可能乱序把新会话停掉。
+    /* 停掉正在跑的挂机（换图进战斗 / 换宠重开才需要）。
+     * 顺序与原因都封装在 IdleBridge.handoff() 里（先结算最后一段 → 只拆本地、不发 stop，
+     * 服务器侧由紧接着的 battle_session('start')「停旧建新」一条事务接替）——
+     * UI 层不需要知道这些先后，只管说"我要交棒"。 */
     const stopRunningIdle = async () => {
       const IB = window.IdleBridge;
       const B = window.Battle;
       const managed = !!(IB && IB.isActive && IB.isActive());
       const local = !!(B && B.isRunning && B.isRunning());
       if (!managed && !local) return;
-      if (managed && IB.settleNow) { try { await IB.settleNow(); } catch (e) { /* 忽略 */ } }
-      if (IB && IB.stop) IB.stop(true);
+      if (managed && IB.handoff) await IB.handoff();
       if (B && B.stopAutoBattle) B.stopAutoBattle();
       // 本地挂机经验是本地记账，停之前补写一次云端（托管由服务器写库，不能本地补）
       if (!managed && window.Game && window.Game.flushPetProgress) window.Game.flushPetProgress();

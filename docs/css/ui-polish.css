@@ -248,6 +248,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .wm-marker--trial:hover .wm-marker-dot, .wm-marker--trial:focus-visible .wm-marker-dot { transform: rotate(45deg) scale(1.28); box-shadow: 0 0 14px rgb(63 158 147 / .85), inset 0 0 6px rgb(0 0 0 / .35); }
 .wm-marker-remain { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #7fd4c9; background: rgb(12 17 18 / .86); border: 1px solid rgb(63 158 147 / .5); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: normal; }
 .wm-marker-remain.is-empty { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
+/* 通天塔节点（2026-09-10）：朱红圆点 + 金环，与副本节点（青玉菱形）视觉区分；常驻可见（塔没有首通概念） */
+.wm-marker--tower .wm-marker-dot { display: block; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background-color: var(--danger); background-image: radial-gradient(circle at 34% 30%, #e08a6a, var(--danger)); border: 1px solid var(--r-gold); box-shadow: 0 0 10px rgb(var(--hp-hi-rgb) / .6), 0 0 0 2px rgb(0 0 0 / .45), inset 0 0 5px rgb(0 0 0 / .45); transition: transform .18s ease, box-shadow .18s ease; }
+.wm-marker--tower:hover .wm-marker-dot, .wm-marker--tower:focus-visible .wm-marker-dot { transform: scale(1.26); box-shadow: 0 0 16px rgb(var(--r-gold-rgb) / .85), 0 0 0 2px rgb(0 0 0 / .45), inset 0 0 6px rgb(0 0 0 / .4); }
+.wm-marker--tower .wm-marker-name { color: var(--accent-hi); border-color: rgb(var(--r-gold-rgb) / .55); text-shadow: 0 1px 2px rgb(0 0 0 / .8); }
+.wm-marker--tower .wm-marker-remain { color: var(--r-gold); border-color: rgb(var(--r-gold-rgb) / .45); }
+.wm-marker--tower .wm-marker-remain.is-empty { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
 /* ============================================================
  * 主城页（不归城）：等距城寨全景（City.png 底图）+ 建筑热区
  * 底图为 meowa 等距暗黑水墨城寨；建筑热区 = 名字标签浮在图上，

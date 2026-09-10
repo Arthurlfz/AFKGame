@@ -992,6 +992,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 .craft-drawer-close:hover { border-color:var(--danger); color:var(--danger-hi); }
 .craft-drawer-body { flex:1; min-height:0; overflow:auto; padding:12px 14px; }
+/* 打造 / 魂铸 分屏（2026-09-10）：魂铸不再折叠在打造屏底部 */
+.craft-tabs { display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid var(--line); }
+.craft-tab {
+  flex:1; padding:6px 4px; background:none; border:none;
+  border-bottom:2px solid transparent; color:var(--text-faint);
+  font-size:0.833rem; letter-spacing:1px; cursor:pointer; transition:color .15s, border-color .15s;
+}
+.craft-tab:hover { color:var(--text-dim); }
+.craft-tab.on { color:var(--accent-hi); border-bottom-color:var(--accent-hi); }
 .craft-eq { font-size:1rem; color:var(--text); margin-bottom:8px; }
 .craft-affixes { margin-top:6px; font-size:1rem; line-height:1.9; }
 /* 打造面板：词缀按前后缀分组（前缀在上、后缀在下、分隔线分开） */
@@ -1144,6 +1153,10 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .battle-stage[data-area-id="bone-wastes"]      { --stage-back: url('../assets/bg/bone-wastes/back.png'); --stage-mid: url('../assets/bg/bone-wastes/mid.png'); }
 #tab-battle .battle-stage[data-area-id="blood-rift"]       { --stage-back: url('../assets/bg/blood-rift/back.png'); --stage-mid: url('../assets/bg/blood-rift/mid.png'); }
 #tab-battle .battle-stage[data-area-id="blight-heart"]     { --stage-back: url('../assets/bg/blight-heart/back.png'); --stage-mid: url('../assets/bg/blight-heart/mid.png'); }
+#tab-battle .battle-stage[data-area-id="echo-cliffs"]       { --stage-back: url('../assets/bg/echo-cliffs/back.png'); --stage-mid: url('../assets/bg/echo-cliffs/mid.png'); }
+#tab-battle .battle-stage[data-area-id="rotfen-bog"]        { --stage-back: url('../assets/bg/rotfen-bog/back.png'); --stage-mid: url('../assets/bg/rotfen-bog/mid.png'); }
+#tab-battle .battle-stage[data-area-id="ember-hollow"]      { --stage-back: url('../assets/bg/ember-hollow/back.png'); --stage-mid: url('../assets/bg/ember-hollow/mid.png'); }
+#tab-battle .battle-stage[data-area-id="soul-abyss"]       { --stage-back: url('../assets/bg/soul-abyss/back.png'); --stage-mid: url('../assets/bg/soul-abyss/mid.png'); }
 /* 立绘角色（我方 / 敌方通用容器）：覆盖整个舞台，info 与立绘分开定位 */
 #tab-battle .fighter {
   position:absolute; inset:0; pointer-events:none;
@@ -3596,3 +3609,461 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .eq-unid-line { font-size: 12px; color: #c9c3b4; margin: 3px 0; }
 .eq-unid-line.hint { color: #8b90a0; }
 .eq-unid-block .btn-sm.id { margin-top: 10px; padding: 6px 16px; }
+
+/* ============================================================
+ * 战斗舞台视觉增强（2026-09-10）
+ * 纯CSS叠加，不改原有逻辑，仅增强视觉表现
+ * ============================================================ */
+
+/* ---------- 1. 脚下光圈 + 地面投影 ---------- */
+/* 我方脚下：蓝色光环 + 椭圆投影 */
+#tab-battle .fighter-pet .stage-avatar::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8%;
+  width: 130%;
+  height: 22%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse center,
+    rgba(80, 180, 255, 0.25) 0%,
+    rgba(80, 180, 255, 0.12) 40%,
+    transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  animation: pet-aura-pulse 3s ease-in-out infinite;
+}
+/* 敌方脚下：红色光环 + 椭圆投影 */
+#tab-battle .fighter-enemy .stage-avatar::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8%;
+  width: 130%;
+  height: 22%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse center,
+    rgba(220, 60, 50, 0.25) 0%,
+    rgba(220, 60, 50, 0.12) 40%,
+    transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  animation: enemy-aura-pulse 3.5s ease-in-out infinite;
+}
+/* 椭圆实体阴影（增强立体感） */
+#tab-battle .fighter-pet .stage-avatar,
+#tab-battle .fighter-enemy .stage-avatar {
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.6));
+}
+@keyframes pet-aura-pulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.05); }
+}
+@keyframes enemy-aura-pulse {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.05); }
+}
+
+/* ---------- 2. 血条视觉升级 ---------- */
+#tab-battle .hp-shell {
+  height: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+#tab-battle .hp-bar.pet-hp {
+  background: linear-gradient(to bottom,
+    #4ade80 0%,
+    #22c55e 40%,
+    #16a34a 100%);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+#tab-battle .hp-bar.enemy-hp {
+  background: linear-gradient(to bottom,
+    #f87171 0%,
+    #ef4444 40%,
+    #dc2626 100%);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+#tab-battle .hp-bar.is-low {
+  background: linear-gradient(to bottom,
+    #ef4444 0%,
+    #dc2626 50%,
+    #b91c1c 100%);
+  animation: hp-low-pulse 0.8s ease-in-out infinite;
+}
+@keyframes hp-low-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
+}
+/* 攻击进度条美化 */
+#tab-battle .atk-shell {
+  height: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+}
+#tab-battle .atk-bar {
+  background: linear-gradient(to right,
+    #fbbf24 0%,
+    #f59e0b 50%,
+    #d97706 100%);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+/* ---------- 3. 伤害飘字优化 ---------- */
+#tab-battle .fs-float {
+  font-family: var(--font-num);
+  font-weight: 800;
+  text-shadow:
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
+    0 0 8px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.5px;
+}
+#tab-battle .fs-float.crit {
+  font-size: 2.2rem;
+  color: #ffd700;
+  text-shadow:
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
+    0 0 12px rgba(255, 215, 0, 0.6),
+    0 0 24px rgba(255, 100, 50, 0.4);
+  animation: fs-float-crit 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+#tab-battle .fs-float.skill {
+  text-shadow:
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    2px 2px 0 #000,
+    0 0 10px rgba(251, 191, 36, 0.5);
+}
+#tab-battle .fs-float.lifesteal {
+  color: #86efac;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 6px rgba(134, 239, 172, 0.4);
+}
+#tab-battle .fs-float.miss {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 1.2rem;
+}
+@keyframes fs-float-crit {
+  0% { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.5) rotate(-5deg); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.3) rotate(3deg); }
+  30% { transform: translateX(-50%) translateY(-4px) scale(1) rotate(-2deg); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.9) rotate(0deg); }
+}
+
+/* ---------- 4. 受击/暴击特效强化 ---------- */
+/* 暴击时舞台边缘红色脉冲 */
+#tab-battle .battle-stage.crit-impact::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center,
+    transparent 40%,
+    rgba(220, 60, 50, 0.15) 100%);
+  pointer-events: none;
+  z-index: 5;
+  animation: crit-screen-flash 0.4s ease-out forwards;
+}
+@keyframes crit-screen-flash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* 受击时角色闪白更亮 */
+#tab-battle .stage-avatar.hit::after {
+  --hit-flash: #ffffff;
+  opacity: 0.95;
+}
+#tab-battle .stage-avatar.crit-hit::after {
+  --hit-flash: #ff6b4a;
+  opacity: 1;
+}
+
+/* ---------- 5. 变异怪/Boss视觉强化 ---------- */
+#tab-battle .fighter-enemy.is-mutant .stage-avatar::before {
+  background: radial-gradient(ellipse center,
+    rgba(255, 80, 60, 0.4) 0%,
+    rgba(255, 80, 60, 0.18) 40%,
+    transparent 70%);
+  animation: mutant-aura-pulse 2s ease-in-out infinite;
+}
+#tab-battle .fighter-enemy.is-mutant .stage-avatar {
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.6))
+          drop-shadow(0 0 20px rgba(255, 80, 60, 0.3));
+}
+@keyframes mutant-aura-pulse {
+  0%, 100% { opacity: 0.8; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.1); }
+}
+
+/* ---------- 6. 行动条轨道视觉升级 ---------- */
+#tab-battle .at-track {
+  background: linear-gradient(to bottom,
+    rgba(10, 10, 12, 0.95),
+    rgba(20, 20, 25, 0.95));
+  border-left: 1px solid rgba(251, 191, 36, 0.25);
+}
+/* 轨道刻度线 */
+#tab-battle .at-track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(25% - 1px),
+    rgba(251, 191, 36, 0.15) calc(25% - 1px),
+    rgba(251, 191, 36, 0.15) 25%
+  );
+  pointer-events: none;
+}
+#tab-battle .at-racer {
+  background: radial-gradient(circle at 35% 35%,
+    #2a2a30 0%,
+    #1a1a20 100%);
+  border-width: 2.5px;
+  box-shadow:
+    0 0 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+#tab-battle .at-racer.leading {
+  box-shadow:
+    0 0 12px rgba(251, 191, 36, 0.7),
+    0 0 24px rgba(251, 191, 36, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+#tab-battle .at-racer--enemy.leading {
+  box-shadow:
+    0 0 12px rgba(239, 68, 68, 0.7),
+    0 0 24px rgba(239, 68, 68, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+#tab-battle .at-finish {
+  height: 3px;
+  background: linear-gradient(to right, transparent, var(--action-gold), transparent);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+}
+
+/* ---------- 7. 氛围粒子（血雾飘动） ---------- */
+#tab-battle .battle-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(180, 40, 40, 0.08) 0%, transparent 3%),
+    radial-gradient(circle at 60% 20%, rgba(180, 40, 40, 0.06) 0%, transparent 2.5%),
+    radial-gradient(circle at 80% 50%, rgba(180, 40, 40, 0.07) 0%, transparent 3.5%),
+    radial-gradient(circle at 30% 70%, rgba(180, 40, 40, 0.05) 0%, transparent 2%),
+    radial-gradient(circle at 50% 80%, rgba(180, 40, 40, 0.06) 0%, transparent 3%);
+  background-size: 100% 100%;
+  pointer-events: none;
+  z-index: 1;
+  animation: blood-mist-drift 12s ease-in-out infinite alternate;
+}
+@keyframes blood-mist-drift {
+  0% { transform: translate(0, 0); opacity: 0.8; }
+  50% { transform: translate(-2%, 1%); opacity: 1; }
+  100% { transform: translate(2%, -1%); opacity: 0.8; }
+}
+
+/* ---------- 8. 胜利演出增强 ---------- */
+#tab-battle .fighter-enemy .stage-avatar.defeated {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+/* 胜利时我方金色光环 */
+#tab-battle .battle-stage.victory-pulse .fighter-pet .stage-avatar::before {
+  background: radial-gradient(ellipse center,
+    rgba(255, 215, 0, 0.4) 0%,
+    rgba(255, 215, 0, 0.15) 40%,
+    transparent 70%);
+  animation: victory-glow 0.8s ease-out forwards;
+}
+@keyframes victory-glow {
+  0% { opacity: 0.5; transform: translateX(-50%) scaleX(1) scaleY(1); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1.3) scaleY(1.2); }
+  100% { opacity: 0.3; transform: translateX(-50%) scaleX(1.5) scaleY(1.4); }
+}
+
+/* ---------- 9. 升级金色光环（JS 加 .level-up class 触发） ---------- */
+#tab-battle .stage-avatar.level-up::before {
+  background: radial-gradient(ellipse center,
+    rgba(255, 215, 0, 0.5) 0%,
+    rgba(255, 215, 0, 0.2) 40%,
+    transparent 70%) !important;
+  animation: level-up-aura 1.5s ease-out forwards !important;
+}
+@keyframes level-up-aura {
+  0% { opacity: 0.8; transform: translateX(-50%) scaleX(0.8) scaleY(0.8); }
+  30% { opacity: 1; transform: translateX(-50%) scaleX(1.4) scaleY(1.3); }
+  100% { opacity: 0; transform: translateX(-50%) scaleX(2) scaleY(1.8); }
+}
+
+/* ---------- 10. 信息条（头顶血条）优化 ---------- */
+/* 信息条更紧凑、更通透 */
+#tab-battle .fighter-info {
+  padding: 6px 10px;
+  background: rgba(8, 8, 10, 0.7);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+#tab-battle .combat-name {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(0, 0, 0, 0.6);
+}
+#tab-battle .hp-text {
+  font-size: 0.85rem;
+  color: #d4cfc5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+/* 经验条美化 */
+#tab-battle .battle-exp {
+  margin-top: 4px;
+}
+#tab-battle .battle-exp-track {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#tab-battle .battle-exp-track i {
+  background: linear-gradient(to right, #fbbf24, #f59e0b);
+  box-shadow: 0 0 4px rgba(245, 158, 11, 0.5);
+}
+#tab-battle .battle-exp-meta span {
+  font-size: 0.75rem;
+  color: #a8a096;
+}
+
+/* ============================================================
+ * 通天塔（2026-09-10）—— 详情页 / 战斗页刻度条 / 结算诊断
+ * 设计约束（game-ui-design）：正文字号 ≥ --fs-xs(14px)；风险与辣度不只靠颜色
+ * （都有文字标签）；动效 ≤300ms；层数用填充条而非纯数字；遵守 prefers-reduced-motion。
+ * ============================================================ */
+/* 详情页容器复用 .area-detail（定位/尺寸），只补内容滚动与最大高度 */
+.tower-detail .nd-page { max-height: 100%; overflow-y: auto; }
+.tw-hint-god { color: var(--r-gold); }
+
+/* ---------- 层阶刻度：30 格网格，每 5 层一个档位格 ---------- */
+.tw-scale { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--gap-xs); margin: var(--gap-sm) 0 var(--gap-md); }
+.tw-cell { position: relative; display: flex; align-items: center; justify-content: center; height: 30px; border: 1px solid var(--line-weak); border-radius: var(--radius-sm); background-color: rgb(255 255 255 / .04); color: var(--text-faint); font-size: var(--fs-xs); font-weight: 700; }
+.tw-cell.is-tier { border-color: rgb(var(--r-gold-rgb) / .5); color: var(--accent-hi); background-color: rgb(var(--r-gold-rgb) / .08); }
+.tw-cell.is-reached { border-color: var(--r-gold); color: var(--accent-hi); background-color: rgb(var(--r-gold-rgb) / .22); }
+.tw-cell-tag { position: absolute; right: 2px; top: 1px; font-size: var(--fs-sm); color: var(--r-gold); }
+
+/* ---------- 辣度条 + 掉率增益 ---------- */
+.tw-hotbar { position: relative; height: 20px; margin: var(--gap-sm) 0 var(--gap-xs); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: rgb(0 0 0 / .35); overflow: hidden; }
+.tw-hotbar-fill { height: 100%; width: 0; background-color: var(--danger); background-image: linear-gradient(90deg, rgb(var(--r-gold-rgb) / .85), var(--danger-hi)); transition: width .3s ease; }
+.tw-hotbar-txt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); font-weight: 700; color: var(--text-hi); text-shadow: 0 1px 3px rgb(0 0 0 / .9); }
+.tw-drop { font-size: var(--fs-xs); color: var(--text-dim); }
+.tw-warn { color: var(--danger-hi); }
+.tw-dim { color: var(--text-faint); font-weight: 400; }
+.tw-empty { padding: var(--gap-md); color: var(--text-faint); font-size: var(--fs-xs); }
+.tw-err { margin: var(--gap-xs) 0; padding: var(--gap-xs) var(--gap-sm); border-left: 3px solid var(--danger-hi); color: var(--danger-hi); font-size: var(--fs-xs); line-height: 1.5; }
+
+/* ---------- 腐印网格 ---------- */
+.tw-affix-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--gap-sm); margin-top: var(--gap-sm); }
+.tw-affix { position: relative; display: flex; flex-direction: column; gap: 2px; min-height: 72px; padding: var(--gap-sm); text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--panel-2); color: var(--text); cursor: pointer; transition: border-color .18s ease, background-color .18s ease; }
+.tw-affix:hover, .tw-affix:focus-visible { border-color: var(--accent-dim); background-color: rgb(var(--action-gold-rgb) / .08); }
+.tw-affix.is-on { border-color: var(--r-gold); background-color: rgb(var(--r-gold-rgb) / .14); box-shadow: inset 0 0 0 1px rgb(var(--r-gold-rgb) / .35); }
+.tw-affix.is-ownless { opacity: .45; cursor: not-allowed; }
+.tw-affix-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-xs); }
+.tw-affix-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent-hi); }
+.tw-affix-hot { font-size: var(--fs-xs); font-weight: 700; color: var(--danger-hi); }
+.tw-affix-desc { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.4; }
+.tw-affix-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-xs); font-size: var(--fs-xs); color: var(--text-faint); }
+.tw-affix-drop { color: var(--r-gold); }
+.tw-affix-own.warn { color: var(--danger-hi); }
+.tw-affix-flag { position: absolute; right: var(--gap-sm); bottom: var(--gap-sm); padding: 0 4px; border: 1px solid rgb(var(--r-purple-rgb) / .6); border-radius: var(--radius-sm); color: var(--r-purple); font-size: var(--fs-xs); font-weight: 700; }
+.tw-affix-flag.warn { border-color: rgb(var(--hp-hi-rgb) / .6); color: var(--danger-hi); }
+
+/* ---------- 难度预估（风险有文字标签，不只靠颜色） ---------- */
+.tw-est { margin-top: var(--gap-md); padding: var(--gap-sm); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: rgb(0 0 0 / .22); }
+.tw-est-h { font-size: var(--fs-sm); font-weight: 700; color: var(--accent); margin-bottom: var(--gap-xs); }
+.tw-est-row { display: flex; justify-content: space-between; gap: var(--gap-sm); font-size: var(--fs-xs); color: var(--text); padding: 2px 0; }
+.tw-est-row .k { color: var(--text-dim); }
+.tw-est-empty { font-size: var(--fs-xs); color: var(--text-faint); }
+.tw-est-risk { margin-top: var(--gap-xs); padding: var(--gap-xs) var(--gap-sm); border-left: 3px solid var(--accent-dim); font-size: var(--fs-xs); line-height: 1.5; display: flex; flex-direction: column; gap: 2px; }
+.tw-est-risk b { font-size: var(--fs-sm); }
+.tw-est-risk span { color: var(--text-dim); }
+.tw-est-risk.is-safe { border-left-color: var(--r-gold); }
+.tw-est-risk.is-safe b { color: var(--r-gold); }
+.tw-est-risk.is-mid { border-left-color: var(--accent); }
+.tw-est-risk.is-mid b { color: var(--accent-hi); }
+.tw-est-risk.is-high { border-left-color: var(--danger-hi); }
+.tw-est-risk.is-high b { color: var(--danger-hi); }
+.tw-est-risk.is-deadly { border-left-color: var(--danger); }
+.tw-est-risk.is-deadly b { color: var(--danger-hi); }
+
+/* ---------- 战斗页：横向 30 格层阶刻度条（只在塔模式显示） ---------- */
+.tw-ladder { display: flex; align-items: center; gap: var(--gap-sm); padding: 4px var(--gap-md); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background-color: rgb(0 0 0 / .28); }
+.tw-ladder[hidden] { display: none; }
+.tw-ladder-h { font-size: var(--fs-xs); font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+.tw-ladder-track { display: flex; flex: 1 1 0; gap: 2px; }
+.tw-ladder-cell { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 14px; border-radius: var(--radius-sm); background-color: var(--line-weak); color: var(--text-faint); font-size: var(--fs-sm); font-weight: 700; transition: background-color .25s ease, box-shadow .25s ease; }
+.tw-ladder-cell.is-tier { background-color: rgb(var(--r-gold-rgb) / .22); }
+.tw-ladder-cell.is-past { background-color: var(--accent-dim); }
+.tw-ladder-cell.is-now { background-color: var(--danger-hi); box-shadow: 0 0 8px rgb(var(--hp-hi-rgb) / .8); color: var(--text-hi); }
+
+/* ---------- 掉落日志（金色 + 🎁 前缀：颜色与文字双编码） ---------- */
+.tw-loot { color: var(--r-gold); font-weight: 700; }
+.tw-epic { color: var(--accent-hi); font-weight: 700; }
+
+/* ---------- 结算面板补充（复用 .ts-* 容器与卡片） ---------- */
+.ts-diag { margin-top: var(--gap-sm); }
+.ts-diag-row { font-size: var(--fs-xs); color: var(--text); line-height: 1.6; padding: 2px 0; }
+.ts-title-tag { margin-top: var(--gap-sm); font-size: var(--fs-xs); color: var(--r-purple); }
+.ts-item.tw-item-gear { color: var(--r-gold); }
+
+/* 减弱动效（可达性）：进度/过渡类动画一律降为瞬时 */
+@media (prefers-reduced-motion: reduce) {
+  .tw-hotbar-fill, .tw-ladder-cell, .tw-affix, .wm-marker--tower .wm-marker-dot { transition: none; }
+}
+
+/* ============================================================
+ * 通天塔·结算面板重构（2026-09-10）
+ * 外壳仍复用 .trial-settle / .ts-card（弹层定位与遮罩不动），只重排内部：
+ *   ① 到达层数做成主视觉（最大字号）② 收获按「装备 / 腐印 / 高级材料 / 保底碎屑」分层
+ *   ③ 碎屑压到最底部淡色一行（Progressive disclosure：不跟好东西抢注意力）
+ * 可达性：正文 ≥ --fs-xs(14px)；品质除颜色外都写了「金装/蓝装/未鉴定」文字。
+ * ============================================================ */
+.tower-settle .ts-card { width: min(500px, 94vw); max-height: 88vh; overflow-y: auto; gap: 8px; }
+.tw-s-floor { font: 700 2rem var(--font-title); color: var(--accent-hi); letter-spacing: 1px; text-shadow: 0 0 14px rgb(var(--action-gold-rgb) / .35); }
+.tw-s-sub { font-size: var(--fs-xs); color: var(--text-dim); }
+.tw-s-body { width: 100%; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line-weak); text-align: left; display: flex; flex-direction: column; gap: 10px; }
+.tw-s-sec { display: flex; flex-direction: column; gap: 5px; }
+.tw-s-sec-h { font-size: var(--fs-sm); font-weight: 700; color: var(--accent); }
+.tw-s-main-h { color: var(--accent-hi); letter-spacing: 1px; }
+.tw-s-sec-h .hint { margin-left: 6px; font-size: var(--fs-xs); font-weight: 400; color: var(--text-faint); }
+/* 装备：每件一行，左侧色条 = 稀有度（同时有「金装/蓝装 · 未鉴定」文字兜底） */
+.tw-s-gear { display: flex; align-items: baseline; gap: 8px; padding: 3px 0 3px 8px; border-left: 3px solid var(--line); font-size: var(--fs-xs); }
+.tw-s-gear .nm { font-weight: 700; font-size: var(--fs-sm); }
+.tw-s-gear .mt { color: var(--text-dim); }
+.tw-s-gear .unid { margin-left: auto; padding: 0 5px; border: 1px solid rgb(var(--r-purple-rgb) / .55); border-radius: var(--radius-sm); color: var(--r-purple); font-size: var(--fs-xs); white-space: nowrap; }
+/* 保底碎屑：淡色一行，不跟好东西抢注意力 */
+.tw-s-junk { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: var(--fs-xs); color: var(--text-faint); }
+.tw-s-junk .k { color: var(--text-dim); }
+.tw-s-empty { font-size: var(--fs-xs); color: var(--text-faint); }
+/* 诊断：事实（常规色）+ 建议（金/朱红强调） */
+.tw-s-diag { width: 100%; margin-top: 2px; padding: 8px 10px; border-left: 3px solid var(--accent-dim); background-color: rgb(0 0 0 / .22); text-align: left; display: flex; flex-direction: column; gap: 3px; }
+.tw-s-diag-f { font-size: var(--fs-xs); color: var(--text); line-height: 1.5; }
+.tw-s-diag-t { font-size: var(--fs-xs); color: var(--accent-hi); line-height: 1.5; }
+.tw-s-meta { font-size: var(--fs-xs); color: var(--text-faint); }
+.ts-item.tw-item-affix { color: var(--r-purple); border-color: rgb(var(--r-purple-rgb) / .5); }
+.ts-item.tw-item-gold { color: var(--r-gold); border-color: rgb(var(--r-gold-rgb) / .5); }
