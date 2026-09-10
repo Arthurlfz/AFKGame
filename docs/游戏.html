@@ -8,15 +8,19 @@
 <link rel="stylesheet" href="css/vars.css?v=6571f00a">
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
-<link rel="stylesheet" href="css/app.css?v=20260903c">
-<link rel="stylesheet" href="css/game.css?v=20260910tower5">
+<link rel="stylesheet" href="css/app.css?v=20260910quest1">
+<link rel="stylesheet" href="css/game.css?v=20260910egg7">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260910tower2">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
 <link rel="stylesheet" href="css/market-refresh.css?v=20260910mt3">
 <link rel="stylesheet" href="css/market-cascade.css?v=20260910mt2">
 <!-- 开发者面板（仅管理员账号可见入口） -->
-<link rel="stylesheet" href="css/dev.css?v=8f54dbc5">`n<!-- 交互体验修复补丁（2026-09-10 实测后修复） -->`n<link rel="stylesheet" href="css/ui-fixes.css?v=20260910fix11">
+<link rel="stylesheet" href="css/dev.css?v=8f54dbc5">
+<!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
+<link rel="stylesheet" href="css/ui-fixes.css?v=20260910fix11">
+<!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
+<link rel="stylesheet" href="css/session-guard.css?v=20260910sess1">
 </head>
 <body>
 
@@ -76,9 +80,6 @@
 
     <!-- 页面容器：display 显隐切换（DOM 常驻，不销毁） -->
     <main class="page-container">
-
-      <!-- 任务追踪栏（常驻所有页面顶部）：新手链当前任务 + 玩家钉住的任务，最多 3 条，由 ui-quest 渲染 -->
-      <div class="quest-tracker" id="quest-tracker" style="display:none"></div>
 
       <!-- ============ 世界地图页（二级菜单：选图 → 进战斗/主城） ============ -->
       <section class="tab-page" id="tab-worldmap">
@@ -460,35 +461,9 @@
           </div>
         </div>
 
-        <!-- 装备 tab：12 槽装备界面在「背包窗口 · 装备」子页（顶栏背包 / B 键），这里给一个直达入口 -->
-        <div class="pet-tab-pane" data-pet-pane="equip">
-          <div class="pet-wrap">
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">出战装备<span class="hint">12 槽 · 点击槽位可脱下</span></div>
-                <div class="merge-hint">
-                  <div class="hint">装备界面在「背包 → 装备」子页：点下面按钮直接打开，给当前出战宠物穿装备 / 换装。</div>
-                </div>
-                <div class="panel-actions">
-                  <button type="button" class="fs-btn fs-btn--primary" id="btn-pet-equip-goto">打开装备界面</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 宠物蛋 tab：孵化入口（ui-pet.renderEggPanel 渲染到 #egg-panel） -->
-        <div class="pet-tab-pane" data-pet-pane="egg">
-          <div class="pet-wrap">
-            <div class="pcol">
-              <div class="panel">
-                <div class="panel-title">宠物蛋<span class="hint">孵化得副宠</span></div>
-                <div class="merge-hint"><div class="hint">点击孵化，得到与你并肩的第二只魂兽。</div></div>
-                <div id="egg-panel"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- 2026-09-10 墓碑清理：删除无 tab 按钮的「装备」「宠物蛋」两个幽灵 pane（tab 按钮早被移除，
+             pane 却留着，引导/主城孵化所的跳转会激活出这个无 tab 高亮的孤儿页）。
+             正主入口：孵化 = 背包浮窗 · 素材蛋（UI.openBagEggs）；装备 = 背包浮窗 · 装备（switchPage('equip')）。 -->
 
       </section>
 
@@ -797,6 +772,11 @@
   </div>
 </div>
 
+<!-- 任务追踪栏（2026-09-10 改为 body 层悬浮：原来它在页面容器里占文档流，
+     等于每天从舞台顶上切一条地给它。现在是右上角浮层 + 可折叠胶囊，不占布局、不抢舞台。
+     引导链当前任务 + 玩家钉住的任务 + 自动追踪项，最多 3 条，由 ui-quest 渲染。 -->
+<div class="quest-tracker is-collapsed" id="quest-tracker" style="display:none"></div>
+
 <!-- ============ 爬塔结算面板（body 层全局弹层，2026-09-10 修正位置） ============
      为什么必须放这里：这两个面板是**战斗页**结束时弹出的，而 .trial-settle 用
      position:fixed + z-index:500 —— fixed 也逃不出 display:none 的祖先。
@@ -828,7 +808,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260910evo5"></script>
+<script src="js/core/config.js?v=20260911gear2"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -853,64 +833,72 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260910tower2"></script>
-<script src="js/core/supabase.js?v=20260910evo6"></script>
-<script src="js/equipment/equipment.js?v=20260909ident"></script>
+<script src="js/core/supabase.js?v=20260910sess1"></script>
+<!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
+<script src="js/core/auth-session.js?v=20260910sess1"></script>
+<!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
+<script src="js/core/server-session.js?v=20260910sess2"></script>
+<script src="js/equipment/equipment.js?v=20260911gear2"></script>
     <script src="js/pet/pet.js?v=20260910evo6"></script>
 <script src="js/core/items.js?v=20260910ident1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
-<script src="js/core/drop.js?v=20260909drop1"></script>
+<script src="js/core/drop.js?v=20260911gear2"></script>
 <script src="js/core/market.js?v=20260910mt4"></script>
 <script src="js/core/market_bot.js?v=20260910mt4"></script>
-<script src="js/equipment/equipment_craft.js?v=20260910awaken1"></script>
+<script src="js/equipment/equipment_craft.js?v=20260911gear2"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260910cloudfix1"></script>
-<script src="js/pet/pet_evolve.js?v=20260910evo6"></script>
-<script src="js/core/quest.js?v=20260910awaken2"></script>
+<script src="js/pet/pet_evolve.js?v=20260911evo8"></script>
+<script src="js/core/quest.js?v=20260910egg7"></script>
 <script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
-<script src="js/core/battle.js?v=20260910tower4"></script>
-<script src="js/trial/trial-config.js?v=20260910evo5"></script>
+<script src="js/core/battle.js?v=20260910fx12"></script>
+<script src="js/trial/trial-config.js?v=20260910fx7"></script>
+<!-- 任务表结构规范化层（2026-09-10）：给任务补 kind(一级分类) / group(二级分组) / chapter / reset。
+     放在 config 与 trial-config 之后（它们才是任务表的写入方），quest.js 读表是懒加载所以顺序安全。 -->
+<script src="js/core/quest-config.js?v=20260910egg7"></script>
 <script src="js/trial/trial-access.js?v=20260910trial1"></script>
 <script src="js/trial/trial-rewards.js?v=20260910trial1"></script>
-<script src="js/trial/trial-engine.js?v=20260910session1"></script>
+<script src="js/trial/trial-engine.js?v=20260910egg7"></script>
 <!-- 通天塔（2026-09-10）：一个文件一个职责。顺序 = 依赖方向：
      config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
-<script src="js/tower/tower-config.js?v=20260910evo5"></script>
+<script src="js/tower/tower-config.js?v=20260911tower1"></script>
 <script src="js/tower/tower-affix.js?v=20260910tower2"></script>
 <script src="js/tower/tower-access.js?v=20260910tower2"></script>
-<script src="js/tower/tower-rewards.js?v=20260910tower2"></script>
+<script src="js/tower/tower-rewards.js?v=20260911tower1"></script>
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
-<script src="js/tower/tower-engine.js?v=20260910tower4"></script>
-<script src="js/core/battle-sim.global.js?v=20260910tower4"></script>
+<script src="js/tower/tower-engine.js?v=20260910egg7"></script>
+<script src="js/core/battle-sim.global.js?v=20260911skill3"></script>
 <script src="js/core/idle-bridge.js?v=20260910wild1"></script>
-<script src="js/ui/ui-common.js?v=20260910awaken1"></script>
-<script src="js/ui/ui-console.js?v=fa16bb1d"></script>
+<script src="js/ui/ui-common.js?v=20260910egg7"></script>
+<script src="js/ui/ui-console.js?v=20260910sess1"></script>
+<script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260910mt2"></script>
 <script src="js/ui/ui-worldmap.js?v=20260910session1"></script>
-<script src="js/ui/ui-capital.js?v=20260903notab"></script>
+<script src="js/ui/ui-capital.js?v=20260910egg7"></script>
 
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260903l"></script>
-<script src="js/ui/ui-quest.js?v=20260910awaken3"></script>
+<script src="js/ui/ui-quest.js?v=20260910egg7"></script>
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
-<script src="js/trial/ui-trial-battle.js?v=20260910trial1"></script>
+<script src="js/trial/ui-trial-battle.js?v=20260910fx12"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
 <!-- 通天塔 UI（2026-09-10）：详情页 → 整页战斗驱动 → 结算面板 -->
 <script src="js/tower/ui-tower-entry.js?v=20260910tower5"></script>
-<script src="js/tower/ui-tower-battle.js?v=20260910tower4"></script>
+<script src="js/tower/ui-tower-battle.js?v=20260910fx12"></script>
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
-<script src="js/ui/ui-battle.js?v=20260910tower3"></script>
+<script src="js/ui/ui-battle.js?v=20260910egg7"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260910mt2"></script>
-<script src="js/ui/ui-pet-evolve.js?v=20260910evo6"></script>
+<script src="js/ui/ui-pet.js?v=20260910egg7"></script>
+<script src="js/ui/ui-pet-evolve.js?v=20260911evo8"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260910mt2"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260910sprite1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
-<script src="js/ui/ui-bag.js?v=20260910tower3"></script>
+<script src="js/ui/ui-bag.js?v=20260910egg7"></script>
 <script src="js/ui/ui-equipment.js?v=20260910craft4"></script>
 <script src="js/ui/ui-craft.js?v=20260910craft4"></script>
 <script src="js/ui/ui-market.js?v=20260910mt4"></script>
@@ -919,10 +907,11 @@ window.PetSprites = {
 <script src="js/ui/ui-market-notify.js?v=20260910mt2"></script>
 <script src="js/ui/ui-codex.js?v=20260910tower5"></script>
 <script src="js/ui/ui-shop.js?v=6097ac8d"></script>
-<script src="js/ui/ui-dev.js?v=20260910trial1"></script>
-<script src="js/main.js?v=20260910mt2"></script>
+<script src="js/ui/ui-dev.js?v=20260911evo7"></script>
+<script src="js/main.js?v=20260910sess2"></script>
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
 <script src="js/ui-fixes.js?v=20260910fix11"></script>
+<script src="js/skill-effects.js?v=20260910fx11"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->
 <div class="bag-tooltip equip-tip" id="bag-tooltip"></div>

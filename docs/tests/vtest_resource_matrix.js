@@ -46,8 +46,13 @@ A(legendQuests.every(q => (q.reward['传说进化素材'] || 0) <= 2), 'a single
 const tiers = C('Config.drop.areaEvolutionTiers');
 const areaNames = C('Config.battle.areas.map(a => a.id)');
 A(areaNames.length === 10, 'ten maps are published');
-A((tiers['soul-abyss'] || []).length === 0 && (tiers['blight-heart'] || []).length === 0,
-  'maps nine and ten do not drop evolution material');
+// 2026-09-10 用户报「传说卡手」：图 9~10 由「完全不掉」改成「只出传说 + 极低权重」。
+// 边界原文禁止的是「图 9~10 稳定刷取」，低权重不等于稳定刷取 → 断言改守「只出最高档 + 权重 ≤ 图 8 的 1/4」。
+A((tiers['soul-abyss'] || []).join() === '传说进化素材' && (tiers['blight-heart'] || []).join() === '传说进化素材',
+  'maps nine and ten only drop the top evolution tier');
+const ew9 = C('Config.drop.materialWeightsByTier');
+A(ew9[9]['进化素材'] * 4 <= ew9[8]['进化素材'] && ew9[10]['进化素材'] * 4 <= ew9[8]['进化素材'],
+  'maps nine and ten stay far below map eight (an unstable trickle, not a stable farm)');
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['锁定石'] || 0) > 0)`),
   'lock stones never drop from maps');
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['涅槃丹'] || 0) > 0)`),

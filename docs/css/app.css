@@ -79,6 +79,7 @@
 /* 右上角快捷按钮组（背包 / 牧场 / 任务 / 消息 / 设置） */
 .top-actions { display: flex; align-items: center; gap: 6px; }
 .top-btn {
+  position: relative;   /* 任务按钮的「可领奖」总红点（.quest-dot）挂在这上面 */
   padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--inset); color: var(--text-dim); font-size: var(--font-small);
   cursor: pointer; white-space: nowrap; transition: border-color .12s, color .12s, background .12s;
@@ -128,22 +129,6 @@
   .sb-btn { justify-content: center; padding: 10px 0; }
   .sb-btn .sb-label { display: none; }
 }
-
-/* ================= 宠物蛋孵化面板（宠物页新增） ================= */
-.egg-panel { display: flex; flex-direction: column; gap: 10px; }
-.egg-panel .egg-info { }
-.egg-panel .egg-count { font-size: 1.083rem; color: var(--text); }
-.egg-panel .egg-count b { color: var(--accent-hi); }
-.egg-panel .egg-desc { font-size: var(--font-small); color: var(--text-faint); margin-top: 2px; }
-/* 按品种展示每种蛋 */
-.egg-species-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.egg-species {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
-}
-.egg-species-name { flex: 1; font-size: 0.95rem; color: var(--text); }
-.egg-species-qty { font-family: var(--font-num); color: var(--accent-hi); font-weight: 700; }
-.egg-species .btn-sm { flex: none; }
 
 /* ================= 市场页 ================= */
 .market-sub-title {

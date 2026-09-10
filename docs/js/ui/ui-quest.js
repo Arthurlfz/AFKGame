@@ -14,25 +14,57 @@
   const $ = id => document.getElementById(id);
   const escapeHtml = UI.escapeHtml || (s => String(s == null ? '' : s));
 
-  // 任务类型标签（13 种）
+  // 任务类型标签
   const TYPE_LABEL = {
     collect: '收集', collect_loop: '地图委托', kill: '击败', evolve: '进化', nirvana: '涅槃',
     synth: '合成', soulcast: '魂铸', hatch: '孵化', craft: '打造', salvage: '分解',
     equipDrop: '获得装备', equip: '穿装备', list: '上架', trade: '成交', disposeBoss: '处置 + Boss',
-    disposeKill: '处置 + 推进', direction: '选方向'
+    disposeKill: '处置 + 推进', direction: '选方向',
+    meter: '周活跃', dailyChest: '日常宝箱', completion: '完成度',
+    chapterChest: '章宝箱', trialRun: '通关副本', trialFloor: '副本层数',
+    towerRun: '登塔', towerFloor: '塔层数'
   };
   const TRACK_MAX = 3;          // 追踪栏最多钉几条（与 quest.js 的 TRACK_MAX 一致）
+  // 自动追踪：进度到这个比例的任务自动顶上追踪栏（手动钉的优先，格子不够时自动的先被挤掉）
+  const AUTO_TRACK_RATIO = 0.8;
 
-  // 六个分类（新手动线排序；pet = 宠物专属 2026-08-31 新增；done = 已完成汇总 2026-08-31 用户拍板）
-  // done 是特殊分类：汇总所有已完成（含当天交掉的日常），其它分类只显示未完成
-  const CATS = [
-    { id: 'tutorial', label: '新手', icon: '🌱' },
-    { id: 'main', label: '主线', icon: '📜' },
-    { id: 'daily', label: '日常', icon: '🔁' },
-    { id: 'achieve', label: '成就', icon: '🏆' },
-    { id: 'pet', label: '宠物', icon: '🐾' },
-    { id: 'done', label: '已完成', icon: '✅' }
+  /* ---------- 一级分类（tab） ----------
+   * 唯一来源 = quest-config.js 的 KIND_META（标签/图标只在那边定义一份，UI 不抄第二份）。
+   * done = 已完成聚合视图（它是视图不是分类，永远排在最后）。
+   * 分类顺序 = 注意力优先级：被引导的 → 推进度的 → 正在养的 → 今天该做的 → 可以刷的 → 长期冲的。 */
+  const FALLBACK_KIND_META = [
+    { id: 'guide',   label: '引导', icon: '🌱', order: 1 },
+    { id: 'series',  label: '系列', icon: '📜', order: 2 },
+    { id: 'pet',     label: '宠物', icon: '🐾', order: 3 },
+    { id: 'daily',   label: '日常', icon: '🔁', order: 4 },
+    { id: 'loop',    label: '循环', icon: '♻️', order: 5 },
+    { id: 'achieve', label: '成就', icon: '🏆', order: 6 }
   ];
+  const DONE_CAT = { id: 'done', label: '已完成', icon: '✅', order: 99 };
+  // 惰性读取：规范化层若因加载顺序还没就位，UI 也不会崩（拿兜底表）。
+  function cats() {
+    const meta = (window.QuestConfig && window.QuestConfig.KIND_META) || FALLBACK_KIND_META;
+    return meta.concat([DONE_CAT]);
+  }
+  // 旧分类 id 兼容（外部调用 / 老测试会传 'main' 'tutorial'）
+  const CAT_ALIAS = { main: 'series', tutorial: 'guide' };
+  function normCat(id) { return CAT_ALIAS[id] || id; }
+
+  /* ---------- 二级分组的折叠记忆 ----------
+   * key = 分类:组id。默认只展开「第一个有可提交的组，
+   * 没有则第一个还没做完的组」；组 ≤2 个时全展开。
+   * 玩家手动点过就以玩家为准（session 内有效，不写云端）。 */
+  const groupOpen = {};
+  function defaultOpenId(groups) {
+    if (groups.length <= 2) return null;   // null = 全展开
+    const first = groups.find(g => g.ready > 0) || groups.find(g => g.done < g.total) || groups[0];
+    return first ? first.id : null;
+  }
+  function isOpen(cat, g, defId) {
+    const k = cat + ':' + g.id;
+    if (k in groupOpen) return groupOpen[k];
+    return defId === null ? true : g.id === defId;
+  }
 
   function areaName(areaId) {
     const a = (Config.battle.areas || []).find(x => x.id === areaId);
@@ -67,6 +99,14 @@
       }
       case 'direction': return '在普通挂机和资源试炼中选一条';
       case 'level': return `出战宠物达到 Lv${q.need}`;
+      /* 目标（bonus）三条：进度是现算的，描述要把"怎么涨"讲清楚，玩家才知道该干嘛 */
+      case 'dailyChest': return `今天交 ${q.need} 条日常（可做的都算）`;
+      case 'meter': return `本周活跃度 ${q.need}（交日常/兑换 +10，交系列/宠物/成就 +5）`;
+      case 'completion': return `全任务完成度达到 ${q.need}%`;
+      /* 副本/塔（2026-09-11 接入）：层数是「历史最高」，描述要说清不会因失败回退 */
+      case 'trialRun': return `通关资源试炼 ${q.need} 次`;
+      case 'towerRun': return `挑战通天塔 ${q.need} 次`;
+      case 'towerFloor': return `通天塔最高打到第 ${q.need} 层（只认历史最高，失败不回退）`;
       default: return `进度 ${q.need}`;
     }
   }
@@ -76,13 +116,22 @@
       const need = q.parts.secondNeed || q.need;
       return `处置 ${q.parts.disposed}/${q.need} · ${q.parts.secondLabel || '目标'} ${q.parts.second}/${need}`;
     }
-    return `${q.progress} / ${q.need}`;
+    // 双保险钳位：循环委托的库存会超过需求（58 个但只要 50），显示钳到 need，超出的留给下一轮
+    const p = Math.min(Number(q.progress) || 0, Number(q.need) || 0);
+    return `${p} / ${q.need}`;
+  }
+
+  // 交完后的状态文案：按重置周期区分（日常=今日已完成 / 兑换=本周已完成 / 一次性=已完成）
+  function doneLabel(q) {
+    if (q.reset === 'weekly') return '本周已完成';
+    if (q.reset === 'daily' || q.repeat) return '今日已完成';
+    return '已完成';
   }
 
   // 状态：未解锁 / 已完成 / 可提交 / 进行中 / 未接取
   function stateOf(q) {
     if (!q.unlocked) return { text: '未解锁', cls: 'q-locked' };
-    if (q.finished) return { text: q.repeat ? '今日已完成' : '已完成', cls: 'q-done' };
+    if (q.finished) return { text: doneLabel(q), cls: 'q-done' };
     if (q.done) return { text: '可提交', cls: 'q-done' };
     if (q.accepted) return { text: '进行中', cls: 'q-active' };
     return { text: '未接取', cls: '' };
@@ -99,7 +148,7 @@
     const tracked = trackedIds || [];
     const pct = q.need ? Math.min(100, Math.round(q.progress / q.need * 100)) : 0;
     const st = stateOf(q);
-    const cat = CATS.find(c => c.id === q.category) || CATS[1];
+    const cat = cats().find(c => c.id === q.kind) || { label: '任务' };
     // 经验是任务奖励的主体（2026-08-30 用户拍板），材料是辅助：奖励列表第一行显示经验
     const expVal = (window.Quest && window.Quest.questExpOf) ? window.Quest.questExpOf(q) : 0;
     const rewardRows = Object.entries(q.reward || {}).map(([n, a]) => `${escapeHtml(n)} ×${a}`);
@@ -126,7 +175,7 @@
           ${q.petName ? `<div class="quest-detail-text" style="color:var(--accent-hi)">绑定宠物：${escapeHtml(q.petName)}</div>` : ''}
           <div class="quest-progress"><div class="quest-progress-bar" style="width:${pct}%"></div></div>
           <div class="quest-detail-text">进度 ${progressText(q)}</div>
-          <div class="quest-detail-row">${escapeHtml(TYPE_LABEL[q.type] || q.type)}类任务 · ${escapeHtml(cat.label)}</div>
+          <div class="quest-detail-row">${escapeHtml(cat.label)} › ${escapeHtml((q.group && q.group.label) || '任务')} › ${escapeHtml(TYPE_LABEL[q.type] || q.type)}类</div>
         </div>
         <div class="quest-detail-sec">
           <div class="quest-detail-head">奖励物品</div>
@@ -167,7 +216,7 @@
     const rewards = `<span class="quest-card-exp">经验 +${expVal}</span>` + mats + gearHtml + nextHtml;
     let btn;
     if (!q.unlocked) btn = `<button class="quest-card-btn locked" disabled>${q.lockText || '未解锁'}</button>`;
-    else if (q.finished) btn = `<button class="quest-card-btn finished" disabled>${q.repeat ? '今日已完成' : '已完成'}</button>`;
+    else if (q.finished) btn = `<button class="quest-card-btn finished" disabled>${doneLabel(q)}</button>`;
     else if (q.done) btn = `<button class="quest-card-btn submit" data-id="${q.id}">提交</button>`;
     else if (q.accepted) btn = `<button class="quest-card-btn prog" disabled>${pct}%</button>`;
     else btn = `<button class="quest-card-btn accept" data-id="${q.id}">接取</button>`;
@@ -261,38 +310,79 @@
     });
   }
 
-  // 分类 tab：普通分类角标 = 未完成数；「已完成」角标 = 已完成总数
+  /* ---------- 分类 tab ----------
+   * 角标两种状态：有奖可领 → 红色「可提交 N」；否则灰色「未完成 N」（都没有则不显示角标）。
+   * 以前只有未完成数，玩家必须逐个点开才知道有没有奖可领。 */
   function renderQuestTabs() {
     const wrap = $('quest-tabs');
     if (!wrap) return;
     const all = Quest.getQuests();
-    const inCat = cat => cat === 'done'
-      ? all.filter(q => q.finished).length
-      : all.filter(q => q.category === cat && !q.finished && q.unlocked).length;
-    // 默认分类：第一个有未完成任务的（新手优先），都空则回主线
-    if (!activeCat || !CATS.some(c => c.id === activeCat)) {
-      const first = CATS.find(c => c.id !== 'done' && inCat(c.id) > 0);
-      activeCat = first ? first.id : 'main';
+    const statOf = id => {
+      if (id === 'done') return { ready: 0, open: all.filter(q => q.finished).length };
+      const rows = all.filter(q => q.kind === id && !q.finished && q.unlocked);
+      return { ready: rows.filter(q => q.done).length, open: rows.length };
+    };
+    // 引导 tab 只在还有未完成的引导任务时显示（毕业/跳过后消失，教程 tab 不常驻 —— 业界惯例）
+    let list = cats();
+    if (statOf('guide').open === 0) list = list.filter(c => c.id !== 'guide');
+    if (!activeCat || !list.some(c => c.id === activeCat)) {
+      // 默认分类：第一个有内容的（引导优先），全空则回系列
+      const first = list.find(c => c.id !== 'done' && statOf(c.id).open > 0);
+      activeCat = first ? first.id : 'series';
     }
-    wrap.innerHTML = CATS.map(c => {
-      const n = inCat(c.id);
-      return `<button class="quest-tab${c.id === activeCat ? ' on' : ''}" data-cat="${c.id}">${c.icon} ${c.label}<span class="quest-tab-cnt">${n}</span></button>`;
+    wrap.innerHTML = list.map(c => {
+      const s = statOf(c.id);
+      const n = s.ready > 0 ? s.ready : s.open;
+      const badge = n > 0
+        ? `<span class="quest-tab-cnt${s.ready > 0 ? ' hot' : ''}"${s.ready > 0 ? ' title="有奖励可领"' : ''}>${n}</span>`
+        : '';
+      return `<button class="quest-tab${c.id === activeCat ? ' on' : ''}" data-cat="${c.id}">${c.icon} ${c.label}${badge}</button>`;
     }).join('');
     wrap.querySelectorAll('.quest-tab').forEach(btn => {
-      btn.onclick = () => { activeCat = btn.dataset.cat; renderQuestPanel(); };
+      btn.onclick = () => { activeCat = btn.dataset.cat; selectedQuestId = null; renderQuestPanel(); };
     });
   }
 
+  /* ---------- 二级分组头（三级结构：分类 tab → 分组 → 具体任务） ---------- */
+  function groupHeadHtml(g, open) {
+    const pct = g.total ? Math.round(g.done / g.total * 100) : 0;
+    const ready = g.ready > 0 ? `<span class="quest-group-ready">可提交 ${g.ready}</span>` : '';
+    return `<button type="button" class="quest-group-head${open ? ' open' : ''}${g.done === g.total ? ' cleared' : ''}" data-group="${escapeHtml(g.id)}">`
+      + `<span class="quest-group-caret">${open ? '▾' : '▸'}</span>`
+      + `<span class="quest-group-label">${escapeHtml(g.label)}</span>`
+      + ready
+      + `<span class="quest-group-prog">${g.done} / ${g.total}</span>`
+      + `<span class="quest-progress quest-group-bar"><span class="quest-progress-bar" style="width:${pct}%"></span></span>`
+      + `</button>`;
+  }
+
+  // 「已完成」视图按一级分类分组：各分类自己的分组键（章节 / 家族 / 目标族）混在一起会看不懂
+  function doneGroups(rows) {
+    const map = {}; const out = [];
+    rows.forEach(q => {
+      if (!map[q.kind]) {
+        const meta = cats().find(c => c.id === q.kind) || { label: q.kind, icon: '·', order: 9 };
+        map[q.kind] = { id: 'k:' + q.kind, label: (meta.icon || '') + ' ' + meta.label, order: meta.order || 9, quests: [] };
+        out.push(map[q.kind]);
+      }
+      map[q.kind].quests.push(q);
+    });
+    out.sort((a, b) => a.order - b.order);
+    out.forEach(g => { g.done = g.quests.length; g.total = g.quests.length; g.ready = 0; });
+    return out;
+  }
+
   function renderQuestPanel(cat) {
-    if (cat) activeCat = cat; // 外部（测试 / 快捷入口）可指定分类
+    if (cat) activeCat = normCat(cat); // 外部（测试 / 快捷入口）可指定分类，兼容旧 id
     const body = $('quest-body');
     if (!body || !Quest) return;
+    if (!activeCat) activeCat = 'series';
     renderQuestTabs();
     const all = Quest.getQuests();
-    // 分类视图：done=所有已完成；其余=该分类未完成（未解锁也显示，灰显，让玩家看到还有什么可解锁）
+    // 分类视图：done = 所有已完成；其余 = 该分类未完成（未解锁也显示，灰显，让玩家看到还有什么可解锁）
     const rows = activeCat === 'done'
       ? all.filter(q => q.finished)
-      : all.filter(q => q.category === activeCat && !q.finished && q.unlocked);
+      : all.filter(q => q.kind === activeCat && !q.finished && q.unlocked);
     // 排序：可提交 > 进行中 > 未接取 > 未解锁
     const rank = q => !q.unlocked ? 3 : q.done ? 0 : q.accepted ? 1 : 2;
     rows.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
@@ -311,7 +401,49 @@
       body.innerHTML = `<div class="quest-empty">${activeCat === 'done' ? '还没有已完成的任务' : '该分类暂无任务'}</div>`;
       return;
     }
-    body.innerHTML = rows.map(cardHtml).join('');
+
+    /* 三级结构：一级分类（tab） → 二级分组（可折叠组头） → 具体任务（卡片） */
+    const groups = activeCat === 'done' ? doneGroups(rows)
+      : (Quest.getGroups ? Quest.getGroups(activeCat, rows)
+        : [{ id: 'all', label: '任务', order: 0, quests: rows, done: 0, total: rows.length, ready: 0 }]);
+    const defId = defaultOpenId(groups);
+    const readyTotal = groups.reduce((n, g) => n + g.ready, 0);
+
+    const bar = groups.length > 1
+      ? `<div class="quest-groups-bar">
+           <span class="quest-groups-sum">${groups.length} 组 · ${rows.length} 条${readyTotal ? ' · <b class="hot">可提交 ' + readyTotal + '</b>' : ''}</span>
+           <button type="button" class="btn-mini ghost quest-expand">全部展开</button>
+           <button type="button" class="btn-mini ghost quest-collapse">全部折叠</button>
+         </div>`
+      : '';
+
+    // 完成度行（2026-09-10）：只算一次性任务，百分比才不会随每日/每周重置而抖
+    let completeLine = '';
+    if (Quest.completion) {
+      const cp = Quest.completion();
+      completeLine = `<div class="quest-complete-line">任务完成度 <b>${cp.pct}%</b>` +
+        `<span class="hint">${cp.done} / ${cp.total} 条一次性任务 · 里程碑在成就里</span></div>`;
+    }
+
+    body.innerHTML = completeLine + bar + groups.map(g => {
+      const open = isOpen(activeCat, g, defId);
+      const inner = open ? `<div class="quest-group-body">${g.quests.map(cardHtml).join('')}</div>` : '';
+      return `<section class="quest-group${open ? ' open' : ''}">${groupHeadHtml(g, open)}${inner}</section>`;
+    }).join('');
+
+    // 组头点击 = 折叠/展开（记忆在 groupOpen，默认规则见 defaultOpenId）
+    body.querySelectorAll('.quest-group-head').forEach(head => {
+      head.onclick = () => {
+        const cur = isOpen(activeCat, { id: head.dataset.group }, defId);
+        groupOpen[activeCat + ':' + head.dataset.group] = !cur;
+        renderQuestPanel();
+      };
+    });
+    const expandAll = body.querySelector('.quest-expand');
+    if (expandAll) expandAll.onclick = () => { groups.forEach(g => { groupOpen[activeCat + ':' + g.id] = true; }); renderQuestPanel(); };
+    const collapseAll = body.querySelector('.quest-collapse');
+    if (collapseAll) collapseAll.onclick = () => { groups.forEach(g => { groupOpen[activeCat + ':' + g.id] = false; }); renderQuestPanel(); };
+
     body.querySelectorAll('.quest-card').forEach(card => {
       card.onclick = e => {
         if (e.target.closest('button')) return; // 卡片内按钮（接取/提交）优先，不触发详情
@@ -328,6 +460,12 @@
   // 否则玩家跳过去只会看到「请先选择挂机地图」，引导就断了。
   function goGuide(guide, area) {
     const page = (guide && guide.page) || 'battle';
+    // 孵化（page:'bag'）：唯一入口 = 背包浮窗 · 素材蛋（2026-09-10 拍板，宠物页蛋 pane 已删）
+    if (page === 'bag') {
+      if (UI.openBagEggs) UI.openBagEggs();
+      else if (UI.switchPage) UI.switchPage('bag');
+      return;
+    }
     const B = window.Battle;
     if (page === 'battle' && B && B.getCurrentArea && !B.getCurrentArea()) {
       const areaId = area || ((Config.battle.areas || [])[0] || {}).id;
@@ -335,18 +473,21 @@
     }
     if (UI.switchPage) UI.switchPage(page);
     if (guide && guide.tab) {
-      const btn = document.querySelector('.pet-tab[data-pet-tab="' + guide.tab + '"]');
-      if (btn && btn.click) {
-        btn.click();
+      // 装备类跳转（tab:'equip'）：12 槽界面在背包浮窗 · 装备子页（宠物页 equip pane 已删）
+      if (guide.tab === 'equip') {
+        if (UI.switchPage) UI.switchPage('equip');
       } else {
-        // 顶部 tab 按钮已移除（宠物页精简 2026-09-03）：直接激活对应 pane 兜底，引导不断链
-        const pane = document.querySelector('.pet-tab-pane[data-pet-pane="' + guide.tab + '"]');
-        if (pane) {
-          document.querySelectorAll('.pet-tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.pet-tab-pane').forEach(p => p.classList.remove('active'));
-          pane.classList.add('active');
-          if (guide.tab === 'egg' && window.UI.renderEggPanel) window.UI.renderEggPanel();
-          if (guide.tab === 'equip') { const gb = document.getElementById('btn-pet-equip-goto'); if (gb) gb.click(); }
+        const btn = document.querySelector('.pet-tab[data-pet-tab="' + guide.tab + '"]');
+        if (btn && btn.click) {
+          btn.click();
+        } else {
+          // 顶部 tab 按钮不存在时兜底：直接激活对应 pane（宠物页精简后部分 tab 无按钮）
+          const pane = document.querySelector('.pet-tab-pane[data-pet-pane="' + guide.tab + '"]');
+          if (pane) {
+            document.querySelectorAll('.pet-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.pet-tab-pane').forEach(p => p.classList.remove('active'));
+            pane.classList.add('active');
+          }
         }
       }
     }
@@ -365,8 +506,9 @@
       case 'evolve': return { page: 'pet', tab: 'evolve', btn: '去进化' };
       case 'nirvana': return { page: 'pet', tab: 'merge', btn: '去涅槃' };
       case 'synth': return { page: 'pet', tab: 'synth', btn: '去合成' };
+      // 孵化唯一入口 = 背包 · 素材蛋（2026-09-10 拍板；宠物页蛋 pane 已删）
+      case 'hatch': return { page: 'bag', btn: '去孵化' };
       case 'soulcast': return { page: 'equip', tab: 'soulcast', btn: '去魂铸' };
-      case 'hatch': return { page: 'pet', tab: 'egg', btn: '去孵化' };
       case 'equip': return { page: 'pet', tab: 'equip', btn: '去穿装备' };
       case 'list': return { page: 'market-sell', btn: '去上架' };
       case 'trade': return { page: 'market', btn: '去交易' };
@@ -407,6 +549,40 @@
     const labels = T.keyItemsFor(next.id).map(keyLabelOf).filter(Boolean);
     return labels.length ? { next: next, labels: labels } : null;
   }
+  /* ---------- 引导毕业结算（2026-09-10，业界惯例四件套）----------
+   * 对照主流做法（大话西游式收尾：及时奖励反馈 + 目标感闭环 + 平滑过渡）：
+   *   1. 仪式感：毕业弹窗回顾「这一路你学会了什么」（recap = config n1~n5 的 learned 字段）
+   *   2. 奖励反馈：毕业礼包清单当场念出来（内容唯一来源 = Config.tutorialMode.starterPack）
+   *   3. 下一步预告：按玩家在 n6 选的方向给不同的"接下来"引导
+   *   4. 平滑过渡：追踪栏由「下一步」（第一个未完成的系列任务）无缝接管（见 trackerItems）
+   * 弹窗只在 n6 交任务那一刻出现；checkGuide 登录补发路径不弹（老玩家登录不轰炸）。 */
+  function graduationRecap() {
+    return (Config.drop.quests || [])
+      .filter(q => q.category === 'tutorial' && q.learned && /^n[1-5]$/.test(q.id))
+      .map(q => '· ' + escapeHtml(q.learned));
+  }
+  function showGuideGraduation(choice) {
+    const pack = (Config.tutorialMode && Config.tutorialMode.starterPack) || {};
+    const rewards = (pack.mats || []).map(m => `${escapeHtml(m.name)} ×${Number(m.qty) || 1}`).join('、');
+    const recap = graduationRecap();
+    const isTrial = choice === 'trial';
+    const nextLine = isTrial
+      ? '资源试炼已为你敞开：进化、涅槃、打造的缺口，都可以去那里定向补。'
+      : '回到挂机地图继续推进，第 2 章和守关 Boss 在前方等你。';
+    if (!UI.showDialog) { if (UI.showToast) UI.showToast('引导完成', '已进入正常游戏节奏'); return; }
+    UI.showDialog({
+      icon: '🎓',
+      speaker: '引路人',
+      npcTitle: '魂兽向导',
+      text: `<b>新手引导完成！</b><br>`
+        + (recap.length ? `这一路你已经学会了：<br>${recap.join('<br>')}<br>` : '')
+        + (rewards ? `<span class="qt-grad-reward">毕业礼包已发放：${rewards}</span><br>` : '')
+        + escapeHtml(nextLine),
+      buttons: [{ label: isTrial && UI.openResourceTrial ? '进入试炼' : '继续冒险',
+                  onClick: () => { if (isTrial && UI.openResourceTrial) UI.openResourceTrial(); } }]
+    });
+  }
+
   // 交完引导任务：用对话气泡讲清"拿到什么、下一步要用"（替代原来只有一行 toast）
   function showGuideReward(q) {
     const pv = rewardPreviewOf(q);
@@ -433,9 +609,31 @@
       if (items.length >= TRACK_MAX) break;
       const q = all.find(x => x.id === id);
       if (!q || q.finished || !q.unlocked) continue;   // 交过的、没解锁的不显示
-      if (q.category === 'tutorial') continue;         // 新手任务由引导链负责，不重复钉
-      const cat = CATS.find(c => c.id === q.category);
+      if (q.kind === 'guide') continue;                // 引导任务由引导链负责，不重复钉
+      const cat = cats().find(c => c.id === q.kind);
       items.push(Object.assign({}, q, { isTutorial: false, tag: cat ? cat.label : '任务' }));
+    }
+    /* 自动追踪（2026-09-10）：进度 ≥80% 的任务自己顶上来，玩家不用翻面板找"马上能交的"。
+     * 手动钉的优先；格子不够时，自动的按进度从高到低往后排。 */
+    if (items.length < TRACK_MAX) {
+      const auto = all
+        .filter(q => q.unlocked && !q.finished && q.kind !== 'guide' &&
+                     q.need > 0 && q.progress / q.need >= AUTO_TRACK_RATIO &&
+                     !items.some(it => it.id === q.id))
+        .sort((a, b) => (b.progress / b.need) - (a.progress / a.need));
+      for (const q of auto) {
+        if (items.length >= TRACK_MAX) break;
+        const cat = cats().find(c => c.id === q.kind);
+        items.push(Object.assign({}, q, { isTutorial: false, tag: cat ? cat.label : '任务', auto: true }));
+      }
+    }
+    /* 引导毕业交接（2026-09-10，业界惯例：引导结束 ≠ 没人管）：
+     * 引导条消失的那一刻，追踪栏若空掉 = 玩家从"始终有人指路"突然变成"没人管"。
+     * 补一条「下一步」= 第一个未完成的已解锁系列任务。玩家一旦自己钉了任务或
+     * 有进度 ≥80% 的自动项，它就自动让位（低侵扰，不抢玩家自主权）。 */
+    if (!items.length) {
+      const next = all.find(q => q.kind === 'series' && q.unlocked && !q.finished);
+      if (next) items.push(Object.assign({}, next, { isTutorial: false, tag: '下一步', handoff: true }));
     }
     return items;
   }
@@ -470,14 +668,109 @@
     } catch (e) { console.warn('[quest] 引导指引失败', e); }
   }
 
+  /* ---------- 顶栏「任务」按钮的总红点 ----------
+   * 全分类「可提交」条数。玩家不打开面板就知道有奖可领；0 则移除红点。 */
+  function renderQuestBadge() {
+    const btn = document.querySelector('.top-btn[data-dialog="任务"]');
+    if (!btn || !btn.querySelector) return;
+    const n = (Quest && Quest.readyCount) ? Quest.readyCount() : 0;
+    let dot = btn.querySelector('.quest-dot');
+    if (n <= 0 || !document.createElement) { if (dot) dot.remove(); return; }
+    if (!dot) { dot = document.createElement('span'); dot.className = 'quest-dot'; if (btn.appendChild) btn.appendChild(dot); }
+    dot.textContent = n > 99 ? '99+' : String(n);
+  }
+
+  /* ---------- 追踪栏折叠（2026-09-10：改成悬浮层后，收起状态要能在刷新后保留）----------
+   * 收起后只剩一枚右上角胶囊：任务条数 + 可提交数（不打开就知道有没有奖可领）。
+   * 状态存 localStorage（体验型标记，丢了大不了展开一次，不进云端）。 */
+  const TRACK_COLLAPSE_KEY = 'fos_track_collapsed';
+  let trackCollapsed = (function () {
+    try { return localStorage.getItem(TRACK_COLLAPSE_KEY) === '1'; } catch (e) { return false; }
+  })();
+  function setTrackCollapsed(v) {
+    trackCollapsed = !!v;
+    try { localStorage.setItem(TRACK_COLLAPSE_KEY, trackCollapsed ? '1' : '0'); } catch (e) { /* 忽略 */ }
+  }
+
+  /* ---------- 追踪栏拖动（2026-09-10：悬浮面板必须能挪，否则右上固定位会挡住要看的地方）----------
+   * 不走 UI.makeDraggable：那是给居中弹窗的（mousedown 会把 left/top 归零再 transform，
+   * 对 right:14px 定位的 fixed 面板会跳位）。这里直接改 left/top，位置存 localStorage。
+   * 把手 = 标题栏左侧的 ⠿（.qt-grip），与「收起/展开」按钮分开职责，不用猜点击还是拖拽。
+   * 越界钳位：至少留 60px 在屏幕内，不会拖丢。 */
+  const TRACK_POS_KEY = 'fos_track_pos';
+  let trackPos = (function () {
+    try { const v = JSON.parse(localStorage.getItem(TRACK_POS_KEY) || 'null'); return (v && typeof v.left === 'number') ? v : null; }
+    catch (e) { return null; }
+  })();
+  function applyTrackPos(bar) {
+    // 没存过 → 用 CSS 默认位置；窄屏（<900px）走底部横条样式，不用宽屏存的坐标
+    if (!trackPos || (typeof window !== 'undefined' && window.innerWidth < 900)) return;
+    bar.style.left = trackPos.left + 'px';
+    bar.style.top = trackPos.top + 'px';
+    bar.style.right = 'auto';                 // 交出 right，改由 left 定位
+  }
+  function bindTrackerDrag(bar, handle) {
+    if (!bar || !handle || handle.__dragBound) return;
+    handle.__dragBound = true;
+    /* 整条标题栏都能拖（只认 ⠿ 太小太淡，玩家根本不会去点它）。
+     * 阈值 4px：没挪动 = 当成点折叠按钮；挪过了 = 拖完把随后的那次 click 吞掉，
+     * 不会"拖完手一松就把面板收起来"。 */
+    let moved = false;
+    handle.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      const r = bar.getBoundingClientRect();
+      const bx = r.left, by = r.top, sx = e.clientX, sy = e.clientY;
+      moved = false;
+      bar.style.left = bx + 'px'; bar.style.top = by + 'px'; bar.style.right = 'auto';
+      e.preventDefault();
+      const mv = ev => {
+        const dx = ev.clientX - sx, dy = ev.clientY - sy;
+        if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) moved = true;
+        if (!moved) return;                       // 阈值内不动 → 让 click 正常触发（=折叠）
+        const limX = window.innerWidth - 60, limY = window.innerHeight - 40;
+        const nx = Math.min(Math.max(bx + dx, 60 - bar.offsetWidth), limX);
+        const ny = Math.min(Math.max(by + dy, 0), limY);
+        bar.style.left = nx + 'px'; bar.style.top = ny + 'px';
+      };
+      const up = () => {
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+        if (!moved) return;
+        const r2 = bar.getBoundingClientRect();
+        trackPos = { left: Math.round(r2.left), top: Math.round(Math.max(0, r2.top)) };
+        try { localStorage.setItem(TRACK_POS_KEY, JSON.stringify(trackPos)); } catch (er) { /* 忽略 */ }
+        window.setTimeout(() => { moved = false; }, 0);   // click 派发完再复位
+      };
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+    // 捕获阶段吞掉"拖完那一下"的 click，避免拖完顺手把面板收起
+    handle.addEventListener('click', e => {
+      if (!moved) return;
+      e.stopPropagation();
+      e.preventDefault();
+    }, true);
+  }
+
   function renderQuestTracker() {
+    renderQuestBadge();
     const bar = $('quest-tracker');
     if (!bar || !Quest) return;
     const items = trackerItems();
     if (!items.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
 
     bar.style.display = '';
-    bar.innerHTML = items.map(it => {
+    const readyN = items.filter(it => it.done).length;
+    bar.classList.toggle('is-collapsed', trackCollapsed);
+    // 标题栏 = 左侧 ⠿ 拖动手柄 + 右侧折叠按钮（职责分开：拖就拖、点就点）
+    const toggleHtml = `<div class="qt-head">`
+      + `<span class="qt-grip" title="按住这里拖动，挪到不挡视线的位置">⠿</span>`
+      + `<button type="button" class="qt-toggle" title="${trackCollapsed ? '展开任务列表' : '收起任务列表（不再占屏幕）'}">`
+      + (trackCollapsed
+        ? `⚑ 任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''}`
+        : `任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''} ▾`)
+      + `</button></div>`;
+    bar.innerHTML = toggleHtml + '<div class="qt-list">' + items.map(it => {
       const pct = it.need ? Math.min(100, Math.round(it.progress / it.need * 100)) : 0;
       const g = guideOf(it);
       // 补发钥匙（2026-09-08 补给箱重构）：这一关的钥匙被花掉/卖掉 → 引导条给手动补发，
@@ -490,32 +783,44 @@
       const choiceActs = it.isTutorial && it.type === 'direction' && !it.done && Array.isArray(it.options)
         ? `<div class="qt-choices">${it.options.map(o => `<button class="btn-mini ${o.id === 'map' ? 'primary' : 'ghost'} qt-direction" data-id="${escapeHtml(o.id)}" title="${escapeHtml(o.desc || '')}">${escapeHtml(o.label)}</button>`).join('')}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button></div>`
         : '';
-      const acts = choiceActs || (it.isTutorial
-        // 引导任务已达标 → 主按钮变「领取奖励」（G1 领资粮这类"等级即目标"的任务靠它交）
-        ? (it.done
-            ? `<button class="btn-mini primary qt-submit" data-id="${it.id}">领取奖励</button>
-               <button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`
-            : `<button class="btn-mini primary qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
-               ${reissueBtn}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`)
-        : `<button class="btn-mini ghost qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>
-           <button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`);
+      const acts = choiceActs || (
+        // 主按钮两态（动词前置）：完成 → 原地直接提交（引导任务叫「领取奖励」）；未完成 → 去做
+        it.done
+          ? `<button class="btn-mini primary qt-submit" data-id="${it.id}">${it.isTutorial ? '领取奖励' : '提交'}</button>`
+          : `<button class="btn-mini ${it.isTutorial ? 'primary' : 'ghost'} qt-go" data-id="${it.id}">${escapeHtml(g.btn)}</button>`
+      ) + (it.isTutorial
+        ? `${it.done ? '' : reissueBtn}<button class="btn-mini ghost qt-skip" title="跳过新手引导">跳过</button>`
+        : (it.handoff
+            // 「下一步」交接项不在玩家追踪列表里 → 没有 × 取消钮（取消不了"主线下一步"）
+            ? ''
+            : `<button class="btn-mini ghost qt-untrack" data-id="${it.id}" title="取消追踪">×</button>`));
       // 奖励即钥匙：引导条上常驻一行"完成可得什么、下一步是谁要用的"
       const pv = it.isTutorial ? rewardPreviewOf(it) : null;
       const rewardRow = pv
         ? `<div class="qt-reward">完成可得 ${escapeHtml(pv.labels.join('、'))} <span class="quest-next-use">→ 下一步「${escapeHtml(pv.next.name)}」要用</span></div>`
         : (it.isTutorial && it.id === 'n6' ? '<div class="qt-reward">完成后：引导结束，进入正常游戏节奏</div>' : '');
-      return `<div class="qt-item${it.done ? ' qt-done' : ''}" data-id="${it.id}">
-        <span class="qt-step">引导 ${it.guideStep || '?'} / ${it.guideTotal || '?'}</span>
-        <span class="qt-tag">${escapeHtml(it.tag)}</span>
-        <span class="qt-name">${escapeHtml(it.name)}</span>
-        <span class="qt-prog">${progressText(it)}</span>
-        <div class="qt-bar"><div class="qt-bar-fill" style="width:${pct}%"></div></div>
+      return `<div class="qt-item${it.done ? ' qt-done' : ''}${it.auto ? ' qt-auto' : ''}"${it.auto ? ' title="自动追踪：进度已到 80%"' : ''} data-id="${it.id}">
+        <div class="qt-row">
+          <span class="qt-tag qt-tag--${escapeHtml(it.kind || 'series')}">${escapeHtml(it.tag)}</span>
+          ${it.isTutorial && it.guideStep ? `<span class="qt-step">引导 ${it.guideStep}/${it.guideTotal}</span>` : ''}
+          <span class="qt-name">${escapeHtml(it.name)}</span>
+          <span class="qt-actions">${acts}</span>
+        </div>
+        <div class="qt-sub">
+          <div class="qt-bar"><div class="qt-bar-fill" style="width:${pct}%"></div></div>
+          <span class="qt-prog">${it.done ? '可提交' : progressText(it)}</span>
+        </div>
         ${it.isTutorial ? `<div class="qt-hint"><b>现在：</b>${it.hint || escapeHtml(taskDesc(it))}</div><div class="qt-why"><b>为什么：</b>${it.npc || '理解这一环，下一环会更清楚。'}</div>` : ''}
-        ${acts}
         ${rewardRow}
       </div>`;
-    }).join('');
+    }).join('') + '</div>';
 
+    applyTrackPos(bar);
+    bindTrackerDrag(bar, bar.querySelector('.qt-head'));   // 整条标题栏 = 拖动把手
+    const toggleBtn = bar.querySelector('.qt-toggle');
+    if (toggleBtn) {
+      toggleBtn.onclick = () => { setTrackCollapsed(!trackCollapsed); renderQuestTracker(); };
+    }
     bar.querySelectorAll('.qt-go').forEach(b => {
       b.onclick = () => {
         const it = items.find(x => x.id === b.dataset.id);
@@ -530,10 +835,11 @@
         if (!r || r.error) { if (UI.showToast) UI.showToast('方向未选择', r && r.error); return; }
         const done = await Quest.completeQuest('n6');
         if (done && done.error) { if (UI.showToast) UI.showToast('引导未结束', done.error); return; }
-        if (UI.showToast) UI.showToast('引导完成', '已进入正常游戏节奏');
         if (UI.renderAll) UI.renderAll();
         renderQuestTracker();
-        if (b.dataset.id === 'trial' && UI.openResourceTrial) UI.openResourceTrial();
+        // 毕业结算弹窗（替代原来的一条 toast）：学会回顾 + 毕业礼包 + 按所选方向预告下一步。
+        // 选了试炼的玩家点弹窗按钮直达试炼入口，不再交完就悄悄打开。
+        showGuideGraduation(b.dataset.id);
       };
     });
     // 引导任务达标后：直接在引导条领奖（G1 领资粮这类任务没有"去某页"的操作）
@@ -581,6 +887,7 @@
   /* ---------- 面板开关（左侧滑出抽屉，动画节奏对齐装备打造 craft-drawer） ---------- */
   function openQuestPanel() {
     renderQuestPanel();
+    renderQuestBadge();
     const host = $('quest-panel');
     if (!host) return;
     host.style.display = 'block';
@@ -613,6 +920,7 @@
   window.UI.initQuestUI = initQuestUI;
   window.UI.renderQuestPanel = renderQuestPanel;
   window.UI.renderQuestTracker = renderQuestTracker;
+  window.UI.renderQuestBadge = renderQuestBadge;
 
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', initQuestUI);

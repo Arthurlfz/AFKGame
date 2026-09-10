@@ -29,6 +29,13 @@
   let completed = {};           // 一次性任务完成记录 { questId: true }
   let dailyDone = {};           // 当天已交的日常 { questId: true }
   let dailyDate = '';           // 日常上次重置日期（YYYY-M-D）
+  // 兑换系统（2026-09-10）：兑换任务的灵魂是「硬上限」——每日 1 次 / 每周 1 次。
+  // 它和日常是两套独立水位（每日兑换不占用日常额度，反过来也一样）。
+  let weeklyDone = {};          // 本周已交的兑换 { questId: true }
+  let weeklyKey = '';           // 本周键 = 本周一的日期（YYYY-M-D）
+  // 周活跃度（0~100）：只认「推进任务」这个动作 —— 交日常/兑换 +10，交其他 +5。
+  // 它是「本周活跃」宝箱的进度（type:'meter'），满 100 可领，每周一随 weekly 一起清零。
+  let weeklyMeter = 0;
   // 账号级一次性标记（云端随 progress 一起存）：新手礼包已领 / 引导补给已发 / 引导祝福已送等。
   // 规则：云端是唯一真相，本地 localStorage 只做读加速与降级兜底（详见 tutorial_mode 的读写封装）。
   let extra = {};
@@ -53,6 +60,10 @@
         completed = data.completed || {};
         dailyDone = data.dailyDone || {};
         dailyDate = data.dailyDate || '';
+        // 旧存档没有这两个键 → 空对象即可（本周还没交过任何兑换），无需迁移
+        weeklyDone = data.weeklyDone || {};
+        weeklyKey = data.weeklyKey || '';
+        weeklyMeter = Math.max(0, Math.min(100, Number(data.weeklyMeter) || 0));
         tracked = Array.isArray(data.tracked) ? data.tracked.slice(0, TRACK_MAX) : [];
         extra = (data.extra && typeof data.extra === 'object') ? data.extra : {};
       } else {
@@ -101,6 +112,9 @@
       completed: Object.assign({}, completed),
       dailyDone: Object.assign({}, dailyDone),
       dailyDate: dailyDate,
+      weeklyDone: Object.assign({}, weeklyDone),
+      weeklyKey: weeklyKey,
+      weeklyMeter: weeklyMeter,
       tracked: tracked.slice(),
       extra: Object.assign({}, extra)
     };
@@ -169,14 +183,34 @@
     const d = new Date();
     return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
   };
-  // 换日则清空日常的累计进度与当天完成记录（成就不清零，见 completeQuest）
+  // 本周键 = 本周一的日期（YYYY-M-D）。
+  // 用「周一日期」而不是 ISO 周号：跨年不会算错，也不依赖任何日期库。
+  function weekKeyOf() {
+    const d = new Date();
+    const dow = (d.getDay() + 6) % 7;   // 周一=0 … 周日=6
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
+    return mon.getFullYear() + '-' + (mon.getMonth() + 1) + '-' + mon.getDate();
+  }
+  // 重置水位（换日 / 换周）：清完成记录 + 把该周期的累计进度归零。
+  // 成就不清零（见 completeQuest），一次性任务也不受影响。
   function ensureDailyReset() {
     const today = todayStr();
-    if (dailyDate === today) return;
-    dailyDate = today;
-    dailyDone = {};
-    (Config.drop.quests || []).forEach(q => { if (q.repeat) progress[q.id] = 0; });
-    saveProgress();
+    let changed = false;
+    if (dailyDate !== today) {
+      dailyDate = today;
+      dailyDone = {};
+      (Config.drop.quests || []).forEach(q => { if (q.reset === 'daily' || q.repeat) progress[q.id] = 0; });
+      changed = true;
+    }
+    const wk = weekKeyOf();
+    if (weeklyKey !== wk) {
+      weeklyKey = wk;
+      weeklyDone = {};
+      weeklyMeter = 0;
+      (Config.drop.quests || []).forEach(q => { if (q.reset === 'weekly') progress[q.id] = 0; });
+      changed = true;
+    }
+    if (changed) saveProgress();
   }
 
   /* ---------- 解锁与进度 ---------- */
@@ -189,7 +223,56 @@
     return lv >= (q.unlockLevel || 1);
   }
 
+  /* ---------- 目标（bonus）与完成度的进度算法 ----------
+   * 这三类都不靠 reportType 上报，进度是**现算**的：
+   *   dailyChest  = 今天已交的日常条数（kind==='daily' 且 dailyDone 里有）
+   *   meter       = 周活跃度（completeQuest 成功后累加，周一清零）
+   *   completion  = 永久完成度百分比（只算一次性任务，周期任务不计入）
+   * 它们的 need 也可能不是配置里的死数：日常宝箱的 need = 可做日常数 × needRatio（见 getQuests）。 */
+  function dailyDoneCount() {
+    let n = 0;
+    (Config.drop.quests || []).forEach(q => { if (q.kind === 'daily' && dailyDone[q.id]) n++; });
+    return n;
+  }
+  // 当天可做的日常数（按出战宠等级过一遍 unlockLevel），×needRatio 向上取整，至少 1
+  function dailyChestNeed(ratio) {
+    const pet = window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null;
+    const lv = pet ? (Number(pet.level) || 1) : 1;
+    let n = 0;
+    (Config.drop.quests || []).forEach(q => {
+      if (q.kind === 'daily' && lv >= (q.unlockLevel || 1)) n++;
+    });
+    return Math.max(1, Math.ceil(n * (Number(ratio) || 0.6)));
+  }
+  // 永久完成度：只算 reset==='none' 的一次性任务（引导/系列/宠物/成就）。
+  // 每日/每周/循环这类周期任务的"完成"是周期性的，算进去会让百分比永远在抖。
+  // type:'completion' 的里程碑自己也不计入（否则 25% 的那一条会拖住 25% 这个数字）。
+  function completion() {
+    const list = (Config.drop.quests || []).filter(q =>
+      q.reset === 'none' && !q.repeatable && q.type !== 'completion' &&
+      q.kind !== 'daily' && q.kind !== 'weekly' && q.kind !== 'exchange' && q.kind !== 'loop');
+    const total = list.length;
+    let done = 0;
+    list.forEach(q => { if (completed[q.id]) done++; });
+    return { done, total, pct: total ? Math.floor(done / total * 100) : 0 };
+  }
+
   function currentProgress(q) {
+    if (q.type === 'meter') return Math.min(Number(q.need) || 100, weeklyMeter);
+    if (q.type === 'dailyChest') return dailyDoneCount();
+    if (q.type === 'completion') return completion().pct;
+    /* 章宝箱（2026-09-11）：同章 6 环（击败/收集/养成/装备/久战/Boss）全 completed 才算 1/1。
+     * 章号用 quest-config 的编号派生（chest{n}/m/mk/boss 同一套规则），进度是现算的、
+     * 不靠上报 —— 6 环各自完成方式不同，统一查 completed 最可靠，也天然幂等。 */
+    if (q.type === 'chapterChest') {
+      const qc = window.QuestConfig;
+      if (!qc || !qc.chapterIndexOf) return 0;
+      const n = qc.chapterIndexOf(q);
+      if (!n) return 0;
+      const rings = (Config.drop.quests || []).filter(x =>
+        x !== q && x.kind === 'series' && x.type !== 'chapterChest' && qc.chapterIndexOf(x) === n);
+      return (rings.length > 0 && rings.every(x => completed[x.id])) ? 1 : 0;
+    }
     // level：进度 = 出战宠等级（引导经验包顶上去即达标，玩家不靠刷怪升级。
     // 2026-09-03 新增，供 G1「引路人的馈赠」这类"等级即目标"的引导任务用）
     if (q.type === 'level') {
@@ -243,28 +326,65 @@
     };
   }
 
-  // 一次性任务看 completed，日常看当天是否交过
+  // 一次性任务看 completed；日常看当天是否交过；兑换看当天/本周额度是否用掉
   function isFinished(q) {
     if (q.repeatable) return false;
-    return q.repeat ? !!dailyDone[q.id] : !!completed[q.id];
+    if (q.reset === 'weekly') return !!weeklyDone[q.id];
+    if (q.reset === 'daily' || q.repeat) return !!dailyDone[q.id];
+    return !!completed[q.id];
   }
 
   function getQuests() {
     ensureDailyReset();
     return (Config.drop.quests || []).map(q => {
       const have = currentProgress(q);
+      // 日常宝箱的 need 不是死数：= 当天可做日常数 × needRatio（见 dailyChestNeed）
+      const need = q.type === 'dailyChest' ? dailyChestNeed(q.needRatio) : (Number(q.need) || 0);
       return {
         id: q.id, category: q.category || 'main', type: q.type || 'collect',
-        area: q.area, matName: q.matName, matList: q.matList || null, petName: q.petName, name: q.name, need: q.need,
+        // 规范字段由 quest-config.js 派生（一级分类 / 二级分组 / 章节）。
+        // 兜底成 category + '其他任务' 组：即使规范化层没加载，UI 也能正常分级。
+        kind: q.kind || q.category || 'series',
+        chapter: q.chapter || null,
+        group: q.group || { id: 'other', label: '其他任务', order: 99 },
+        reset: q.reset || (q.repeat ? 'daily' : 'none'),
+        area: q.area, matName: q.matName, matList: q.matList || null, petName: q.petName, name: q.name, need,
         reward: q.reward, rewardGear: q.rewardGear || null, unlockLevel: q.unlockLevel, requires: q.requires,
         repeat: !!q.repeat, repeatable: !!q.repeatable, expReward: q.expReward, guide: q.guide,
         options: q.options || null, action: q.action || null, minLevel: q.minLevel || 0, disposeTypes: q.disposeTypes || null,
-        have, progress: Math.min(have, q.need), done: have >= q.need,
+        have, progress: Math.min(have, need), done: have >= need,
         parts: progressParts(q),
         unlocked: isUnlocked(q), finished: isFinished(q),
         accepted: q.category === 'tutorial' || accepted.has(q.id)
       };
     });
+  }
+
+  /* ---------- 二级分组（UI 的「日常 → 收集任务 → 具体任务」中间那一层） ----------
+   * 分组键由 quest-config.js 派生（系列=章节 / 宠物=家族 / 日常与成就=目标形式族 /
+   * 循环=地图委托·长线收集），本函数只做聚合与排序，不判断分组语义。 */
+  function getGroups(kind, rows) {
+    const list = rows || getQuests().filter(q => q.kind === kind);
+    const buckets = {};
+    const out = [];
+    list.forEach(q => {
+      const g = q.group || { id: 'other', label: '其他任务', order: 99 };
+      let b = buckets[g.id];
+      if (!b) { b = buckets[g.id] = { id: g.id, label: g.label, order: Number(g.order) || 0, quests: [] }; out.push(b); }
+      b.quests.push(q);
+    });
+    out.sort((a, b) => a.order - b.order || String(a.label).localeCompare(String(b.label)));
+    out.forEach(g => {
+      g.done = g.quests.filter(q => q.finished).length;
+      g.total = g.quests.length;
+      g.ready = g.quests.filter(q => q.done && !q.finished).length;   // 可提交数（组头红点用）
+    });
+    return out;
+  }
+
+  // 全部分类里「可提交」的条数 —— 顶栏任务按钮的总红点用它，玩家不打开面板就知道有奖可领。
+  function readyCount() {
+    return getQuests().filter(q => q.done && !q.finished && q.unlocked).length;
   }
 
   function getReadyLoop(areaId) {
@@ -369,8 +489,15 @@
       }
       if ((type === 'kill' || type === 'boss') && q.area && ctx.areaId && q.area !== ctx.areaId) continue;
       if (q.petName && ctx.petName !== q.petName) continue;
-      progress[q.id] = (progress[q.id] || 0) + (amount || 1);
-      changed = true;
+      if (ctx.mode === 'max') {
+        // 「最高纪录」语义（2026-09-11）：爬塔/副本的"最高到过第几层"只认历史最大值，
+        // 重复通关不累加、失败不回退。调用方传 { mode:'max' }。
+        const cur = progress[q.id] || 0;
+        if ((amount || 0) > cur) { progress[q.id] = amount || 0; changed = true; }
+      } else {
+        progress[q.id] = (progress[q.id] || 0) + (amount || 1);
+        changed = true;
+      }
     }
     if (changed) {
       saveProgressThrottled();
@@ -438,8 +565,18 @@
     const q = (Config.drop.quests || []).find(x => x.type === 'boss' && x.area === areaId);
     return !!q && isFinished(q);
   }
-  function markFinished(q) { if (q.repeatable) return; if (q.repeat) dailyDone[q.id] = true; else completed[q.id] = true; }
-  function unmarkFinished(q) { if (q.repeatable) return; if (q.repeat) delete dailyDone[q.id]; else delete completed[q.id]; }
+  function markFinished(q) {
+    if (q.repeatable) return;
+    if (q.reset === 'weekly') weeklyDone[q.id] = true;
+    else if (q.reset === 'daily' || q.repeat) dailyDone[q.id] = true;
+    else completed[q.id] = true;
+  }
+  function unmarkFinished(q) {
+    if (q.repeatable) return;
+    if (q.reset === 'weekly') delete weeklyDone[q.id];
+    else if (q.reset === 'daily' || q.repeat) delete dailyDone[q.id];
+    else delete completed[q.id];
+  }
 
   /* ---------- 任务经验奖励（2026-08-31 用户拍板「固定值 · 大方档」：经验是奖励主体，材料是辅助） ----------
    * 完成一次任务 = 给当前出战宠物【固定】经验（与等级无关）：
@@ -461,8 +598,10 @@
     if (submitting.has(id)) return { error: '正在提交中，请稍候' };
     if (isFinished(q)) return { error: '这个任务已经交过了' };
     if (!isUnlocked(q)) return { error: '任务尚未解锁' };
-    if (currentProgress(q) < q.need) {
-      const left = q.need - currentProgress(q);
+    // need 可能是现算的（日常宝箱 = 可做日常数 × needRatio），不能直接读配置
+    const need = q.type === 'dailyChest' ? dailyChestNeed(q.needRatio) : (Number(q.need) || 0);
+    if (currentProgress(q) < need) {
+      const left = need - currentProgress(q);
       const matLabel = (q.type === 'collect' && Array.isArray(q.matList)) ? '图 1~10 区域材料' : q.matName;
       return { error: `还差 ${left} ${q.type === 'collect' ? matLabel : ''}` };
     }
@@ -515,6 +654,11 @@
       // 奖励必须真正落盘：Materials.gain 现在只改本地并入队（不上传），
       // 不 flush 的话玩家一刷新，刚领的奖励就没了。
       await Materials.flushMaterials();
+      // 周活跃度：只认「推进任务」。宝箱自己（kind==='bonus'）不算，否则领宝箱会喂宝箱。
+      // 日常/兑换是"今天该做的"权重高（+10），系列/宠物/成就这类长线 +5。满 100 封顶，周一清零。
+      if (q.kind !== 'bonus') {
+        weeklyMeter = Math.min(100, weeklyMeter + ((q.kind === 'daily' || q.kind === 'exchange') ? 10 : 5));
+      }
       // 引导推进：交完一条引导任务 → 驱动 tutorial_mode（顶下一条的等级门槛 / 走完则发毕业礼包）。
       // 不 await：它是发礼包/改等级这种附加动作，失败不该拖住玩家的提交反馈。
       if (q.category === 'tutorial' && window.TutorialMode && window.TutorialMode.checkGuide) {
@@ -592,6 +736,7 @@
   // 切换账号/登出时清空内存，避免残留旧号数据
   function reset() {
     progress = {}; completed = {}; dailyDone = {}; dailyDate = '';
+    weeklyDone = {}; weeklyKey = ''; weeklyMeter = 0;
     tracked = [];
     extra = {};
     accepted.clear();
@@ -610,11 +755,11 @@
 
   /* ---------- 对外 API ---------- */
   window.Quest = {
-    getQuests, getReadyLoop, getGuideQuest, acceptQuest, completeQuest,
+    getQuests, getGroups, readyCount, getReadyLoop, getGuideQuest, acceptQuest, completeQuest,
     reportType, skipGuide, abandonQuest, toggleTrack, getTracked, loadCloudProgress, reset,
     getExtra, setExtra, resetGuideChain,
     saveProgressStrict, isCloudLoaded,
     isFinished, isUnlocked, isAreaCleared,
-    questExpOf, QUEST_EXP_FIXED, chooseGuideDirection
+    questExpOf, QUEST_EXP_FIXED, chooseGuideDirection, completion
   };
 })();

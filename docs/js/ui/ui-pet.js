@@ -2,7 +2,7 @@
  * ui/ui-pet.js —— 宠物页 UI
  * 职责：
  *  1. 出战宠物面板（属性含装备加成）、装备 tab 三连屏（属性 / 12 装备槽 / 换装背包）
- *  2. 宠物列表（切换出战）、宠物蛋孵化面板、宠物 Tooltip
+ *  2. 宠物列表（切换出战）、宠物 Tooltip
  *  3. PetUI 共享 API（iconHtml / tooltip / 特质胶囊），供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 使用
  * 不在本文件：进化 / 合成 / 涅槃三个 tab 的实现在 ui-pet-evolve.js / ui-pet-synth.js / ui-pet-merge.js。
  *   它们在 游戏.html 里后加载，会覆盖同名 UI API —— 本文件不要重复实现，只提供共用的 PetUI 工具。
@@ -479,94 +479,16 @@
     }
   }
 
-  /* ---------- 宠物蛋孵化面板（宠物页「宠物蛋」tab：按品种展示 + 孵化） ---------- */
-  function renderEggPanel() {
-    const wrap = $('egg-panel');
-    const Drop = window.Drop;
-    if (!wrap || !Drop) return;
-    const eggMap = Drop.getEggs ? Drop.getEggs() : {};
-    const eggs = Drop.getEggCount();
-    wrap.innerHTML = '';
-    const info = document.createElement('div');
-    info.className = 'egg-info';
-    const count = document.createElement('div');
-    count.className = 'egg-count';
-    count.innerHTML = eggs > 0
-      ? `🥚 宠物蛋共 ×<b>${eggs}</b>`
-      : '🥚 暂无宠物蛋（挂机打基础怪有概率掉落对应品种的蛋）';
-    info.appendChild(count);
-    const desc = document.createElement('div');
-    desc.className = 'egg-desc';
-    desc.textContent = UI.isLoggedIn() ? '每个品种的蛋孵出对应的宠物；可上架市场交易' : '登录后才能孵化';
-    info.appendChild(desc);
-    wrap.appendChild(info);
+  /* ---------- 装备/孵化面板（2026-09-10 墓碑清理，已删除）----------
+   * 原这里的「宠物蛋孵化面板」（renderEggPanel）与「装备直达 pane」的 tab 按钮早已移除，
+   * pane 变成无 tab 高亮的孤儿页（引导「去孵化」跳过去就是它 → 用户拍板删）。
+   * 正主入口：孵化 = 背包浮窗 · 素材蛋（UI.openBagEggs）；装备 = 背包浮窗 · 装备（switchPage('equip')）。 */
 
-    // 按品种逐一展示（每种蛋一张卡：品种名 + 数量 + 孵化按钮）
-    const list = document.createElement('div');
-    list.className = 'egg-species-list';
-    const entries = Object.entries(eggMap).filter(([, n]) => n > 0);
-    if (!entries.length) {
-      const empty = document.createElement('div');
-      empty.className = 'quick-empty';
-      empty.textContent = '背包空空，去挂机捡蛋';
-      list.appendChild(empty);
-    }
-    for (const [baseName, n] of entries) {
-      const row = document.createElement('div');
-      row.className = 'egg-species';
-      const name = document.createElement('span');
-      name.className = 'egg-species-name';
-      name.textContent = Drop.makeEggName(baseName);
-      const qty = document.createElement('span');
-      qty.className = 'egg-species-qty';
-      qty.textContent = `×${n}`;
-      const btn = document.createElement('button');
-      btn.className = 'btn-sm alt';
-      btn.textContent = UI.isLoggedIn() ? '孵化' : '🔒 登录后孵化';
-      btn.disabled = !UI.isLoggedIn() || n <= 0;
-      btn.onclick = async () => {
-        if (!UI.isLoggedIn()) return;
-        const res = await Drop.hatchEgg(baseName);
-        if (!res) return;
-        if (res.error) { showToast('❌ 无法孵化', res.error); return; }
-        addLog(`🐣 孵化成功！获得新宠物 ${res.baby.name}（成长值 ${res.baby.growth}）！`);
-        showToast('🐣 孵化成功！', `${iconHtml(res.baby.name)} ${res.baby.name}｜成长值 ${res.baby.growth}｜已出战`);
-        const traitBlock = (res.baby && Array.isArray(res.baby.traits) && res.baby.traits.length)
-          ? PetUI.traitsHtml(res.baby)
-          : '<span class="trait-none">无血脉特质</span>';
-        if (UI.showDialog) UI.showDialog({ icon: '🐣', speaker: '孵化', text: `${iconHtml(res.baby.name)} ${res.baby.name}<br>成长值 ${res.baby.growth} · 已出战<br>${traitBlock}` });
-        if (res.saveError) addLog('⚠️ 云端存档失败，宠物仅保存在本地');
-        UI.renderAll();
-      };
-      row.appendChild(name);
-      row.appendChild(qty);
-      row.appendChild(btn);
-      list.appendChild(row);
-    }
-    wrap.appendChild(list);
-  }
-
-  /* ---------- 装备界面（12 槽）在「背包窗口 · 装备」子页，这里统一一个打开入口 ----------
-   * 2026-09-03：宠物页「装备」tab 与 pane 内的按钮都走它，避免入口指向空气（G3 穿装备指引入口）。 */
-  function openEquipWindow() {
-    if (window.UI && window.UI.openBagWindow) {
-      try { window.UI.openBagWindow(); } catch (e) { console.warn('[pet] 打开背包失败', e); }
-    }
-    const sub = document.querySelector('.bag-subtab[data-bag-subtab="equip"]');
-    if (sub && sub.click) sub.click();
-  }
-
-  /* ---------- 宠物页顶部 tab 切换（资料 / 进化 / 合成 / 涅槃 / 装备 / 宠物蛋） ---------- */
+  /* ---------- 宠物页顶部 tab 切换（资料 / 进化 / 合成 / 涅槃 / 觉醒） ---------- */
   function initPetTabs() {
     const tabs = $('pet-tabs');
     if (!tabs || tabs.__petTabBound) return;
     tabs.__petTabBound = true;
-    // 装备 pane 内的直达按钮
-    const gotoBtn = $('btn-pet-equip-goto');
-    if (gotoBtn && !gotoBtn.__bound) {
-      gotoBtn.__bound = true;
-      gotoBtn.addEventListener('click', openEquipWindow);
-    }
     tabs.addEventListener('click', e => {
       const btn = e.target.closest && e.target.closest('.pet-tab');
       if (!btn) return;
@@ -574,12 +496,8 @@
       tabs.querySelectorAll('.pet-tab').forEach(t => t.classList.toggle('active', t === btn));
       document.querySelectorAll('.pet-tab-pane').forEach(p =>
         p.classList.toggle('active', p.dataset.petPane === name));
-      // 装备：切到这一栏就把装备界面带出来（不用玩家再找背包入口）
-      if (name === 'equip') openEquipWindow();
-      // 其余 tab：收起背包浮窗（它带全屏遮罩，开着会盖住宠物页——孵化 tab 被"层级压住"的根因就是它没关）
-      else if (window.UI && UI.closeBagWindow) UI.closeBagWindow();
-      // 宠物蛋：孵化面板按需渲染（切到才渲染，避免宠物页首屏多跑一遍）
-      if (name === 'egg') renderEggPanel();
+      // 切 tab 时收起背包浮窗（它带全屏遮罩，开着会盖住宠物页——历史上的"层级压住"根因）
+      if (window.UI && UI.closeBagWindow) UI.closeBagWindow();
     });
   }
 
@@ -593,7 +511,6 @@
   UI.renderEquipPetStats = renderEquipPetStats;
   UI.renderEquipSlots = renderEquipSlots;
   UI.renderPetEquipInv = renderPetEquipInv;
-  UI.renderEggPanel = renderEggPanel;
   UI.initPetTabs = initPetTabs;
 
   /* ---------- PetUI 共享 API（供 ui-pet-evolve / ui-pet-merge / ui-pet-synth 使用） ----------

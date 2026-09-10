@@ -268,7 +268,6 @@
     $('strip-num').textContent = String(Materials.getQuantity(Config.craft.strip.name));
     $('holy-num').textContent = String(Materials.getQuantity(Config.craft.holy.name));
     $('augment-num').textContent = String(Materials.getQuantity(Config.craft.augment.name));
-    UI.renderEggPanel && UI.renderEggPanel(); // 宠物页孵化面板（ui-pet 定义，未定义时跳过）
     UI.renderQuestTracker && UI.renderQuestTracker(); // 任务追踪栏（ui-quest 定义，未定义时跳过）
     UI.renderShop && UI.renderShop();                 // 魔石商店页（ui-shop 定义，用缓存数据重绘，不打接口）
   }

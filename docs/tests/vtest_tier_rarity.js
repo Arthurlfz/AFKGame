@@ -1,9 +1,11 @@
 /* ============================================================
- * vtest_tier_rarity.js —— T 阶稀缺性底线（2026-08-30 用户拍板「再砍到底」）
- * 守三条设计承诺，改 config.equipment.affixTierWeights / equipment_craft.js 时必须过：
- *  1. T1 只能从金装来：白/蓝装（掉落或重铸）永远抽不到 T1、T2
- *  2. 金装 T1 概率 ≈ 2%（8% 玩家实测仍觉得"太容易出"→ 降到 2%，顶级词缀求而不得）
- *  3. 重铸不许再写死 randInt(1,5)——那个写法不看成色，白装能洗出全 T1
+ * vtest_tier_rarity.js —— 词缀/底材 T 阶生成规则（2026-09-11 按 PoE 模式重写）
+ * 规则（用户拍板「颜色由词缀数量决定；T 阶仅由装备等级解锁」+ PoE 式权重池）：
+ *  1. 每个 tier 有 ilvl 门槛（T1=70/T2=60/T3=25/T4=1）+ 权重（5/15/30/25/25）；
+ *     掉落时「门槛达标」的 tier 全部进池按权重抽 —— T1 可以出现但稀有。
+ *  2. 词缀条数由 ilvl 决定（affixCountByIlvl），颜色 = 条数的结果（1白/2蓝/3+金）。
+ *  3. 底材 T 阶同一套门槛 + 权重池。
+ *  4. 重铸/增缀走同一个 rollAffixTier(ilvl) 入口，没有绕过等级的口子。
  * ============================================================ */
 const fs = require('fs'), vm = require('vm');
 const VTF=require('./vtest_files');
@@ -20,62 +22,47 @@ for (const f of ['../js/core/config.js', '../js/equipment/equipment.js']) VTF.lo
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 
-/* ---------- 1. T 阶抽取按稀有度分层 ---------- */
-const sample = (rarity, n) => C(`(function(){
+/* ---------- 1. 门槛池：等级外的不可能，等级内的按权重出现 ---------- */
+const sample = (lv, n) => C(`(function(){
   const out={};
-  for(let i=0;i<${n};i++){const t=Equipment.rollAffixTier('${rarity}');out[t]=(out[t]||0)+1;}
+  for(let i=0;i<${n};i++){const t=Equipment.rollAffixTier(${lv});out[t]=(out[t]||0)+1;}
   return out;
 })()`);
-const pctOf = (m, t, n) => ((m[t] || 0) / n * 100);
+const s80 = sample(80, 20000), s65 = sample(65, 8000), s40 = sample(40, 8000), s10 = sample(10, 4000);
+console.log('  ilvl80', JSON.stringify(s80), '｜65', JSON.stringify(s65), '｜40', JSON.stringify(s40), '｜10', JSON.stringify(s10));
+A(!s80[0] && !s10[1] && !s10[2] && !s10[3], '门槛外不可能：ilvl 80 之外不出 T1；ilvl 10 只有 T4/T5');
+A(s80[1] > 0, 'ilvl 80 能出 T1（「可以出现」—— 顶级词缀不是锁死的）');
+const t1pct = (s80[1] || 0) / 20000 * 100;
+A(t1pct >= 3.5 && t1pct <= 6.5, `ilvl 80 的 T1 概率 ≈ 5%（实际 ${t1pct.toFixed(2)}%，权重 5/100）`);
+A((s80[1] || 0) < (s80[3] || 0), 'T1 比 T3 稀有（权重递增，高档词缀求而不得）');
+A(!!s65[2] && !s65[1], 'ilvl 65：T2 进池、T1 不进池（70 级门槛）');
 
-const w = sample('white', 4000), b = sample('blue', 4000), g = sample('gold', 40000);
-console.log('  白装 T 分布', JSON.stringify(w), '｜蓝装', JSON.stringify(b), '｜金装', JSON.stringify(g));
-A(!w[1] && !w[2] && !w[3], '白装抽不到 T1/T2/T3（T 阶被稀有度锁死）');
-A(!b[1] && !b[2], '蓝装抽不到 T1/T2');
-A(!!g[1], '金装能抽到 T1（顶级词缀的唯一来源）');
-
-const t1 = pctOf(g, 1, 40000);
-console.log(`  金装 T1 实际概率 ${t1.toFixed(1)}%（设计值 5%，2026-09-06 手册 2.3：2%→5%）`);
-A(t1 >= 4 && t1 <= 7, `金装 T1 概率在设计值附近（${t1.toFixed(1)}% ∈ [4,7]）`);
-
-/* ---------- 2. 实际生成的装备也守规矩 ---------- */
-// 基础词缀（base:true，固定 T5）不参与统计
-const scan = (rarityId, count) => C(`(function(){
-  const R=Config.equipment.rarities.find(r=>r.id==='${rarityId}');
-  // 图10（areaTier 10 → ilvl 55）：T1 的 ilvl gate 是 55，只有图10+ 才可能出 T1，
-  // 旧扫描用图6（ilvl 31）时 T1 全被 gate 降级，0 条属正常设计。
-  let t1=0,t2=0,total=0;
-  for(let i=0;i<${count};i++){
-    const eq=Equipment.generateEquipment(R, 10, 1);
-    for(const a of Equipment.flattenAffixes(eq.affixes)){
-      if(a.base)continue; total++;
-      if(a.tier===1)t1++; if(a.tier===2)t2++;
-    }
-  }
-  return {t1,t2,total};
+/* ---------- 2. 实际生成的装备守规矩（条数→颜色 / 每条独立 roll / 底材同池） ---------- */
+const scan = lv => C(`(function(){
+  const eq = Equipment.generateEquipment(null, 10, 0, ${lv});
+  const aff = Equipment.flattenAffixes(eq.affixes).filter(a => !a.base);
+  return { count: aff.length + 1, color: eq.rarity.id, matTier: eq.materialTier,
+           minT: Math.min.apply(null, aff.map(a => a.tier)), maxT: Math.max.apply(null, aff.map(a => a.tier)) };
 })()`);
-const sw = scan('white', 400), sb = scan('blue', 400), sg = scan('gold', 400);
-console.log(`  实装统计：白 ${sw.total} 条词缀 / 蓝 ${sb.total} 条 / 金 ${sg.total} 条（金中 T1 ${sg.t1} 条）`);
-A(sw.t1 === 0 && sw.t2 === 0, '生成的白装没有 T1/T2 词缀');
-A(sb.t1 === 0 && sb.t2 === 0, '生成的蓝装没有 T1/T2 词缀');
-A(sg.t1 > 0, '生成的金装能出 T1 词缀');
+const g80 = scan(80), g55 = scan(55), g10 = scan(10);
+A(g80.matTier >= 1 && g80.matTier <= 5, `底材 T 来自同一权重池（ilvl 80 实际 T${g80.matTier}）`);
+A(g80.color === 'gold' && g80.count >= 4 && g80.count <= 5, `ilvl 80：4~5 条 → 金色（实际 ${g80.count} 条 ${g80.color}）`);
+A(g55.matTier === 3, `野图图 10（ilvl 55）：底材最高 T3（实际 T${g55.matTier}）—— T1/T2 只在塔（ilvl 60+/70+）`);
+A(g10.count >= 1 && g10.count <= 2 && (g10.color === 'white' || g10.color === 'blue'),
+  `ilvl 10：1~2 条 → 白/蓝（实际 ${g10.count} 条 ${g10.color}）`);
 
-/* ---------- 3. 重铸不许绕过稀有度（静态检查，防回归） ---------- */
+/* ---------- 3. 重铸/增缀走统一入口（静态检查，防回归） ---------- */
 const craftSrc = fs.readFileSync('../js/equipment/equipment_craft.js', 'utf8');
-A(craftSrc.indexOf('randInt(1, 5)') < 0, '重铸/增缀代码里没有写死的 randInt(1, 5)（不看成色的老写法）');
-A((craftSrc.match(/rollAffixTier\(eq\.rarity\.id,\s*window\.Equipment\.ilvlOf\(eq\)\)/g) || []).length >= 3,
-  '重铸（两处）与增缀都改成按稀有度抽 T 阶（带 ilvl gate）');
+A(craftSrc.indexOf('randInt(1, 5)') < 0, '重铸/增缀代码里没有写死的 randInt(1, 5)');
+A((craftSrc.match(/rollAffixTier\(window\.Equipment\.ilvlOf\(eq\)\)/g) || []).length >= 3,
+  '重铸（两处）与增缀都改成 rollAffixTier(ilvlOf(eq)) —— T 阶只看装备等级');
+A(craftSrc.indexOf('rollAffixTier(eq.rarity.id') < 0, '旧签名（按稀有度抽 T 阶）已清干净');
 
-/* ---------- 4. 底材 T 阶：T1 在图6 也才 20% ---------- */
-const mt = C(`JSON.stringify(Config.equipment.materialTierWeights||{})`);
-const t = JSON.parse(mt);
-const p = (tier, T) => {
-  const row = t[tier] || {};
-  const sum = Object.values(row).reduce((a, b) => a + b, 0);
-  return (row[T] || 0) / sum * 100;
-};
-console.log(`  底材 T1 概率：图1 ${p(1, 1).toFixed(1)}% → 图6 ${p(6, 1).toFixed(1)}%`);
-A(p(1, 1) <= 3, `图1 的 T1 底材极稀有（${p(1, 1).toFixed(1)}%）`);
-A(p(6, 1) >= 15 && p(6, 1) <= 22, `图6 的 T1 底材约 20%（${p(6, 1).toFixed(1)}%）`);
+/* ---------- 4. 配置表在位 ---------- */
+A(C(`Config.equipment.affixIlvlGates[1]`) === 70 && C(`Config.equipment.affixIlvlGates[2]`) === 60,
+  'ilvl 门槛：T1=70 / T2=60（用户拍板值）');
+A(C(`Config.equipment.affixTierWeights[1]`) === 5 && C(`Config.equipment.affixTierWeights[3]`) === 30,
+  'per-tier 权重表在位（T1=5 / T3=30）');
+A(C(`(Config.equipment.affixCountByIlvl||[]).length`) === 4, 'affixCountByIlvl 四档区间表在位');
 
 console.log('ALL TIER RARITY TESTS PASSED');

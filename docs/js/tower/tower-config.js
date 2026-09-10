@@ -277,14 +277,17 @@
 
     /* ================= 档位奖励（每 5 层一档，按最高到达层数取最深一档） =================
      * 死在第 7 层 = 拿第 5 层档；不足第 5 层 = 只给 consolation。
-     * 2026-09-10 加厚：装备件数与材料数量整体上调（用户要求"奖励丰厚一点"）。 */
+     * 2026-09-10 加厚：装备件数与材料数量整体上调（用户要求"奖励丰厚一点"）。
+     * 2026-09-11 修：materialTier 全改 1 —— 底材 T 是反向档（T1 ×1.5 最优 → T5 ×0.6 最烂），
+     *   旧值 3/4/5 = 档位越深装备越垃圾，被野图图 10 全面碾压。塔=最高强度区域，底材一律 T1，
+     *   深层成长走 ilvl（塔怪 Lv60→120）。 */
     floorTiers: [
-      { floor: 5,  gear: { rarity: 'blue', count: 2, areaTier: 10, materialTier: 3 }, items: [{ name: '鉴定石', qty: 5 }, { name: '重铸石', qty: 2 }] },
-      { floor: 10, gear: { rarity: 'gold', count: 2, areaTier: 10, materialTier: 4 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 1 }] },
-      { floor: 15, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 4 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 2 }] },
-      { floor: 20, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 5 }, items: [{ name: '越龙之石', qty: 2 }, { name: '神圣石', qty: 2 }] },
-      { floor: 25, gear: { rarity: 'gold', count: 4, areaTier: 10, materialTier: 5 }, items: [{ name: '越龙之石', qty: 2 }, { name: '天仙玉露', qty: 2 }] },
-      { floor: 30, gear: { rarity: 'gold', count: 5, areaTier: 10, materialTier: 5 }, items: [{ name: '越龙之石', qty: 3 }, { name: '天仙玉露', qty: 3 }, { name: '强化丹B', qty: 3 }] }
+      { floor: 5,  gear: { rarity: 'blue', count: 2, areaTier: 10, materialTier: 1 }, items: [{ name: '鉴定石', qty: 5 }, { name: '重铸石', qty: 2 }] },
+      { floor: 10, gear: { rarity: 'gold', count: 2, areaTier: 10, materialTier: 1 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 1 }] },
+      { floor: 15, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 1 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 2 }] },
+      { floor: 20, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 2 }, { name: '神圣石', qty: 2 }] },
+      { floor: 25, gear: { rarity: 'gold', count: 4, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 2 }, { name: '天仙玉露', qty: 2 }] },
+      { floor: 30, gear: { rarity: 'gold', count: 5, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 3 }, { name: '天仙玉露', qty: 3 }, { name: '强化丹B', qty: 3 }] }
     ],
     /* 不足第一档（死在第 1~4 层）的保底：必须属于塔本身（内向进度），不发区域材料 */
     consolation: [{ name: '重铸石', qty: 2 }],

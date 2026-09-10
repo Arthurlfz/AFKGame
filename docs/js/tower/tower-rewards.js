@@ -77,17 +77,14 @@
     if (kind === 'equipment') {
       const rw = drop.equipmentRarityWeights || { blue: 70, gold: 30 };
       const rid = pickWeightedKey({ blue: num(rw.blue, 70), gold: num(rw.gold, 30) });
-      const eq = makeGear(rid || 'blue', drop.equipmentAreaTier || 10, gearMatTierFor(floor), num(ctx.ilvl, 100));
+      // 底材恒 T1（2026-09-11 修）：materialTier 是【反向档】——倍率表 {1:1.5 … 5:0.6}，T1 最优 T5 最烂。
+      // 旧写法 gearMatTierFor 把它当"越深越大"的正向数（1~10 层 3 / 21+ 层 5）= 塔越深装备越垃圾，
+      // 被野图图 10（能 roll 出 T1 ×1.5）全面碾压。塔是最高强度区域，底材必须全 T1；
+      // 深层的成长走 ilvl（塔怪 Lv60→120，底材命中 baseHitByIlvl 段位随之上移），不走底材降档。
+      const eq = makeGear(rid || 'blue', drop.equipmentAreaTier || 10, 1, num(ctx.ilvl, 100));
       return { kind: 'equipment', eq };
     }
     return { kind: 'none' };
-  }
-
-  // 底材档：越深越好（第 1~10 层 T3 / 11~20 T4 / 21~30 T5）
-  function gearMatTierFor(floor) {
-    if (floor >= 21) return 5;
-    if (floor >= 11) return 4;
-    return 3;
   }
 
   /* 造一件装备并落到背包（本地 + 云端存档）。
@@ -201,5 +198,5 @@
     };
   }
 
-  window.TowerRewards = { rollLayer, settle, preview, tierFor, titleFor, bandWeights, gearMatTierFor, setRnd, makeGear };
+  window.TowerRewards = { rollLayer, settle, preview, tierFor, titleFor, bandWeights, setRnd, makeGear };
 })();

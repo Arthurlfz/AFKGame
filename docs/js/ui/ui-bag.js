@@ -598,6 +598,15 @@
 
   UI.openBagWindow = openBagWindow;
   UI.closeBagWindow = closeBagWindow;
+  /* ---------- 孵化唯一入口（2026-09-10 用户拍板）----------
+   * 宠物页的「宠物蛋」pane 是墓碑已删；孵化统一走这里：打开背包浮窗 + 停在「素材蛋」分类。
+   * 调用方：主城孵化所（ui-capital）、任务/引导跳转（ui-quest goGuide page:'bag'）。 */
+  UI.openBagEggs = function () {
+    bagCat = 'egg';
+    openBagWindow();   // 内部先 renderBag()，egg 分类立即生效
+    const sub = document.querySelector('.bag-subtab[data-bag-subtab="bag"]');
+    if (sub && sub.click) sub.click();
+  };
 
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', initBagWindow);

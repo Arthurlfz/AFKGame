@@ -25,16 +25,9 @@
       x: 41, y: 80,
       desc: '宠物蛋在此孵化。挂机掉落的蛋，到这里孵出你的新伙伴。',
       go: () => {
-        if (!window.UI.switchPage) return;
-        window.UI.switchPage('pet');
-        // 宠物页顶部「宠物蛋」tab 已移除（2026-09-03 精简）：直接激活蛋 pane + 渲染，不依赖 tab 按钮
-        const pane = document.querySelector('.pet-tab-pane[data-pet-pane="egg"]');
-        if (pane) {
-          document.querySelectorAll('.pet-tab').forEach(t => t.classList.remove('active'));
-          document.querySelectorAll('.pet-tab-pane').forEach(p => p.classList.remove('active'));
-          pane.classList.add('active');
-          if (window.UI.renderEggPanel) window.UI.renderEggPanel();
-        }
+        // 孵化唯一入口 = 背包浮窗 · 素材蛋（2026-09-10 拍板；宠物页蛋 pane 墓碑已删）
+        if (window.UI.openBagEggs) window.UI.openBagEggs();
+        else if (window.UI.switchPage) window.UI.switchPage('bag');
       }
     },
     {
@@ -147,7 +140,7 @@
         if (!b) return;
         const tip = $('capital-tip');
         if (!tip) return;
-        tip.innerHTML = `<div class="cap-tip-name">${b.icon} ${esc(b.name)}</div>
+        tip.innerHTML = `<div class="cap-tip-name">${esc(b.name)}</div>
           <div class="cap-tip-desc">${esc(b.desc)}</div>
           <div class="cap-tip-cta">点击进入</div>`;
         tip.hidden = false;

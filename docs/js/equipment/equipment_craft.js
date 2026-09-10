@@ -123,7 +123,7 @@
           if (!avail.length) break;
           const aff = pick(avail);
           used.add(aff.type);
-          const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
+          const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq));
           const T = tierOf(tier, aff.type);
           chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) });
         }
@@ -136,7 +136,7 @@
         const pool = AFFIX_POOL.filter(a => a.category === bucket);
         if (pool.length) {
           const aff = pick(pool);
-          const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq));
+          const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq));
           const T = tierOf(tier, aff.type);
           const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
           if (bucket === 'prefix') prefix = [one]; else suffix = [one];
@@ -238,7 +238,7 @@
       const old = normalizeAffixes(eq.affixes);  // 深拷贝嵌套结构，便于回滚与对比
       const oldRarity = eq.rarity;
       const aff = pick(pool);
-      const tier = window.Equipment.rollAffixTier(eq.rarity.id, window.Equipment.ilvlOf(eq)); // 按稀有度加权 + 装备等级解锁，白/蓝加不出 T1
+      const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq)); // T 阶只由装备等级解锁（2026-09-11）
       const T = tierOf(tier, aff.type);
       const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
       eq.affixes[target] = [...eq.affixes[target], added];

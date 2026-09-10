@@ -116,7 +116,7 @@
       return;
     }
     if (reward.type === 'egg') {
-      addLootEntry('宠物蛋 ×1（去「宠物」页或「装备」页背包孵化）');
+      addLootEntry('宠物蛋 ×1（孵化去「背包 → 宠物蛋」）');
       flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
       return;
     }
@@ -359,12 +359,12 @@
    * 这段时间行动条继续走的话，会出现"人还在半路、下一次出手已经开始蓄力"的错位。 */
   let lastBackMs = 0;
   function attackRecoverMs() { return lastBackMs; }
-  function animateAttack(attacker) {
+  function animateAttack(attacker, holdMs) {
     const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
     const foe = attacker === 'pet' ? $('enemy-icon') : $('pet-icon');
     if (!icon) { lastBackMs = 0; return 0; }
     const pace = paceOf(attacker);
-    lastBackMs = Math.round(pace.back * 1000);
+    holdMs = holdMs || 0; lastBackMs = Math.round(pace.back * 1000) + holdMs;
     const dashMs = setDashDistance(icon, foe, attacker, pace.speed);
     icon.style.setProperty('--dash-charge', (pace.charge / 1000).toFixed(3) + 's');
     icon.style.setProperty('--dash-back', pace.back.toFixed(3) + 's');
@@ -379,7 +379,7 @@
     icon.__chargeT = setTimeout(() => {
       icon.classList.remove('charging');
       icon.classList.add('attacking');
-      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'), dashMs + pace.back * 1000);
+      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'), dashMs + holdMs + pace.back * 1000);
     }, pace.charge);
     // 逐帧动画立绘：有攻击帧则切换播一遍（无则维持现有 CSS 突进+刀光）
     const node = icon && icon.querySelector('.pet-anim');

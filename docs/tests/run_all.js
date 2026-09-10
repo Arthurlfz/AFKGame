@@ -81,6 +81,6 @@ if (bad.length) {
     }
   }
   console.log('');
-  console.log('（已知存量红：vtest_bugfix=emoji 断言过期 / vtest_quest=任务数 108 vs 109 / vtest_enemy_balance=蒙特卡洛 flaky）');
+  console.log('（已知存量红：vtest_bugfix=emoji 断言过期 / vtest_enemy_balance=蒙特卡洛 flaky）');
 }
 process.exit(bad.length ? 1 : 0);

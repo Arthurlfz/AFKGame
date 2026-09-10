@@ -1,7 +1,9 @@
-// 任务系统回归测试（120 条任务 v4：10 新手 + 68 主线 + 12 日常 + 6 成就 + 24 宠物）
-// 注：2026-08-30 地图从 6 图扩到 10 图，主线由 24 条（6图×4）扩到 40 条（10图×4）；
-//     2026-08-31 新增宠物专属 24 条（8 宠 × 3 养成链：孵化→带它击杀→它进化），独立 pet 分类
-//     2026-08-31 第二幕 7 图（61-100 级），主线再扩 28 条（m41~m68，17图×4）
+// 任务系统回归测试（109 条任务 v5：引导 6 + 系列 50 + 宠物 24 + 日常 12 + 循环 11 + 成就 6）
+// 注：2026-08-30 地图从 6 图扩到 10 图，主线由 24 条（6图×4）扩到 40 条（10图×4）
+//     2026-08-31 新增宠物专属 24 条（8 宠 × 3 养成链：孵化→带它击杀→它进化）
+//     2026-09-06 第二幕 7 图（61-100 级）随地图精简删除，m41~m68 一并删掉
+//     2026-09-10 任务系统整理：分类口径 category → 派生 kind（可重复条目从 main/pet 摘出独立成 loop），
+//                新增三级结构（一级分类 → 二级分组 → 具体任务）与分组断言
 //  - 数据：五类任务数量、新手链前置依赖、类型齐全
 //  - 逻辑：引导条取当前任务、按类型上报、限定地图匹配、一次性完成、日常当天只交一次、跳过引导
 //  - 宠物专属：petName 过滤（进度只算指定宠出战）、孵化任务已拥有即完成、固定经验档位
@@ -16,7 +18,7 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, fet
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
-for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/quest.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-codex.js', '../js/ui/ui-quest.js', '../js/main.js']) VTF.load(ctx, f);
+for (const f of ['../js/core/config.js', '../js/core/quest-config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/quest.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-codex.js', '../js/ui/ui-quest.js', '../js/main.js']) VTF.load(ctx, f);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 (async () => {
@@ -25,25 +27,100 @@ const C = code => vm.runInContext(code, ctx);
   C(`(function(){const p=Pet.createPet('腐噜兽','🐹',5,110,22,11,40,'腐噜兽');Pet.addPet(p);Pet.setActive(p.id);return true})()`);
   A(C(`Pet.getActivePet() && Pet.getActivePet().level`) >= 1, '已建立 Lv.1 出战宠物（任务解锁依赖它）');
 
-  /* ---------- 数据完整性 ---------- */
+  /* ---------- 数据完整性（口径 = quest-config.js 派生的一级分类 kind） ---------- */
   const total = C('Config.drop.quests.length');
-  // 2026-09-08 N1-N6 override：config 末尾把旧的 G1-G10（10 条）整段替换成 N1-N6（6 条）→ 总数 112 → 108
-  A(total === 108, '任务总数 108 条（N1-N6 引导替换 G1-G10 后：实际 ' + total + '）');
-  const count = cat => C(`Config.drop.quests.filter(q=>q.category==='${cat}').length`);
-  A(count('tutorial') === 6, '新手引导 6 条（N1-N6）');
-  A(count('main') === 60, '主线 60 条（m1-m40 + 10 条地图委托 + 10 条 Boss 首通）');
-  A(count('daily') === 12, '日常 12 条');
-  A(count('achieve') === 6, '成就 6 条');
-  A(count('pet') === 24, '宠物专属 24 条（8 宠 × 3 养成链）');
+  // 2026-09-11 P2：+章宝箱 10 + 副本/塔分档成就 6 + 周常 6 → 160 → 182
+  A(total === 182, '任务总数 182 条（实际 ' + total + '）');
+  const count = kind => C(`Config.drop.quests.filter(q=>q.kind==='${kind}').length`);
+  A(count('guide') === 6, '引导 6 条（N1-N6）');
+  A(count('series') === 70, '系列 70 条（10 章 × 7 条：6 环 + 章宝箱）');
+  A(count('pet') === 32, '宠物 32 条（8 宠 × 4 环：孵化 / 试炼 / 进化 / 百战）');
+  A(count('daily') === 16, '日常 16 条');
+  A(count('weekly') === 6, '周常 6 条（2026-09-11 新分类，reset 全部 weekly）');
+  A(count('exchange') === 12, '兑换 12 条（每日 6 + 每周 6；卵石相易已删）');
+  A(count('bonus') === 2, '目标 2 条（今日勤勉 + 本周活跃）');
+  A(count('loop') === 11, '循环 11 条（10 条地图委托 + 觉醒之路）');
+  A(count('achieve') === 27, '成就 27 条（21 + 副本/塔分档 6）');
+  A(count('guide') + count('series') + count('pet') + count('daily') + count('weekly') +
+    count('exchange') + count('bonus') + count('loop') + count('achieve') === total,
+    '九个一级分类正好覆盖全部任务（无遗漏、无重复归类）');
   const types = C('JSON.stringify([...new Set(Config.drop.quests.map(q=>q.type))].sort())');
-  // N1-N6 替换掉 G1-G10 后，level / soulcast 两类只在旧链里出现 → 16 种降为 15 种
-  A(JSON.parse(types).length === 15, '覆盖 15 种任务类型（含地图委托，实际 ' + JSON.parse(types).length + ' 种）');
+  // 2026-09-11：+chapterChest（章宝箱）+trialRun/towerRun/towerFloor（副本/塔上报）→ 20 种升到 24 种
+  A(JSON.parse(types).length === 24, '覆盖 24 种任务类型（实际 ' + JSON.parse(types).length + ' 种）');
   ['kill', 'equip', 'craft', 'evolve', 'disposeKill', 'direction', 'collect_loop', 'boss']
     .forEach(t => A(JSON.parse(types).indexOf(t) >= 0, '任务类型仍包含 ' + t));
+
+  /* ---------- 三级结构：一级分类 → 二级分组 → 具体任务 ---------- */
+  // ① 结构性错位必须修掉：可重复任务不能再混在一次性分类里
+  A(C(`Config.drop.quests.filter(q=>q.type==='collect_loop').every(q=>q.kind==='loop')`),
+    '地图委托全部归到「循环」分类（不再占着「系列」的列表）');
+  A(C(`Config.drop.quests.filter(q=>q.repeatable).every(q=>q.kind==='loop')`),
+    '所有可重复任务都在「循环」分类（不再占着「宠物」的列表）');
+  A(C(`Config.drop.quests.filter(q=>q.repeat).every(q=>q.kind==='daily'&&q.reset==='daily')`),
+    '所有每日任务的 kind/reset 都是 daily（重置周期写进数据，不再靠 repeat 字段猜）');
+  // ② 系列 = 10 章 × 7 条（6 环 + 章宝箱）
+  A(C(`(function(){var m={};Config.drop.quests.filter(q=>q.kind==='series').forEach(function(q){m[q.chapter]=(m[q.chapter]||0)+1;});var ks=Object.keys(m);return ks.length===10&&ks.every(function(k){return m[k]===7;});})()`),
+    '系列按图分成 10 章，每章 7 条（6 环 + 章宝箱）');
+  // 章宝箱：每章恰好 1 条、requires 指向该章 Boss、进度是现算的（同章 6 环全 completed 才 1/1）
+  A(C(`(function(){var m={};Config.drop.quests.filter(function(q){return q.type==='chapterChest';}).forEach(function(q){m[q.id]=(Config.drop.quests.filter(function(x){return x.requires===q.id;}).length);});return Object.keys(m).length===10;})()`),
+    '章宝箱 10 条（无人 require 它，链的终点）');
+  A(C(`Config.drop.quests.filter(function(q){return q.type==='chapterChest';}).every(function(q){var boss='boss'+q.id.replace('chest','');var b=Config.drop.quests.find(function(x){return x.id===boss;});return b&&q.requires===boss&&q.unlockLevel===b.unlockLevel;})`),
+    '章宝箱都 requires 本章 Boss 且解锁等级对齐（防在错误阶段看到宝箱）');
+  // 周常：周期写死 weekly（复用兑换那套 weeklyDone/weekKey 清零机制），不许出现无上限的周常
+  A(C(`Config.drop.quests.filter(function(q){return q.kind==='weekly';}).every(function(q){return q.reset==='weekly';})`),
+    '周常全部 reset:"weekly"（周一随 weeklyDone 清零，复用兑换的机制）');
+  // 副本/塔上报：mode:"max" 只认历史最大（5→12→7 = 12，失败不回退）
+  A(C(`(function(){Quest.reportType('towerFloor',5,{mode:'max'});Quest.reportType('towerFloor',12,{mode:'max'});Quest.reportType('towerFloor',7,{mode:'max'});return Quest.getQuests().find(function(q){return q.id==='tw2';}).progress;})()`) === 12,
+    'towerFloor 用 mode:"max" 只认历史最大（5→12→7 = 12，不会累加也不会回退）');
+  // 每章都不是"每一类只有一条"：至少有两环是同一类之外，久战环保证"击败"每章有 2 条
+  A(C(`(function(){var m={};Config.drop.quests.filter(function(q){return q.kind==='series'&&q.type==='kill';}).forEach(function(q){m[q.chapter]=(m[q.chapter]||0)+1;});var ks=Object.keys(m);return ks.length===10&&ks.every(function(k){return m[k]===2;});})()`),
+    '每章都有 2 条击败类任务（推进环 + 久战环），不是"每种只有一个"');
+  // 需求数量不能只有个位数（用户报「每一个都只有一个」）：击杀环 ≥ 180、装备/打造环 ≥ 6、养成环 ≥ 2
+  A(C(`Config.drop.quests.filter(function(q){return q.kind==='series'&&q.type==='kill';}).every(function(q){return q.need>=180;})`),
+    '系列击杀环的需求量全部 ≥180（不再出现 30 只就交差）');
+  A(C(`Config.drop.quests.filter(function(q){return q.kind==='series'&&['equipDrop','craft','salvage'].indexOf(q.type)>=0;}).every(function(q){return q.need>=6;})`),
+    '系列装备/打造环的需求量全部 ≥6（不再出现 ×1 ×2）');
+  // ③ 宠物 = 8 家族 × 3 条
+  A(C(`(function(){var m={};Config.drop.quests.filter(q=>q.kind==='pet').forEach(function(q){m[q.petName]=(m[q.petName]||0)+1;});var ks=Object.keys(m);return ks.length===8&&ks.every(function(k){return m[k]===4;});})()`),
+    '宠物按家族分成 8 组，每组 4 条（孵化 / 试炼 / 进化 / 百战）');
+  // ④ 日常与成就按目标形式族分组 —— 这就是「日常任务 → 收集任务 → 具体任务」的中间那一层
+  A(C(`Config.drop.quests.filter(q=>q.kind==='daily'||q.kind==='achieve').every(q=>q.group&&q.group.label)`),
+    '日常与成就的每条任务都带二级分组标签（收集 / 击败 / 打造 …）');
+  A(C(`(function(){var m={};Config.drop.quests.filter(q=>q.kind==='daily').forEach(function(q){m[q.group.label]=(m[q.group.label]||0)+1;});return m['收集任务']===6&&m['击败任务']===2;})()`),
+    '日常分组正确（收集 6 条、击败 2 条）');
+  A(C(`Config.drop.quests.filter(q=>q.kind==='loop'&&q.type==='collect_loop').every(q=>q.group.id==='l:map')`),
+    '循环分类里，「地图委托」与「长线收集」分成两组');
+  // ④b 兑换（2026-09-10 新增分类）：硬上限是它的灵魂，数据层就得守住，不靠 UI 提醒
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange').every(q=>q.reset==='daily'||q.reset==='weekly')`),
+    '每条兑换都带硬重置周期（每日/每周）—— 否则就是无限刷，会取代地图与试炼');
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange').every(q=>!q.repeatable)`),
+    '兑换不准标 repeatable（那会绕过每日/每周上限）');
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.reset==='weekly').length`) === 6, '每周兑换 6 条');
+  // 传说补遗（2026-09-10 用户点名）：必须是硬上限的兑换，且单条 ≤2 个传说（归属表铁律 3）
+  A(C(`(function(){var q=Config.drop.quests.find(function(x){return x.id==='ex_day_legend';});
+       return !!q && q.reset==='daily' && q.reward['传说进化素材']<=2 && q.unlockLevel===31;})()`),
+    '「传说补遗」是每日限 1 次的兑换（保底 2 个传说，不靠运气/不退低级图）');
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.category==='exchange').length`) === 12,
+    '兑换任务的 category 已对齐成 exchange（不谎报自己是日常）');
+  A(C(`Quest.getGroups('exchange', Quest.getQuests().filter(q=>q.kind==='exchange')).length`) === 2,
+    '兑换按重置周期分成「每日兑换 / 每周兑换」两组');
+  // ⑤ Quest 侧的分组聚合 API
+  A(C(`typeof Quest.getGroups==='function' && typeof Quest.readyCount==='function'`),
+    'Quest.getGroups / Quest.readyCount 已导出（UI 分级与顶栏红点用）');
+  A(C(`Quest.getGroups('series', Quest.getQuests().filter(q=>q.kind==='series')).length`) === 10,
+    'Quest.getGroups("series") 返回 10 章');
 
   /* ---------- 新手链前置依赖 ---------- */
   A(C(`Config.drop.quests.find(q=>q.id==='n1') && !Config.drop.quests.find(q=>q.id==='n1').requires`), '新手第一条 n1 无前置');
   A(C(`['n2','n3','n4','n5','n6'].every(id=>!!(Config.drop.quests.find(q=>q.id===id)||{}).requires)`), '新手 n2~n6 都配了前置任务');
+
+  /* ---------- 引导毕业结算（2026-09-10，业界惯例：仪式感 + 奖励反馈 + 平滑过渡） ---------- */
+  A(C(`(function(){const L=Config.drop.quests.filter(q=>/^n[1-5]$/.test(q.id));return L.length===5&&L.every(q=>typeof q.learned==='string'&&q.learned.length>=8);})()`),
+    'n1~n5 都配了 learned（毕业弹窗「这一路你学会了」recap 的唯一数据源）');
+  const gradPack = C('Config.tutorialMode.starterPack.mats||[]');
+  A(gradPack.length >= 3, '毕业礼包有真奖励（空包发"已发放"是撒谎，2026-09-10 修复）');
+  A(gradPack.every(m => ['合成之石', '鉴定石', '资源试炼门票'].indexOf(m.name) >= 0 && (m.qty || 0) >= 1),
+    '毕业礼包 = 打造通货 + 鉴定石 + 门票（符合资源铁律：不发进化/涅槃材料）');
   // 链完整性：有且仅有一个起点，从起点能一路走到底且条数 = 总数（防断链 / 分叉 / 成环）
   // requires 指向的是「前置」，所以要反向建「后继」索引才能从 g1 一路走到底
   A(C(`(function(){const T=Config.drop.quests.filter(q=>q.category==='tutorial');
@@ -124,7 +201,10 @@ const C = code => vm.runInContext(code, ctx);
 
   /* ---------- 追踪栏渲染 + 任务追踪 ---------- */
   C(`UI.renderQuestTracker()`);
-  A(C(`document.getElementById('quest-tracker').style.display`) === 'none', '跳过后且无追踪任务时追踪栏隐藏');
+  // 2026-09-10 自动追踪上线：手动追踪为空时，进度 ≥80% 的任务会自己顶上来 ——
+  // 这是有意的行为（"有个任务能交了"不该等玩家自己翻面板才发现），所以不再断言"隐藏"。
+  A((C(`document.getElementById('quest-tracker').innerHTML`).match(/qt-auto/g) || []).length >= 1,
+    '跳过引导 + 无手动追踪时，追踪栏由自动追踪项接管（进度 ≥80%）');
 
   // 模拟「换号 / 新账号」：清内存 + 清云端任务表 + 重拉进度。
   // 真实流程是登出走 clearAccountState → Quest.reset()，再登录走 restoreCloudPets → loadCloudProgress。
@@ -145,7 +225,8 @@ const C = code => vm.runInContext(code, ctx);
   // 测试桩不解析 HTML，所以断言走 innerHTML 字符串
   const qtCount = () => C(`(document.getElementById('quest-tracker').innerHTML.match(/qt-item/g)||[]).length`);
   const qtHtml = () => C(`document.getElementById('quest-tracker').innerHTML`);
-  A(qtCount() === 1, '追踪栏当前 1 条（新手链当前任务）');
+  // 2026-09-10 自动追踪：除引导外，进度 ≥80%（含"做完还没交"）的任务也会上栏 —— 条数不再固定为 1
+  A(qtCount() >= 1, '追踪栏至少有引导当前任务（+ 可能的自动追踪项）');
   A(qtHtml().indexOf('选择出战宠物并开始挂机') !== -1, '追踪栏显示任务名「选择出战宠物并开始挂机」（n1）');
 
   // 钉住两个普通任务
@@ -175,8 +256,40 @@ const C = code => vm.runInContext(code, ctx);
   C(`UI.renderQuestPanel('main')`);
   const panel = () => C(`document.getElementById('quest-body').innerHTML`);
   A(panel().indexOf('q-mark--accept') !== -1, '未接取的任务显示可接角标 !');
+
+  /* ---------- 三级结构在 UI 上真的成立（数据对了但没渲染分级 = 白做） ---------- */
+  C(`UI.renderQuestPanel('series')`);
+  const seriesHtml = panel();
+  A(seriesHtml.indexOf('quest-group-head') !== -1, '系列面板渲染出二级分组组头');
+  A(seriesHtml.indexOf('第 1 章') !== -1, '组头显示章节名（第 N 章 · 图名）');
+  A(seriesHtml.indexOf('quest-group-body') !== -1, '默认展开的组里有具体任务卡片');
+  // 面板只显示「已解锁」的条目，所以这里按实际解锁数对账（章节完整性由数据层断言守）
+  const seriesOpen = C(`Quest.getQuests().filter(q=>q.kind==='series'&&!q.finished&&q.unlocked).length`);
+  A((seriesHtml.match(/quest-group-head/g) || []).length >= 1, '系列面板至少渲染 1 个章节组头');
+  A((seriesHtml.match(/class="quest-card[" ]/g) || []).length === seriesOpen,
+    '展开组里的卡片数 = 已解锁系列任务数（' + seriesOpen + '）');
+  A(C(`Quest.getGroups('series', Quest.getQuests().filter(q=>q.kind==='series')).length`) === 10,
+    '系列数据层始终是完整的 10 章（与面板只显示已解锁不冲突）');
+  A(seriesHtml.indexOf('undefined') === -1, '分组渲染无 undefined 泄漏');
+  A(seriesHtml.indexOf('全部展开') !== -1 && seriesHtml.indexOf('全部折叠') !== -1, '面板提供全部展开/折叠');
+  C(`UI.renderQuestPanel('daily')`);
+  A(panel().indexOf('收集任务') !== -1, '日常面板渲染出「收集任务」分组（日常 → 收集 → 具体任务）');
+  // 循环（委托）要该图守关 Boss 首通才解锁 → 先上报一次 Boss 击杀并交掉首通任务，再看分组渲染
+  C(`Quest.reportType('boss', 1, { areaId: 'corrupted-forest' })`);
+  const bossR = await C(`Quest.completeQuest('boss1')`);
+  A(bossR && bossR.ok, '图 1 守关 Boss 首通（循环委托的解锁前提，实际 ' + JSON.stringify(bossR) + '）');
+  C(`UI.renderQuestPanel('loop')`);
+  A(panel().indexOf('地图委托') !== -1, '循环面板渲染出「地图委托」分组（图 1 首通后解锁）');
+  // 旧分类 id 兼容：外部调用 / 老代码传 'main' 仍能定位到「系列」
+  C(`UI.renderQuestPanel('main')`);
+  A(panel().indexOf('第 1 章') !== -1, '旧 id "main" 自动映射到「系列」分类');
+  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('quest-tab-cnt') !== -1,
+    '分类 tab 角标已渲染（可提交=红 / 未完成=灰）');
+  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('♻️ 循环') !== -1,
+    'tab 栏出现「循环」分类');
   // 打够进度让它变成可交
-  C(`Quest.acceptQuest('m1'); for(let i=0;i<30;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' }); UI.renderQuestPanel('main')`);
+  // m1 需求量已从 30 提到 180（2026-09-10），这里要打够 180 才算"进度满"
+  C(`Quest.acceptQuest('m1'); for(let i=0;i<180;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' }); UI.renderQuestPanel('main')`);
   A(panel().indexOf('q-mark--submit') !== -1, '进度满了的任务显示可交角标 ?');
 
   // 放弃：进度清零 + 回到未接取 + 从追踪栏撤下
@@ -194,7 +307,7 @@ const C = code => vm.runInContext(code, ctx);
    * 奖励走云端 RPC 累加（add_material），重入一次就多给一份材料，所以这里必须卡死。 */
   await hardReset();
   C(`Quest.acceptQuest('m1')`);
-  C(`for(let i=0;i<30;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`);
+  C(`for(let i=0;i<180;i++) Quest.reportType('kill', 1, { areaId: 'corrupted-forest' })`);
   const matBefore = C(`Materials.getQuantity('进化素材')`);
   // 连点 5 次：不等上一次返回就发下一次（模拟玩家狂点，或网络慢时 UI 重复触发）
   const burst = await C(`Promise.all([1,2,3,4,5].map(()=>Quest.completeQuest('m1')))`);
@@ -249,6 +362,38 @@ const C = code => vm.runInContext(code, ctx);
   A(pe2r && pe2r.exp === 600, `pe2 完成给固定经验 600（实际 ${pe2r && pe2r.exp}）`);
   A(pe2r && (pe2r.rewards || []).join('').indexOf('经验 +600') >= 0, 'pe2 奖励列表含「经验 +600」');
   A(C(`Quest.getQuests().find(q=>q.id==='pe2').finished`) === true, 'pe2 已标记完成');
+
+  /* ---------- 兑换任务行为：每日 / 每周 各自的硬上限（2026-09-10 新增分类） ---------- */
+  // 把出战宠顶到 Lv60 解锁全部兑换并给足消耗物（本段放最后，不影响前面的等级断言）
+  C(`(function(){const p=Pet.getActivePet();p.level=60;p.exp=0;return true})()`);
+  // 兑换定价 2026-09-10 上调（用户报「需求数量太少」）→ 这里要給足 120+ 才能同时交掉每日与每周各一条
+  C(`Materials.gain('重铸石',120); Materials.gain('增缀石',120); Materials.gain('剥离石',120);
+     Materials.gain('神圣石',120); Materials.gain('合成之石',120)`);
+  const idBefore = C(`Materials.getQuantity('鉴定石')`);
+  const exR = await C(`Quest.completeQuest('ex_day_identify')`);
+  A(exR && exR.ok, '每日兑换「废石辨真」可提交（' + JSON.stringify(exR && (exR.rewards || exR.error)) + '）');
+  A(C(`Materials.getQuantity('鉴定石')`) - idBefore === 20, '兑换到手 鉴定石 ×20');
+  A(C(`Quest.getQuests().find(q=>q.id==='ex_day_identify').finished`) === true, '每日兑换交完即 finished');
+  A(C(`Quest.getQuests().find(q=>q.id==='ex_day_identify').reset`) === 'daily', '每日兑换带 reset=daily');
+  const exAgain = await C(`Quest.completeQuest('ex_day_identify')`);
+  A(exAgain && exAgain.error, '同一天不能重复兑换（提示：' + ((exAgain && exAgain.error) || '') + '）');
+
+  const hbBefore = C(`Materials.getQuantity('强化丹B')`);
+  const exWk = await C(`Quest.completeQuest('ex_week_dan_b')`);
+  A(exWk && exWk.ok, '每周兑换「玉液凝丹」可提交（' + JSON.stringify(exWk && (exWk.rewards || exWk.error)) + '）');
+  A(C(`Materials.getQuantity('强化丹B')`) - hbBefore === 3, '兑换到手 强化丹B ×3');
+  A(C(`Quest.getQuests().find(q=>q.id==='ex_week_dan_b').reset`) === 'weekly', '每周兑换带 reset=weekly');
+  A(C(`Quest.getQuests().find(q=>q.id==='ex_week_dan_b').finished`) === true, '每周兑换交完即 finished');
+  const exWkAgain = await C(`Quest.completeQuest('ex_week_dan_b')`);
+  A(exWkAgain && exWkAgain.error, '本周内不能重复兑换（提示：' + ((exWkAgain && exWkAgain.error) || '') + '）');
+  A(C(`Quest.getQuests().filter(q=>q.kind==='daily'&&q.id==='ex_day_identify').length`) === 0,
+    '兑换任务不落在「日常」分类里（两套独立水位，互不占额度）');
+  C(`UI.renderQuestPanel('exchange')`);
+  const exHtml = C(`document.getElementById('quest-body').innerHTML`);
+  A(exHtml.indexOf('每日兑换') !== -1 && exHtml.indexOf('每周兑换') !== -1,
+    '兑换面板渲染出「每日兑换 / 每周兑换」两组');
+  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('🔄 兑换') !== -1,
+    'tab 栏出现「🔄 兑换」分类');
 
   console.log('ALL QUEST TESTS PASSED');
 })();

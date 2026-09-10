@@ -1830,6 +1830,49 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .quest-tab:hover { border-color:var(--line-hi); color:var(--text); }
 .quest-tab.on { border-color:var(--accent); color:var(--accent-hi); box-shadow:0 0 0 1px rgb(var(--action-gold-rgb) / .25) inset; }
 .quest-tab-cnt { color:var(--text-faint); font-size:0.722rem; margin-left:3px; }
+.quest-tab-cnt.hot { color:#e0894a; font-weight:700; }
+
+/* ---------- 任务三级结构：分类 tab → 二级分组（可折叠） → 具体任务卡片 ----------
+ * 分组键由 quest-config.js 派生：系列=章节 / 宠物=家族 / 日常与成就=目标形式族 /
+ * 循环=地图委托·长线收集 / 已完成=一级分类。 */
+.quest-groups-bar { display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:0.778rem; color:var(--text-faint); }
+.quest-groups-sum { flex:1; min-width:0; }
+.quest-groups-sum .hot { color:#e0894a; }
+.quest-group { border:1px solid var(--line); border-radius:4px; margin-bottom:6px; background:rgb(0 0 0 / .12); }
+.quest-group.open { border-color:var(--line-hi); }
+.quest-group-head {
+  display:flex; align-items:center; gap:6px; width:100%; text-align:left;
+  padding:7px 9px; background:none; border:0; cursor:pointer; color:var(--text); font-size:0.889rem;
+}
+.quest-group-head:hover { background:rgb(var(--action-gold-rgb) / .07); }
+.quest-group-caret { flex:none; width:10px; color:var(--text-faint); font-size:0.722rem; }
+.quest-group-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-hi); }
+.quest-group-head.cleared .quest-group-label { color:var(--text-dim); }
+.quest-group-ready {
+  flex:none; padding:1px 6px; border-radius:8px; font-size:0.722rem;
+  color:#e0894a; background:rgb(224 137 74 / .14); border:1px solid rgb(224 137 74 / .4);
+}
+.quest-group-prog { flex:none; color:var(--text-faint); font-family:var(--font-num); font-size:0.778rem; }
+.quest-group-bar { flex:none; width:52px; margin:0; }
+.quest-group-body { padding:8px 9px 2px; border-top:1px solid var(--line); }
+.quest-group-body .quest-card { margin-bottom:8px; }
+.quest-group-body .quest-card:last-child { margin-bottom:6px; }
+
+/* 顶栏「任务」按钮的总红点：全分类可提交条数（0 时由 JS 移除节点） */
+.top-btn .quest-dot {
+  position:absolute; top:-5px; right:-5px; min-width:16px; height:16px; padding:0 4px;
+  border-radius:8px; background:#c0562e; color:#fff; font-size:0.667rem;
+  line-height:16px; text-align:center; font-family:var(--font-num); pointer-events:none;
+}
+
+/* 完成度行（任务抽屉顶部）+ 自动追踪标记（追踪栏） */
+.quest-complete-line {
+  display:flex; align-items:baseline; gap:6px; margin-bottom:8px;
+  font-size:0.778rem; color:var(--text-dim);
+}
+.quest-complete-line b { color:var(--accent-hi); font-family:var(--font-num); font-size:0.944rem; }
+.quest-complete-line .hint { color:var(--text-faint); }
+/* （自动追踪的视觉区分已并入下方追踪栏块：qt-auto 用 tag 虚线边，不再抢 tag 颜色） */
 
 /* 任务卡片（对齐 2026-08-31 demo 排版） */
 .quest-card {
@@ -1870,6 +1913,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   flex-basis:100%; margin-top:2px; font-size:var(--fs-xs); color:var(--text-dim);
 }
 @media (max-width: 900px) { .quest-tracker .qt-reward { order: 6; } }
+/* 引导毕业弹窗里的「毕业礼包已发放」行（金色，和奖励即时反馈的惯例一致） */
+.qt-grad-reward { color:#e0894a; font-weight:700; }
 .quest-card-btn {
   flex:none; padding:3px 10px; cursor:pointer; font-size:0.778rem; font-weight:700; letter-spacing:1px;
   background:transparent; border:1px solid var(--accent); border-radius:var(--radius-sm);
@@ -2069,33 +2114,81 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   color: var(--text-faint); font-size: var(--fs-sm); text-align: center;
 }
 
-/* ---------- 任务追踪栏（常驻页面容器顶部：新手链当前任务 + 玩家钉住的任务，最多 3 条） ---------- */
-.quest-tracker { display: flex; flex-direction: column; gap: var(--gap-xs); margin: 0 0 var(--gap-md); }
+/* ---------- 任务追踪栏（2026-09-10 重做：两行结构 = 摘要行 + 进度条；
+   完成即可原地提交（完成态绿色 + 「可提交」+ 主按钮变「提交/领取奖励」）；
+   分类 tag 按一级分类染色（水墨底上的少量点缀：暗金/暗紫/病绿/青灰/锈红）。 ---------- */
+/* 2026-09-10：从「页面容器顶部占文档流的一条」改为 **body 层右上悬浮**（hotspot 式：
+   不占布局、不把舞台往下挤）。收起后只剩一枚胶囊（带可提交数），点一下展开任务列表。 */
+.quest-tracker {
+  position: fixed; right: 14px; top: 74px; width: 302px; z-index: 280; margin: 0;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+}
+/* 整条标题栏 = 拖动把手（move 光标 + 悬停描边，让玩家一眼看出"这玩意能挪"） */
+.quest-tracker .qt-head {
+  display: flex; align-items: center; gap: 4px; align-self: flex-end; cursor: move; user-select: none;
+  padding: 2px 2px 2px 3px; border: 1px solid transparent; border-radius: 999px;
+}
+.quest-tracker .qt-head:hover { border-color: var(--line); background: rgb(0 0 0 / .2); }
+.quest-tracker .qt-grip {
+  flex: none; padding: 1px 3px; color: var(--text-dim); font-size: 1rem; line-height: 1; letter-spacing: -1px;
+}
+.quest-tracker .qt-head:hover .qt-grip { color: var(--accent-hi); }
+.quest-tracker .qt-toggle {
+  align-self: flex-end; padding: 3px 10px; cursor: pointer; font-size: var(--fs-xs);
+  background: var(--panel); background-image: var(--ui-paper-texture); color: var(--text-dim);
+  border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow-panel);
+  letter-spacing: 1px; transition: border-color .12s, color .12s;
+}
+.quest-tracker .qt-toggle:hover { border-color: var(--accent-dim); color: var(--text-hi); }
+.quest-tracker .qt-toggle b { color: #e0894a; }
+.quest-tracker .qt-list {
+  display: flex; flex-direction: column; gap: var(--gap-xs);
+  max-height: 44vh; overflow: auto; padding-right: 2px;
+}
+.quest-tracker.is-collapsed .qt-list { display: none; }
+/* 窄屏：改成底部横条（贴聊天窄条上方），不压战斗舞台 */
+@media (max-width: 900px) {
+  .quest-tracker { left: 8px; right: 8px; width: auto; top: auto; bottom: 52px; }
+}
 .quest-tracker .qt-item {
-  display: flex; align-items: center; flex-wrap: wrap; gap: var(--gap-sm); padding: 7px 12px;
+  display: flex; flex-direction: column; gap: 5px; padding: 8px 12px;
   background: var(--panel); background-image: var(--ui-paper-texture);
   border: 1px solid rgb(var(--action-gold-rgb) / .38); border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm); box-shadow: var(--shadow-panel);
 }
-/* 进度满了：换成绿色描边，提示可以去交 */
+.quest-tracker .qt-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--gap-sm); }
+/* 完成态：绿描边 + 绿进度条 + 金绿「可提交」，色彩+文字双重编码（不单靠颜色） */
 .quest-tracker .qt-item.qt-done { border-color: rgb(127 174 127 / .5); border-left-color: #7fae7f; }
 .quest-tracker .qt-tag {
-  flex: none; padding: 1px 6px; border: 1px solid var(--accent-dim);
-  border-radius: var(--radius-xs); color: var(--accent-hi); font-size: var(--fs-xs); letter-spacing: 1px;
+  flex: none; padding: 1px 6px; border: 1px solid var(--line);
+  border-radius: var(--radius-xs); color: var(--text-dim); font-size: var(--fs-xs); letter-spacing: 1px;
+  background: rgb(0 0 0 / .18);
 }
-.quest-tracker .qt-name { flex: none; font-weight: 700; color: var(--text-hi); }
+.quest-tracker .qt-tag--guide    { color: #8aa46a; border-color: rgb(138 164 106 / .5); }
+.quest-tracker .qt-tag--series   { color: var(--accent-hi); border-color: var(--accent-dim); }
+.quest-tracker .qt-tag--pet      { color: #9a7fb8; border-color: rgb(154 127 184 / .5); }
+.quest-tracker .qt-tag--daily    { color: #7fae7f; border-color: rgb(127 174 127 / .5); }
+.quest-tracker .qt-tag--loop     { color: #6fa8a8; border-color: rgb(111 168 168 / .5); }
+.quest-tracker .qt-tag--exchange { color: #c08a5a; border-color: rgb(192 138 90 / .5); }
+.quest-tracker .qt-tag--achieve  { color: var(--accent-hi); border-color: var(--accent-dim); }
+.quest-tracker .qt-tag--bonus    { color: #c07a6a; border-color: rgb(192 122 106 / .5); }
+/* 自动追踪项：tag 虚线边（区别于手动钉的实线），具体含义靠 title 提示，不靠颜色单扛 */
+.quest-tracker .qt-item.qt-auto .qt-tag { border-style: dashed; }
+.quest-tracker .qt-step { flex: none; color: var(--text-faint); font-size: var(--fs-xs); font-family: var(--font-num); }
+.quest-tracker .qt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--text-hi); }
+/* 第二行 = 进度条 + 数字：数字从摘要行挪下来，第一行的名称才有地方显示（曾把名称挤到只剩 1 字宽） */
+.quest-tracker .qt-sub { display: flex; align-items: center; gap: var(--gap-sm); }
 .quest-tracker .qt-prog { flex: none; color: var(--text-dim); font-family: var(--font-num); font-size: var(--fs-sm); }
+.quest-tracker .qt-item.qt-done .qt-prog { color: #7fae7f; font-weight: 700; letter-spacing: 1px; }
+.quest-tracker .qt-actions { flex: none; display: flex; align-items: center; gap: 4px; }
 .quest-tracker .qt-bar {
-  flex: 1; min-width: 80px; height: 8px; overflow: hidden;
+  flex: 1; min-width: 0; height: 8px; overflow: hidden;
   background: var(--inset); border: 1px solid var(--line);
   border-radius: var(--radius-xs); box-shadow: var(--shadow-inset);
 }
 .quest-tracker .qt-bar-fill { height: 100%; width: 0; background: var(--exp); transition: width .25s ease; }
+.quest-tracker .qt-item.qt-done .qt-bar-fill { background: #7fae7f; }
 .quest-tracker .btn-mini { flex: none; }
-@media (max-width: 900px) {
-  .quest-tracker .qt-item { flex-wrap: wrap; }
-  .quest-tracker .qt-bar { order: 5; flex-basis: 100%; }
-}
 
 /* ============ 宠物血脉特质 + 觉醒 + 魂铸（2026-09-01 设计 v1） ============ */
 /* 特质胶囊（宠物卡 / 市场 / 预览） */

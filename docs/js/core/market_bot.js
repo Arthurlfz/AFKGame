@@ -153,7 +153,7 @@
    * 价 = 图档基数(basePerTier^(areaTier-1)) × 稀有度乘数 × 材料系数 × 流派口味 × 个人波动(1±jitter)。
    * 低价漏 = 下限再打折（容易挂漏的 persona 概率翻倍、稳妥 persona 减半）。 */
   function rollPrice(rarityId, areaTier, affinity, persona) {
-    const weights = MB.materialWeights || { reforge: 30, strip: 20, holy: 15, augment: 15, phoenix: 15 };
+    const weights = MB.materialWeights || { reforge: 30, strip: 20, holy: 15, augment: 15 };
     const matId = pickWeighted(Config.trade.materials.map(m => ({ id: m.id, weight: weights[m.id] || 0 }))).id;
     const mat = Config.trade.materials.find(m => m.id === matId);
     const PG = MB.priceGradient || {};

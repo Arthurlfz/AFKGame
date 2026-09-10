@@ -75,8 +75,12 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   const keys = Object.keys(mw).map(Number).sort((a, b) => a - b);
   A(keys.length === areas.length, `materialWeightsByTier 覆盖 ${keys[0]}~${keys[keys.length - 1]}（${keys.length} 档，与地图一致）`);
   const has = (t, k) => !!(mw[t] && mw[t][k] > 0);
-  // 最新资源边界：涅槃材料由资源试炼·涅槃承担，普通地图不稳定生产。
-  A(Object.keys(mw).every(t => !has(t, '涅磐兽') && !has(t, '涅槃丹')), '普通地图不稳定产出涅槃材料');
+  // 2026-09-10 用户拍板：涅磐兽（已退役，纯稀有收藏/交易物）挪到图 10 极低概率掉落；
+  // 涅槃丹（唯一真消耗品）仍然不进地图，继续由资源试炼·涅槃承担。
+  A(Object.keys(mw).every(t => !has(t, '涅槃丹')), '涅槃丹不进地图掉落表（归资源试炼·涅槃）');
+  A(keys.filter(t => t !== 10).every(t => !has(t, '涅磐兽')), '涅磐兽只出现在图 10，不向低图泄露');
+  A(has(10, '涅磐兽') && mw[10]['涅磐兽'] < 1,
+    `图 10 极低概率掉落涅磐兽（权重 ${mw[10]['涅磐兽']}，小于表内任何材料的权重下限 1）`);
   A([1, 2, 3].every(t => !has(t, '合成之石') && !has(t, '神圣石')), '合成之石/神圣石 图1-3 不出现（成长期 图4 才解锁）');
   A([4, 5, 6, 7, 8, 9, 10].every(t => has(t, '合成之石')), '合成之石 图4-10 都出现（成长期 图4 解锁）');
   // 2026-09-09 产出削减：神圣石移出地图（归通天塔，淬炼试炼 Lv43+ 是唯一活来源）
@@ -84,9 +88,15 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   A(Object.keys(mw).every(t => !has(t, '越龙之石') && !has(t, '天仙玉露') && !has(t, '强化丹B')),
     '越龙之石/天仙玉露/强化丹B 不进地图掉落表（归通天塔）');
   const evoTiers = JSON.parse(C('JSON.stringify(Config.drop.areaEvolutionTiers)'));
-  A(evoTiers['echo-cliffs'].includes('传说进化素材') && evoTiers['ember-hollow'].includes('传说进化素材')
-    && !evoTiers['soul-abyss'].length && !evoTiers['blight-heart'].length,
-    '传说进化素材稳定来源收束到图6-8，图9-10不再稳定掉落');
+  A(evoTiers['echo-cliffs'].includes('传说进化素材') && evoTiers['ember-hollow'].includes('传说进化素材'),
+    '传说进化素材的稳定来源收束在图6-8');
+  // 2026-09-10 用户报「传说卡手」：图 9~10 由「完全不掉」改成「只出传说 + 极低权重」。
+  // 归属表禁止的是「图 9~10 **稳定刷取**」，不是「偶尔出一两个」—— 所以断言改守「只出最高档 + 权重远低于图 8」。
+  A(evoTiers['soul-abyss'].join() === '传说进化素材' && evoTiers['blight-heart'].join() === '传说进化素材',
+    '图 9~10 只产出传说档进化素材（不产普通/精粹）');
+  A(has(9, '进化素材') && has(10, '进化素材'), '图 9~10 有进化素材占位键（否则那一档根本不参与抽取）');
+  A(mw[9]['进化素材'] * 4 <= mw[8]['进化素材'] && mw[10]['进化素材'] * 4 <= mw[8]['进化素材'],
+    `图 9~10 的进化素材权重远低于图 8（${mw[9]['进化素材']} / ${mw[10]['进化素材']} vs ${mw[8]['进化素材']}）→ 属「不稳定掉落」而非「稳定刷取」`);
   const loops = JSON.parse(C('JSON.stringify(Config.drop.quests || [])')).filter(q => q.type === 'collect_loop');
   A(loops.every(q => !q.reward || (!q.reward['涅槃丹'] && !q.reward['涅磐兽'] && !q.reward['百变魔石'])),
     '地图循环任务不发放涅槃材料或稀有合成道具');

@@ -38,43 +38,8 @@
   }
 
   // 稀有度（颜色）随「图档」平滑爬升：读 config.equipment.rarityWeightsByTier[图档] 的
-  // 白/蓝/金 概率表（17 张图各一组，越深金装越常见）。取代旧版按怪 lootTier 的 3 档枚举
-  // （旧版图3~17 全锁 'high'→必出金，15 张图颜色无差异）。返回稀有度对象——
-  // generateEquipment 需要读 rarity.affixMin/affixMax，字符串会让词缀数量算出 NaN。
-  function pickDropRarity(areaTier) {
-    const table = (Config.equipment.rarityWeightsByTier || {})[areaTier]
-      || { white: 80, blue: 18, gold: 2 };
-    const r = Math.random() * 100;
-    let acc = 0;
-    for (const id of ['white', 'blue', 'gold']) {
-      acc += table[id] || 0;
-      if (r < acc) return Config.equipment.rarities.find(x => x.id === id) || Config.equipment.rarities[0];
-    }
-    return Config.equipment.rarities.find(x => x.id === 'gold') || Config.equipment.rarities[0];
-  }
-
-  // 底材 T 阶随机：直接读 config.equipment.materialTierWeights（每图一套显式权重）。
-  // 以前是这里线性插值算权重（图6 → T1 占 33%，顶级底材太常见）；
-  // 改配置表后策划能一眼调，且 T1 在图6 也只有 20%。
-  function rollMaterialTier(areaTier, ilvl) {
-    const table = (Config.equipment.materialTierWeights || {})[areaTier] || { 5: 50, 4: 30, 3: 15, 2: 4, 1: 1 };
-    const entries = Object.entries(table);
-    const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
-    let r = Math.random() * total;
-    let picked = 5;
-    for (const [t, v] of entries) {
-      r -= (Number(v) || 0);
-      if (r < 0) { picked = Number(t); break; }
-    }
-    // 底材 ilvl 门槛（与词缀共用 affixIlvlGates：T1≥55/T2≥40/T3≥25）：低于门槛抽到高档底材 → 降到允许最高 T。
-    // 挂钩「实际击杀怪等级」：低图普通怪出不了顶级底材，越级杀高等级怪有奖励。
-    const lv = ilvl == null ? 100 : Number(ilvl);
-    const gates = (Config.equipment.affixIlvlGates) || {};
-    let best = 5;
-    for (const [t, g] of Object.entries(gates)) { if (lv >= Number(g) && Number(t) < best) best = Number(t); }
-    if (picked < best) picked = best;
-    return picked;
-  }
+  // 2026-09-11：pickDropRarity / rollMaterialTier 已删除 —— 颜色（=词缀条数）、底材 T、词缀 T
+  // 全部由装备 ilvl 在 equipment.generateEquipment 内部派生，掉落方只传 areaTier + ilvl。
 
   // 宠物蛋按品种计数：{ '血狐': 2, '骨狼': 1 }（已登录以云端 pet_egg 为准，本地同步）
   let eggMap = {};
@@ -159,9 +124,8 @@
       const maxTier = (Config.equipment.baseTierMultipliers || []).length || 17;
       const areaTier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
       const ilvl = (opts && opts.enemyLevel) || (area && area.levelRange && area.levelRange[1]) || 1;
-      const gold = Config.equipment.rarities.find(x => x.id === 'gold') || Config.equipment.rarities[0];
-      const matTier = rollMaterialTier(areaTier, ilvl);
-      const eq = generateEquipment(gold, areaTier, matTier, ilvl);
+      // 2026-09-11：颜色/底材T/词缀T 全部由 ilvl 派生（equipment.generateEquipment 内部处理），调用方不再传稀有度
+      const eq = generateEquipment(null, areaTier, 0, ilvl);
       eq.identified = false;
       const am = (D.areaMaterials && D.areaMaterials[area && area.id]) || null;
       let mat = null;
@@ -211,16 +175,12 @@
       const areaIdx = area && area.id ? areaList.findIndex(a => a.id === area.id) : -1;
       const maxTier = (Config.equipment.baseTierMultipliers || []).length || 17;
       const areaTier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
-      let rarity = pickDropRarity(areaTier);
-      // 「掉落稀有度」词缀：按 (dropRare-1) 概率把稀有度提升一档（白→蓝→金，金封顶）
-      if (Math.random() < (res.dropRare - 1)) {
-        const upR = rarity.id === 'white' ? 'blue' : (rarity.id === 'blue' ? 'gold' : null);
-        if (upR) rarity = Config.equipment.rarities.find(x => x.id === upR) || rarity;
-      }
       // ilvl 挂钩「实际击杀怪等级」（2026-09-05 拍板：与怪物等级挂钩，不再按图档下限）
       const ilvl = (opts && opts.enemyLevel) || (area && area.levelRange && area.levelRange[0]) || 1;
-      const matTier = rollMaterialTier(areaTier, ilvl);
-      const eq = generateEquipment(rarity, areaTier, matTier, ilvl);
+      // 2026-09-11：颜色（=词缀条数）/底材T/词缀T 全部由 ilvl 派生。
+      // 「掉落稀有度」词缀的加成改为提升词缀条数：按 (dropRare-1) 概率多出 1 条（白→蓝/蓝→金的自然途径）
+      const rareBonus = Math.random() < (res.dropRare - 1) ? 1 : 0;
+      const eq = generateEquipment(null, areaTier, 0, ilvl, rareBonus);
       eq.identified = false;          // 掉落即未鉴定，背包里灰框，鉴定后揭晓
       if (!dry) {
         addToInventory(eq);

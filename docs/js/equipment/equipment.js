@@ -113,23 +113,36 @@
   }
   // T 阶按稀有度映射（展示用；金色=最强档）：金→T1、蓝→T2、白→T4
   const TIER_BY_RARITY = { gold: 1, blue: 2, white: 4 };
-  // 词缀 T 阶抽取（唯一入口）：按 config.equipment.affixTierWeights 的稀有度权重抽。
-  // 掉落 / 重铸 / 增缀 都调这里 —— 以前重铸是 randInt(1,5) 且不看成色，白装能洗出全 T1。
-  function rollAffixTier(rarityId, ilvl) {
-    const w = (Config.equipment.affixTierWeights || {})[rarityId];
-    const entries = Object.entries(w || { 4: 60, 5: 40 });
-    const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
-    let r = Math.random() * total;
-    let picked = Number(entries[entries.length - 1][0]);
-    for (const [t, v] of entries) { r -= (Number(v) || 0); if (r < 0) { picked = Number(t); break; } }
-    // 装备等级解锁（POE 式 ilvl gate）：T 阶要装备等级达到门槛才能 roll 出。
-    // ilvl 为空视为 100（存量装备不追溯，避免刷新后降级破坏市场）；低于门槛抽到高档 T → 降到允许的最高 T。
+  /* ---------- T 阶生成（2026-09-11 按 PoE 模式重做，唯一入口）----------
+   * PoE 规则：每个 tier 有自己的 ilvl 门槛 + 自己的权重；掉落时把「门槛 ≤ 物品 ilvl」的
+   * tier 全部放进池子按权重抽 —— 高档 tier 进得了池但权重低（"可以出现但稀有"）。
+   * 本项目落地：affixIlvlGates（每档门槛：T1=70/T2=60/T3=25/T4=1）+ affixTierWeights
+   * （每档权重：T1 5 / T2 15 / T3 30 / T4 25 / T5 25）。
+   * 稀有度（颜色）不参与 T 阶判定；ilvl 为空视为 100（存量不追溯）。
+   * 掉落 / 重铸 / 增缀全部走这一个函数。 */
+  function rollAffixTier(ilvl) {
     const lv = ilvl == null ? 100 : Number(ilvl);
     const gates = (Config.equipment.affixIlvlGates || {});
-    let best = 5;
-    for (const [t, g] of Object.entries(gates)) { if (lv >= Number(g) && Number(t) < best) best = Number(t); }
-    if (picked < best) picked = best;
-    return picked;
+    const weights = (Config.equipment.affixTierWeights) || { 4: 60, 5: 40 };
+    // 池子 = 门槛已达标的 tier（ilvl 10 → 只有 T4/T5；ilvl 80 → T1~T5 全在池里）
+    const entries = Object.entries(gates)
+      .filter(([, g]) => lv >= Number(g))
+      .map(([t]) => ({ tier: Number(t), weight: Number(weights[t]) || 0 }));
+    if (!entries.length) return 5;
+    return Util.pickWeighted(entries).tier;
+  }
+  // 词缀总条数（含基础词缀 1 条）：按装备等级查 affixCountByIlvl 区间随机。
+  // 颜色是这条数的结果（1 白 / 2 蓝 / 3+ 金，syncRarity 收尾），不再反向由颜色定条数。
+  function rollAffixCount(ilvl) {
+    const lv = ilvl == null ? 100 : Number(ilvl);
+    const table = Config.equipment.affixCountByIlvl || [];
+    // 取「满足 lv 且门槛最高」的段（表按 minIlvl 降序写，但这里不依赖顺序，防手滑改序）
+    let seg = null;
+    for (const s of table) {
+      if (lv >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
+    }
+    if (!seg) seg = table[table.length - 1] || { min: 1, max: 2 };
+    return Util.randInt(Number(seg.min) || 1, Math.max(Number(seg.min) || 1, Number(seg.max) || 1));
   }
   // 词缀数值表分派：每属性独立 T1~T5 表（2026-09-04），未列出的走通用 affixTiers。
   // 生成（generateEquipment）、roll 区间展示（affixRange）共用这一张分派表，杜绝两套口径。
@@ -179,15 +192,21 @@
     eq.rarity = { id: r.id, label: r.label, color: r.color };
     return eq.rarity;
   }
-  // generateEquipment(rarity, areaTier=1, materialTier=3)：基底=部位基准×地图档次×底材 T 阶系数。
-  // 白装 1 条、蓝装 2 条、金装至少 3 条词缀；每件装备仍保证带 1 条基础词缀。
-  function generateEquipment(rarity, areaTier, materialTier, ilvl) {
-    rarity = rarity || Config.equipment.rarities[0];
+  /* ---------- 装备生成（2026-09-11 用户拍板重做）----------
+   * 一切由装备等级(ilvl)决定，颜色只是最后的结果：
+   *   ① 词缀条数 = affixCountByIlvl 按等级 roll（1~2 / 2~3 / 3~4 / 4~5）
+   *   ② 每条词缀 T 阶 = tierByIlvl(ilvl)（≥70 全 T1 / ≥60 T2 / ≥25 T3 / 其余 T4）
+   *   ③ 底材 T 阶 = tierByIlvl(ilvl)（同一套门槛）
+   *   ④ 颜色 = rarityIdFromCount(条数)（1 白 / 2 蓝 / 3+ 金），syncRarity 收尾
+   * 兼容：rarity / materialTier 参数仍接收但【被忽略】（老调用方 drop.js / 塔 / 引导不用改签名）；
+   * ilvl 缺省按图档等级下限换算（levelOfAreaTier）。基底 = 部位基准 × 图档倍数 × 底材 T 系数。 */
+  function generateEquipment(rarity, areaTier, materialTier, ilvl, countBonus) {
     // 图档上限与 baseTierMultipliers 档数一致（地图 10 图后这里还钳 6 → 图7~10 掉落和图6 一样强，已修）
     const maxTier = (Config.equipment.baseTierMultipliers || []).length || 6;
     areaTier = Math.max(1, Math.min(maxTier, areaTier || 1));
-    materialTier = Math.max(1, Math.min(5, materialTier || 3));
     if (ilvl == null) ilvl = levelOfAreaTier(areaTier);
+    // 底材 T 阶：同一套 ilvl 门槛 + 权重池（传入的 materialTier 参数忽略 —— 旧调用方还在传，签名兼容）
+    materialTier = rollAffixTier(ilvl);
     const slot = Util.pick(SLOTS);
     const info = SLOT_INFO[slot];
     const multiplier = (Config.equipment.baseTierMultipliers[areaTier - 1] || 1) *
@@ -196,7 +215,8 @@
     for (const b of info.bases) baseStats[b.type] = Math.round(b.value * multiplier * 100) / 100;
     const firstBase = info.bases[0];
     const base = { type: firstBase.type, label: firstBase.label, value: baseStats[firstBase.type] };
-    const count = Util.randInt(rarity.affixMin, rarity.affixMax);
+    // countBonus：「掉落稀有度」词缀的加成落点 —— 多 1 条词缀（颜色自然升一档），替代旧的按图 roll 颜色
+    const count = rollAffixCount(ilvl) + (Number(countBonus) || 0);
     const affixes = { prefix: [], suffix: [] };
     // 底材命中：随 ilvl 成长的区间值（取代固定 +5 死数），作为基础词缀（base:true 无 T 阶区间）
     const baselineType = baseStats.hit !== undefined ? 'hit' : 'crit';
@@ -205,7 +225,7 @@
     affixes.suffix.push(baseline);
     const pool = AFFIX_POOL.filter(a => a.type !== baselineType);
     // 补词缀：targetCount 为词缀总条数上限（含基础词缀）。每次只选「目标桶未满(≤3)」的类型，
-    // 避免前缀/后缀超过单桶上限 3 条（金装 4~6 条时若全堆一个桶会爆结构）。
+    // 避免前缀/后缀超过单桶上限 3 条（金装 4~5 条时若全堆一个桶会爆结构）。
     const targetCount = Math.min(count, 7); // 结构上限：基础1 + 前缀3 + 后缀3 = 7
     const slotW = (Config.equipment.slotAffixWeights || {})[slot] || {};
     while (affixCount({ affixes }) < targetCount && pool.length) {
@@ -218,7 +238,8 @@
       })).filter(a => a.weight > 0));
       if (!aff) break;
       pool.splice(pool.indexOf(aff), 1);
-      const tier = rollAffixTier(rarity.id, ilvl); // T 阶按稀有度加权 + 装备等级解锁（白/蓝抽不到 T1，低等级抽不到高档 T）
+      // 每条词缀独立 roll T 阶：门槛达标的 tier 进池按权重抽（ilvl 70+ 才可能有 T1，且只占 5%）
+      const tier = rollAffixTier(ilvl);
       const tiers = affixTiersFor(aff.type);
       const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
       const fixed = ['hit', 'dodge', 'spd', 'pen'].includes(aff.type);
@@ -226,10 +247,9 @@
     }
     const eq = {
       id: uid++, name: Util.pick(info.names), slot, areaTier, materialTier, ilvl,
-      tier: materialTier, rarity: { id: rarity.id, label: rarity.label, color: rarity.color },
-      base, baseStats, affixes, cloudId: null, locked: false, fresh: true
+      tier: materialTier, base, baseStats, affixes, cloudId: null, locked: false, fresh: true
     };
-    syncRarity(eq); // 颜色以词缀条数为准（1白/2蓝/3+金），掉落时与图档稀有度一致，打造加减词缀后实时同步
+    syncRarity(eq); // 颜色 = 词缀条数的结果（1白/2蓝/3+金）；打造加减词缀后也调这里实时同步
     return eq;
   }
 
@@ -421,7 +441,7 @@
   /* ---------- 对外 API ---------- */
   window.Equipment = {
     SLOTS, AFFIX_POOL, affixCategory, normalizeAffixes, flattenAffixes, affixCount, affixLocations,
-    pickRarity, generateEquipment, rollAffixTier, ilvlOf, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
+    pickRarity, generateEquipment, rollAffixTier, rollAffixCount, ilvlOf, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
     equipItem, unequip, getEquipBonuses, describeItem, formatAffix, formatAffixHtml, affixRange, rarityOf, baseOf
   };
 })();

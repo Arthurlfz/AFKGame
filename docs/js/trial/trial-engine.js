@@ -139,6 +139,13 @@
     });
     state.running = false;
     if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    // 任务上报（2026-09-11 副本/塔接入任务系统）：次数累加 + 最高层数只认历史最大（mode:'max'）
+    if (window.Quest && window.Quest.reportType) {
+      try {
+        window.Quest.reportType('trialRun', 1);
+        window.Quest.reportType('trialFloor', state.result.maxFloor || 0, { mode: 'max' });
+      } catch (e) { console.warn('[trial] 任务上报失败', e); }
+    }
     releasePage(); // 终局即交出战斗页（结算面板显示时玩家应能重新开始挂机/再打一次）
     emit({ type: 'settle', route, result: state.result });
     return state.result;
