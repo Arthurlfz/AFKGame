@@ -298,8 +298,36 @@
     const sameScript = !!(sc && sc.id && sc.id === currentScriptId);
     applyAuthoritative(r, { skipExpLevel: sameScript });
     presentSettle(r, sc, sameScript);
+    /* 2026-09-11 甲：装备/蛋由【服务端写库】，客户端本地背包不会自动多出这两样。
+     * 不刷一次就会出现「飘字说掉了一件金装，背包里没有」—— 而"掉宝"是本作第一爽点，
+     * 这个落差比丢东西还伤。只在真掉到时才拉（约 1.3% + 0.6% 的场次），不是每次结算都拉。 */
+    if (droppedGear(r)) refreshCloudBag();
     notifyChange();
     return r;
+  }
+
+  // 本段战报里有没有掉装备或蛋（补账明细 + 剧本事件都要看）
+  function droppedGear(r) {
+    const list = [].concat((r && r.detail) || [], (r && r.script && r.script.events) || []);
+    for (const x of list) {
+      const rw = x && x.reward;
+      if (rw && (rw.type === 'equipment' || rw.type === 'egg')) return true;
+    }
+    return false;
+  }
+  // 拉云端真值覆盖本地背包（顺带刷新蛋数）。失败不挡挂机：下次登录仍以云端为准。
+  async function refreshCloudBag() {
+    try {
+      const It = window.Items;
+      if (It && It.loadCloudItems) {
+        const { data, error } = await It.loadCloudItems();
+        if (!error && data) It.setCloudItems(data);
+      }
+      if (window.Supabase && window.Supabase.loadEggCount) {
+        const { eggMap } = await window.Supabase.loadEggCount();
+        if (window.Drop && window.Drop.setEggs) window.Drop.setEggs(eggMap || {});
+      }
+    } catch (e) { /* 刷新失败无妨，下次登录以云端为准 */ }
   }
   /* settle 失败：会话没了 → 本地退场；其它 → 设冷却后继续跑。
    * 冷却必须有（2026-09-08 血泪）：剧本空 + settle 失败 + 无冷却 = 每帧轰炸服务器

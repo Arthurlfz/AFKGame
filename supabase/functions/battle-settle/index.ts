@@ -244,9 +244,18 @@ async function handle(req: Request): Promise<Response> {
   // 奖励由服务器直接入账（补账窗 + 剧本窗一起）。battle_settle 已用游标幂等，重复请求不会再次走到这里。
   // 当前先落材料；装备/宠物蛋沿用同一 detail 结构接入对应表。
   const rewardTotals: Record<string, number> = {};
+  const equipDrops: any[] = [];
+  const eggDrops: Record<string, number> = {};
   for (const reward of (plan.logDetail || []).map((x: any) => x.reward)) {
-    if (reward && reward.type === 'material' && reward.material) {
+    if (!reward) continue;
+    if (reward.type === 'material' && reward.material) {
       rewardTotals[reward.material] = (rewardTotals[reward.material] || 0) + Math.max(1, Math.floor(Number(reward.qty) || 1));
+    } else if (reward.type === 'equipment' && reward.eq) {
+      // 2026-09-11 甲：装备掉落入包。产出由 _shared/equip-gen-server.mjs 生成 ——
+      // 那份是从前端 equipment.js 构建期抽取的，与前端是同一套逻辑（vtest_equip_gen 守）。
+      equipDrops.push(reward.eq);
+    } else if (reward.type === 'egg' && reward.baseName) {
+      eggDrops[reward.baseName] = (eggDrops[reward.baseName] || 0) + 1;
     }
   }
   for (const [material, amount] of Object.entries(rewardTotals)) {
@@ -255,6 +264,30 @@ async function handle(req: Request): Promise<Response> {
       p_amount: amount
     });
     if (rewardErr) return json({ ok: false, error: 'REWARD_GRANT_FAILED', detail: rewardErr.message }, 500);
+  }
+  if (equipDrops.length) {
+    const rows = equipDrops.map((eq: any) => ({
+      user_id: uid,
+      name: eq.name,
+      slot: eq.slot,
+      base_stat: eq.base,
+      // ⚠️ affixes 是 jsonb：这里【必须传对象】。JSON.stringify 过会落成 jsonb 字符串
+      //（2026-09-11 审计 P0-1 就是这么炸的）。_ilvl 与前端 Items.saveItem 同一约定。
+      affixes: Object.assign({}, eq.affixes, { _ilvl: eq.ilvl != null ? eq.ilvl : null }),
+      tier: eq.tier,
+      rarity: eq.rarity && eq.rarity.id ? eq.rarity.id : 'white',
+      locked: false,
+      identified: eq.identified !== false,
+      soul_affix: null
+    }));
+    const { error: eqErr } = await supabase.from('equip_items').insert(rows);
+    if (eqErr) return json({ ok: false, error: 'EQUIP_GRANT_FAILED', detail: eqErr.message }, 500);
+  }
+  for (const [baseName, n] of Object.entries(eggDrops)) {
+    // ⚠️ pet_egg.owner_id 是 text 列（不是 uuid）—— 见 docs/fos-cloud 技能的类型对照表
+    const rows = Array.from({ length: n }, () => ({ owner_id: String(uid), egg_type: baseName, status: '未孵化' }));
+    const { error: eggErr } = await supabase.from('pet_egg').insert(rows);
+    if (eggErr) return json({ ok: false, error: 'EGG_GRANT_FAILED', detail: eggErr.message }, 500);
   }
 
   return json({

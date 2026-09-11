@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-11T04:46:42.300Z
+// 生成时间：2026-09-11T12:10:27.903Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1121,6 +1121,656 @@ const serverConfig = {
   },
   "regen": {
     "hpPerSecRatio": 0.2
+  },
+  "equipment": {
+    "baseValues": {
+      "武器": {
+        "atk": 30
+      },
+      "戒指": {
+        "atk": 15,
+        "crit": 2
+      },
+      "项链": {
+        "atk": 15,
+        "critDamage": 8
+      },
+      "头盔": {
+        "def": 15
+      },
+      "护甲": {
+        "hp": 80,
+        "def": 8
+      },
+      "盾牌": {
+        "def": 15,
+        "dodge": 5
+      },
+      "靴子": {
+        "spd": 8
+      },
+      "腰带": {
+        "hp": 60,
+        "spd": 5
+      },
+      "斗篷": {
+        "dodge": 10,
+        "hp": 50
+      },
+      "饰品": {
+        "atk": 12,
+        "hit": 5
+      },
+      "护符": {
+        "lifesteal": 4
+      },
+      "徽章": {
+        "crit": 3,
+        "critDamage": 10
+      }
+    },
+    "baseTierMultipliers": [
+      1,
+      1.25,
+      1.5,
+      1.75,
+      2,
+      2.25,
+      2.5,
+      2.75,
+      3,
+      3.25
+    ],
+    "materialTierMultipliers": {
+      "1": 1.5,
+      "2": 1.3,
+      "3": 1,
+      "4": 0.8,
+      "5": 0.6
+    },
+    "speedAffixTiers": [
+      {
+        "tier": 1,
+        "min": 12,
+        "max": 16
+      },
+      {
+        "tier": 2,
+        "min": 9,
+        "max": 11
+      },
+      {
+        "tier": 3,
+        "min": 6,
+        "max": 8
+      },
+      {
+        "tier": 4,
+        "min": 3,
+        "max": 5
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 2
+      }
+    ],
+    "affixTiers": [
+      {
+        "tier": 1,
+        "min": 6,
+        "max": 8
+      },
+      {
+        "tier": 2,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "tier": 3,
+        "min": 3,
+        "max": 4
+      },
+      {
+        "tier": 4,
+        "min": 2,
+        "max": 2
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "lifestealAffixTiers": [
+      {
+        "tier": 1,
+        "min": 3,
+        "max": 4
+      },
+      {
+        "tier": 2,
+        "min": 2,
+        "max": 3
+      },
+      {
+        "tier": 3,
+        "min": 2,
+        "max": 2
+      },
+      {
+        "tier": 4,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "critDamageAffixTiers": [
+      {
+        "tier": 1,
+        "min": 18,
+        "max": 25
+      },
+      {
+        "tier": 2,
+        "min": 12,
+        "max": 16
+      },
+      {
+        "tier": 3,
+        "min": 8,
+        "max": 10
+      },
+      {
+        "tier": 4,
+        "min": 4,
+        "max": 6
+      },
+      {
+        "tier": 5,
+        "min": 2,
+        "max": 3
+      }
+    ],
+    "critAffixTiers": [
+      {
+        "tier": 1,
+        "min": 6,
+        "max": 8
+      },
+      {
+        "tier": 2,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "tier": 3,
+        "min": 3,
+        "max": 3
+      },
+      {
+        "tier": 4,
+        "min": 2,
+        "max": 2
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "penAffixTiers": [
+      {
+        "tier": 1,
+        "min": 30,
+        "max": 40
+      },
+      {
+        "tier": 2,
+        "min": 20,
+        "max": 28
+      },
+      {
+        "tier": 3,
+        "min": 12,
+        "max": 18
+      },
+      {
+        "tier": 4,
+        "min": 6,
+        "max": 10
+      },
+      {
+        "tier": 5,
+        "min": 2,
+        "max": 5
+      }
+    ],
+    "dmgBonusAffixTiers": [
+      {
+        "tier": 1,
+        "min": 6,
+        "max": 8
+      },
+      {
+        "tier": 2,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "tier": 3,
+        "min": 3,
+        "max": 3
+      },
+      {
+        "tier": 4,
+        "min": 2,
+        "max": 2
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "drAffixTiers": [
+      {
+        "tier": 1,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "tier": 2,
+        "min": 3,
+        "max": 3
+      },
+      {
+        "tier": 3,
+        "min": 2,
+        "max": 2
+      },
+      {
+        "tier": 4,
+        "min": 1,
+        "max": 1
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "baseHitByIlvl": [
+      {
+        "minIlvl": 1,
+        "min": 3,
+        "max": 5
+      },
+      {
+        "minIlvl": 25,
+        "min": 5,
+        "max": 8
+      },
+      {
+        "minIlvl": 43,
+        "min": 8,
+        "max": 12
+      },
+      {
+        "minIlvl": 55,
+        "min": 12,
+        "max": 16
+      },
+      {
+        "minIlvl": 73,
+        "min": 16,
+        "max": 22
+      }
+    ],
+    "slotAffixWeights": {
+      "武器": {
+        "atk": 2,
+        "dmgBonus": 2,
+        "pen": 2,
+        "hp": 0.5,
+        "def": 0.5
+      },
+      "戒指": {
+        "crit": 2,
+        "critDamage": 2
+      },
+      "项链": {
+        "crit": 1.5,
+        "critDamage": 1.5,
+        "dmgBonus": 1.5
+      },
+      "头盔": {
+        "def": 1.5,
+        "hit": 1.5
+      },
+      "护甲": {
+        "hp": 2,
+        "def": 2,
+        "dr": 2,
+        "atk": 0.5
+      },
+      "盾牌": {
+        "def": 2,
+        "dr": 1.5,
+        "dodge": 1.5
+      },
+      "靴子": {
+        "spd": 3,
+        "dodge": 1.5
+      },
+      "腰带": {
+        "hp": 1.5,
+        "lifesteal": 1.5
+      },
+      "斗篷": {
+        "dodge": 2,
+        "dr": 1.5,
+        "spd": 1.5
+      },
+      "饰品": {
+        "hit": 2,
+        "crit": 1.5
+      },
+      "护符": {
+        "lifesteal": 3,
+        "hp": 1.5
+      },
+      "徽章": {
+        "crit": 1.5,
+        "critDamage": 1.5,
+        "dmgBonus": 1.5
+      }
+    },
+    "affixTierWeights": {
+      "1": 5,
+      "2": 15,
+      "3": 30,
+      "4": 25,
+      "5": 25
+    },
+    "affixIlvlGates": {
+      "1": 70,
+      "2": 60,
+      "3": 25,
+      "4": 1,
+      "5": 1
+    },
+    "affixCountByIlvl": [
+      {
+        "minIlvl": 70,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "minIlvl": 60,
+        "min": 3,
+        "max": 4
+      },
+      {
+        "minIlvl": 25,
+        "min": 2,
+        "max": 3
+      },
+      {
+        "minIlvl": 1,
+        "min": 1,
+        "max": 2
+      }
+    ],
+    "areaLevels": [
+      1,
+      7,
+      13,
+      19,
+      25,
+      31,
+      37,
+      43,
+      49,
+      55
+    ],
+    "materialTierWeights": {
+      "1": {
+        "1": 1,
+        "2": 4,
+        "3": 15,
+        "4": 30,
+        "5": 50
+      },
+      "2": {
+        "1": 2,
+        "2": 6,
+        "3": 18,
+        "4": 32,
+        "5": 42
+      },
+      "3": {
+        "1": 4,
+        "2": 9,
+        "3": 22,
+        "4": 33,
+        "5": 32
+      },
+      "4": {
+        "1": 7,
+        "2": 13,
+        "3": 26,
+        "4": 32,
+        "5": 22
+      },
+      "5": {
+        "1": 12,
+        "2": 18,
+        "3": 28,
+        "4": 27,
+        "5": 15
+      },
+      "6": {
+        "1": 20,
+        "2": 24,
+        "3": 28,
+        "4": 20,
+        "5": 8
+      },
+      "7": {
+        "1": 25,
+        "2": 26,
+        "3": 27,
+        "4": 16,
+        "5": 6
+      },
+      "8": {
+        "1": 30,
+        "2": 27,
+        "3": 25,
+        "4": 13,
+        "5": 5
+      },
+      "9": {
+        "1": 35,
+        "2": 28,
+        "3": 23,
+        "4": 10,
+        "5": 4
+      },
+      "10": {
+        "1": 42,
+        "2": 28,
+        "3": 20,
+        "4": 8,
+        "5": 4
+      }
+    },
+    "rarityWeightsByTier": {
+      "1": {
+        "white": 78,
+        "blue": 19,
+        "gold": 3
+      },
+      "2": {
+        "white": 78,
+        "blue": 19,
+        "gold": 3
+      },
+      "3": {
+        "white": 78,
+        "blue": 19,
+        "gold": 3
+      },
+      "4": {
+        "white": 25,
+        "blue": 50,
+        "gold": 25
+      },
+      "5": {
+        "white": 25,
+        "blue": 50,
+        "gold": 25
+      },
+      "6": {
+        "white": 25,
+        "blue": 50,
+        "gold": 25
+      },
+      "7": {
+        "white": 25,
+        "blue": 50,
+        "gold": 25
+      },
+      "8": {
+        "white": 8,
+        "blue": 27,
+        "gold": 65
+      },
+      "9": {
+        "white": 8,
+        "blue": 27,
+        "gold": 65
+      },
+      "10": {
+        "white": 8,
+        "blue": 27,
+        "gold": 65
+      }
+    },
+    "score": {
+      "stat": {
+        "atk": 1,
+        "hp": 0.2,
+        "def": 1,
+        "spd": 1.5,
+        "hit": 1,
+        "dodge": 1,
+        "crit": 2,
+        "critDamage": 0.5,
+        "lifesteal": 3,
+        "pen": 1
+      },
+      "pct": {
+        "atk": 5,
+        "hp": 5,
+        "def": 5,
+        "dmgBonus": 6,
+        "dr": 8
+      },
+      "resource": {
+        "dropQty": 8,
+        "dropRare": 6,
+        "matDrop": 6
+      }
+    },
+    "rarities": [
+      {
+        "id": "white",
+        "label": "白色",
+        "color": "#b2aa9c",
+        "affixMin": 1,
+        "affixMax": 1
+      },
+      {
+        "id": "blue",
+        "label": "蓝色",
+        "color": "#4a6fa8",
+        "affixMin": 2,
+        "affixMax": 2
+      },
+      {
+        "id": "gold",
+        "label": "金色",
+        "color": "#f2b632",
+        "affixMin": 3,
+        "affixMax": 6
+      }
+    ]
+  },
+  "drop": {
+    "pool": {
+      "none": 900,
+      "material": 85,
+      "equipment": 13,
+      "egg": 6
+    },
+    "poolByStage": {
+      "1": {
+        "none": 900,
+        "material": 85,
+        "equipment": 30,
+        "egg": 6
+      },
+      "2": {
+        "none": 900,
+        "material": 85,
+        "equipment": 13,
+        "egg": 6
+      },
+      "3": {
+        "none": 900,
+        "material": 85,
+        "equipment": 15,
+        "egg": 6
+      }
+    },
+    "areaMaterials": {
+      "corrupted-forest": {
+        "name": "枯荣种荚"
+      },
+      "plague-swamp": {
+        "name": "泣腐之泪"
+      },
+      "shadow-mountains": {
+        "name": "白骨残片"
+      },
+      "bone-wastes": {
+        "name": "幽影魂丝"
+      },
+      "blood-rift": {
+        "name": "血潮凝晶"
+      },
+      "blight-heart": {
+        "name": "腐变之心"
+      },
+      "echo-cliffs": {
+        "name": "回响之羽"
+      },
+      "rotfen-bog": {
+        "name": "腐沼黏液"
+      },
+      "ember-hollow": {
+        "name": "余烬残灰"
+      },
+      "soul-abyss": {
+        "name": "魂渊之尘"
+      }
+    }
   },
   "petTraits": {
     "嗜血": {

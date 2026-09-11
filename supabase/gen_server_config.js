@@ -66,6 +66,18 @@ const serverConfig = {
     nextFightDelay: C.battle.nextFightDelay
   },
   regen: C.regen,
+  // 装备（2026-09-11 甲）：服务端掉落装备需要它。equip-gen-server.mjs（由 gen_equip_gen.js
+  // 从前端 equipment.js 抽取）读这一段的 rarities / affixIlvlGates / affixCountByIlvl /
+  // 各属性 T 阶表 / baseTierMultipliers / slotAffixWeights 等。
+  equipment: C.equipment,
+  // 掉落（2026-09-11 甲）：挂机掉落从「服务端硬编码 18% 材料」改为读前端这一套单池。
+  // 只带掉落需要的三段，不带 C.drop.quests（145 条任务，会让服务端配置白白胖几百 KB）。
+  // ⚠️ 改了这里就等于改了玩家的实际产出速度 —— 调数值只动 config.drop.poolByStage。
+  drop: {
+    pool: C.drop.pool,
+    poolByStage: C.drop.poolByStage,
+    areaMaterials: C.drop.areaMaterials
+  },
   petTraits: C.petTraits,
   traitHatch: C.traitHatch,
   bloodlinePassive: C.bloodlinePassive,

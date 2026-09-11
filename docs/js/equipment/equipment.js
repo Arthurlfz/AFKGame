@@ -440,8 +440,13 @@
 
   /* ---------- 对外 API ---------- */
   window.Equipment = {
-    SLOTS, AFFIX_POOL, affixCategory, normalizeAffixes, flattenAffixes, affixCount, affixLocations,
+    // SLOT_INFO / LABELS 导出是给 supabase/gen_equip_gen.js 用的：
+    // 服务端掉落装备需要与前端【同一份】生成逻辑，靠构建期抽取（不是手抄副本）。
+    SLOTS, AFFIX_POOL, SLOT_INFO, LABELS, affixCategory, normalizeAffixes, flattenAffixes, affixCount, affixLocations,
     pickRarity, generateEquipment, rollAffixTier, rollAffixCount, ilvlOf, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
+    // 生成链的内部纯函数：导出只为让 supabase/gen_equip_gen.js 能 toString() 出源码
+    // 生成服务端副本（构建期抽取，不手抄 —— 手抄必漂移）
+    affixTiersFor, rollBaseHit, levelOfAreaTier, rarityIdFromCount,
     equipItem, unequip, getEquipBonuses, describeItem, formatAffix, formatAffixHtml, affixRange, rarityOf, baseOf
   };
 })();
