@@ -189,13 +189,40 @@ function getBloodline(pet, config) {
 function skillOf(pet, config) {
   const evo = config.pet && config.pet.evolution;
   if (!evo) return null;
-  const name = String(pet.name || '').replace(/·异变$/, '');
+  const name = String((pet && pet.name) || '').replace(/·异变$/, '');
   const skills = evo.activeSkills || {};
-  if (skills[name]) return Object.assign({}, skills[name]);
-  // 神级宠（2026-09-11）：继承其 sprite 立绘终形态（该线主形态）的主动技，满威力
-  const GP = config.pet && config.pet.godPets;
-  const god = GP && (GP.list || []).find(g => g.name === name);
-  return god && skills[god.sprite] ? Object.assign({}, skills[god.sprite]) : null;
+  // 找技能定义 + 形态深度（0=终阶 1=二阶/三阶 2=一阶 3=基宠）
+  let def = skills[name] || null, depth = 0, isGod = false;
+  if (!def) {
+    const GP = config.pet && config.pet.godPets;
+    const god = GP && (GP.list || []).find(g => g.name === name);
+    if (god) { def = skills[god.sprite] || null; isGod = true; }
+  }
+  if (!def) {
+    const tree = evo.tree || {};
+    let cur = name, steps = 0, routes = tree[cur];
+    while (routes && routes.length) { steps++; cur = routes[0].to; routes = tree[cur]; }
+    def = skills[cur] || null; depth = steps;
+  }
+  if (!def) return null;
+  // 定档（2026-09-11 用户拍板「技能跟血统线走」）：一阶=I、二阶/三阶=II、终阶/神级=III 满档
+  let stage;
+  if (isGod) stage = 5; // 神级宠无条件满档（不依赖 evolve_stage/evolve_times 落库是否齐全）
+  else if (pet && (pet.evolveStage != null || pet.evolveTimes != null)) {
+    const max = ((evo.stages) || []).length || 5;
+    stage = Math.min(max, Math.max(1, Number(pet.evolveStage != null ? pet.evolveStage : (Number(pet.evolveTimes) || 0) + 1)));
+  } else {
+    stage = depth === 0 ? 5 : depth === 1 ? 3 : depth === 2 ? 2 : 1;
+  }
+  if (stage <= 1) return null;
+  const idx = stage >= 5 ? 2 : stage >= 3 ? 1 : 0;
+  const sc = (evo.skillTierScale || [])[idx] || { chance: 1, damage: 1 };
+  return Object.assign({}, def, {
+    triggerChance: Math.round((def.triggerChance || 0) * sc.chance * 100) / 100,
+    damageMultiplier: Math.round((1 + ((def.damageMultiplier || 1) - 1) * sc.damage) * 100) / 100,
+    tier: idx + 1,
+    tierName: ['I', 'II', 'III'][idx]
+  });
 }
 function addTraitStat(pet, flat, pct, config) {
   const defs = config.petTraits || {};

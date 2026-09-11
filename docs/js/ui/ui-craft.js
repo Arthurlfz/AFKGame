@@ -57,14 +57,14 @@
     const lockSideBtn = (side, label) => {
       const locked = side === 'prefix' ? lockPrefix : lockSuffix;
       const blocked = side === 'prefix' ? lockSuffix : lockPrefix;
-      return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 重铸保留该侧（一次）')}">
-        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 重铸后失效 · 点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 重铸保留该侧（一次）'}</span></button>`;
+      return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 只保一次打造')}">
+        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 下次打造后失效 · 点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 只保一次打造'}</span></button>`;
     };
     const lockAreaHtml = `
       <div class="craft-section-label">锁定（锁前 / 锁后）<span class="craft-lock-count">${lockCfg.name} ×${lockStone}</span></div>
       <div class="craft-lock-sides">${lockSideBtn('prefix', '锁前缀')}${lockSideBtn('suffix', '锁后缀')}</div>`;
     const lockActive = lockPrefix || lockSuffix;
-    const reforgeSub = lockActive ? '锁定侧重铸后自动失效' : '全部词缀重洗';
+    const reforgeSub = lockActive ? '锁定侧保留 · 生效后失效' : '全部词缀重洗';
     const esc = window.escapeHtml || (s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])));
     const eqR = eq.rarity || { label: '白色', color: '#b2aa9c' };
     const mt = eq.materialTier != null ? eq.materialTier : (eq.tier != null ? eq.tier : 4);
@@ -114,7 +114,13 @@
     el.querySelectorAll('.craft-tab').forEach(btn => {
       btn.onclick = () => { soulTabActive = btn.dataset.ctab === 'soul'; renderCraftInto(el, eq); };
     });
-    const resultEl = el.querySelector('#craft-result');
+    /* 结果区必须【每次现查】：renderCraftInto 会整块重建 el.innerHTML，
+     * 之前缓存的 resultEl 当场变成被丢弃的孤儿节点 —— 写进去的文字玩家根本看不到，
+     * 表现为「点完重铸，词条闪一下，提示一个字没有」（2026-09-11）。 */
+    function setResult(html) {
+      const box = el.querySelector('#craft-result');
+      if (box) box.innerHTML = html;
+    }
 
     /* 乐观 UI（打造的四种石头共用） */
     function craftOptimistic(btn, loadingText, craftFn, showResult) {
@@ -123,7 +129,7 @@
         const res = await craftFn((r) => { appliedEarly = true; showResult(r); });
         if (res.error) {
           if (appliedEarly) renderCraftInto(el, eq);
-          resultEl.innerHTML = `<span class="err">❌ ${res.error}</span>`;
+          setResult(`<span class="err">❌ ${res.error}</span>`);
           return;
         }
         if (!appliedEarly) showResult(res);
@@ -136,10 +142,11 @@
         (onApplied) => Craft.reforge(eq, onApplied),
         (r) => {
           const ns = flattenAffixes(r.changed.new);
-          resultEl.innerHTML = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · 🔒锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+          const text = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · 🔒锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
           addLog(`🎲 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}`);
           showToast('🎲 重铸完成', `词条已全部随机重洗`);
           renderCraftInto(el, eq);
+          setResult(text); // 必须在 renderCraftInto 之后写：重建面板会丢掉旧结果区
           if (UI.renderInventory) UI.renderInventory();
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
@@ -151,10 +158,11 @@
         (onApplied) => Craft.strip(eq, onApplied),
         (r) => {
           const removed = r.changed.removed;
-          resultEl.innerHTML = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）`;
+          const text = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）${lockActive ? ' · 🔒锁定已失效' : ''}`;
           addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
           showToast('✂️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
           renderCraftInto(el, eq);
+          setResult(text);
           if (UI.renderInventory) UI.renderInventory();
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
@@ -168,10 +176,11 @@
           const os = flattenAffixes(r.changed.old);
           const ns = flattenAffixes(r.changed.new);
           const lines = os.map((o, i) => `${o.label} +${o.value}%（T${o.tier}）→ ${Craft.affixText(ns[i])}`).join('<br>');
-          resultEl.innerHTML = `🔮 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}`;
+          const text = `🔮 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}${lockActive ? '<br>🔒锁定已失效' : ''}`;
           addLog(`🔮 重铸成功：${eq.name} 词缀数值重 Roll（类型 / T 阶不变）`);
           showToast('🔮 重铸成功', `数值已重 Roll<br><small>类型 / T 阶不变</small>`);
           renderCraftInto(el, eq);
+          setResult(text);
           if (UI.renderInventory) UI.renderInventory();
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
@@ -183,10 +192,11 @@
         (onApplied) => Craft.augment(eq, onApplied),
         (r) => {
           const n = r.changed.new;
-          resultEl.innerHTML = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）`;
+          const text = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）${lockActive ? ' · 🔒锁定已失效' : ''}`;
           addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
           showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
           renderCraftInto(el, eq);
+          setResult(text);
           if (UI.renderInventory) UI.renderInventory();
           if (UI.renderInvToolbar) UI.renderInvToolbar();
         });
@@ -199,10 +209,11 @@
         const locked = side === 'prefix' ? eq.lockPrefix : eq.lockSuffix;
         const sideName = side === 'prefix' ? '前缀' : '后缀';
         const res = locked ? await Craft.unlockSide(eq, side) : await Craft.lockSide(eq, side);
-        if (res && res.error) { resultEl.innerHTML = `<span class="err">❌ ${res.error}</span>`; return; }
-        resultEl.innerHTML = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（消耗 1 ${lockCfg.name} · 重铸后失效）`;
+        if (res && res.error) { setResult(`<span class="err">❌ ${res.error}</span>`); return; }
+        const text = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（消耗 1 ${lockCfg.name} · 下次打造后失效）`;
         showToast(locked ? '🔓 已解锁' : '🔒 已锁定', `${sideName}${locked ? '解锁' : '锁定'}成功`);
         renderCraftInto(el, eq);
+        setResult(text);
         if (UI.renderInventory) UI.renderInventory();
         if (UI.renderInvToolbar) UI.renderInvToolbar();
       };

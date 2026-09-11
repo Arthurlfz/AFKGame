@@ -60,9 +60,9 @@ A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['涅槃丹']
 
 /* ---- 3b. 高级物品不进地图掉落表（2026-09-09 产出削减，归属见 Config.towerDrops） ---- */
 // 地图只出「燃料」；高级物品归通天塔（塔未开发，见 towerDrops 占位登记）。
-const TOWER_ITEMS = ['神圣石', '越龙之石', '天仙玉露', '强化丹B'];
+const TOWER_ITEMS = ['神圣石', '越龙之石', '天仙玉露', '强化丹B', '锁魂玉', '琼浆玉露'];
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => ${JSON.stringify(TOWER_ITEMS)}.some(n => (w[n] || 0) > 0))`),
-  'holy/jade/overdragon/pill-b never drop from maps (tower-owned)');
+  'tower-owned items never drop from maps');
 A(C(`(Config.towerDrops && Config.towerDrops.items.map(i => i.name).join(','))`) === TOWER_ITEMS.join(','),
   'towerDrops registers every map-removed high tier item');
 

@@ -17,6 +17,7 @@
 
   let evolveMainId = null;
   let evolvePreview = null;
+  let godCulItemId = null; // 神宠培育：记住选中的玉露道具 id
 
   // 阶段总数（从 config 推导；别再硬写 5 —— 改阶段表时界面要跟着走）
   const stageCount = () => (((Config.pet && Config.pet.evolution && Config.pet.evolution.stages) || []).length) || 5;
@@ -31,7 +32,11 @@
     const E = Config.pet.evolution || {};
     const maxTimes = E.maxEvolveTimes || 10;
     list.innerHTML = '';
-    const evoPets = getPets().filter(p => Evolve.hasRoute(p) && p.cloudId && !(Market && Market.isListed(p.cloudId)));
+    const evoPets = getPets().filter(p => {
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(p) : !!p.isGodPet;
+      // 神宠也走进化页：吃玉露培育成长（2026-09-11）
+      return (isGod || Evolve.hasRoute(p)) && p.cloudId && !(Market && Market.isListed(p.cloudId));
+    });
     if (!evoPets.length) {
       const empty = document.createElement('div');
       empty.className = 'quick-empty';
@@ -90,6 +95,7 @@
     const matName = (rm && rm.name) || E.materialName || '进化素材';
     const have = rm ? rm.have : (Materials.getQuantity ? Materials.getQuantity(matName) : 0);
     const mainIsGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
+    if (mainIsGod) { renderGodCultivate(main); return; } // 神宠培育：不走进化树
     mb.innerHTML = `<div class="evo-card">
       <div class="avatar">${iconHtml(main.name)}</div>
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
@@ -227,7 +233,7 @@
       if (res.error) { showToast('进化失败', res.error); return; }
       const changed = res.keepForm ? '（形态不变）': '';
       const itemText = res.boostItem ? `（消耗 ${res.boostItem.name}）` : '';
-      addLog(`进化成功！${origName} 成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${changed}${itemText}`);
+      addLog(`进化成功！${origName} → 【${res.result}】成长 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}（第 ${res.stage}/5 阶）${changed}${itemText}`);
       showToast('进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${itemText}</small>`);
       evolveMainId = res.pet ? res.pet.id : pet.id;
       evolvePreview = null; // 已进化：旧预览（形态/成长都变了）作废
@@ -235,10 +241,52 @@
     };
   }
 
+  // 神宠培育（2026-09-11）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3），成长 100 封顶。
+  // 不占进化次数、不改形态；普通宠不适用（它们走正常进化）。
+  function renderGodCultivate(main) {
+    const mb = $('evolve-main-box'), tb = $('evolve-target-box'), pb = $('evolve-preview'), cb = $('evolve-confirm');
+    const items = (Config.itemsOf ? Config.itemsOf('evolve') : []).concat(Config.itemsOf ? Config.itemsOf('cultivate') : []).filter(i => i.godGrowth);
+    if (!godCulItemId && items.length) godCulItemId = items[0].id;
+    const item = items.find(i => i.id === godCulItemId) || null;
+    const have = item && Materials.getQuantity ? Materials.getQuantity(item.name) : 0;
+    const maxCul = (Config.pet && Config.pet.godPets && Config.pet.godPets.cultivateMax) || 10;
+    const used = main.cultivateUsed || 0;
+    const left = Math.max(0, maxCul - used);
+    const outOfTurn = used >= maxCul;
+    const full = (main.growth || 0) >= 100;
+    const nextGrowth = item ? Math.min(100, Math.round((main.growth + (item.godGrowth[0] + item.godGrowth[1]) / 2) * 10) / 10) : main.growth;
+    mb.innerHTML = `<div class="evo-card">
+      <div class="avatar">${iconHtml(main.name)}</div>
+      <div class="pname">${main.name} · 神级</div>
+      <div class="pmeta">Lv.${main.level} · 成长 ${main.growth.toFixed(1)}${full ? ' · 已满' : ''}</div>
+    </div>`;
+    tb.innerHTML = `<div class="evo-card next">
+      <div class="avatar">${iconHtml(main.name)}</div>
+      <div class="pname">培育</div>
+      <div class="pmeta">神宠不走进化树 · 吃玉露直接涨成长（上限 100）</div>
+    </div>`;
+    const opts = items.map(i => '<option value="' + i.id + '"' + (i.id === godCulItemId ? ' selected' : '') + '>' + i.name + ' +' + i.godGrowth[0] + '~' + i.godGrowth[1] + '（持有 ' + (Materials.getQuantity ? Materials.getQuantity(i.name) : 0) + '）</option>').join('');
+    pb.innerHTML = `<div class="preview-bar">
+      <div class="pv"><div class="k">培育素材</div><div class="v"><select id="god-cul-item">${opts}</select></div></div>
+      <div class="pv"><div class="k">成长</div><div class="v">${main.growth.toFixed(1)} → ${nextGrowth.toFixed(1)}<small>${item ? '期望 +' + item.godGrowth[0] + '~' + item.godGrowth[1] : ''}</small></div></div>
+      <div class="pv"><div class="k">本轮次数</div><div class="v">${used}/${maxCul}<small>${outOfTurn ? '已用完 · 涅槃后重置' : '剩 ' + left + ' 次'}</small></div></div>
+      <div class="pv"><div class="k">说明</div><div class="v"><small>形态与等级不变 · 只涨成长 · 上限 100</small></div></div>
+    </div>`;
+    cb.innerHTML = `<button class="confirm-btn" id="god-cul-go"${(!item || have < 1 || full || outOfTurn) ? ' disabled' : ''}>确认培育</button>`;
+    const sel = document.getElementById('god-cul-item');
+    if (sel) sel.onchange = () => { godCulItemId = sel.value; renderGodCultivate(main); };
+    document.getElementById('god-cul-go').onclick = async () => {
+      const res = await Merge.cultivate(main.id, godCulItemId);
+      if (res.error) { addLog(`培育失败：${res.error}`); showToast('培育失败', res.error); return; }
+      addLog(`培育成功！${res.pet.name} 成长 +${res.add.toFixed(1)}（消耗 ${res.itemName}；本轮还剩 ${res.left}/${maxCul} 次）`);
+      showToast('培育成功！', `${res.pet.name} 成长 +${res.add.toFixed(1)}（剩 ${res.left} 次）`);
+      UI.renderAll();
+    };
+  }
   function renderEvolveHint() {
     const el = $('evolve-hint-text');
     const E = Config.pet.evolution;
-    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成。`;
+    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成；神宠可在本页吃<b>天仙玉露 / 琼浆玉露</b>培育成长（上限 100）。`;
   }
 
 

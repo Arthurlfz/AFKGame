@@ -26,15 +26,7 @@
       const host = $('bag-window');
       if (host) {
         host.style.display = 'block';
-        setTimeout(() => {
-          host.classList.add('is-open');
-          // 再强制确保可见
-          const win = host.querySelector('.bag-window');
-          if (win) {
-            win.style.opacity = '1';
-            win.style.transform = 'translate(-50%, -50%) scale(1)';
-          }
-        }, 50);
+        setTimeout(() => { host.classList.add('is-open'); }, 50);
       }
     };
     UI.__bagPatched = true;

@@ -545,6 +545,9 @@
     if (UI.renderInvToolbar) UI.renderInvToolbar();
     const host = document.getElementById('bag-window');
     if (!host) return;
+    // 清掉上次拖拽残留的内联 left/top/transform，回到 CSS 居中模型（否则重开会飞左上角）
+    const win = host.querySelector('.bag-window');
+    if (win) { win.style.left = ''; win.style.top = ''; win.style.transform = ''; }
     host.style.display = 'block';
     requestAnimationFrame(() => host.classList.add('is-open'));
   }

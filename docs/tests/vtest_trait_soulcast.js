@@ -112,35 +112,56 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
   A(Math.abs(s.critDamage - 2.0) < 1e-9, '觉醒暴伤加成结算进 getStats');
 }
 
-/* ================= 4. 合成继承 ================= */
+/* ================= 4. 合成继承（2026-09-11 新规则：主宠全保只升不降、副宠嫁接、至尊神石全收） ================= */
 {
+  // 确定性：主嗜血升档（0.1<0.2 → T2→T1）；副狂暴嫁接（0.1<0.4）档位照抄 T3
   const main = baby(); main.growth = 50; main.traits = [{ id: '嗜血', tier: 2 }];
   const sub = baby(); sub.traits = [{ id: '狂暴', tier: 3 }];
-  // 确定性：main 保留(0.1<0.7)、不升阶(0.9)、sub 继承(0.1<0.4)、不升阶(0.9)
-  rnd = [0.1, 0.9, 0.1, 0.9];
+  rnd = [0.1, 0.1];
   const out = ctx.Merge.inheritSynthTraits(main, sub, false);
-  const ids = out.map(t => t.id).sort();
-  A(ids.includes('嗜血') && ids.includes('狂暴'), '合成继承：主+副特质都保留');
-  A(out.find(t => t.id === '嗜血').tier === 2 && out.find(t => t.id === '狂暴').tier === 3, '合成继承：T 阶不变（无升/降）');
-  // 上限 3 + 不重复
-  const m2 = baby(); m2.traits = [{ id: 'A', tier: 1 }].concat(ctx.Config.petTraits ? [] : []); // 占位
+  A(out.length === 2 && out.find(t => t.id === '嗜血').tier === 1, '合成继承：主宠词条必留且升档（T2→T1）');
+  A(out.find(t => t.id === '狂暴').tier === 3, '合成继承：副宠词条嫁接、档位照抄（T3）');
 }
 {
-  // 主宠成长≥60 → 继承概率 +10%（一档封顶），用概率测试难，改为验证 milestone 逻辑不崩
-  // 注意：真随机下"主 70%+bonus / 副 40%+bonus"可能全丢（~10%），故断言允许 0~3
-  const main = baby(); main.growth = 60; main.traits = [{ id: '精准', tier: 1 }];
-  const sub = baby(); sub.traits = [{ id: '疾风', tier: 1 }];
-  const out = ctx.Merge.inheritSynthTraits(main, sub, false);
-  A(Array.isArray(out) && out.length <= 3, '主成长≥60 继承条数合法（0~3）');
+  // 至尊神石 subAll：副宠词条 100% 嫁接（不掷概率），主宠只掷升档
+  const main = baby(); main.traits = [{ id: '嗜血', tier: 2 }];
+  const sub = baby(); sub.traits = [{ id: '狂暴', tier: 1 }];
+  rnd = [0.9];
+  const out = ctx.Merge.inheritSynthTraits(main, sub, false, { subAll: true });
+  A(out.length === 2 && out.find(t => t.id === '嗜血').tier === 2 && out.find(t => t.id === '狂暴').tier === 1,
+    '至尊神石：主宠全保 + 副宠词条 100% 嫁接');
 }
 {
-  // 变异成功额外追 1 条随机新特质（保底）
+  // 变异追加：档位走变异福利（T1 20%、保底 T2），不再用普通 roll
   const main = baby(); main.traits = [];
   const sub = baby(); sub.traits = [];
-  const out = ctx.Merge.inheritSynthTraits(main, sub, true);
-  A(out.length >= 1 && out.length <= 3, '变异成功：额外追 1 条（1~3）');
+  rnd = [0.5, 0.05]; // 第一掷选特质 id，第二掷定档位
+  const out1 = ctx.Merge.inheritSynthTraits(main, sub, true);
+  A(out1.length === 1 && out1[0].tier === 1, '变异追加：T1 20%（0.05 命中）');
+  rnd = [0.5, 0.5];
+  const out2 = ctx.Merge.inheritSynthTraits(main, sub, true);
+  A(out2.length === 1 && out2[0].tier === 2, '变异追加：保底 T2（0.5 未中 T1 → T2，不再出 T3）');
 }
-
+{
+  // 满栏变异：新特质挤掉主宠档位最低的一条（T1 永不被顶）
+  const main = baby(); main.traits = [{ id: '嗜血', tier: 1 }, { id: '狂暴', tier: 2 }, { id: '战意', tier: 3 }];
+  const sub = baby(); sub.traits = [];
+  rnd = [0.9, 0.9, 0.9, 0.5, 0.5]; // 主宠三条各掷升档（0.9 不升）+ 变异 id + 变异档位
+  const out = ctx.Merge.inheritSynthTraits(main, sub, true);
+  A(out.length === 3 && !out.find(t => t.id === '战意') && out.find(t => t.id === '嗜血').tier === 1 && out.find(t => t.id === '狂暴').tier === 2,
+    '满栏变异：新特质 T2 顶掉主宠 T3，T1 不动');
+}
+{
+  // 主宠成长≥60：副宠嫁接概率 +10%（40%→50%），分布级断言
+  let hit = 0;
+  for (let i = 0; i < 200; i++) {
+    const main = baby(); main.growth = 60; main.traits = [];
+    const sub = baby(); sub.traits = [{ id: '嗜血', tier: 2 }];
+    const out = ctx.Merge.inheritSynthTraits(main, sub, false);
+    if (out.length === 1) hit++;
+  }
+  A(hit > 70 && hit < 130, '主宠成长≥60：副宠嫁接概率 40%→50%（200 次 ' + hit + ' 次命中）');
+}
 /* ================= 5. 涅槃植入 ================= */
 {
   const main = baby(); main.traits = [{ id: '嗜血', tier: 2 }];

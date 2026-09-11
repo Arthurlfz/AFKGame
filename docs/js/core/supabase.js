@@ -73,7 +73,7 @@
   const PET_BASE_COLS = 'id,name,icon,growth,level,hp,attack,defense,speed,cur_hp,is_active,evolve_times,reborn_count,created_at';
   // 附加列（旧库可能缺失）：2026-09-06 新增 evolve_stage / is_god_pet（神级宠 + 5 阶进化，
   // 需先跑 supabase/migrate_god_pet.sql；没跑迁移的库会自动剔除这两列，宠物本体照常读写）
-  const PET_EXTRA_COLS = ['exp', 'traits', 'awaken_trait', 'source', 'evolve_stage', 'is_god_pet'];
+  const PET_EXTRA_COLS = ['exp', 'traits', 'awaken_trait', 'source', 'evolve_stage', 'is_god_pet', 'cultivate_used'];
   const missingPetCols = new Set();
   const currentPetCols = () => PET_BASE_COLS + ',' + PET_EXTRA_COLS.filter(c => !missingPetCols.has(c)).join(',');
   // 判断错误是否为「缺列」（Postgres 42703 / PostgREST PGRST204）
@@ -125,6 +125,7 @@
     const maxStage = ((Config.pet && Config.pet.evolution && Config.pet.evolution.maxEvolveTimes) || 4) + 1;
     row.evolve_stage = Math.min(maxStage, Math.max(1, Math.floor(pet.evolveStage || (pet.evolveTimes || 0) + 1 || 1)));
     row.is_god_pet = !!pet.isGodPet;
+    row.cultivate_used = Math.max(0, Math.floor(pet.cultivateUsed || 0)); // 神宠培育已用次数（涅槃归零）
     // 血脉特质 / 永久觉醒标记 / 来源（缺列时由 savePet 剔除）
     if (Array.isArray(pet.traits) && pet.traits.length) row.traits = pet.traits;
     if (pet.awakened) row.awaken_trait = '1';   // 复用 awaken_trait 列（2026-09-10 v2：'1' = 永久觉醒）

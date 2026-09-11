@@ -42,8 +42,8 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   A(/traitInheritLine\(main, sub, ?'synth'\)/.test(srcSynth), '合成预览函数调用 traitInheritLine');
   const TI = JSON.parse(C('JSON.stringify(Config.traitInherit || {})'));
   const TN = JSON.parse(C('JSON.stringify(Config.traitNirvana || {})'));
-  A(Math.round((TI.mainKeep || 0) * 100) === 70 && Math.round((TI.subKeep || 0) * 100) === 40,
-    `Config.traitInherit 主70%/副40%（${TI.mainKeep}/${TI.subKeep}）`);
+  A(TI.mainKeep === undefined && Math.round((TI.subKeep || 0) * 100) === 40,
+    `Config.traitInherit 主宠全保留（mainKeep 已废）/副40%（${TI.subKeep}）`);
   A(Math.round((TN.implantChance || 0) * 100) === 30, `Config.traitNirvana 植入30%（${TN.implantChance}）`);
   // 直接用 vm 调内部 traitInheritLine 不可行（未导出），改验证 UI 渲染的宠物卡 tooltip 含特质
   C(`(function(){const pet=Pet.getPets().find(p=>p.id===globalThis.__p);const tip=UI.traitsHtml(pet);globalThis.__tip=tip;return true})()`);

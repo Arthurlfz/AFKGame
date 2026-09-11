@@ -83,7 +83,6 @@
     { group: '特质/魂铸', fields: [
       { path: 'traitHatch.mutant.t1Boost', label: '变异T1特质概率加成', min: 0, max: 50, step: 1, note: '合成变异时 T1 特质概率 +X%（%为单位）' },
       { path: 'traitHatch.mutant.count3', label: '变异3条特质概率', min: 0, max: 50, step: 1, note: '合成变异时出 3 条特质的概率（%）' },
-      { path: 'traitInherit.mainKeep', label: '合成主宠特质保留率', min: 0, max: 1, step: 0.05 },
       { path: 'traitInherit.subKeep', label: '合成副宠特质继承率', min: 0, max: 1, step: 0.05 },
       { path: 'traitInherit.up', label: '继承升阶概率', min: 0, max: 1, step: 0.01, note: '特质继承时 T 阶 +1 概率（封顶 T1）' },
       { path: 'traitNirvana.implantChance', label: '涅槃特质植入率', min: 0, max: 1, step: 0.01 },

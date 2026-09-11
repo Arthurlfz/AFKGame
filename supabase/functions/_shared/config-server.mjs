@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-10T17:22:38.957Z
+// 生成时间：2026-09-11T04:46:42.300Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -826,7 +826,21 @@ const serverConfig = {
           "triggerChance": 0.16,
           "damageMultiplier": 1.7
         }
-      }
+      },
+      "skillTierScale": [
+        {
+          "chance": 0.6,
+          "damage": 0.5
+        },
+        {
+          "chance": 0.8,
+          "damage": 0.75
+        },
+        {
+          "chance": 1,
+          "damage": 1
+        }
+      ]
     }
   },
   "exp": {

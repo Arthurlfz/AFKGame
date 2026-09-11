@@ -144,11 +144,10 @@
     return enemy;
   }
   function initCombatSkills(pet) {
-    // 变异宠名字带「·异变」后缀，用 skillOf 剥离后缀继承本体主动技能
-    // 名字在技能表 = 曾经到过终形态（进化到终阶才改名；合成继承 / 涅槃名字不回退）
-    // → 技能永久保留，涅槃后 Lv1 也能放（2026-09-10 拍板：曾经到过终形态就激活）
+    // 技能跟血统线走（2026-09-11 拍板）：skillOf 按宠物阶段定档（一阶 I / 二三阶 II / 终阶神级 III 满档），
+    // 变异宠剥「·异变」后缀继承本体；涅槃保留形态 → 档位不退
     const skill = (Config.pet.evolution && Config.pet.evolution.skillOf)
-      ? Config.pet.evolution.skillOf(pet.name)
+      ? Config.pet.evolution.skillOf(pet)
       : Config.pet.evolution.activeSkills?.[pet.name];
     state.activeSkill = skill || null;
     state.skillCooldown = 0;

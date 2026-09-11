@@ -12,12 +12,11 @@
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
 }
-/* 确保背包窗口在 is-open 时可见（修复 renderBag 报错导致 transition 不触发的问题） */
-.bag-window-host.is-open .bag-window {
-  opacity: 1 !important;
-  transform: translate(-50%, -50%) scale(1) !important;
-  transition: none !important;
-}
+/* 2026-09-11：已删 transform/transition !important 强制覆盖。
+ * 它和 makeDraggable 的定位残留打架：内联 left:0/top:0 盖不掉，
+ * 重开背包窗口时被 translate(-50%,-50%) 拉到「锚定原点」= 飞左上角；
+ * 且它同时废掉了拖拽的 translate3d。开合可见性由 game.css
+ * .bag-window-host.is-open .bag-window（非 important）正常接管。 */
 
 /* ---------- 2. 关闭按钮加大到 32×32，加 hover 高亮 ---------- */
 .bag-window-close,

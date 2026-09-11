@@ -13,7 +13,7 @@
   const PetUI = window.PetUI || (window.PetUI = {});
   const { iconHtml, petTipHtml, showPetTip, hidePetTip, bindPetTip, flashStat, traitInheritLine } = PetUI;
 
-  let mergeMainId = null, mergeSubId = null, useNirvanaPill = false, useCrystal = false;
+  let mergeMainId = null, mergeSubId = null, useNirvanaPill = false, useCrystal = false, useLock = false, lockTraitId = null;
 
   function statRows(pet) {
     const s = getStats(pet);
@@ -54,6 +54,7 @@
       card.onclick = () => {
         mergeMainId = pet.id;
         mergeSubId = null; // 换主宠重置副宠
+        useLock = false; lockTraitId = null;
         UI.renderAll();
       };
       list.appendChild(card);
@@ -136,6 +137,7 @@
     sb.querySelectorAll('.sub-opt').forEach(btn => {
       btn.onclick = () => {
         mergeSubId = Number(btn.dataset.sub);
+        useLock = false; lockTraitId = null;
         renderMergePreview(main, matName, matAmt, haveMat);
         UI.renderAll();
       };
@@ -164,6 +166,12 @@
     const cryOk = !!CB && cryHave >= CB.amount;
     if (!pillOk) useNirvanaPill = false;   // 持有不足时自动取消勾选，避免按钮被自己禁用还不知道为什么
     if (!cryOk) useCrystal = false;
+    const lockItem = Config.itemOf ? Config.itemOf('nir_lock') : null;
+    const lockHave = lockItem && Materials.getQuantity ? Materials.getQuantity(lockItem.name) : 0;
+    const subTraitList = (sub.traits || []);
+    const lockOpts = subTraitList.map(t => '<option value="' + t.id + '"' + (t.id === lockTraitId ? ' selected' : '') + '>' + ((Config.petTraits[t.id] || {}).label || t.id) + ' T' + t.tier + '</option>').join('');
+    if (!lockTraitId && subTraitList.length) lockTraitId = subTraitList[0].id;
+    if (useLock && (lockHave < 1 || !subTraitList.length)) useLock = false;
     const pillMult = useNirvanaPill && nirPill ? (nirPill.boostMult || 1.2) : 1;
     const cryMult = (useCrystal && CB) ? (1 + CB.absorbBonus) : 1;
     const bonusMult = pillMult * cryMult;
@@ -175,7 +183,7 @@
       const arrowTxt = b > a ? '▲' : b < a ? '▼' : '—';
       return `<tr><td>${label}</td><td>${a}</td><td class="${cls}">${b} ${arrowTxt}</td></tr>`;
     };
-    const canMerge = (!useNirvanaPill || pillOk) && (!useCrystal || cryOk);
+    const canMerge = (!useNirvanaPill || pillOk) && (!useCrystal || cryOk) && (!useLock || (lockHave >= 1 && !!lockTraitId));
     const footWarns = [];
     if (useNirvanaPill && !pillOk) footWarns.push(`<span class="warn">${matName}不足：需要 1 个，当前持有 ${pillHave}</span>`);
     if (useCrystal && !cryOk) footWarns.push(`<span class="warn">${CB.material}不足：需要 ${CB.amount} 颗，当前持有 ${cryHave}</span>`);
@@ -186,6 +194,7 @@
         <div class="pv"><div class="k">等级</div><div class="v">Lv.${main.level} → ${M.resetLevel ? 'Lv.1' : '不变'}<small>${M.resetLevel ? '重置 · 经验清零' : ''}</small></div></div>
         <div class="pv"><div class="k">涅槃丹</div><div class="v"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> ×${pillMult}（持有 ${pillHave}）</label></div></div>
         ${CB ? `<div class="pv"><div class="k">${CB.material}</div><div class="v"><label><input type="checkbox" id="nir-crystal-check" ${useCrystal ? 'checked' : ''} ${cryOk ? '' : 'disabled'}> ×${cryMult}（消耗 ${CB.amount}，持有 ${cryHave}）</label></div></div>` : ''}
+        <div class="pv"><div class="k">锁魂玉</div><div class="v"><label><input type="checkbox" id="nir-lock-check" ${useLock ? 'checked' : ''} ${lockHave >= 1 && subTraitList.length ? '' : 'disabled'}> 定向植入</label>${useLock ? `<select id="nir-lock-trait">${lockOpts}</select>` : ''}（持有 ${lockHave}）</div></div>
       </div>
       <div class="preview-foot">
         <b>${sub.name}</b>（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${useCrystal && CB ? ` · 消耗 ${CB.material} ×${CB.amount}（持有 ${cryHave}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
@@ -201,17 +210,23 @@
       pillCheck.onchange = () => { useNirvanaPill = pillCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
     }
     const cryCheck = document.getElementById('nir-crystal-check');
+    if (lockCheck) {
+      lockCheck.onchange = () => { useLock = lockCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
+      const lockSel = document.getElementById('nir-lock-trait');
+      if (lockSel) lockSel.onchange = () => { lockTraitId = lockSel.value; };
+    }
     if (cryCheck) {
       cryCheck.onchange = () => { useCrystal = cryCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
     }
     cb.querySelector('#merge-ok').onclick = async () => {
       if (!canMerge) { showToast('无法涅槃', '道具或材料不足'); return; }
-      const res = await Merge.nirvana(main.id, sub.id, useCrystal, useNirvanaPill);
+      const res = await Merge.nirvana(main.id, sub.id, useCrystal, useNirvanaPill, useLock ? lockTraitId : null);
       if (res.error) { showToast('涅槃失败', res.error); return; }
-      addLog(`涅槃成功！${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}，等级重置为 Lv.${res.main.level}`);
+      addLog(`涅槃成功！${res.main.name} 成长 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}，等级重置为 Lv.${res.main.level}，转生 ${res.main.rebornCount} 次；本轮培育次数已重置（0/10）`);
       showToast('涅槃成功！', `${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}`);
       mergeMainId = res.main ? res.main.id : null;
       mergeSubId = null;
+      useLock = false; lockTraitId = null;
       UI.renderAll();
     };
   }

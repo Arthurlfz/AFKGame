@@ -197,7 +197,8 @@
 
     function applyTransform() {
       rafId = null;
-      winEl.style.transform = 'translate3d(' + curX + 'px,' + curY + 'px,0)';
+      winEl.style.left = curX + 'px';
+      winEl.style.top = curY + 'px';
     }
 
     function onMouseDown(e) {
@@ -211,11 +212,13 @@
       baseY = rect.top;
       curX = baseX;
       curY = baseY;
-      // 拖动时禁用 transition（否则窗口会追着鼠标跑），用 translate3d 走 GPU
+      // 统一定位模型：位置完全由 left/top 决定，transform 归还给 CSS（居中/开合动画）。
+      // 旧实现 left:0/top:0 + translate3d(x,y) 在关窗后残留，重开时会被 .is-open 的
+      // translate(-50%,-50%) 盖成「锚定原点再回拉半格」= 窗口飞左上角。
       winEl.classList.add('is-dragging');
-      winEl.style.left = '0';
-      winEl.style.top = '0';
-      winEl.style.transform = 'translate3d(' + baseX + 'px,' + baseY + 'px,0)';
+      winEl.style.left = baseX + 'px';
+      winEl.style.top = baseY + 'px';
+      winEl.style.transform = 'none';
       e.preventDefault();
     }
 

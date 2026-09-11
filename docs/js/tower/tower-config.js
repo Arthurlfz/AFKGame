@@ -270,7 +270,7 @@
                                      '神圣石': 12, '强化丹B': 10, '越龙之石': 6,
                                      '腐印·荆棘': 8, '腐印·蚀甲': 8, '腐印·破阵': 6 } },
       { from: 21, to: 30, weights: { '鉴定石': 16, '重铸石': 4, '增缀石': 4, '剥离石': 4,
-                                     '神圣石': 16, '强化丹B': 10, '越龙之石': 12, '天仙玉露': 12,
+                                     '神圣石': 16, '强化丹B': 10, '越龙之石': 12, '天仙玉露': 12, '锁魂玉': 4, '琼浆玉露': 10,
                                      '腐印·屠戮': 8, '腐印·渴血': 8, '腐印·枯竭': 6, '腐印·禁疗': 4, '腐印·天罚': 3 } }
     ],
     materialQty: { min: 1, max: 3 },
@@ -286,8 +286,8 @@
       { floor: 10, gear: { rarity: 'gold', count: 2, areaTier: 10, materialTier: 1 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 1 }] },
       { floor: 15, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 1 }, items: [{ name: '神圣石', qty: 2 }, { name: '强化丹B', qty: 2 }] },
       { floor: 20, gear: { rarity: 'gold', count: 3, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 2 }, { name: '神圣石', qty: 2 }] },
-      { floor: 25, gear: { rarity: 'gold', count: 4, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 2 }, { name: '天仙玉露', qty: 2 }] },
-      { floor: 30, gear: { rarity: 'gold', count: 5, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 3 }, { name: '天仙玉露', qty: 3 }, { name: '强化丹B', qty: 3 }] }
+      { floor: 25, gear: { rarity: 'gold', count: 4, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 2 }, { name: '天仙玉露', qty: 2 }, { name: '锁魂玉', qty: 1 }] },
+      { floor: 30, gear: { rarity: 'gold', count: 5, areaTier: 10, materialTier: 1 }, items: [{ name: '越龙之石', qty: 3 }, { name: '天仙玉露', qty: 3 }, { name: '强化丹B', qty: 3 }, { name: '琼浆玉露', qty: 1 }] }
     ],
     /* 不足第一档（死在第 1~4 层）的保底：必须属于塔本身（内向进度），不发区域材料 */
     consolation: [{ name: '重铸石', qty: 2 }],

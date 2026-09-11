@@ -271,7 +271,7 @@
     const r = Math.random() * 100;
     if (r < t1) return 1;
     if (r < t1 + t2) return 2;
-    return (mutant && m.minTier) ? Math.max(m.minTier, 3) : 3;
+    return (mutant && m.minTier) ? Math.min(m.minTier, 3) : 3; // 保底 T2：数字小=档高，用 min 封顶（旧 Math.max 写反，从未生效）
   }
   // 按孵化概率 roll 宠物特质（条数 + T 阶）；mutant=true 变异宠（保底 1 条、3 条概率抬升、T 阶抬升）
   function rollPetTraits(pet, opts) {
@@ -543,8 +543,11 @@
     pet.evolveTimes = Math.max(0, Math.floor(num(row.evolve_times)));
     // 进化阶段：云端有 evolve_stage 列则用之，没有（旧库/迁移前）按 evolveTimes+1 兜底
     const stageRaw = num(row.evolve_stage);
-    pet.evolveStage = stageRaw > 0 ? Math.min(5, Math.floor(stageRaw)) : Math.min(5, pet.evolveTimes + 1);
+    // 神级宠固定 5 阶：它生而为终阶、evolveTimes 恒 0，拿次数兜底会让技能被误判成未解锁
     pet.isGodPet = !!row.is_god_pet;
+    pet.evolveStage = stageRaw > 0 ? Math.min(5, Math.floor(stageRaw))
+      : pet.isGodPet ? 5 : Math.min(5, pet.evolveTimes + 1);
+    pet.cultivateUsed = Math.max(0, Math.floor(num(row.cultivate_used))); // 神宠培育已用次数（旧库缺列兜底 0）
     pet.rebornCount = Math.max(0, Math.floor(num(row.reborn_count)));
     pet.curHp = num(row.cur_hp);
     pet.isActive = !!row.is_active; // 出战标记（DB 权威，刷新后据此还原出战宠物）

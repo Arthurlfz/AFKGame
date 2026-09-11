@@ -28,7 +28,9 @@
     const mainPet = getPets().find(p => p.id === synthMainId);
     const cands = getPets().filter(p => {
       const ec = Object.values(p.equipment || {}).filter(Boolean).length;
-      return !ec && Merge.canSynthesize(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
+      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(p) : !!p.isGodPet;
+      // 神级宠不准参与合成（2026-09-11 拍板），列表里直接不出现
+      return !ec && !isGod && Merge.canSynthesize(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
     });
     if (!cands.length) {
       const empty = document.createElement('div');
@@ -95,7 +97,7 @@
       <div class="stats">${statRows(main)}</div>
       ${godNote}</div>`;
     if (arrow) arrow.innerHTML = '<div class="forge-core"><div class="cauldron">合</div><div class="cauldron-tip">炼妖炉<br>两只素材宠都将消失</div></div>';
-    const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id, S) : [];
+    const subs = (Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id, S) : []).filter(s => !(window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(s) : !!s.isGodPet)); // 神宠禁当副宠
     if (!subs.length) {
       sb.innerHTML = `<div class="hint">没有可用的副素材（需要另一只 ${S.minLevel} 级、不在出售、没穿装备的宠物）</div>`;
       pb.innerHTML = ''; cb.innerHTML = '';

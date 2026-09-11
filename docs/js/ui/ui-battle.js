@@ -452,13 +452,19 @@
     btn.textContent = label;
     btn.disabled = !!disabled;
   }
-  function renderActiveSkill(skill, cooldown, queued) {
+  function renderActiveSkill(skill, cooldown, queued, opts) {
     const btn = $('btn-active-skill');
     if (!btn) return;
     btn.hidden = false; // 主动技能按钮始终显示；未解锁置灰占位（2026-09-03）
     if (!skill) {
       btn.disabled = true;
       btn.textContent = '主动技能 · 未解锁';
+      return;
+    }
+    if (opts && opts.auto) {
+      btn.disabled = true;
+      btn.textContent = `${skill.name} · 自动释放`;
+      btn.title = `托管挂机中由服务器自动释放 · ${Math.round((skill.triggerChance || 0) * 100)}% 概率替代普攻 · ${Math.round(skill.damageMultiplier * 100)}% 伤害 · ${skill.cooldownTurns} 回合冷却`;
       return;
     }
     btn.disabled = cooldown > 0 || queued;

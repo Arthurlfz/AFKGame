@@ -468,6 +468,13 @@
   function notifyChange() { if (onChange) { try { onChange(); } catch (e) { /* 忽略 */ } } }
 
   /* ---------- 演出：怪上台 ---------- */
+  // 托管回放层的主动技能按钮：托管模式从不进 beginFight，按钮此前永远停在初始「未解锁」。
+  function renderIdleSkillButton(pet, UI) {
+    if (!UI.renderActiveSkill) return;
+    const skillDef = (window.Config.pet.evolution && window.Config.pet.evolution.skillOf)
+      ? window.Config.pet.evolution.skillOf(pet) : null;
+    UI.renderActiveSkill(skillDef, 0, false, { auto: true });
+  }
   // 顺序铁律（2026-09-10）：showEnemy 赋值与 UI 挂载必须同生共死。
   // 事故：旧代码先设 showEnemy 再查 pet/UI，检查不通过时本场战斗照常推进
   // （掉血/经验/结算全走），但 resetBattle 没跑 → 立绘没挂 + enemy-fighter 还带着
@@ -516,6 +523,7 @@
       maxHp, showEnemy.maxHp || 100
     );
     if (UI.updateBars) UI.updateBars(Math.round(showHp), maxHp, showEnemy.maxHp, showEnemy.maxHp || 100);
+    renderIdleSkillButton(pet, UI);
     blog('[战斗·上怪]', showEnemy.name, 'Lv' + showEnemy.level,
       '| 血=' + showEnemy.maxHp,
       '| 刀数(我/敌)=' + (showPlan ? (showPlan.petHits + '/' + showPlan.enemyHits) : '(无计划→时间插值)'),

@@ -122,13 +122,14 @@
       // 用 skillOf 而不是 activeSkills[名字]：变异宠名字带「·异变」，直接查表必然查不到，
       // 结果就是"明明有技能却显示未解锁"。skillOf 会剥后缀查本体（config 里现成的）。
       const evo = Config.pet.evolution || {};
-      const skill = (evo.skillOf ? evo.skillOf(pet.name) : null) || (evo.activeSkills || {})[pet.name];
+      const skill = (evo.skillOf ? evo.skillOf(pet) : null) || (evo.activeSkills || {})[pet.name];
       // 触发概率以前全项目 UI 都没有展示（只有战斗逻辑在读），玩家只能看到"有技能"却不知道多强
       const chanceTxt = skill ? `${Math.round((skill.triggerChance || 0) * 100)}% 概率发动` : '';
       const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}% 伤害${skill.maxHpDamageRate ? ` + 目标最大生命 ${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
+      const tierTxt = skill && skill.tier && skill.tier < 3 ? `（${skill.tierName} 档·进化升档）` : '';
       skillInfo.textContent = skill
-        ? `主动技能：${skill.name} · ${chanceTxt} · ${effect} · ${skill.cooldownTurns} 回合冷却`
-        : '主动技能：终形态 Lv.60 解锁';
+        ? `主动技能：${skill.name}${tierTxt} · ${chanceTxt} · ${effect} · ${skill.cooldownTurns} 回合冷却`
+        : '主动技能：一阶选分支后解锁，随进化升档';
     }
     // 血脉特质胶囊（出战面板常驻；空态显示"无血脉特质"）
     const traitsEl = $('pet-traits');
@@ -550,13 +551,15 @@
       ? Math.round(((window.Config.traitNirvana && window.Config.traitNirvana.implantChance != null ? window.Config.traitNirvana.implantChance : 0.3)) * 100)
       : Math.round(((cfg.synthGive != null ? cfg.synthGive : 0.4)) * 100);
     const upP = Math.round(((cfg.up != null ? cfg.up : 0.2)) * 100);
-    const downP = Math.round(((cfg.down != null ? cfg.down : 0.1)) * 100);
     const cap = (cfg.cap != null ? cfg.cap : 3);
     const label = type === 'nirvana' ? '涅槃植入' : '合成继承';
-    return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）' +
-      giveP + '% 概率继承（主宠成长≥' + (cfg.growthMin != null ? cfg.growthMin : 60) + ' 额外 +' +
-      Math.round((cfg.growthBonus != null ? cfg.growthBonus : 0.1) * 100) + '%；T 阶 ' + upP + '% 升 / ' + downP +
-      '% 降；上限 ' + cap + ' 条）</div>';
+    if (type === 'synth') {
+      return '<div class="es-preview-row">' + label + '：主宠词条全保留（' + upP + '% 概率升档，不会丢不会降）；副宠特质（' + escapeHtml(names) + '）' +
+        giveP + '% 概率嫁接（主宠成长≥' + (cfg.growthMin != null ? cfg.growthMin : 60) + ' 额外 +' +
+        Math.round((cfg.growthBonus != null ? cfg.growthBonus : 0.1) * 100) + '%；上限 ' + cap + ' 条）</div>';
+    }
+    return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）各 ' + giveP +
+      '% 概率植入（同类型取高阶；上限 ' + cap + ' 条）；用锁魂玉可指定一条 100% 植入</div>';  
   }
   PetUI.iconHtml = iconHtml;
   PetUI.petTipHtml = petTipHtml;

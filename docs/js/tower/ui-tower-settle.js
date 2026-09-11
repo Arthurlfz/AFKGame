@@ -23,7 +23,7 @@
   const cfg = () => (window.Config && window.Config.tower) || {};
 
   // 高级材料（塔的招牌产出）：结算里按「高级 / 碎屑」两档分开展示
-  const HIGH_MATS = ['神圣石', '越龙之石', '天仙玉露', '强化丹B'];
+  const HIGH_MATS = ['神圣石', '越龙之石', '天仙玉露', '强化丹B', '锁魂玉', '琼浆玉露'];
   const isAffixName = n => /^腐印/.test(String(n || ''));
 
   /* ---------- 诊断：事实 + 一条可操作建议 ---------- */

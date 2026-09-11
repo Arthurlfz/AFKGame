@@ -19,6 +19,21 @@
   const Market = window.Market;
   const { randInt, pick } = window.Util;
 
+  // 会消耗掉「锁定」的打造操作（2026-09-11 用户拍板）：
+  // 锁定石只保【一次】打造操作 —— 重铸/剥离/神圣/增缀 任一生效后锁定立即失效，
+  // 想继续锁就得再上一颗锁定石。这条规则收口在 applyCraft（不散在各操作里），
+  // 漏一个就会变成「锁定一直不失效」，之前只有 reforge 清、其余三种不清就是这么来的。
+  const LOCK_CONSUMING = ['reforge', 'strip', 'reroll', 'augment'];
+  // 让锁定失效，返回还原函数（云同步失败回滚时用）。非打造操作（lockSide/unlockSide）原样不动。
+  function expireLock(eq, actionType) {
+    if (LOCK_CONSUMING.indexOf(actionType) < 0) return () => {};
+    if (!eq.lockPrefix && !eq.lockSuffix) return () => {};
+    const p = eq.lockPrefix, s = eq.lockSuffix;
+    delete eq.lockPrefix;
+    delete eq.lockSuffix;
+    return () => { eq.lockPrefix = p; eq.lockSuffix = s; };
+  }
+
   // 词缀数值表分派（2026-09-04 独立定标）：与 equipment.js 的 affixTiersFor 同一套映射，杜绝两套口径
   const AFFIX_TIER_TABLES = {
     spd: () => Config.equipment.speedAffixTiers,
@@ -58,11 +73,15 @@
     // 本地先行：改词缀 + 本地扣材料
     const applied = apply(); // { changed, onFail() } 或 { error }
     if (applied.error) return applied;
+    // 锁定失效必须在【云同步之前】：Items.updateCloudItem 会把 _lockPrefix/_lockSuffix 一起写库，
+    // 晚于它清就会出现「本地看着解锁了、刷新又锁回来」。
+    const restoreLock = expireLock(eq, actionType);
+    const failLocal = () => { applied.onFail(); restoreLock(); };
     const spentLocal = Materials.spendLocal(stoneName, stoneAmount);
-    if (!spentLocal.ok) { applied.onFail(); return { error: spentLocal.error || '材料不足' }; }
+    if (!spentLocal.ok) { failLocal(); return { error: spentLocal.error || '材料不足' }; }
     if (extraStone) {
       const spentExtra = Materials.spendLocal(extraStone.name, extraStone.amount);
-      if (!spentExtra.ok) { Materials.gainLocal(stoneName, stoneAmount); applied.onFail(); return { error: spentExtra.error || '材料不足' }; }
+      if (!spentExtra.ok) { Materials.gainLocal(stoneName, stoneAmount); failLocal(); return { error: spentExtra.error || '材料不足' }; }
     }
 
     // 本地已生效（词缀改好、石头扣了）→ 立刻通知界面刷新，不等云端。
@@ -86,10 +105,17 @@
     ];
     if (extraStone) cloudOps.push(Materials.cloudSpend(extraStone.name, extraStone.amount));
     const [sp, up] = await Promise.all(cloudOps);
-    const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null) || (up && up.error);
+    let syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null) || (up && up.error);
+    // 余额不足先重试一次：上面那次 flush 可能撞上限流（ERR_RATE_LIMIT）被退回队列，
+    // 云端也就没收到刚掉的那批石头。此时直接回滚，玩家看到的就是「词条跳过去又跳回来」。
+    if (syncErr && sp && sp.data === false && !sp.error) {
+      await Materials.flushMaterials();
+      const again = await Materials.cloudSpend(stoneName, stoneAmount);
+      if (again && again.data !== false && !again.error) syncErr = null;
+    }
     if (syncErr) {
-      // 回滚本地：词缀还原 + 材料加回（含附加石头）
-      applied.onFail();
+      // 回滚本地：词缀还原 + 锁定还原 + 材料加回（含附加石头）
+      failLocal();
       Materials.gainLocal(stoneName, stoneAmount);
       if (extraStone) Materials.gainLocal(extraStone.name, extraStone.amount);
       return { ok: false, error: '云端同步失败，已回滚：' + (syncErr.message || syncErr), rolledBack: true };
@@ -101,8 +127,9 @@
   }
 
   /* ---------- 重铸：随机重铸装备词缀（数量 / 类型 / T 阶 / 数值 全部随机） ---------- */
-  // POE 锁前锁后 + 一次性锁定（2026-09-04 拍板）：锁定前缀 → 前缀整组保留，后缀整组重 roll；锁定后缀 → 反之。
-  // 锁定石是消耗品：锁定动作耗 1 颗（见 lockSide）；重铸生效后【锁定自动失效】，再锁需重新上锁定石。
+  // POE 锁前锁后 + 一次性锁定：锁定前缀 → 前缀整组保留，后缀整组重 roll；锁定后缀 → 反之。
+  // 锁定石是消耗品：锁定动作耗 1 颗（见 lockSide）；本次重铸生效后锁定由 applyCraft 统一清掉，
+  // 再锁需重新上锁定石（别在这里 delete，四种石头要同一个出口，见 expireLock）。
   // 两侧都锁 → 禁止。返回 { ok, changed: {old, new} } 或 { error }
   async function reforge(eq, onApplied) {
     const C = Config.craft.reforge;
@@ -111,7 +138,6 @@
     return applyCraft(eq, C.name, C.amount, () => {
       const old = normalizeAffixes(eq.affixes);
       const oldRarity = eq.rarity;
-      const oldLockPrefix = eq.lockPrefix, oldLockSuffix = eq.lockSuffix;
       const rollBucket = (category, keep) => {
         if (keep) return (old[category] || []).slice(); // 锁定侧：整组保留（原对象引用）
         const pool = AFFIX_POOL.filter(a => a.category === category);
@@ -144,10 +170,7 @@
       }
       eq.affixes = { prefix, suffix };
       syncRarity(eq); // 重铸会重摇词缀条数 → 颜色按新条数同步
-      // POE 一次性：锁定效果在本次重铸后失效，需重新上锁定石
-      delete eq.lockPrefix;
-      delete eq.lockSuffix;
-      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; eq.lockPrefix = oldLockPrefix; eq.lockSuffix = oldLockSuffix; } };
+      return { changed: { old, new: eq.affixes }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
     }, onApplied, undefined, 'reforge');
   }
 
@@ -168,7 +191,7 @@
       eq.affixes[loc.bucket].splice(loc.index, 1);
       syncRarity(eq); // 词缀-1 → 颜色按条数同步（如金→蓝→白）
       return { changed: { old, removed }, onFail: () => { eq.affixes = old; eq.rarity = oldRarity; } };
-    }, onApplied);
+    }, onApplied, undefined, 'strip');
   }
 
   // 词缀展示：如「攻击 +12%（T4）」，带 T 阶颜色
@@ -187,7 +210,8 @@
   async function reroll(eq, onApplied) {
     const C = Config.craft.holy;
     if (affixCount(eq) === 0) return { error: '这件装备没有词缀，无法重铸' };
-    // POE 锁前锁后：锁定侧数值也不动（只重 Roll 未锁侧）；神圣石不消耗锁定（POE 中工艺词缀不受神圣影响，锁定状态保留）
+    // POE 锁前锁后：锁定侧数值也不动（只重 Roll 未锁侧）。
+    // 神圣石同样会消耗掉锁定（锁定只保一次打造，见 expireLock）
     const lockPrefix = !!eq.lockPrefix, lockSuffix = !!eq.lockSuffix;
     if (lockPrefix && lockSuffix) return { error: '只能锁定前缀或后缀其中一边，先解锁另一边' };
     return applyCraft(eq, C.name, C.amount, () => {
@@ -203,7 +227,7 @@
         changed: { old, new: changed },
         onFail: () => { eq.affixes = old; }     // 云同步失败时整组还原
       };
-    }, onApplied);
+    }, onApplied, undefined, 'reroll');
   }
 
   /* ---------- 增缀石：按前后缀优先级给装备【新增】一条随机词缀 ---------- */
@@ -247,13 +271,12 @@
         changed: { old, new: added, target },
         onFail: () => { eq.affixes = old; eq.rarity = oldRarity; }      // 云同步失败时整组还原
       };
-    }, onApplied);
+    }, onApplied, undefined, 'augment');
   }
 
-  /* ---------- 锁定石：POE 锁前/锁后，一次性消耗（2026-09-04 拍板） ----------
+  /* ---------- 锁定石：POE 锁前/锁后，一次锁定只保一次打造（2026-09-11 拍板） ----------
    * 只锁一边：eq.lockPrefix 或 eq.lockSuffix（布尔）。锁定侧在重铸中整组保留、剥离/增缀不触及。
-   * 锁定动作消耗 1 颗锁定石（applyCraft）；重铸生效后【锁定自动失效】，需重新上锁定石。
-   * 神圣石（重 Roll 数值）保留锁定；剥离/增缀不触及锁定侧、不消耗锁定。
+   * 锁定动作消耗 1 颗锁定石（applyCraft）；四种打造操作任一生效后锁定由 expireLock 统一失效。
    * 持久化：affixes JSON 附加键 _lockPrefix/_lockSuffix（与 _ilvl 同模式，零 DB 改动）。
    * side 取值 'prefix' | 'suffix'。
    */

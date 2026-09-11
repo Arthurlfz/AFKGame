@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * config.js v2.0.0 —— 全部游戏数值集中配置（最先加载）
  * 用法：改这里的数字即可调数值，无需动任何逻辑代码。
  * 注意：本文件必须在所有模块之前加载（游戏.html 中第一个 script）。
@@ -149,17 +149,58 @@ window.Config = {
         '影蚀魔君': { id: 'shadow-eclipse', name: '影蚀绝杀', minLevel: 60, cooldownTurns: 3, triggerChance: 0.12, damageMultiplier: 2.1 },
         '霜魂兔皇': { id: 'frost-moon', name: '霜魂月刃', minLevel: 60, cooldownTurns: 3, triggerChance: 0.16, damageMultiplier: 1.7 }
       },
+      // 技能档位（2026-09-11 用户拍板「技能跟血统线走，不本末倒置」）：
+      //   一阶(Lv10 选分支) = I 档，二阶/三阶淬体 = II 档，终阶/神级 = III 满档。
+      //   档位只缩放 triggerChance / damageMultiplier；冷却与 maxHpDamageRate 不缩放。
+      skillTierScale: [
+        { chance: 0.6, damage: 0.5 },   // I  档（一阶）
+        { chance: 0.8, damage: 0.75 },  // II 档（二阶/三阶）
+        { chance: 1,   damage: 1 }      // III 档（终阶/神级）
+      ],
       // 变异宠（名字带 ·异变）继承本体主动技能：skillOf 剥离后缀查找
-      // 神级宠（2026-09-11 用户拍板）：继承其 sprite 立绘终形态（该线主形态）的主动技，满威力。
+      // 神级宠：继承其 sprite 立绘终形态（该线主形态）的技能，III 满档。
       //   注意：合成分支信息没有落库字段，神级宠固定带「线主形态」技能，不区分 A/B 分支 —— 想区分要先加云端列。
-      skillOf: (name) => {
+      // skillOf(petOrName)：传宠物对象按其 evolveStage/evolveTimes 定档；
+      //   传名字（旧调用兜底）按形态深度推档（终阶=满档、二阶/三阶=II、一阶=I、基宠=无）。
+      skillOf: (petOrName) => {
         const E = window.Config.pet && window.Config.pet.evolution;
         const skills = (E && E.activeSkills) || {};
-        const baseName = String(name || '').replace(/·异变$/, '');
-        if (skills[baseName]) return skills[baseName];
-        const GP = window.Config.pet && window.Config.pet.godPets;
-        const god = GP && (GP.list || []).find(g => g.name === baseName);
-        return god ? (skills[god.sprite] || null) : null;
+        const scales = (E && E.skillTierScale) || [{ chance: 1, damage: 1 }];
+        const name0 = typeof petOrName === 'string' ? petOrName : (petOrName && petOrName.name) || '';
+        const baseName = String(name0 || '').replace(/·异变$/, '');
+        // 找技能定义 + 形态深度（0=终阶 1=二阶/三阶 2=一阶 3=基宠）
+        let def = skills[baseName] || null, depth = 0, isGod = false;
+        if (!def) {
+          const GP = window.Config.pet && window.Config.pet.godPets;
+          const god = GP && (GP.list || []).find(g => g.name === baseName);
+          if (god) { def = skills[god.sprite] || null; isGod = true; }
+        }
+        if (!def) {
+          const tree = (E && E.tree) || {};
+          let cur = baseName, steps = 0, routes = tree[cur];
+          while (routes && routes.length) { steps++; cur = routes[0].to; routes = tree[cur]; }
+          def = skills[cur] || null; depth = steps;
+        }
+        if (!def) return null;
+        // 定档：神级宠无条件满档（名字即唯一标识，不依赖 evolve_stage/evolve_times 落库是否齐全）；
+        //   其余：宠物对象按阶段；只有名字时按深度推
+        let stage;
+        if (isGod) stage = 5;
+        else if (typeof petOrName === 'object' && petOrName && (petOrName.evolveStage != null || petOrName.evolveTimes != null)) {
+          const max = ((E && E.stages) || []).length || 5;
+          stage = Math.min(max, Math.max(1, Number(petOrName.evolveStage != null ? petOrName.evolveStage : (Number(petOrName.evolveTimes) || 0) + 1)));
+        } else {
+          stage = depth === 0 ? 5 : depth === 1 ? 3 : depth === 2 ? 2 : 1;
+        }
+        if (stage <= 1) return null;
+        const idx = stage >= 5 ? 2 : stage >= 3 ? 1 : 0;
+        const sc = scales[idx] || { chance: 1, damage: 1 };
+        return Object.assign({}, def, {
+          triggerChance: Math.round((def.triggerChance || 0) * sc.chance * 100) / 100,
+          damageMultiplier: Math.round((1 + ((def.damageMultiplier || 1) - 1) * sc.damage) * 100) / 100,
+          tier: idx + 1,
+          tierName: ['I', 'II', 'III'][idx]
+        });
       },
       // 路线只配「进化到哪 / 几级解锁」；目标形态头像由 PetSprites.avatarOf(to) 按名字取真实素材（2026-09-10 移除 emoji 占位）
       tree: {
@@ -226,6 +267,9 @@ window.Config = {
       excessStatCoeffMax: 0.2,
       baseLevelRequire: 60,
       supremeStoneLevelReduce: 10,
+      // 神宠培育：每只神宠「一轮」最多吃 cultivateMax 次玉露（天仙/琼浆共用），
+      //   用尽后只能等涅槃 —— 涅槃成功时计数归零，开启新一轮（计数存 pets.cultivate_used）。
+      cultivateMax: 10,
       // 8 只神级宠（每条基宠线 1 只）；line 用于从普通宠反查它对应的神级形态
       list: [
         { name: '腐界母神', line: '腐噜兽', sprite: '腐烂之母', speed: 80,  baseHp: 165, baseAtk: 33, baseDef: 17, statCoeff: { hp: 7.35, atk: 3.57, def: 1.53 } },
@@ -1081,13 +1125,13 @@ window.Config = {
       effect: '新增一条随机且不重复的词缀。',
       rule: '装备已有 3 条词缀时无法使用。'
     },
-    // 锁定石（2026-09-03 新增）：锁定一条词缀，重铸/神圣时该词缀保持不变、剥离不会移除它。
-    // 仅可锁定前缀或后缀其中一侧；重铸生效后锁定自动解除，再次锁定需重新消耗 1 颗锁定石。
+    // 锁定石（2026-09-03 新增，2026-09-11 改「只保一次」）：锁前缀或后缀一侧，本次打造不触及被锁侧。
+    // 只保【一次】打造：重铸/剥离/神圣/增缀 任一生效后锁定立即失效，再锁需重新消耗 1 颗（expireLock 收口）。
     // 来源 = 副本·淬炼试炼（20 层），不进入普通地图掉落表（config.towerDrops 登记其归属）。
     lock: {
       name: '锁定石', amount: 1, maxLocked: 1, icon: '<img class="mat-img" src="assets/icons/final/item_fused_stone.png" alt="">',
-      effect: '锁定一条词缀：重铸/神圣时该词缀保持不变，剥离也不会移除它。',
-      rule: '仅可锁定前缀或后缀其中一侧；被锁侧在重铸/神圣中整组保留，剥离/增缀不触及。重铸生效后锁定自动解除，再次锁定需重新消耗 1 颗锁定石。由副本·淬炼试炼（20 层）产出，不通过普通地图掉落。'
+      effect: '锁定前缀或后缀其中一侧：本次打造不会触及被锁的那一侧。',
+      rule: '只保一次打造：重铸、剥离、神圣、增缀 任意一种生效后，锁定立即失效，想继续锁就得再消耗 1 颗锁定石。由副本·淬炼试炼（20 层）产出，不通过普通地图掉落。'
     }
   },
 
@@ -1138,6 +1182,10 @@ window.Config = {
       { id: 'evo_dan_a',     name: '强化丹A', icon: '💊', category: 'evolve' },
       { id: 'evo_dan_b',     name: '强化丹B', icon: '💊', category: 'evolve' },
       { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', category: 'evolve' },
+      { id: 'nir_lock',      name: '锁魂玉', icon: '🪙', category: 'nirvana' },
+      { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', category: 'cultivate' },
+      { id: 'nir_lock',      name: '锁魂玉', icon: '🪙', category: 'nirvana' },
+      { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', category: 'cultivate' },
       /* ---------- 通天塔（2026-09-10） ---------- */
       /* 腐印（进塔词缀，消耗品）：用户拍板「塔外产出 + 可交易」→ 必须进这张白名单，
        * 否则市集既不能上架也不能当收款物。产出见 Config.drop.materialWeightsByTier（图 8~10）
@@ -1355,13 +1403,13 @@ window.Config = {
   },
   awakenSkillDamage: 0.2,  // 终形态 Lv60 觉醒：对应主动技能伤害 +20%
   traitInherit: {
-    mainKeep: 0.7,     // 合成：主宠每条特质保留概率（9/1 契约字段名）
-    subKeep: 0.4,      // 合成：副宠每条继承概率
-    synthKeep: 0.7,    // 兼容别名
+    // 2026-09-11 拍板重做：主宠词条 100% 保留、只升不降（mainKeep/down 已废除，别再加回来）；
+    //   继承只掷副宠（subKeep），主宠成长 >= growthMin 时概率 +growthBonus；升档概率 up；上限 cap。
+    subKeep: 0.4,      // 合成：副宠每条特质继承概率（至尊神石 100%，不走这里）
+    synthKeep: 0.7,    // 兼容别名（旧存档/测试引用）
     synthGive: 0.4,    // 合成：副宠每条特质继承概率
-    up: 0.2,           // 继承时 T 阶 +1 概率（封顶 T1）
-    down: 0.1,         // 继承时 T 阶 -1 概率（最低 T3）
-    growthBonus: 0.1,  // 主宠成长≥60：整体 +10%（一档封顶）
+    up: 0.2,           // 主宠词条 T 阶升档概率（封顶 T1；无降档）
+    growthBonus: 0.1,  // 主宠成长>=60：副宠继承概率 +10%（一档封顶）
     growthMin: 60,
     cap: 3,            // 特质总条数上限
     mutantExtra: 1,    // 合成变异成功额外追 1 条随机新特质
@@ -1392,17 +1440,22 @@ window.Config = {
     { id: 'synth_shift',   name: '百变魔石', icon: '🔮', rarity: '稀有', category: 'synth',   boost: 0.2, godChance: 0.6, levelRequireReduce: 0,
       effect: '提升 +20%，神级宠概率 60%', description: '石心难测，六成天意。' },
     { id: 'synth_supreme', name: '至尊神石', icon: '👑', rarity: '稀有', category: 'synth',   boost: 0.3, godChance: 1.0, levelRequireReduce: 10,
-      effect: '必定出神级宠；终阶等级要求降到 Lv50', description: '一石定乾坤，神位唾手可得。' },
+      effect: '必定出神级宠；终阶等级要求降到 Lv50；副宠词条 100% 继承', description: '一石定乾坤，神位唾手可得。' },
     /* ---- 进化（3）---- */
     { id: 'evo_dan_a',     name: '强化丹A', icon: '💊', rarity: '普通', category: 'evolve',  boost: 0.1,
       effect: '进化成长提升 +10%', description: '温和的火候，慢慢来。' },
     { id: 'evo_dan_b',     name: '强化丹B', icon: '💊', rarity: '稀有', category: 'evolve',  boost: 0.2,
       effect: '进化成长提升 +20%', description: '比 A 猛，也更稀罕。' },
-    { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', rarity: '稀有', category: 'evolve',  boost: 0.3,
-      effect: '进化成长提升 +30%，终阶亦可使用', description: '一滴玉露，脱胎换骨。' },
+    { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', rarity: '稀有', category: 'evolve',  boost: 0.3, godGrowth: [0.5, 0.8],
+      effect: '进化成长提升 +30%；神宠培育 +0.5~0.8 成长', description: '一滴玉露，脱胎换骨。' },
     /* ---- 涅槃（1）---- */
     { id: 'nir_pill',      name: '涅槃丹',   icon: '🔥', rarity: '普通', category: 'nirvana', boostMult: 1.2,
-      effect: '涅槃吸收 ×1.2（20%额外加乘）', description: '常规涅槃加成丹。火候更猛，吸收更足。' }
+      effect: '涅槃吸收 ×1.2（20%额外加乘）', description: '常规涅槃加成丹。火候更猛，吸收更足。' },
+    /* ---- 神宠培育 / 定向植入（2026-09-11 新增）---- */
+    { id: 'nir_lock',      name: '锁魂玉',   icon: '🪙', rarity: '稀有', category: 'nirvana_lock', lockTrait: true,
+      effect: '涅槃时指定副宠一条特质 100% 植入，其余特质本次不植', description: '锁住一缕魂，稳稳落进主宠血脉里。' },
+    { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', rarity: '传说', category: 'cultivate', godGrowth: [0.8, 1.3],
+      effect: '神宠培育成长 +0.8~1.3（仅神级宠可用）', description: '塔顶之酿，一口值半阶。' }
   ],
   // 按 id / 类别取道具（UI 与逻辑统一走这两个，别自己 find）
   itemOf: (id) => (window.Config.items || []).find(i => i.id === id) || null,
@@ -1693,6 +1746,8 @@ window.Config.towerDrops = {
     { name: '神圣石', value: 8, backup: '资源试炼·淬炼 Lv43+（不断供）', note: '重随词缀数值，毕业必需' },
     { name: '越龙之石', value: 7, backup: '无（绝版中）', note: '合成 +10% 成长 / 神级宠 30%' },
     { name: '天仙玉露', value: 8, backup: '无（绝版中）', note: '进化成长 +30%，终阶可用' },
-    { name: '强化丹B', value: 6, backup: '无（绝版中）', note: '进化成长 +20%' }
+    { name: '强化丹B', value: 6, backup: '无（绝版中）', note: '进化成长 +20%' },
+    { name: '锁魂玉', value: 9, backup: '商店（已配置，重开后可购）', note: '涅槃指定植入一条血脉特质' },
+    { name: '琼浆玉露', value: 9, backup: '商店（已配置，重开后可购）', note: '神宠培育 +0.8~1.3 成长' }
   ]
 };

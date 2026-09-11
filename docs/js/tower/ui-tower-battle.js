@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * tower/ui-tower-battle.js —— 通天塔·整页战斗驱动（单一职责）
  * 职责：
  *  1. startTowerBattle：详情页「进入」→ 切整页战斗页 → TowerEngine.start → 结算面板
@@ -90,13 +90,18 @@
         + (corrosion > 0 ? ` · 腐蚀度 <b class="tw-warn">${esc(corrosion)}</b>` : ' · 白图');
     }
     const stage = document.querySelector('#tab-battle .battle-stage');
-    if (stage && typeof stage.setAttribute === 'function' && cfg().bgAreaId) {
-      stage.setAttribute('data-area-id', cfg().bgAreaId);
+    if (stage && typeof stage.setAttribute === 'function') {
+      const floor = Number(info && info.floor) || 1;
+      let towerBg;
+      if (floor <= 5) towerBg = 'tower-base';
+      else if (floor <= 15) towerBg = 'tower-cloud';
+      else if (floor <= 25) towerBg = 'tower-storm';
+      else towerBg = 'tower-cosmos';
+      stage.setAttribute('data-area-id', towerBg);
       const h = stage.offsetHeight || 0;
       if (stage.style && stage.style.setProperty) stage.style.setProperty('--bg-w', (h * (1376 / 768)) + 'px');
       if (stage.classList && !stage.classList.contains('stage-scroll')) stage.classList.add('stage-scroll');
     }
-    renderLadder(Number(info && info.floor) || 0, total, false);
   };
 
   /* ---------- 掉落日志：金色 + 文字前缀（双编码，不只靠颜色） ---------- */

@@ -50,6 +50,7 @@ const serverConfig = {
       tree: C.pet.evolution.tree,
       activeSkills: C.pet.evolution.activeSkills,
       skillTierScale: C.pet.evolution.skillTierScale
+      // skillTierScale（2026-09-11）：技能档位缩放表，battle-sim skillOf 按阶段取档
     }
   },
   exp: C.exp,

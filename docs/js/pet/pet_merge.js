@@ -140,14 +140,14 @@
   /* ============================================================
    * 涅槃 nirvana（= 原融合 merge）：主宠吸副宠成长 + 重置等级
    * ============================================================ */
-  async function nirvana(mainId, subId, useCrystal, useNirvanaPill) {
+  async function nirvana(mainId, subId, useCrystal, useNirvanaPill, lockTraitId) {
     const k = 'nir:' + mainId + ':' + subId;
     if (inFlight.has(k)) return { error: '涅槃进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await nirvanaInner(mainId, subId, useCrystal, useNirvanaPill); }
+    try { return await nirvanaInner(mainId, subId, useCrystal, useNirvanaPill, lockTraitId); }
     finally { inFlight.delete(k); }
   }
-  async function nirvanaInner(mainId, subId, useCrystal, useNirvanaPill) {
+  async function nirvanaInner(mainId, subId, useCrystal, useNirvanaPill, lockTraitId) {
     const M = NV();
     const main = getPets().find(p => p.id === mainId);
     const sub = getPets().find(p => p.id === subId);
@@ -197,6 +197,20 @@
       return { error: `${nirPill.name}不足` };
     }
     if (nirPill && nirPill.boostMult) bonusMult *= nirPill.boostMult;
+    // 锁魂玉（2026-09-11）：指定副宠一条特质 100% 植入，其余特质本次一律不植。
+    // 栏位已满且该类型主宠没有 → 新类型塞不进，提前拦（否则玉扣了特质进不来，玩家白亏）。
+    let lockItem = null;
+    if (lockTraitId) {
+      const st = (sub.traits || []).find(t => t.id === lockTraitId);
+      if (!st) return { error: '副宠身上没有可指定的特质' };
+      const mine = (main.traits || []).find(t => t.id === lockTraitId);
+      if (!mine && (main.traits || []).length >= ((Config.traitInherit && Config.traitInherit.cap) || 3)) {
+        return { error: '特质栏已满（3 条），无法植入新类型特质' };
+      }
+      lockItem = Config.itemOf ? Config.itemOf('nir_lock') : null;
+      if (!lockItem) return { error: '锁魂玉未配置' };
+      if (Materials.getQuantity(lockItem.name) < 1) return { error: '锁魂玉不足（指定特质需要 1 颗）' };
+    }
 
     if (useCrystal && bonusMult > 1) {
       const cs = await Materials.spend(CB.material, CB.amount);
@@ -209,18 +223,27 @@
         return { error: ps.error || `${nirPill.name}扣减失败` };
       }
     }
+    if (lockTraitId && lockItem) {
+      const ls = await Materials.spend(lockItem.name, 1);
+      if (!ls.ok) {
+        if (useCrystal && bonusMult > 1) Materials.gain(CB.material, CB.amount);
+        if (nirPill) Materials.gain(nirPill.name, 1);
+        return { error: ls.error || '锁魂玉扣减失败' };
+      }
+    }
 
     const oldGrowth = main.growth;
     const { growth: newGrowth } = calcNirvanaGrowth(main, sub, bonusMult);
     main.growth = newGrowth;
     // 涅槃植入：主宠特质全保留；副宠每条 30% 概率植入（同类型取高 T，不叠加）
-    main.traits = implantNirvanaTraits(main, sub);
+    main.traits = implantNirvanaTraits(main, sub, lockTraitId);
     // 觉醒（pet.awakened）是觉醒石激活的永久标记：涅槃/转生不清除（2026-09-10 v2 拍板）
 
     // 涅槃 = 突破：重置进化次数 + 累计涅槃/转生次数 + 等级重置
     main.evolveTimes = 0;
     // 阶段：神级宠保持终阶（它不走进化树，重置成 1 阶会变成无法进化的死宠）；普通宠跟随次数回 1 阶
     main.evolveStage = (window.Pet && window.Pet.isGodPet && window.Pet.isGodPet(main)) ? 5 : 1;
+    main.cultivateUsed = 0;   // 神宠培育次数：涅槃即重置一轮
     main.rebornCount = (main.rebornCount || 0) + 1;
     if (M.resetLevel) { main.level = 1; main.exp = 0; }
     main.curHp = getStats(main).hp;
@@ -237,7 +260,7 @@
     }
 
     // 主宠成长/等级同步云端
-    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits, evolve_stage: main.evolveStage };
+    const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits, evolve_stage: main.evolveStage, cultivate_used: 0 };
     // 等级重置时必须连 exp 一起清零并同步：否则云端留着旧经验，
     // 刷新后会变成「Lv1 + 几千经验」，打一场直接连升几十级
     if (M.resetLevel) { patch.level = main.level; patch.exp = 0; }
@@ -266,6 +289,9 @@
     const sub = getPets().find(p => p.id === subId);
     if (!main || !sub) return { error: '宠物不存在' };
     if (main.id === sub.id) return { error: '不能选择同一只宠物' };
+    // 神级宠不准参与合成（2026-09-11 拍板）：只能涅槃——防止把神宠当素材合没
+    const godOf = p => (window.Pet && window.Pet.isGodPet) ? window.Pet.isGodPet(p) : !!(p && p.isGodPet);
+    if (godOf(main) || godOf(sub)) return { error: '神级宠不准参与合成（只能涅槃）' };
     if (main.level < S.minLevel || sub.level < S.minLevel) {
       return { error: `两只素材宠都必须达到 ${S.minLevel} 级才能合成` };
     }
@@ -340,7 +366,7 @@
     if (isGod) { baby.isGodPet = true; baby.evolveStage = 5; baby.statCoeffBonus = godStatCoeffBonus; }
     baby.level = 1;
     baby.exp = 0;
-    baby.traits = inheritSynthTraits(main, sub, mutated);   // 血脉特质继承（合成）
+    baby.traits = inheritSynthTraits(main, sub, mutated, { subAll: synthItem && synthItem.id === 'synth_supreme' });   // 血脉特质继承（合成；至尊神石副宠词条 100%）
     addPet(baby);
     // 新宠云端建档（合成是新增一只，不是改主宠）。
     // 顺序铁律（2026-09-10）：建档【确认成功】之前，素材宠和材料一律不动。
@@ -393,47 +419,68 @@
     if (r < upP + downP) return Math.min(3, tier + 1);
     return tier;
   }
-  // 合成继承：主宠每条 70% 保留、副宠每条 40% 继承；主宠成长≥60 整体 +10%（一档封顶）；
-  // 变异成功额外追 1 条随机新特质；总条数上限 cap（默认 3）
-  function inheritSynthTraits(main, sub, mutated) {
+  // 合成继承（2026-09-11 拍板重做）：主宠词条【全保留、只升不降】（升档 20%）——
+  //   旧版主宠每条 70% 随机保留，玩家会莫名丢自己的血脉（直觉灾难），已废。
+  // 副宠词条：40% 概率嫁接（主宠成长≥60 → 50%；opts.subAll=至尊神石 → 100%）——
+  //   新类型直接新增（档位照抄副宠），已有类型取两边更高档；满 3 栏后新类型进不来，同类型仍可升档。
+  // 变异成功追加 1 条（档位走 traitHatch.mutant：T1 20%、保底 T2——此前误用普通 roll）；
+  //   满栏时：同类型取高阶，全新类型挤掉主宠档位最低的那条（T1 永不被顶）。
+  function inheritSynthTraits(main, sub, mutated, opts) {
     const cfg = Config.traitInherit || {};
-    const keepP = (cfg.mainKeep != null ? cfg.mainKeep : cfg.synthKeep) != null ? (cfg.mainKeep != null ? cfg.mainKeep : cfg.synthKeep) : 0.7;
-    const giveP = (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) != null ? (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) : 0.4;
     const upP = cfg.up != null ? cfg.up : 0.2;
-    const downP = cfg.down != null ? cfg.down : 0.1;
-    const growthMin = cfg.growthMin != null ? cfg.growthMin : 60;
-    const growthBonus = cfg.growthBonus != null ? cfg.growthBonus : 0.1;
     const cap = cfg.cap != null ? cfg.cap : 3;
     const defs = Config.petTraits || {};
     const keys = Object.keys(defs);
     const out = [];
-    const bonus = (main.growth >= growthMin) ? growthBonus : 0;
-    for (const t of (main.traits || [])) {
-      if (Math.random() < keepP + bonus) out.push({ id: t.id, tier: shiftTier(t.tier, upP, downP) });
+    const put = (id, tier) => {
+      const ex = out.find(t => t.id === id);
+      if (ex) { if (tier < ex.tier) ex.tier = tier; return true; }   // 同类型取更高档
+      if (out.length >= cap) return false;                            // 满栏：新类型进不来
+      out.push({ id, tier });
+      return true;
+    };
+    for (const t of (main.traits || [])) put(t.id, shiftTier(t.tier, upP, 0));
+    let giveP = (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) != null
+      ? (cfg.subKeep != null ? cfg.subKeep : cfg.synthGive) : 0.4;
+    if (opts && opts.subAll) giveP = 1;   // 至尊神石：副宠词条 100% 继承
+    else if ((main.growth || 0) >= (cfg.growthMin != null ? cfg.growthMin : 60)) {
+      giveP += (cfg.growthBonus != null ? cfg.growthBonus : 0.1);
     }
     for (const t of (sub.traits || [])) {
-      if (Math.random() < giveP + bonus) out.push({ id: t.id, tier: shiftTier(t.tier, upP, downP) });
+      if (Math.random() < Math.min(1, giveP)) put(t.id, t.tier);
     }
     if (mutated && keys.length) {
+      const m = (Config.traitHatch && Config.traitHatch.mutant) || {};
       const id = keys[Math.floor(Math.random() * keys.length)];
-      const r = Math.random() * 100, tr = Config.traitHatch && Config.traitHatch.tierRoll || [0, 10, 30, 60];
-      const tier = r < tr[1] ? 1 : r < tr[1] + tr[2] ? 2 : 3;
-      out.push({ id, tier });
+      const t1 = m.t1Boost != null ? m.t1Boost : 10;
+      const tier = Math.random() * 100 < t1 ? 1 : (m.minTier != null ? Math.min(m.minTier, 3) : 3);
+      if (!put(id, tier)) {
+        const worst = out.slice().sort((a, b) => b.tier - a.tier)[0];
+        if (worst && worst.tier > tier) { out.splice(out.indexOf(worst), 1); out.push({ id, tier }); }
+      }
     }
-    const byId = {};
-    for (const t of out) { if (!byId[t.id] || t.tier < byId[t.id].tier) byId[t.id] = t; }
-    return Object.values(byId).slice(0, cap);
+    return out;
   }
   // 涅槃植入：副宠每条 30% 概率植入主宠（同类型取高 T，不叠加）；主宠特质全保留
-  function implantNirvanaTraits(main, sub) {
+  function implantNirvanaTraits(main, sub, forcedId) {
     const cfg = Config.traitNirvana || {};
     const chance = cfg.implantChance != null ? cfg.implantChance : 0.3;
     const cap = (Config.traitInherit && Config.traitInherit.cap) || 3;
     const subTraits = (sub && sub.traits) || [];
+    if (forcedId) {
+      const st = subTraits.find(t => t.id === forcedId);
+      const list = main.traits || (main.traits = []);
+      if (st) {
+        const same = list.find(t => t.id === st.id);
+        if (same) { if (st.tier < same.tier) same.tier = st.tier; }
+        else if (list.length < cap) list.push({ id: st.id, tier: st.tier });
+      }
+      return list;
+    }
     if (!subTraits.length || !main) return (main && main.traits) || [];
     const list = main.traits || (main.traits = []);
     for (const st of subTraits) {
-      if (Math.random() >= chance) continue;
+      if (forcedId || Math.random() >= chance) continue; // 锁魂玉定向：其余词条一律不进
       const same = list.find(t => t.id === st.id);
       if (same) {
         if (cfg.takeHigherT !== false && st.tier < same.tier) same.tier = st.tier; // 取高 T（数字小=高）
@@ -444,6 +491,38 @@
     return list;
   }
 
+  // 神宠培育（2026-09-11 新增）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3），成长 100 封顶。
+  // 普通宠不能用（成长走进化/合成）；道具云端原子扣，失败不涨。
+  async function cultivate(petId, itemId) {
+    const k = 'cul:' + petId + ':' + itemId;
+    if (inFlight.has(k)) return { error: '培育进行中，请勿重复点击' };
+    inFlight.add(k);
+    try {
+      const pet = getPets().find(p => p.id === petId);
+      const item = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
+      if (!pet) return { error: '宠物不存在' };
+      const isGod = (window.Pet && window.Pet.isGodPet) ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
+      if (!isGod) return { error: '只有神级宠可以培育' };
+      if (!item || !item.godGrowth) return { error: '所选道具不能用于神宠培育' };
+      const maxCul = (Config.pet && Config.pet.godPets && Config.pet.godPets.cultivateMax) || 10;
+      if ((pet.cultivateUsed || 0) >= maxCul) return { error: '本轮培育次数已用完（' + maxCul + '/' + maxCul + '），涅槃后可重置' };
+      if ((pet.growth || 0) >= 100) return { error: '成长已达 100，培育封顶' };
+      if (Materials.getQuantity(item.name) < 1) return { error: item.name + '不足' };
+      const spent = await Materials.spend(item.name, 1);
+      if (!spent.ok) return { error: spent.error || '道具扣减失败' };
+      const g = item.godGrowth;
+      const add = Math.round((g[0] + Math.random() * (g[1] - g[0])) * 10) / 10;
+      const oldGrowth = pet.growth;
+      pet.growth = Math.min(100, Math.round((pet.growth + add) * 10) / 10);
+      pet.cultivateUsed = (pet.cultivateUsed || 0) + 1;
+      if (pet.cloudId) {
+        const r = await Supabase.updatePet(pet.cloudId, { growth: pet.growth, cultivate_used: pet.cultivateUsed });
+        if (r && r.error) console.warn('云端更新培育成长失败：', r.error.message);
+      }
+      return { ok: true, pet, oldGrowth, add: Math.round((pet.growth - oldGrowth) * 10) / 10, itemName: item.name, used: pet.cultivateUsed, left: Math.max(0, maxCul - pet.cultivateUsed) };
+    } finally { inFlight.delete(k); }
+  }
+
   /* ---------- 对外 API ---------- */
   window.Merge = {
     nirvana,              // 涅槃：主宠涨成长（新）
@@ -451,7 +530,7 @@
     merge: nirvana,       // 兼容别名：旧调用 Merge.merge = 涅槃
     getMergeCandidates, canMerge, canSynthesize,
     calcNirvanaGrowth, calcSynthesizeGrowth,
-    inheritSynthTraits, implantNirvanaTraits,
+    inheritSynthTraits, implantNirvanaTraits, cultivate,
     // 神级宠（手册 2.6）
     godSynthInfo
   };
