@@ -223,7 +223,7 @@
   }
   // 捡漏 / 比价标签（市场捡漏 = 三爽点之一，AI 的 isLeak 标记也在这里落地）
   function dealBadge(l, pool) {
-    if (l.isLeak) return '<span class="mk-deal mk-deal--leak">💎 捡漏</span>';
+    if (l.isLeak) return '<span class="mk-deal mk-deal--leak"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg> 捡漏</span>';
     const ref = refQty(l, pool);
     const q = Number(l.material_qty || 0);
     if (!ref || !q) return '';
@@ -611,7 +611,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-avatar mk-avatar--item">⚔️</div>
+        <div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
           <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -623,7 +623,7 @@
     const detailAffixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(l.item_affixes || []) : { prefix: [], suffix: [] };
     const detailLine = (items, cls) => (items || []).map(a => window.Equipment.formatAffixHtml(a, cls)).join('') || '<div class="tip-empty">无</div>';
     const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
-    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + color + '"><span class="emoji">' + (ICONS[l.item_slot] || '🛡') + '</span></span></div>';
+    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + color + '"><span class="emoji">' + (ICONS[l.item_slot] || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>') + '</span></span></div>';
     const tipHtml = iconHtml + `<div class="tip-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div><div class="tip-line">槽位：<b>${escapeHtml(l.item_slot || '未知')}</b></div><div class="tip-line">底材：<b>T${l.item_tier || '?'}</b></div><div class="tip-section">词缀</div>${detailLine(detailAffixes.prefix, 'tip-prefix')}<hr class="tip-divider">${detailLine(detailAffixes.suffix, 'tip-suffix')}<div class="tip-section">魂铸</div>${l.item_soul ? `<div class="tip-affix soul-affix">${escapeHtml(l.item_soul.label || '')} <span class="tip-tier">T${l.item_soul.tier || 1}</span></div>` : '<div class="tip-empty">无</div>'}`;
     if (window.UI && UI.bindTip) UI.bindTip(div, tipHtml);
 
@@ -660,7 +660,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item">🐾</div>'}
+        ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg></div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
           <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -716,7 +716,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">${l.egg_icon || '🥚'}</div>
+        <div class="mk-egg-icon">${l.egg_icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg>'}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
           <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -733,7 +733,7 @@
       }
       const res = l.isBot ? await Market.buyBotEgg(l.id) : await Market.buyEgg(l.id);
       if (res.error) showToast('❌ 购买失败', res.error);
-      else { showToast('🥚 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
+      else { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
     };
     return div;
   }
@@ -745,7 +745,7 @@
     const mat = Market.findMaterial(l.material_type);
     const deal = dealBadge(l, pool);
     const goodQty = Number(l.good_qty || 1);
-    const goodIcon = l.good_icon || Market.findMaterial(l.good_name).icon || '📦';
+    const goodIcon = l.good_icon || Market.findMaterial(l.good_name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>';
     // 真实玩家挂单带 seller_id，AI 假单不带（只有 seller 昵称）→ 用它判定「我的」
     const myId = (UI.getAuthUser && UI.getAuthUser() || {}).id;
     const mine = !l.isBot && !!(l.seller_id && myId && String(l.seller_id) === String(myId));
@@ -778,7 +778,7 @@
         Materials.gainLocal(l.good_name, goodQty);
         Materials.spendLocal(l.material_type, l.material_qty || 0);
       }
-      showToast('🎉 购买成功', `获得 ${goodQty} × ${l.good_name}`);
+      showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 购买成功', `获得 ${goodQty} × ${l.good_name}`);
       UI.renderAll();
     };
     return div;
@@ -883,10 +883,10 @@
     const cnt = $('rpCount');
     if (cnt) cnt.textContent = '共 ' + total + ' 件';
 
-    if (pets.length) renderMarketSection(box, 'pet', '🐾 宠物', pets, (l, pool) => buildPetCard(l, pool), petPool);
-    if (items.length) renderMarketSection(box, 'item', '⚔️ 装备', items, (l, pool) => buildItemCard(l, RARITY_LABEL, pool), itemPool);
-    if (mats.length) renderMarketSection(box, 'material', '🧪 材料', mats, (l, pool) => buildMaterialCard(l, pool), matPool);
-    if (eggs.length) renderMarketSection(box, 'egg', '🥚 宠物蛋', eggs, (l, pool) => buildEggCard(l, pool), eggPool);
+    if (pets.length) renderMarketSection(box, 'pet', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 宠物', pets, (l, pool) => buildPetCard(l, pool), petPool);
+    if (items.length) renderMarketSection(box, 'item', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ 装备', items, (l, pool) => buildItemCard(l, RARITY_LABEL, pool), itemPool);
+    if (mats.length) renderMarketSection(box, 'material', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg> 材料', mats, (l, pool) => buildMaterialCard(l, pool), matPool);
+    if (eggs.length) renderMarketSection(box, 'egg', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 宠物蛋', eggs, (l, pool) => buildEggCard(l, pool), eggPool);
 
     if (!total) {
       box.innerHTML = '<div class="mk-empty">没有符合条件的商品</div>';
@@ -947,7 +947,7 @@
       if (res.error) { showToast('❌ 购买失败', res.error); return; } // 失败保留弹窗：让玩家看清商品再重试
       // 本地扣材料（真实购买：云端 RPC 已扣，本地同步减；假单购买 buyBot* 内部已扣，不重复）
       if (l.material_type && !l.isBot) Materials.spendLocal(l.material_type, l.material_qty || 0);
-      showToast('🎉 购买成功！', isPet ? `${l.pet_name} 已加入你的宠物列表`
+      showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 购买成功！', isPet ? `${l.pet_name} 已加入你的宠物列表`
         : (l.isBot ? `${l.item_name} 已加入你的背包（来自${l.seller || '流浪商人'}）` : `${l.item_name} 已加入你的背包`));
       // 单条拉取新宠物/装备追加本地（假单物品已直接入列，无需拉取）
       if (isPet) { if (!l.isBot) await window.Game.afterBuyPet(res.petId); }

@@ -80,8 +80,8 @@
         ${kind === 'pet'
           ? (avatar ? `<img class="mk-avatar" src="${avatar}">` : '<div class="mk-avatar mk-avatar--item"></div>')
           : kind === 'item'? '<div class="mk-avatar mk-avatar--item"></div>'
-            : kind === 'material'? `<div class="mk-egg-icon">${Market.findMaterial(payload.name).icon || '📦'}</div>`
-              : '<div class="mk-egg-icon">🥚</div>'}
+            : kind === 'material'? `<div class="mk-egg-icon">${Market.findMaterial(payload.name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>`
+              : '<div class="mk-egg-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></div>'}
         <div class="mk-card-info"><div class="mk-name">${escapeHtml(title)}</div><div class="mk-meta">选择收款物并定价</div></div>
       </div>
       <div class="sell-payment">
@@ -405,7 +405,7 @@
     const listed = Market.getMaterialListing ? Market.getMaterialListing(entry.name) : null;
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">${mat.icon || '📦'}</div>
+        <div class="mk-egg-icon">${mat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>
         <div class="mk-card-info">
           <div class="mk-name">${escapeHtml(entry.name)}</div>
           <div class="mk-meta">持有 ×${entry.qty}${listed ? ' · 已挂 ×' + (listed.goodQty || 0) : ''}</div>

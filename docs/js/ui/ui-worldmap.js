@@ -175,7 +175,7 @@
     const passHTML = point.type !== 'capital'
       ? '<span class="wm-marker-pass">' + (cleared ? '✓' : '') + '</span>' : '';
     el.innerHTML = point.type === 'capital'
-      ? '<span class="wm-marker-icon">' + (point.icon || '🏯') + '</span>' + nameHTML
+      ? '<span class="wm-marker-icon">' + (point.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5V3"/><path d="M14 5V3"/><path d="M15 21v-3a3 3 0 0 0-6 0v3"/><path d="M18 3v8"/><path d="M18 5H6"/><path d="M22 11H2"/><path d="M22 9v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9"/><path d="M6 3v8"/></svg>') + '</span>' + nameHTML
       : '<span class="wm-marker-dot"></span>' + nameHTML + lvHTML + passHTML;
     return el;
   }
@@ -391,7 +391,7 @@
       <div class="nd-foot">
         <span class="tip">进入后自动挂机，经验 / 材料 / 装备持续入账 · <b>打不过会自动停</b></span>
         <button type="button" class="nd-go nd-go--ghost" id="nd-fight">只进战斗</button>
-        <button type="button" class="nd-go" id="nd-idle">⚔ 开始挂机</button>
+        <button type="button" class="nd-go" id="nd-idle"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg> 开始挂机</button>
       </div>`;
   }
 

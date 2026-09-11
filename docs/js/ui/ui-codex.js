@@ -357,25 +357,25 @@
     const hc = H.counts || [40, 45, 13, 2];
     const tr = H.tierRoll || [0, 10, 30, 60];
     const rows = [
-      ['🌟 进化', gates.length ? gates.join(' → ') : '不限', matList.join('；') || (EV.materialName || '进化素材'),
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 进化', gates.length ? gates.join(' → ') : '不限', matList.join('；') || (EV.materialName || '进化素材'),
         `共 ${EV.maxEvolveTimes} 次（初始 → 一阶 → 二阶 → 三阶 → 终阶）。${keepText}；其余阶段换形态`,
         '素材与成长提升按「当前阶」决定；可选消耗 1 个进化道具放大倍率'],
-      ['♻️ 涅槃', 'Lv.' + (NI.minLevel || 0) + '（主宠与副宠都要到）',
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>️ 涅槃', 'Lv.' + (NI.minLevel || 0) + '（主宠与副宠都要到）',
         nirItems.length ? '可选消耗 ' + nirItems.map(i => escapeHtml(i.name)).join(' / ') + ' ×1' : '无（不再消耗涅磐兽）',
         `主宠成长 += 副宠成长 × 吸收比例（${nirItems.map(i => escapeHtml(i.name) + '：' + escapeHtml(i.effect || '')).join('；')}）；副宠消失，主宠等级重置为 1`,
         `${NI.requireGodPet !== false ? '只有神级宠能涅槃；' : ''}可反复涅槃叠加成长${cb.amount ? `；额外投入 ${escapeHtml(cb.material)} ×${cb.amount} 可让本次吸收 ×${(1 + (cb.absorbBonus || 0)).toFixed(1)}` : ''}；穿着装备的宠物不能涅槃`],
-      ['⚗️ 合成', 'Lv.' + (SY.minLevel || 0) + '（两只都要到）',
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>️ 合成', 'Lv.' + (SY.minLevel || 0) + '（两只都要到）',
         ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1) + ' + 合成道具 ×1',
         `新宠成长 = 主宠成长 + 副宠成长 × ${SY.baseBoostRatio} ×（1 + 等级加成 + 道具加成）+ 随机 +${rb[0]} 到 +${rb[1]}，成长只涨不跌；${pct(mu.chance || 0)} 概率出「·异变」宠`,
         `两只素材宠都消失，新宠等级回 1；普通宠成长软上限 ${SY.normalGrowthCap}；穿着装备的宠物不能合成；主宠词条全保留（20% 概率升档，不降不丢），副宠词条 40% 概率嫁接进来（至尊神石 100%）；神级宠不准参与合成`],
-      ['⚡ 神级宠', `终阶（第 ${(SY.god && SY.god.minStage) || 5} 阶）+ Lv.${godLv}`,
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> 神级宠', `终阶（第 ${(SY.god && SY.god.minStage) || 5} 阶）+ Lv.${godLv}`,
         '合成道具 ×1（决定出神概率）',
         synthItems.map(i => `${escapeHtml(i.name)} ${Math.round((i.godChance || 0) * 100)}%`).join(' / ') + ' 概率出神级宠',
         `门槛：主宠与副宠都终阶且成长 ≥ ${godMin}；神宠可用天仙玉露 / 琼浆玉露培育成长（上限 100），血脉特质靠涅槃喂副宠慢慢烙（锁魂玉可定向）`],
-      ['🥚 孵化', '无', '宠物蛋 ×1',
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 孵化', '无', '宠物蛋 ×1',
         `孵出一只基础宠，成长 ${baby.min} 到 ${baby.max} 随机；孵化时按概率携带血脉特质（${hc[1]}% 一条 / ${hc[2]}% 两条 / ${hc[3]}% 三条，T 阶 T1 ${tr[1]}% / T2 ${tr[2]}% / T3 ${tr[3]}%）`,
         '孵出的是基础形态，高阶形态靠进化'],
-      ['🔥 魂铸', '宠物 Lv.40 起（传承档 Lv.60）',
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 魂铸', '宠物 Lv.40 起（传承档 Lv.60）',
         `${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}`,
         '把宠物的血脉 / 觉醒特质铸进装备，让特质跨世代传承',
         `每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀；传承档需终形态、成长 ≥ ${((SC.tiers || {}).legend || {}).minGrowth || 60}`]
@@ -418,14 +418,14 @@
 
   /* ---------- 页签清单（8 个板块） ---------- */
   const ENTRIES = [
-    { id: 'battle', icon: '⚔️', title: '战斗', intro: '战斗全自动，出手快慢由速度决定，命中、暴击、吸血各自独立结算。', build: buildBattle },
-    { id: 'drop', icon: '💧', title: '掉落与鉴定', intro: '每场战斗摇一次掉落；掉落的装备需要鉴定后才能使用。', build: buildDrop },
-    { id: 'trial', icon: '🗝️', title: '副本与通天塔', intro: '普通地图掉什么随缘，副本里掉什么是你选的；通天塔则用腐印把风险换成掉率。', build: buildTrial },
-    { id: 'equipcraft', icon: '🛡️', title: '装备与打造', intro: '品质由词缀条数决定，词缀 T 阶由装备等级定门槛；打造用石头改变词缀，魂铸把特质铸进装备。', build: buildEquipCraft },
-    { id: 'pet', icon: '🐾', title: '宠物成长', intro: '属性由基础值、等级、成长值和成长系数共同决定，速度是固定值。', build: buildPet },
-    { id: 'growth', icon: '📈', title: '变强路线', intro: '宠物通过进化、涅槃、合成、神级合成、孵化变强，魂铸把特质传承到装备。', build: buildGrowth },
-    { id: 'area', icon: '🗺️', title: '地图', intro: '每张图对应一个等级段，并掉落该图的专属材料。', build: buildArea },
-    { id: 'market', icon: '💰', title: '市场', intro: '交易用材料计价，不用金币；挂单期间商品被锁定。', build: buildMarket }
+    { id: 'battle', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️', title: '战斗', intro: '战斗全自动，出手快慢由速度决定，命中、暴击、吸血各自独立结算。', build: buildBattle },
+    { id: 'drop', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>', title: '掉落与鉴定', intro: '每场战斗摇一次掉落；掉落的装备需要鉴定后才能使用。', build: buildDrop },
+    { id: 'trial', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2 21 9.6-9.6"/><path d="m7.5 15.5 2.3 2.3a1 1 0 0 1 0 1.4l-2.1 2.1a1 1 0 0 1-1.4 0L4 19"/></svg>️', title: '副本与通天塔', intro: '普通地图掉什么随缘，副本里掉什么是你选的；通天塔则用腐印把风险换成掉率。', build: buildTrial },
+    { id: 'equipcraft', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>️', title: '装备与打造', intro: '品质由词缀条数决定，词缀 T 阶由装备等级定门槛；打造用石头改变词缀，魂铸把特质铸进装备。', build: buildEquipCraft },
+    { id: 'pet', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>', title: '宠物成长', intro: '属性由基础值、等级、成长值和成长系数共同决定，速度是固定值。', build: buildPet },
+    { id: 'growth', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>', title: '变强路线', intro: '宠物通过进化、涅槃、合成、神级合成、孵化变强，魂铸把特质传承到装备。', build: buildGrowth },
+    { id: 'area', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>️', title: '地图', intro: '每张图对应一个等级段，并掉落该图的专属材料。', build: buildArea },
+    { id: 'market', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>', title: '市场', intro: '交易用材料计价，不用金币；挂单期间商品被锁定。', build: buildMarket }
   ];
 
   /* ---------- 渲染（页签式：一次只渲染当前板块） ---------- */

@@ -424,5 +424,32 @@ C(`
   A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('兑换') !== -1,
     'tab 栏出现「🔄 兑换」分类');
 
+  /* ---------- 服务端领取记录回灌（2026-09-12 修「显示可提交却永远交不了」） ----------
+   * 事故：领取记录在服务端 quest_claims，完成状态在本地 quest_progress。本地那份丢了
+   * （写失败 / 换设备 / 清缓存）→ 面板显示「可提交」→ 点下去被服务端 ALREADY_CLAIMED 拒
+   * → 还是「可提交」→ 再点还是同一句报错。所以拉进度时必须拿服务端记录补本地显示。 */
+  const now = new Date();
+  const dayKey = dt => dt.getFullYear() + '-' + (dt.getMonth() + 1) + '-' + dt.getDate();
+  const kToday = dayKey(now);
+  const kYest = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const kMonday = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)));
+  C(`
+    Supabase.fetchQuestClaims = async function () {
+      return { data: ['d1@${kToday}', 'd3@${kYest}', 'm1', 'ex_week_jade@${kMonday}'], error: null };
+    };
+  `);
+  C(`Quest.reset()`);
+  await C(`Quest.loadCloudProgress()`);
+  A(C(`Quest.getQuests().find(q=>q.id==='d1').finished`) === true,
+    '服务端有今天的日常记录 → 本地显示已交（不再「可提交却一直报已交过」）');
+  A(C(`Quest.getQuests().find(q=>q.id==='d3').finished`) === false,
+    '过期周期（昨天的日常）不回灌（今天照常能做）');
+  A(C(`Quest.getQuests().find(q=>q.id==='m1').finished`) === true,
+    '一次性任务的无周期记录 → 回灌为已完成');
+  A(C(`Quest.getQuests().find(q=>q.id==='ex_week_jade').finished`) === true,
+    '本周的周常记录 → 回灌进 weeklyDone（周一那天也不会错记成日常）');
+  A(C(`Quest.getQuests().find(q=>q.id==='loop_corrupted_forest').finished`) === false,
+    '循环任务不参与领取记录，回灌后依然可重复交');
+
   console.log('ALL QUEST TESTS PASSED');
 })();

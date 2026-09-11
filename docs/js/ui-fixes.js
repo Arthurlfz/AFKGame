@@ -124,7 +124,7 @@
 
       panel.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-        '<b style="color:#f2b632;font-size:1.05rem">⚙ 设置</b>' +
+        '<b style="color:#f2b632;font-size:1.05rem"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg> 设置</b>' +
         '<button id="fix-settings-close" style="background:none;border:1px solid #555;color:#999;width:28px;height:28px;border-radius:4px;cursor:pointer">×</button>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:10px;font-size:.9rem;color:#ccc">' +
@@ -140,7 +140,7 @@
         '<span>聊天面板透明度</span>' +
         '<span style="color:#888;font-size:.8rem">拖拽聊天面板底部滑块</span></label>' +
         '<div style="border-top:1px solid #333;margin-top:6px;padding-top:10px;color:#888;font-size:.8rem;line-height:1.6">' +
-        '💡 更多设置（音效/快捷键/数据管理）将在后续版本加入。<br>' +
+        '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> 更多设置（音效/快捷键/数据管理）将在后续版本加入。<br>' +
         '当前账号：' + (window.__USER_EMAIL || '已登录') +
         '</div>' +
         '</div>';
@@ -195,13 +195,13 @@
     const card = document.createElement('div');
     card.className = 'next-step-card';
     card.innerHTML =
-      '<h3>🎉 新手教程完成！</h3>' +
+      '<h3><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 新手教程完成！</h3>' +
       '<p>你已经掌握了核心循环：挂机 → 掉装备 → 重铸词缀 → 进化宠物。接下来想做什么？</p>' +
       '<div class="next-step-options">' +
-      '<button data-action="battle">⚔️ 继续挂机升级</button>' +
-      '<button data-action="trial">🎫 资源试炼</button>' +
-      '<button data-action="market">🏪 逛市集买装备</button>' +
-      '<button data-action="pet">🐾 看看宠物养成</button>' +
+      '<button data-action="battle"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ 继续挂机升级</button>' +
+      '<button data-action="trial"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg> 资源试炼</button>' +
+      '<button data-action="market"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 逛市集买装备</button>' +
+      '<button data-action="pet"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 看看宠物养成</button>' +
       '</div>';
 
     document.body.appendChild(card);

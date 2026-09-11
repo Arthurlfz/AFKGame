@@ -476,6 +476,18 @@
       return { gems: 0, totalRecharged: 0, error: e && e.message, missing: true };
     }
   }
+  // 我的玩家权益（魔石买的便利类，如市场挂单额度加成）
+  // 与钱包同款服务端权威：user_perks 表只有 SELECT 策略，写入只走 spend_gems。
+  async function getMyPerks() {
+    try {
+      const { data, error } = await client.rpc('get_my_perks');
+      if (error) return { listing_slots: 0, error: error.message };
+      const row = (data && data[0]) || null;
+      return { listing_slots: (row && row.listing_slots) || 0, error: null };
+    } catch (e) {
+      return { listing_slots: 0, error: e && e.message };
+    }
+  }
   // 卡密兑换：返回 'ok:数量' / 'notfound' / 'used' / 'expired' / 'nologin'
   async function redeemCode(code) {
     const { data, error } = await client.rpc('redeem_code', { p_code: String(code || '').trim() });
@@ -536,8 +548,10 @@
     return { data: (data && data.progress) || {}, error: null };
   }
   // 写任务进度到当前账号（未登录静默忽略；upsert 保证首次也写入）
-  // ⚠️ claimed 列【不要】写进来：它是服务端持有的领取记录，客户端没有该列的写权限
-  //    （列级 revoke，见 migrate_quest_claim.sql）。upsert 不含它就不会覆盖它。
+  // 领取记录在独立的 quest_claims 表（客户端零写权限），本表只存进度，可以整行覆盖。
+  // ⚠️ 别再动「只给列级写权限」那套：PostgREST 只认表级 has_table_privilege，
+  //    收掉表级 insert/update 会让这里的 upsert 全量 403（2026-09-12 事故，见
+  //    migrate_quest_claims_table.sql 文件头）。
   async function saveQuestProgress(progress) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: null };
@@ -545,11 +559,30 @@
       .upsert({ user_id: user.id, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   }
 
+  /* 读服务端的任务领取记录（2026-09-12 补）：quest_claims 客户端只有 SELECT 权限
+   * （写只走 complete_quest RPC），这里只读不改。
+   * 为什么要读：领取记录（服务端）与完成状态（本地 quest_progress）不同源。
+   *   本地那份一旦丢（写失败 / 换设备 / 清缓存），玩家看到任务「可提交」，
+   *   点下去却被服务端以 ALREADY_CLAIMED 拒 —— 永远交不了还一直报错。
+   *   所以拉进度时把服务端记录回灌进本地显示状态（见 quest.js applyServerClaims）。 */
+  async function fetchQuestClaims() {
+    const user = await getCurrentUser();
+    if (!user) return { data: null, error: null };
+    try {
+      // RLS 只放行 user_id = auth.uid() 的行，不必再带 eq
+      const { data, error } = await client.from('quest_claims').select('claim_key');
+      if (error) return { data: null, error };
+      return { data: (data || []).map(r => r.claim_key).filter(Boolean), error: null };
+    } catch (e) {
+      return { data: null, error: e };
+    }
+  }
+
   /* 任务奖励的【服务端领取记录】（2026-09-12）：
    * 本地 quest_progress 的 completed / dailyDone / weeklyDone 客户端可改 ——
    * 清一下就能无限重领任务奖励（材料有 add_material 限流兜着，装备走 saveItem 没有）。
-   * 现在由服务端持有「这条任务领过没有」这个判定事实（quest_progress.claimed 列，
-   * 客户端只有 SELECT 权限），本函数就是唯一写入口。
+   * 现在由服务端持有「这条任务领过没有」这个判定事实（quest_claims 表，
+   * 客户端对它连列都碰不到），本函数就是唯一写入口。
    * periodKey：一次性任务传 ''；日常传当天、周常传本周一（与 quest.js 的 markFinished 同口径）。
    * 返回 'OK' / 'ALREADY_CLAIMED' / 'ERR_NO_LOGIN' … */
   async function completeQuest(questId, periodKey) {
@@ -645,10 +678,10 @@
     listItem, fetchItemMarket, fetchMyListedItemIds, buyItem, cancelEquipListing, botBuyEquip, botBuyPet,
     fetchItemById, loadTradeRecords,
     consumeEgg, loadEggCount, addEgg,
-    getMyWallet, redeemCode, spendGems, fetchProducts, fetchMyOrders,
+    getMyWallet, getMyPerks, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
-    fetchQuestProgress, saveQuestProgress, completeQuest,
+    fetchQuestProgress, saveQuestProgress, completeQuest, fetchQuestClaims,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
     loadMyProfile, setMyNickname, getMyProfile
   };

@@ -40,7 +40,7 @@
       }
     }
     if (event.type === 'log' && UI.addLog) UI.addLog(event.text);
-    if (event.type === 'floorFail' && UI.addLog) UI.addLog('💀 战斗失败……');
+    if (event.type === 'floorFail' && UI.addLog) UI.addLog(' 战斗失败……');
   };
 
   /* ---------- 主流程：进副本 = 切整页战斗页 + 引擎逐层推进 ----------

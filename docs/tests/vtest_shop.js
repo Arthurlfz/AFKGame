@@ -31,7 +31,7 @@ await C('(async()=>{const p=Pet.createPet("血狐","🦊",6,100,20,10,8);Pet.add
 await C('Game.onLogin("shop@test.com","123456")');await S(400);
 
 A(C('UI.getGems()')===0,'初始余额 0 魔石');
-A(C(`els['gem-balance'].textContent`).indexOf('0')>=0,'顶栏余额芯片已渲染：'+C(`els['gem-balance'].textContent`));
+A(C(`els['gem-balance'].innerHTML`).indexOf('0')>=0,'顶栏余额芯片已渲染：'+C(`els['gem-balance'].innerHTML`));
 const root=C(`els['shop-root'].innerHTML`);
 A(root.indexOf('涅磐兽 ×1')>=0,'商店页渲染出商品（服务端 products 表）');
 A(root.indexOf('小袋魔石')<0,'充值档位不出现在商店列表（自测阶段不发卡，不直接买）');

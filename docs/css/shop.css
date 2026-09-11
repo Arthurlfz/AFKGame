@@ -1,0 +1,70 @@
+/* ============================================================
+ * shop.css —— 魔石商店页样式（2026-09-12）
+ *
+ * 背景：商店页此前因 Config.shop.enabled=false 长期隐藏，页面容器的样式
+ *       **从来没写过**（全仓 .shop-* 只有一条 .shop-card-icon .mat-img）。
+ *       开关打开后整页是没有排版的裸 HTML，所以这里补齐，不是覆盖式补丁。
+ *
+ * 风格：与市集卡片（market-refresh.css 的 .mk-card）同规格的水墨牌匾，
+ *       两个页的卡片视觉保持一致。
+ * ============================================================ */
+
+.shop-page { padding: 2px; }
+
+/* ---------- 顶部余额 ---------- */
+.shop-head { display: flex; align-items: baseline; gap: var(--gap-md); flex-wrap: wrap; margin-bottom: var(--gap-md); }
+.shop-balance {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-title); font-size: var(--fs-xl);
+  color: var(--accent-hi); letter-spacing: 1px;
+  text-shadow: 0 1px 0 rgb(0 0 0 / .65), 0 0 10px rgb(184 155 89 / .2);
+}
+.shop-balance b { font-family: var(--font-num); font-size: var(--fs-2xl); color: var(--r-gold); }
+
+/* ---------- 商品网格（与 .mk-grid 同规格） ---------- */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 10px; padding: 4px 2px; }
+
+.shop-card {
+  position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .018));
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.shop-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgb(0 0 0 / .35); transform: translateY(-1px); }
+.shop-card-icon {
+  width: 44px; height: 44px; flex: none; display: flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; border-radius: 9px; border: 1px solid rgb(255 255 255 / .06);
+  background: linear-gradient(135deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+}
+.shop-card-title { font-weight: 700; font-size: .95rem; color: var(--text-hi); }
+.shop-card-desc { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.45; min-height: 2.2em; }
+.shop-card-price {
+  display: flex; align-items: center; gap: 5px; margin-top: auto; padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / .06);
+  font-family: var(--font-num); font-weight: 700; color: var(--r-gold);
+}
+.shop-card-rmb { font-family: var(--font-body); font-weight: 400; font-size: var(--fs-xs); color: var(--text-faint); }
+.shop-card .btn-mini { margin-top: 6px; align-self: flex-start; }
+
+/* ---------- 卡密兑换 ---------- */
+.shop-pay-note { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.6; margin-bottom: var(--gap-sm); }
+.shop-redeem { display: flex; gap: var(--gap-sm); align-items: center; flex-wrap: wrap; }
+.shop-code-input {
+  flex: 1 1 200px; min-width: 0; padding: 7px 9px;
+  font-family: var(--font-num); font-size: .86rem; color: var(--text);
+  background-color: var(--inset); background-image: var(--ui-paper-texture);
+  border: 1px solid var(--line); border-radius: 7px; box-shadow: var(--shadow-inset); outline: none;
+}
+.shop-code-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgb(var(--action-gold-rgb) / .3), var(--shadow-inset); }
+.shop-code-input::placeholder { color: var(--text-faint); }
+
+/* ---------- 交易记录 ---------- */
+.shop-order { padding: 5px 8px; font-size: var(--fs-xs); color: var(--text-dim); border-bottom: 1px solid var(--line-weak); }
+.shop-order:last-child { border-bottom: 0; }
+
+/* ---------- 未开通提示 ---------- */
+.shop-missing { padding: var(--gap-lg); text-align: center; color: var(--text-dim); font-size: var(--fs-sm); line-height: 1.7; }
+.shop-missing-title {
+  font-family: var(--font-title); font-size: var(--fs-lg); letter-spacing: 1px;
+  color: var(--accent-hi); margin-bottom: var(--gap-sm);
+}

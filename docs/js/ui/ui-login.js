@@ -84,7 +84,11 @@
       setErr('');
       try {
         const result = await window.Game.onLogin(email.value.trim(), pwd.value);
-        if (result && result.error) setErr(result.error.message || '登录失败，请检查邮箱和密码');
+        if (result && result.error) {
+          setErr(result.error.message || '登录失败，请检查邮箱和密码');
+        } else if (window.UI && window.UI.showToast) {
+          window.UI.showToast('欢迎回来，旅者');
+        }
       } catch (e) {
         setErr(e.message || '登录失败，请稍后重试');
       } finally {
@@ -126,6 +130,17 @@
     pwd.addEventListener('keydown', onEnter);
     if (nickname) nickname.addEventListener('keydown', onEnter);
     if (invite) invite.addEventListener('keydown', onEnter);
+
+    // 密码可见切换（2026-09-11 UX 审计）
+    const pwdToggle = $('login-pwd-toggle');
+    if (pwdToggle) {
+      pwdToggle.onclick = () => {
+        const show = pwd.type === 'password';
+        pwd.type = show ? 'text' : 'password';
+        pwdToggle.textContent = show ? '隐藏' : '显示';
+        pwd.focus();
+      };
+    }
   }
 
   if (typeof document !== 'undefined' && document.addEventListener) {

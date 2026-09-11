@@ -115,7 +115,7 @@
           ${bonusLine ? bonusLine.replace('血统加成', '觉醒后血统加成') : ''}
           <div class="panel-actions">
             <button type="button" class="fs-btn fs-btn--primary" id="btn-awaken-go" ${canDo ? '' : 'disabled'}>
-              ${canDo ? `✨ 消耗 ${STONE} ×1 觉醒「${escapeHtml(pet.name)}」` : `缺少${STONE}：先去交「觉醒之路」任务`}
+              ${canDo ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 消耗 ${STONE} ×1 觉醒「${escapeHtml(pet.name)}」` : `缺少${STONE}：先去交「觉醒之路」任务`}
             </button>
           </div>
           <div class="hint">觉醒永久生效，涅槃 / 转生不清除；觉醒消耗 1 颗${STONE}，石头不会返还。</div>
@@ -150,7 +150,7 @@
         }
       }
       const aw = window.Pet.getAwakenState ? window.Pet.getAwakenState(pet) : null;
-      addLog(`✨「${pet.name}」觉醒成功：${aw ? aw.skillName : '主动技能'} 伤害+${Math.round((aw ? aw.damage : 0.2) * 100)}%，永久生效！`);
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg>「${pet.name}」觉醒成功：${aw ? aw.skillName : '主动技能'} 伤害+${Math.round((aw ? aw.damage : 0.2) * 100)}%，永久生效！`);
       UI.renderAll();
     } catch (e) {
       // 任何异常都要把按钮放回来，别让玩家以为功能坏了

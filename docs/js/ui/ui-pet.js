@@ -306,13 +306,13 @@
           return;
         }
         setActive(pet.id);
-        addLog(`🐾 ${pet.name} 出战！`);
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> ${pet.name} 出战！`);
         UI.renderAll();
       };
       if (equipCount > 0) {
         const eqTag = document.createElement('div');
         eqTag.className = 'pet-eq-tag';
-        eqTag.textContent = '👔 有装备';
+        eqTag.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg> 有装备';
         eqTag.title = '穿着装备的宠物不能融合，请先卸下装备';
         card.appendChild(eqTag);
       }
@@ -463,7 +463,7 @@
         e.stopPropagation();
         const res = equipItem(pet, eq.id);
         if (res) {
-          addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
           UI.renderAll();
         } else {
           showToast('❌ 无法穿上', '可能是槽位已满或等级不符');

@@ -22,7 +22,7 @@
     type: 'capital',          // capital = 主城/安全区；wild = 野图
     desc: '旅者的据点，暗黑大陆上唯一安全的栖息地。在此休整、回满生命。',
     x: 50, y: 34,             // 底图中央偏上的城池位置（百分比）
-    icon: '🏯',               // 占位（后续换水墨城池图）
+    icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5V3"/><path d="M14 5V3"/><path d="M15 21v-3a3 3 0 0 0-6 0v3"/><path d="M18 3v8"/><path d="M18 5H6"/><path d="M22 11H2"/><path d="M22 9v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9"/><path d="M6 3v8"/></svg>',               // 占位（后续换水墨城池图）
     capital: true
   };
 

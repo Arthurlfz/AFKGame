@@ -90,8 +90,8 @@
       const xp = expFromBattle(enemy, area); // 经验唯一来源（与怪物 tooltip 预览同源）
       const info = grantExp(pet, xp);
       if (info.leveled) {
-        addLog(`✨ ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`);
-        if (info.maxed) addLog(`👑 ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`);
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`);
+        if (info.maxed) addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`);
         // 升级是大事：等级 + 经验立即写云端，刷新页面都不丢
         syncPetProgress(pet, true);
       } else {
@@ -100,10 +100,10 @@
         if (info.maxed) {
           const EP = Config.pet.expPool;
           addLog(info.crystal
-            ? `💠 ${pet.name} 满级经验凝成 ${EP.material} ×${info.crystal}（持有 ${Materials.getQuantity(EP.material)}）`
-            : `✦ ${pet.name} 已满级，经验 +${xp} 转入经验池（${Math.round(pet.expPool || 0)}/${EP.perCrystal}）`);
+            ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41l-7.59-7.59a2.41 2.41 0 0 0-3.41 0Z"/></svg> ${pet.name} 满级经验凝成 ${EP.material} ×${info.crystal}（持有 ${Materials.getQuantity(EP.material)}）`
+            : `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 已满级，经验 +${xp} 转入经验池（${Math.round(pet.expPool || 0)}/${EP.perCrystal}）`);
         } else {
-          addLog(`✦ ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`);
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`);
         }
       }
       showLoot(await rollReward(enemy, area, { boss: false, enemyLevel: (enemy && enemy.level) || undefined })); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料；ilvl 挂钩实际怪等级
@@ -311,7 +311,7 @@
     hideSessionGuard();
     await clearAccountState();
     setAuthUser(null);
-    addLog('👋 账号已在其他页面退出登录');
+    addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg> 账号已在其他页面退出登录');
     renderAll();
     syncButton();
   }
@@ -352,7 +352,7 @@
     setAuthUser(null);
     await Supabase.signOut().catch(() => {});
     if (UI.onAuthChange) UI.onAuthChange(false);
-    addLog(banned ? '⛔ 账号已被封禁，已断开连接' : '⚠️ 账号已在其他设备登录，本页已断开');
+    addLog(banned ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.929 4.929 19.07 19.071"/></svg> 账号已被封禁，已断开连接' : '⚠️ 账号已在其他设备登录，本页已断开');
     showSessionGuard({
       title: banned ? '账号已被封禁' : '已在其他设备登录',
       text: banned
@@ -423,7 +423,7 @@
     // 防重复：cloudId 已存在则不重复添加
     if (!getPets().some(p => p.cloudId === data.id)) {
       addPet(Pet.petFromRow(data));
-      addLog(`🐾 买到的宠物已入列：${data.name}（成长 ${data.growth}）`);
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 买到的宠物已入列：${data.name}（成长 ${data.growth}）`);
     }
     renderAll();
     refreshStats();
@@ -445,7 +445,7 @@
     if (error || !data) { addLog('⚠️ 读取新装备失败，已刷新背包'); await refreshItems(); return; }
     if (!Equipment.getInventory().some(eq => eq.cloudId === data.id)) {
       Equipment.addToInventory(Items.fromCloud(data));
-      addLog(`🎒 买到的装备已入包：${data.name}`);
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8"/><path d="M8 18h8"/><path d="M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg> 买到的装备已入包：${data.name}`);
     }
     renderAll();
   }
@@ -521,6 +521,8 @@
     ]);
     // 魔石钱包 / 商店商品：失败只提示（表没建时界面自己显示"未开通"），不能挡住进游戏
     if (UI.refreshShop) { try { await UI.refreshShop(); } catch (e) { console.warn('商店数据加载失败：', e && e.message); } }
+    // 玩家权益（魔石买的挂单额度加成）：影响 Market.listQuota 的上限，必须在渲染前就位
+    if (Market.refreshPerks) { try { await Market.refreshPerks(); } catch (e) { console.warn('权益加载失败：', e && e.message); } }
     // 云装备/蛋/材料/宠物已全部就位 → 现在跑引导例行（经验包+钥匙补给，reconcile 不会误判）
     startGuideOnboarding(true);
     // 离线成交汇总：比对卖出记录，把"你不在时被买走的东西"一次性讲清楚（延后一点，让引导弹窗先出）
@@ -538,7 +540,7 @@
     const profile = (Supabase.getMyProfile && Supabase.getMyProfile()) || null;
     if (!profile || !profile.banned) return false;
     const reason = profile.ban_reason ? `（${profile.ban_reason}）` : '';
-    addLog(`⛔ 账号已被封禁${reason}，如有疑问请联系管理员`);
+    addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.929 4.929 19.07 19.071"/></svg> 账号已被封禁${reason}，如有疑问请联系管理员`);
     setAuthUser(null);
     if (ServerSession) ServerSession.stop();
     if (AuthSession) { AuthSession.markSelfSignOut(); AuthSession.broadcastLogout(); }
@@ -583,7 +585,7 @@
     const { error } = await Supabase.signIn(email, password);
     if (error) { addLog('❌ 登录失败：' + (error.message || '未知错误')); return { error }; }
     await clearAccountState();
-    addLog('☁️ 登录成功');
+    addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>️ 登录成功');
     await onAuthenticated();
     return { error: null };
   }
@@ -618,7 +620,7 @@
       return { error: null, needsEmailConfirm: true };
     }
     await clearAccountState();
-    addLog('☁️ 注册成功并已登录');
+    addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>️ 注册成功并已登录');
     // 玩家填了昵称就写库；没填由 loadMyProfile 自动生成
     if (nickname && Supabase.setMyNickname) {
       const r = await Supabase.setMyNickname(nickname);
@@ -641,7 +643,7 @@
     setAuthUser(null);
     hideSessionGuard();
     if (error) addLog('⚠️ 登出失败：' + (error.message || '未知错误'));
-    else addLog('👋 已登出');
+    else addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg> 已登出');
     renderAll();
     syncButton();
   }
@@ -696,7 +698,7 @@
         syncButton();
         // 野图挂机被玩家主动玩法（副本/塔）抢占：说一句，否则玩家以为挂机自己坏了
         if (info.holder && info.holder.kind !== 'wild' && info.previous && info.previous.kind === 'wild') {
-          addLog('🛑 ' + info.holder.label + '进行中，野图挂机已停止（最后一段收益已结算）。');
+          addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z"/></svg> ' + info.holder.label + '进行中，野图挂机已停止（最后一段收益已结算）。');
         }
       });
     }
@@ -733,7 +735,7 @@
           if (r && r.ok === false) addLog('⚠️ ' + ownerText() + '进行中，先打完再挂机。');
         }
       } else {
-        addLog('💤 出战宠物气血见底，恢复一些后再开始挂机。');
+        addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5h4"/><path d="M20 3v4"/><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> 出战宠物气血见底，恢复一些后再开始挂机。');
       }
       syncButton();
     });

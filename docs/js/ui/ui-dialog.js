@@ -27,7 +27,7 @@
     const actions = $('dialog-actions');
     if (!box || !text) return;
 
-    if (icon) icon.textContent = opt.icon || '💬';
+    if (icon) icon.innerHTML = opt.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>';
     if (speaker) speaker.textContent = opt.speaker || '系统';
     text.innerHTML = opt.text || '';
     box.className = 'dialog-box' + (opt.type === 'error' ? ' error' : '');
@@ -62,7 +62,7 @@
     // 对话同步写入消息控制台（社交分类），气泡本身行为不变
     if (UI.consoleLog) {
       const text = String(opt.text || '').replace(/<[^>]*>/g, ''); // 控制台只留纯文本
-      UI.consoleLog('social', (opt.icon || '💬') + ' <b>' + (opt.speaker || '系统') + '</b>：' + text);
+      UI.consoleLog('social', (opt.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>') + ' <b>' + (opt.speaker || '系统') + '</b>：' + text);
     }
     queue.push(opt);
     if (!showing) {

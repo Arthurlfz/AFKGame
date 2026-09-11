@@ -2,7 +2,7 @@
  * ui/ui-console.js —— 消息中心（底部聊天弹窗 + 页面内嵌 console）
  * 职责：
  *  1. 统一消息入口：UI.consoleLog(category, html)，category ∈ system / social / loot
- *  2. 底部聊天弹窗（2026-08-31 用户拍板）：💬世界 / ⚙️系统 / ✦掉落 三频道 + 输入发送
+ *  2. 底部聊天弹窗（2026-08-31 用户拍板）：世界 / ️系统 / 掉落 三频道 + 输入发送
  *  3. 页面内嵌 console（2026-09-01）：世界地图页 / 战斗页下半区，与抽屉共享同一份 history，
  *     三频道消息流 + 输入框；比例可拖拽（默认 65/35，localStorage 记忆）
  *  4. 实时聊天：Supabase Realtime 订阅广播，玩家互相能看到
@@ -21,9 +21,9 @@
   let activeTab = 'social';           // 当前频道（单选视图，抽屉与内嵌 console 共享）
   const QUICK_PHRASES = ['求组队 刷精英！', '收进化素材，价可谈', '求带新图，等级不够', '刚才那件装备谁捡了？', '这波掉落给力！'];
   const TAB_META = [
-    { id: 'social', icon: '💬', label: '世界' },
-    { id: 'system', icon: '⚙️', label: '系统' },
-    { id: 'loot', icon: '✦', label: '掉落' }
+    { id: 'social', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>', label: '世界' },
+    { id: 'system', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg>️', label: '系统' },
+    { id: 'loot', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg>', label: '掉落' }
   ];
 
   const timeNow = () => new Date().toTimeString().slice(0, 5);
@@ -51,7 +51,7 @@
   // 渲染一条聊天消息进社交分类（name 已转义；同时存结构化字段供弹窗排版）
   function renderChatMessage(name, text, isSelf) {
     const tag = isSelf ? '<b style="color:var(--accent)">' + escHtml(name) + '</b>' : '<b>' + escHtml(name) + '</b>';
-    consoleLog('social', '💬 ' + tag + '：' + escHtml(text), { name: escHtml(name), self: isSelf, text: escHtml(text) });
+    consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg> ' + tag + '：' + escHtml(text), { name: escHtml(name), self: isSelf, text: escHtml(text) });
   }
 
   // 加载最近聊天历史（进游戏先显示）
@@ -104,7 +104,7 @@
     let user = null;
     try { user = await (window.Supabase.getCurrentUser && window.Supabase.getCurrentUser()); } catch (e) { /* ignore */ }
     if (!user || !window.Supabase || !window.Supabase.sendChatMessage) {
-      consoleLog('social', '💬 <b>我</b>：' + escHtml(text), { name: '我', self: true, text: escHtml(text) });
+      consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg> <b>我</b>：' + escHtml(text), { name: '我', self: true, text: escHtml(text) });
       inputEl.value = '';
       inputEl.focus();
       return;
@@ -152,7 +152,7 @@
     }
     return '<div class="chat-msg ' + m.cat + '">' +
       '<span class="chat-time">' + m.time + '</span>' +
-      '<span class="chat-ic">' + (m.cat === 'loot' ? '✦' : '⚙️') + '</span>' +
+      '<span class="chat-ic">' + (m.cat === 'loot' ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg>' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg>️') + '</span>' +
       '<span class="chat-text">' + m.html + (m.action === 'openQuest' ? ' <button class="chat-action" data-chat-action="openQuest">去领取</button>' : '') + '</span></div>';
   }
 

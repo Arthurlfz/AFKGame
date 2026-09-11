@@ -193,7 +193,36 @@ async function handle(req: Request): Promise<Response> {
   script.levelBefore = plan.result.scriptLevelBefore; // 窗前真值（回放起点基线）
   script.expBefore = plan.result.scriptExpBefore;
 
-  // 6) 写库：会话累计 + 结算日志 + pending_script（一次 RPC 原子提交，幂等）
+  /* 归集本窗奖励（补账窗 + 剧本窗一起）。
+   * ⚠️ 为什么挪到 battle_settle 【之前】：奖励现在作为参数随结算 RPC 一起入库，
+   *    这样发奖与「游标推进」在同一个事务里 —— 任一失败整单回滚、下次 settle 重试，
+   *    不再出现「账记了、奖没发 / 发一半」（2026-09-11 审计第 1 批 P1-1，见 migrate_settle_reward_tx.sql）。 */
+  const rewardTotals: Record<string, number> = {};
+  const equipDrops: any[] = [];
+  const eggDrops: Record<string, number> = {};
+  for (const reward of (plan.logDetail || []).map((x: any) => x.reward)) {
+    if (!reward) continue;
+    if (reward.type === 'material' && reward.material) {
+      rewardTotals[reward.material] = (rewardTotals[reward.material] || 0) + Math.max(1, Math.floor(Number(reward.qty) || 1));
+    } else if (reward.type === 'equipment' && reward.eq) {
+      // 装备产出由 _shared/equip-gen-server.mjs 生成 —— 那份是从前端 equipment.js
+      // 构建期抽取的，与前端同一套逻辑（vtest_equip_gen 守）。
+      equipDrops.push(reward.eq);
+    } else if (reward.type === 'egg' && reward.baseName) {
+      eggDrops[reward.baseName] = (eggDrops[reward.baseName] || 0) + 1;
+    } else if (reward.type === 'boss') {
+      // 对齐前端 drop.js：boss = 必掉一件未鉴定装备 + 本图区域材料×5 + 稀有道具骰
+      if (reward.eq) equipDrops.push(reward.eq);
+      if (reward.material && reward.material.material) {
+        rewardTotals[reward.material.material] = (rewardTotals[reward.material.material] || 0) + Math.max(1, Number(reward.material.qty) || 1);
+      }
+      for (const bi of (reward.bossItems || [])) {
+        if (bi && bi.name) rewardTotals[bi.name] = (rewardTotals[bi.name] || 0) + Math.max(1, Number(bi.qty) || 1);
+      }
+    }
+  }
+
+  // 6) 写库：会话累计 + 结算日志 + pending_script + 发奖（一次 RPC 原子提交，幂等）
   //    游标直接跳到剧本窗尾（p_cursor）——这段战斗已全部入账，下次 settle 只补窗尾之后的账。
   const { data: settleRes, error: settleErr } = await supabase.rpc('battle_settle', {
     p_session_id: session.id,
@@ -212,7 +241,22 @@ async function handle(req: Request): Promise<Response> {
     // 同上：必须传对象。曾经 JSON.stringify 过 → pending_script 落库成字符串 →
     // 下面读回来的 pending.script 恒为 undefined → 幂等分支永不命中 →
     // 每次 settle 都重新入账一个 30 秒剧本窗，产出被放大 1.4~2.1 倍。
-    p_pending_script: { id: script.id, until: untilIso, script }
+    p_pending_script: { id: script.id, until: untilIso, script },
+    // ↓ 发奖：与上面的游标推进同事务（任一失败整单回滚）。都【必须传对象/数组】，
+    //   绝不能 JSON.stringify —— 那会落成 jsonb 字符串（2026-09-11 审计 P0-1 踩实）。
+    p_reward_materials: rewardTotals,
+    p_reward_equips: equipDrops.map((eq: any) => ({
+      name: eq.name,
+      slot: eq.slot,
+      base_stat: eq.base,
+      affixes: Object.assign({}, eq.affixes, { _ilvl: eq.ilvl != null ? eq.ilvl : null }),
+      tier: eq.tier,
+      rarity: eq.rarity && eq.rarity.id ? eq.rarity.id : 'white',
+      locked: false,
+      identified: eq.identified !== false,
+      soul_affix: null
+    })),
+    p_reward_eggs: eggDrops
   });
   if (settleErr) return json({ ok: false, error: 'SETTLE_RPC_FAILED', detail: settleErr.message }, 500);
   if (settleRes && settleRes.error === 'STALE_SETTLE_CURSOR') {
@@ -243,63 +287,10 @@ async function handle(req: Request): Promise<Response> {
   }
   if (petUpdErr) return json({ ok: false, error: 'PET_UPDATE_FAILED', detail: petUpdErr.message }, 500);
 
-  // 奖励由服务器直接入账（补账窗 + 剧本窗一起）。battle_settle 已用游标幂等，重复请求不会再次走到这里。
-  // 当前先落材料；装备/宠物蛋沿用同一 detail 结构接入对应表。
-  const rewardTotals: Record<string, number> = {};
-  const equipDrops: any[] = [];
-  const eggDrops: Record<string, number> = {};
-  for (const reward of (plan.logDetail || []).map((x: any) => x.reward)) {
-    if (!reward) continue;
-    if (reward.type === 'material' && reward.material) {
-      rewardTotals[reward.material] = (rewardTotals[reward.material] || 0) + Math.max(1, Math.floor(Number(reward.qty) || 1));
-    } else if (reward.type === 'equipment' && reward.eq) {
-      // 2026-09-11 甲：装备掉落入包。产出由 _shared/equip-gen-server.mjs 生成 ——
-      // 那份是从前端 equipment.js 构建期抽取的，与前端是同一套逻辑（vtest_equip_gen 守）。
-      equipDrops.push(reward.eq);
-    } else if (reward.type === 'egg' && reward.baseName) {
-      eggDrops[reward.baseName] = (eggDrops[reward.baseName] || 0) + 1;
-    } else if (reward.type === 'boss') {
-      // 2026-09-11 对齐前端 drop.js：boss = 必掉一件未鉴定装备 + 本图区域材料×5 + 稀有道具骰
-      if (reward.eq) equipDrops.push(reward.eq);
-      if (reward.material && reward.material.material) {
-        rewardTotals[reward.material.material] = (rewardTotals[reward.material.material] || 0) + Math.max(1, Number(reward.material.qty) || 1);
-      }
-      for (const bi of (reward.bossItems || [])) {
-        if (bi && bi.name) rewardTotals[bi.name] = (rewardTotals[bi.name] || 0) + Math.max(1, Number(bi.qty) || 1);
-      }
-    }
-  }
-  for (const [material, amount] of Object.entries(rewardTotals)) {
-    const { error: rewardErr } = await supabase.rpc('add_material', {
-      p_name: material,
-      p_amount: amount
-    });
-    if (rewardErr) return json({ ok: false, error: 'REWARD_GRANT_FAILED', detail: rewardErr.message }, 500);
-  }
-  if (equipDrops.length) {
-    const rows = equipDrops.map((eq: any) => ({
-      user_id: uid,
-      name: eq.name,
-      slot: eq.slot,
-      base_stat: eq.base,
-      // ⚠️ affixes 是 jsonb：这里【必须传对象】。JSON.stringify 过会落成 jsonb 字符串
-      //（2026-09-11 审计 P0-1 就是这么炸的）。_ilvl 与前端 Items.saveItem 同一约定。
-      affixes: Object.assign({}, eq.affixes, { _ilvl: eq.ilvl != null ? eq.ilvl : null }),
-      tier: eq.tier,
-      rarity: eq.rarity && eq.rarity.id ? eq.rarity.id : 'white',
-      locked: false,
-      identified: eq.identified !== false,
-      soul_affix: null
-    }));
-    const { error: eqErr } = await supabase.from('equip_items').insert(rows);
-    if (eqErr) return json({ ok: false, error: 'EQUIP_GRANT_FAILED', detail: eqErr.message }, 500);
-  }
-  for (const [baseName, n] of Object.entries(eggDrops)) {
-    // ⚠️ pet_egg.owner_id 是 text 列（不是 uuid）—— 见 docs/fos-cloud 技能的类型对照表
-    const rows = Array.from({ length: n }, () => ({ owner_id: String(uid), egg_type: baseName, status: '未孵化' }));
-    const { error: eggErr } = await supabase.from('pet_egg').insert(rows);
-    if (eggErr) return json({ ok: false, error: 'EGG_GRANT_FAILED', detail: eggErr.message }, 500);
-  }
+  /* 奖励已随上面的 battle_settle 【同事务】入库 —— 不再在这里单独发。
+   * 以前这几步（add_material / equip_items / pet_egg）在结算 RPC 之后执行：
+   * 任一失败就返回 500，但游标已经推进 → 那段产出永久丢失，而且是部分发放。
+   * 现在要么全成、要么整单回滚等下次重试。见 supabase/migrate_settle_reward_tx.sql */
 
   return json({
     ok: true,

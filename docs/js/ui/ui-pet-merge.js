@@ -74,7 +74,7 @@
       const matName2 = pill2 ? pill2.name : '涅槃丹';
       const matAmt2 = 1;
       const haveMat2 = pill2 && Materials.getQuantity ? Materials.getQuantity(pill2.name) : 0;
-      mb.innerHTML = '<div class="es-tip">🦚 涅槃是什么</div>';
+      mb.innerHTML = '<div class="es-tip"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.086 18.412A2 2 0 0112.67 19H5v-7.672a2 2 0 01.586-1.414L11.75 3.75a6 6 0 118.49 8.49z"/><path d="M16 8 2 22"/><path d="M17.488 15H9"/></svg> 涅槃是什么</div>';
       sb.innerHTML = '<div class="es-tip"><b>只有神级宠才能涅槃</b>（手册 2.7）。主宠吸收副宠 50% 的成长值（不衰减），等级重置回 <b>Lv.1</b>，继续叠成长。</div>';
       pb.innerHTML = '<div class="es-tip">条件：主宠必须是<b>神级宠</b>且 Lv.<b>' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；可选消耗 <b>' + matName2 + ' ×1</b>（吸收 ×1.2，当前持有 ' + haveMat2 + '）。<br>神级宠：两只<b>终阶</b>宠 + 成长 ≥ ' + ((Config.pet.godPets && Config.pet.godPets.minGrowth) || 60) + ' 在<b>合成</b>里搏出（30% 概率，持涅槃丹必出）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
       cb.innerHTML = '';
@@ -98,7 +98,7 @@
         <div class="stats">${statRows(main)}</div>
       </div>`;
       if (arrow) arrow.innerHTML = '';
-      sb.innerHTML = '<div class="warn">🚫 只有<b>神级宠</b>才能涅槃——' + main.name + ' 是普通宠。先把两只<b>终阶</b>宠（成长 ≥ ' + minG + '）拿去<b>合成</b>，30% 概率搏出神级宠（持涅槃丹必出）。</div>';
+      sb.innerHTML = '<div class="warn"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.929 4.929 19.07 19.071"/></svg> 只有<b>神级宠</b>才能涅槃——' + main.name + ' 是普通宠。先把两只<b>终阶</b>宠（成长 ≥ ' + minG + '）拿去<b>合成</b>，30% 概率搏出神级宠（持涅槃丹必出）。</div>';
       pb.innerHTML = ''; cb.innerHTML = '';
       return;
     }

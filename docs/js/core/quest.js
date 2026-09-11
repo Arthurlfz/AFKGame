@@ -74,6 +74,9 @@
       cloudLoaded = true;
       if (migrateLegacyGuide()) saveProgress();
       ensureDailyReset();
+      /* 服务端领取记录回灌（2026-09-12）：顺序不能反 —— 必须先按周期清水位，
+       * 再回灌，否则刚补进去的记录会被 ensureDailyReset 当成旧数据清掉。 */
+      await syncServerClaims();
     } catch (e) {
       // 读云端失败不能阻断登录：任务进度拉不到，最坏是玩家看到进度为空，
       // 不该把人挡在游戏外面。内存仍是本次会话的真相，照常能玩。
@@ -94,6 +97,57 @@
     });
     return changed;
   }
+
+  /* ---------- 服务端领取记录回灌（2026-09-12）----------
+   * 为什么需要它（玩家实测的死循环）：
+   *   「领过没有」由服务端 quest_claims 持有，而「显示已完成」用的是本地
+   *   quest_progress 的 completed / dailyDone / weeklyDone。两者不同源：
+   *   本地那份一旦丢（写失败 403、换设备、清缓存），任务就显示成「可提交」，
+   *   玩家点下去 → 服务端 ALREADY_CLAIMED → 报错 → 面板还是「可提交」→ 再点还是报错。
+   *   奖励其实早就发了，玩家却永远卡在这一句提示上。
+   * 所以每次拉进度都拿服务端记录补一次本地显示：服务端说领过，本地就显示已交。
+   * ⚠️ 只补不删：本机制上线前领的任务没有记录，本地已有的完成状态一律保留。 */
+  function applyServerClaims(keys) {
+    const today = todayStr();
+    const wk = weekKeyOf();
+    let changed = false;
+    (keys || []).forEach(raw => {
+      const s = String(raw || '');
+      const at = s.indexOf('@');
+      const id = at < 0 ? s : s.slice(0, at);
+      if (!id) return;
+      const period = at < 0 ? '' : s.slice(at + 1);
+      // 无周期 = 一次性任务（键就是任务 id，永久有效）
+      if (!period) {
+        if (!completed[id]) { completed[id] = true; changed = true; }
+        return;
+      }
+      /* 周期归属按【任务自己的 reset】判，不能只比日期：周一那天 today === weekKey，
+       * 光比日期会把周常记录错记成日常，玩家当天点周常照样被服务端拒。 */
+      const q = (Config.drop.quests || []).find(x => x.id === id);
+      if (q && q.reset === 'weekly') {
+        if (period === wk && !weeklyDone[id]) { weeklyDone[id] = true; changed = true; }
+      } else if (period === today && !dailyDone[id]) {
+        // 过期周期（昨天的日常、上周的周常）直接丢：本地水位早就翻篇了
+        dailyDone[id] = true; changed = true;
+      }
+    });
+    return changed;
+  }
+  async function syncServerClaims() {
+    const Supabase = window.Supabase;
+    if (!Supabase || !Supabase.fetchQuestClaims) return;
+    try {
+      const { data, error } = await Supabase.fetchQuestClaims();
+      if (error || !Array.isArray(data) || !data.length) return;
+      // 补出来的状态要落盘，否则玩家刷新一次又回到「可提交但交不了」
+      if (applyServerClaims(data)) saveProgress();
+    } catch (e) {
+      // 读不到就按本地显示，最坏回到「点了报错」，不能因为这一句把登录卡住
+      console.warn('[quest] 读取服务端领取记录失败，本次以本地为准', e);
+    }
+  }
+
   /* ---------- 写云端：串行队列 + 内存快照 ----------
    * quest_progress 是整行 JSON 覆盖写（upsert），两条写并发飞就会互相覆盖：
    * 挂机每场胜利都走 reportType → saveProgress，若和交任务那次写入撞在一起，
@@ -649,7 +703,7 @@
       }
       /* ② 服务端权威的领取记录（2026-09-12 新增，堵「改本地 completed 无限重领」）：
        * 本地 quest_progress 客户端可改 → 清掉 completed 刷新一下就能再领一次。
-       * 现在由服务端持有「领过没有」（quest_progress.claimed，客户端只有 SELECT 权限）。
+       * 现在由服务端持有「领过没有」（quest_claims 独立表，客户端对它没有任何写权限）。
        * ⚠️ 顺序为什么在扣材料之后：材料【能退回】，占位【退不回】—— 退回去等于又能重领一次。
        *    所以「容易退的先扣、难退的后扣」；占位失败必须把材料原样退回。 */
       /* ⚠️ repeatable（loop 类）【不参与】领取记录：它们设计上就是无限重复做的
@@ -670,8 +724,12 @@
          * 断网时 Materials.spend 同样会失败、收集类任务本来也过不去，
          * 所以这个降级换不来多少收益，却能救回弱网下交不了任务的体验。 */
         if (claim && claim.data === 'ALREADY_CLAIMED') {
+          // 材料原样退回：这一趟一份奖励都没发出去，不能白扣
           for (const [n, amt] of spentList) Materials.gain(n, amt);
-          unmarkFinished(q);
+          /* ⚠️ 这里【不能】unmarkFinished：服务端说"领过"就是真领过（多半是上一次会话领的，
+           * 本地那份状态丢了而已）。保持已交并落盘，面板才会显示"已交"；
+           * 撤成未完成 → 玩家看到"可提交" → 再点一次还是同一句报错，死循环。 */
+          await saveProgress().catch(() => {});
           return { error: '这个任务已经交过了' };
         }
         if (claim && claim.error) {

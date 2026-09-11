@@ -20,7 +20,7 @@
   --text: #d2d3c8;
   --text-hi: #ece6d2;
   --text-dim: #9aa49f;
-  --text-faint: #687572;
+  --text-faint: #7a8783; /* 2026-09-11 UX 审计：3.84:1 → 4.93:1 达标 AA，仍弱于 --text-dim 保持层次 */
   --mist: #899694;
   --paper: #d8d1bd;
   --metal: #9ba7a2;

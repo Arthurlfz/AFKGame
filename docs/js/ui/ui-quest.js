@@ -33,14 +33,14 @@
    * done = 已完成聚合视图（它是视图不是分类，永远排在最后）。
    * 分类顺序 = 注意力优先级：被引导的 → 推进度的 → 正在养的 → 今天该做的 → 可以刷的 → 长期冲的。 */
   const FALLBACK_KIND_META = [
-    { id: 'guide',   label: '引导', icon: '🌱', order: 1 },
-    { id: 'series',  label: '系列', icon: '📜', order: 2 },
-    { id: 'pet',     label: '宠物', icon: '🐾', order: 3 },
-    { id: 'daily',   label: '日常', icon: '🔁', order: 4 },
-    { id: 'loop',    label: '循环', icon: '♻️', order: 5 },
-    { id: 'achieve', label: '成就', icon: '🏆', order: 6 }
+    { id: 'guide',   label: '引导', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3"/><path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4"/><path d="M5 21h14"/></svg>', order: 1 },
+    { id: 'series',  label: '系列', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>', order: 2 },
+    { id: 'pet',     label: '宠物', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>', order: 3 },
+    { id: 'daily',   label: '日常', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>', order: 4 },
+    { id: 'loop',    label: '循环', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>️', order: 5 },
+    { id: 'achieve', label: '成就', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg>', order: 6 }
   ];
-  const DONE_CAT = { id: 'done', label: '已完成', icon: '✅', order: 99 };
+  const DONE_CAT = { id: 'done', label: '已完成', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m16 9-5.5 5.5L8 12"/></svg>', order: 99 };
   // 惰性读取：规范化层若因加载顺序还没就位，UI 也不会崩（拿兜底表）。
   function cats() {
     const meta = (window.QuestConfig && window.QuestConfig.KIND_META) || FALLBACK_KIND_META;
@@ -153,7 +153,7 @@
     const expVal = (window.Quest && window.Quest.questExpOf) ? window.Quest.questExpOf(q) : 0;
     const rewardRows = Object.entries(q.reward || {}).map(([n, a]) => `${escapeHtml(n)} ×${a}`);
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
-    if (gearCount > 0) rewardRows.push(`🎁 装备 ×${gearCount}`);
+    if (gearCount > 0) rewardRows.push(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 装备 ×${gearCount}`);
     if (expVal > 0) rewardRows.unshift(`经验 +${expVal}`);
     // matList 多材料任务：逐种列出材料名 + 背包持有量（够 888 标绿，差的标红提示还缺多少）
     const matRows = Array.isArray(q.matList)
@@ -207,7 +207,7 @@
     // 送装备的任务（新手链 t2）：卡片上要写清楚，玩家才知道「做完这条就有装备穿了」
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
     const gearHtml = gearCount > 0
-      ? `<span class="quest-card-mat gear">🎁 装备 ×${gearCount}</span>` : '';
+      ? `<span class="quest-card-mat gear"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 装备 ×${gearCount}</span>` : '';
     // 奖励即钥匙：卡片上直接写明"做完给什么、下一步是谁要用的"
     const pv = rewardPreviewOf(q);
     const nextHtml = pv
@@ -224,7 +224,7 @@
       <div class="quest-card${q.petName ? ' bind' : ''}" data-id="${q.id}">
         <div class="quest-card-head">
           <span class="quest-card-name">${markOf(q)}${escapeHtml(q.name || (TYPE_LABEL[q.type] || q.type) + '任务')}</span>
-          ${q.petName ? `<span class="quest-card-pet">🐾 ${escapeHtml(q.petName)}</span>` : ''}
+          ${q.petName ? `<span class="quest-card-pet"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> ${escapeHtml(q.petName)}</span>` : ''}
         </div>
         <div class="quest-card-desc">${escapeHtml(taskDesc(q))}</div>
         <div class="quest-progress"><div class="quest-progress-bar" style="width:${pct}%"></div></div>
@@ -349,7 +349,7 @@
     const ready = g.ready > 0 ? `<span class="quest-group-ready">可提交 ${g.ready}</span>` : '';
     return `<button type="button" class="quest-group-head${open ? ' open' : ''}${g.done === g.total ? ' cleared' : ''}" data-group="${escapeHtml(g.id)}">`
       + `<span class="quest-group-caret">${open ? '▾' : '▸'}</span>`
-      + `<span class="quest-group-label">${escapeHtml(g.label)}</span>`
+      + `<span class="quest-group-label">${g.label}</span>`
       + ready
       + `<span class="quest-group-prog">${g.done} / ${g.total}</span>`
       + `<span class="quest-progress quest-group-bar"><span class="quest-progress-bar" style="width:${pct}%"></span></span>`
@@ -571,7 +571,7 @@
       : '回到挂机地图继续推进，第 2 章和守关 Boss 在前方等你。';
     if (!UI.showDialog) { if (UI.showToast) UI.showToast('引导完成', '已进入正常游戏节奏'); return; }
     UI.showDialog({
-      icon: '🎓',
+      icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>',
       speaker: '引路人',
       npcTitle: '魂兽向导',
       text: `<b>新手引导完成！</b><br>`
@@ -589,7 +589,7 @@
     if (!pv || !UI.showDialog) return false;
     const g = guideOf(pv.next);
     UI.showDialog({
-      icon: '🎁',
+      icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg>',
       speaker: '引路人',
       text: `「${escapeHtml(q.name || '任务')}」完成，拿到 `
         + `<b>${escapeHtml(pv.labels.join('、'))}</b><br>`
@@ -767,7 +767,7 @@
       + `<span class="qt-grip" title="按住这里拖动，挪到不挡视线的位置">⠿</span>`
       + `<button type="button" class="qt-toggle" title="${trackCollapsed ? '展开任务列表' : '收起任务列表（不再占屏幕）'}">`
       + (trackCollapsed
-        ? `⚑ 任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''}`
+        ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg> 任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''}`
         : `任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''} ▾`)
       + `</button></div>`;
     bar.innerHTML = toggleHtml + '<div class="qt-list">' + items.map(it => {

@@ -40,7 +40,7 @@
     const lockStone = Materials.getQuantity(lockCfg.name);
     const affixLine = (a) => `<div class="grp-line">${Craft.affixText(a)}</div>`;
     const grpTitle = (label, cnt, locked) =>
-      `<div class="grp-title">${label}（${cnt}/3）${locked ? '<span class="grp-lock">🔒 已锁</span>' : ''}</div>`;
+      `<div class="grp-title">${label}（${cnt}/3）${locked ? '<span class="grp-lock"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁</span>' : ''}</div>`;
     const affixGroupHtml = `
       <div class="craft-affix-group">
         ${grpTitle('前缀', pfx.length, lockPrefix)}
@@ -58,7 +58,7 @@
       const locked = side === 'prefix' ? lockPrefix : lockSuffix;
       const blocked = side === 'prefix' ? lockSuffix : lockPrefix;
       return `<button class="craft-lock-side-btn${locked ? ' on' : ''}" data-lock-side="${side}" ${blocked ? 'disabled' : ''} title="${blocked ? '只能锁定一边，先解锁另一边' : (locked ? '点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 只保一次打造')}">
-        <span class="clsb-icon">${locked ? '🔒' : '🔓'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 下次打造后失效 · 点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 只保一次打造'}</span></button>`;
+        <span class="clsb-icon">${locked ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>'}</span><span class="clsb-label">${label}</span><span class="clsb-sub">${locked ? '已锁定 · 下次打造后失效 · 点击解锁（免费）' : '消耗 1 ' + lockCfg.name + ' · 只保一次打造'}</span></button>`;
     };
     const lockAreaHtml = `
       <div class="craft-section-label">锁定（锁前 / 锁后）<span class="craft-lock-count">${lockCfg.name} ×${lockStone}</span></div>
@@ -75,7 +75,7 @@
     // 未鉴定：不泄露词缀，但物品等级(ilvl)掉落时即确定、不涉及词缀内容，
     // 仍展示等级 + 词缀 T 阶上限，便于判断是否为图10 的 T1 胚子（无需先鉴定）。
     if (eq.identified === false) {
-      el.innerHTML = `<div class="eq-unid-block"><div class="eq-unid-icon">🔒</div><div class="eq-unid-name" style="color:${eqR.color}">${esc(eq.name || '未知装备')}</div><div class="eq-unid-line">未鉴定的 ${esc(eq.slot || '装备')} · 词缀封印</div><div class="eq-unid-line hint">鉴定后揭晓词缀并开放打造</div><div class="ceh-stats" style="display:flex; gap:14px; margin-top:8px;"><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">物品等级</span><b style="font-size:14px;">${ilvl}</b></div><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">词缀 T 阶上限</span><b style="font-size:14px;">T${_maxT}</b></div></div></div>`;
+      el.innerHTML = `<div class="eq-unid-block"><div class="eq-unid-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><div class="eq-unid-name" style="color:${eqR.color}">${esc(eq.name || '未知装备')}</div><div class="eq-unid-line">未鉴定的 ${esc(eq.slot || '装备')} · 词缀封印</div><div class="eq-unid-line hint">鉴定后揭晓词缀并开放打造</div><div class="ceh-stats" style="display:flex; gap:14px; margin-top:8px;"><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">物品等级</span><b style="font-size:14px;">${ilvl}</b></div><div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">词缀 T 阶上限</span><b style="font-size:14px;">T${_maxT}</b></div></div></div>`;
       return;
     }
     const eqBase = (eq.base && eq.base.label != null) ? eq.base : null;
@@ -90,8 +90,8 @@
       </div>`;
     const tabHtml = `
       <div class="craft-tabs">
-        <button class="craft-tab${soulTabActive ? '' : ' on'}" data-ctab="craft">⚒ 打造</button>
-        <button class="craft-tab${soulTabActive ? ' on' : ''}" data-ctab="soul">🔥 魂铸${eq.soulAffix ? ' ✓' : ''}</button>
+        <button class="craft-tab${soulTabActive ? '' : ' on'}" data-ctab="craft"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 打造</button>
+        <button class="craft-tab${soulTabActive ? ' on' : ''}" data-ctab="soul"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 魂铸${eq.soulAffix ? ' ✓' : ''}</button>
       </div>`;
     const craftBody = `
       <div class="craft-eq">
@@ -100,9 +100,9 @@
       ${lockAreaHtml}
       <div class="craft-section-label">打造操作</div>
       <div class="craft-actions craft-action-grid">
-        <button class="btn-mini primary" id="craft-reforge" title="${esc(stoneTitle('reforge'))}">🎲 重铸石<span>×${Materials.getQuantity(C.reforge.name)} · ${reforgeSub}</span></button>
-        <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''} title="${esc(stoneTitle('strip'))}">✂️ 剥离石<span>×${Materials.getQuantity(C.strip.name)} · ${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '移除未锁侧词缀'}</span></button>
-        <button class="btn-mini holy" id="craft-holy" title="${esc(stoneTitle('holy'))}">🔮 神圣石<span>×${Materials.getQuantity(C.holy.name)} · 重 Roll 未锁侧数值</span></button>
+        <button class="btn-mini primary" id="craft-reforge" title="${esc(stoneTitle('reforge'))}"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸石<span>×${Materials.getQuantity(C.reforge.name)} · ${reforgeSub}</span></button>
+        <button class="btn-mini alt" id="craft-strip" ${(pfx.length + sfx.length <= 1) ? 'disabled' : ''} title="${esc(stoneTitle('strip'))}"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️ 剥离石<span>×${Materials.getQuantity(C.strip.name)} · ${(pfx.length + sfx.length <= 1) ? '仅剩 1 条' : '移除未锁侧词缀'}</span></button>
+        <button class="btn-mini holy" id="craft-holy" title="${esc(stoneTitle('holy'))}"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> 神圣石<span>×${Materials.getQuantity(C.holy.name)} · 重 Roll 未锁侧数值</span></button>
         <button class="btn-mini augment" id="craft-augment" ${(pfx.length >= 3 && sfx.length >= 3) ? 'disabled' : ''} title="${esc(stoneTitle('augment'))}">➕ 增缀石<span>×${Materials.getQuantity(C.augment.name)} · ${(pfx.length >= 3 && sfx.length >= 3) ? '前后缀已满' : '新增到未锁侧'}</span></button>
       </div>
       ${inSell ? '<div class="inv-empty">装备在售中，先取回才能打造</div>' : ''}
@@ -138,13 +138,13 @@
     const btnReforge = el.querySelector('#craft-reforge');
     if (btnReforge) btnReforge.onclick = () => {
       if (inSell) return;
-      return craftOptimistic(btnReforge, '🎲 重铸中…',
+      return craftOptimistic(btnReforge, '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸中…',
         (onApplied) => Craft.reforge(eq, onApplied),
         (r) => {
           const ns = flattenAffixes(r.changed.new);
-          const text = `🎲 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · 🔒锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-          addLog(`🎲 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}`);
-          showToast('🎲 重铸完成', `词条已全部随机重洗`);
+          const text = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}`);
+          showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸完成', `词条已全部随机重洗`);
           renderCraftInto(el, eq);
           setResult(text); // 必须在 renderCraftInto 之后写：重建面板会丢掉旧结果区
           if (UI.renderInventory) UI.renderInventory();
@@ -154,13 +154,13 @@
     const btnStrip = el.querySelector('#craft-strip');
     if (btnStrip) btnStrip.onclick = () => {
       if (inSell) return;
-      return craftOptimistic(btnStrip, '✂️ 剥离中…',
+      return craftOptimistic(btnStrip, '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️ 剥离中…',
         (onApplied) => Craft.strip(eq, onApplied),
         (r) => {
           const removed = r.changed.removed;
-          const text = `✂️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）${lockActive ? ' · 🔒锁定已失效' : ''}`;
-          addLog(`✂️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
-          showToast('✂️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
+          const text = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️ 剥离成功：移除 ${Craft.affixText(removed)}（剩余 ${flattenAffixes(eq.affixes).length} 条）${lockActive ? ' · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效' : ''}`;
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️ 剥离成功：${eq.name} 移除词缀 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + '+' + removed.value + '%'}（T${removed.tier}）`);
+          showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️ 剥离成功', `移除 ${Equipment.formatAffix ? Equipment.formatAffix(removed) : removed.label + ' +' + removed.value + '%'}`);
           renderCraftInto(el, eq);
           setResult(text);
           if (UI.renderInventory) UI.renderInventory();
@@ -170,15 +170,15 @@
     const btnHoly = el.querySelector('#craft-holy');
     if (btnHoly) btnHoly.onclick = () => {
       if (inSell) return;
-      return craftOptimistic(btnHoly, '🔮 重铸中…',
+      return craftOptimistic(btnHoly, '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> 重铸中…',
         (onApplied) => Craft.reroll(eq, onApplied),
         (r) => {
           const os = flattenAffixes(r.changed.old);
           const ns = flattenAffixes(r.changed.new);
           const lines = os.map((o, i) => `${o.label} +${o.value}%（T${o.tier}）→ ${Craft.affixText(ns[i])}`).join('<br>');
-          const text = `🔮 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}${lockActive ? '<br>🔒锁定已失效' : ''}`;
-          addLog(`🔮 重铸成功：${eq.name} 词缀数值重 Roll（类型 / T 阶不变）`);
-          showToast('🔮 重铸成功', `数值已重 Roll<br><small>类型 / T 阶不变</small>`);
+          const text = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> 重铸成功（类型 / T 阶不变，数值已重 Roll）：<br>${lines}${lockActive ? '<br><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效' : ''}`;
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> 重铸成功：${eq.name} 词缀数值重 Roll（类型 / T 阶不变）`);
+          showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg> 重铸成功', `数值已重 Roll<br><small>类型 / T 阶不变</small>`);
           renderCraftInto(el, eq);
           setResult(text);
           if (UI.renderInventory) UI.renderInventory();
@@ -192,7 +192,7 @@
         (onApplied) => Craft.augment(eq, onApplied),
         (r) => {
           const n = r.changed.new;
-          const text = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）${lockActive ? ' · 🔒锁定已失效' : ''}`;
+          const text = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）${lockActive ? ' · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效' : ''}`;
           addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
           showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
           renderCraftInto(el, eq);
@@ -210,8 +210,8 @@
         const sideName = side === 'prefix' ? '前缀' : '后缀';
         const res = locked ? await Craft.unlockSide(eq, side) : await Craft.lockSide(eq, side);
         if (res && res.error) { setResult(`<span class="err">❌ ${res.error}</span>`); return; }
-        const text = locked ? `🔓 已解锁${sideName}（免费）` : `🔒 已锁定${sideName}（消耗 1 ${lockCfg.name} · 下次打造后失效）`;
-        showToast(locked ? '🔓 已解锁' : '🔒 已锁定', `${sideName}${locked ? '解锁' : '锁定'}成功`);
+        const text = locked ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> 已解锁${sideName}（免费）` : `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁定${sideName}（消耗 1 ${lockCfg.name} · 下次打造后失效）`;
+        showToast(locked ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> 已解锁' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁定', `${sideName}${locked ? '解锁' : '锁定'}成功`);
         renderCraftInto(el, eq);
         setResult(text);
         if (UI.renderInventory) UI.renderInventory();
@@ -332,7 +332,7 @@
     // 按钮文案要说清到底缺哪一步（旧版不论缺什么都写"先选宠物"，误导玩家）
     const castText = inSell ? '装备在售中'
       : !selPet ? '先选宠物'
-        : canCast ? '⚒ 确认魂铸（消耗 1 只宠物 + ' + matCount + ' ' + mat + '）'
+        : canCast ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 确认魂铸（消耗 1 只宠物 + ' + matCount + ' ' + mat + '）'
           : '先选要铸的特质';
     return `<div class="craft-soul-block">
         <div class="craft-soul-tiers">${tierBtns}</div>
@@ -377,7 +377,7 @@
     if (btnCast && !btnCast.disabled) btnCast.onclick = async () => {
       const btn = btnCast;
       btn.disabled = true;
-      btn.textContent = '⚒ 魂铸中…';
+      btn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 魂铸中…';
       /* ⚠️ 整段必须 try/catch（2026-09-08 血泪）：
        * 这里原来读 res.aff.label，但 Craft.soulCast 返回的字段名是 soulAffix（没有 aff）
        * → 魂铸其实已经成功，却在这一行抛 TypeError → 后面的 btn.disabled=false 永远不执行
@@ -385,29 +385,29 @@
        * 结论：任何 await 之后的异常都必须先把按钮放回来，否则一次小错误 = 界面永久卡死。 */
       try {
         const petObj = (window.Pet && window.Pet.getPets ? window.Pet.getPets() : []).find(p => p.id === soulState.petId);
-        if (!petObj) { btn.disabled = false; btn.textContent = '⚒ 确认魂铸'; return; }
+        if (!petObj) { btn.disabled = false; btn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 确认魂铸'; return; }
         const res = await Craft.soulCast(eq, petObj, soulState.tier, soulState.traitId || undefined);
         const box = body.querySelector('#craft-soul-result');
         if (!box) { if (UI.renderAll) UI.renderAll(); return; }
         if (res && res.ok) {
           const aff = res.soulAffix || {};
-          box.innerHTML = `<span style="color:#7fae7f">⚒ 魂铸成功：${aff.label || '魂铸词缀'}（T${aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
-          addLog(`⚒ 魂铸成功：${eq.name} 获得 ${aff.label || '魂铸词缀'}（T${aff.tier}），${res.petName} 被消耗`);
-          showToast('⚒ 魂铸成功', `${aff.label || '魂铸词缀'}（T${aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
+          box.innerHTML = `<span style="color:#7fae7f"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 魂铸成功：${aff.label || '魂铸词缀'}（T${aff.tier}）已永久铸入 ${eq.name}。${res.petName} 已消失。</span>`;
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 魂铸成功：${eq.name} 获得 ${aff.label || '魂铸词缀'}（T${aff.tier}），${res.petName} 被消耗`);
+          showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 魂铸成功', `${aff.label || '魂铸词缀'}（T${aff.tier}）<br><small>永久词缀 · 不可剥离/重铸/神圣石洗</small>`);
           // 宠已被消耗、装备已有魂铸词缀 → 清空选择，避免残留指向不存在的宠
           soulState.petId = null; soulState.traitId = null;
           if (UI.renderAll) UI.renderAll();
         } else {
           box.innerHTML = `<span class="err">❌ ${(res && res.error) || '魂铸失败'}</span>`;
           btn.disabled = false;
-          btn.textContent = '⚒ 确认魂铸';
+          btn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 确认魂铸';
         }
       } catch (e) {
         console.error('[soulcast] 魂铸异常', e);
         const box = body.querySelector('#craft-soul-result');
         if (box) box.innerHTML = `<span class="err">❌ 魂铸异常：${(e && e.message) || e}</span>`;
         btn.disabled = false;
-        btn.textContent = '⚒ 确认魂铸';
+        btn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9"/><path d="m18 15 4-4"/><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5"/></svg> 确认魂铸';
       }
     };
   }

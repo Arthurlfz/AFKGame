@@ -87,7 +87,7 @@
     const godNote = mainIsGod
       ? '<div class="pet-note ok">神级宠 · 已是神级（成长系数 +50% · 可涅槃）</div>'
       : (mainStage >= 5
-        ? (mainGodReady ? '<div class="pet-note ok">⚡ 终阶 + 成长达标（≥' + minG + '）：满足神级宠条件</div>' : '<div class="pet-note no">已终阶，但成长未达 ' + minG + '（神级宠门槛）</div>')
+        ? (mainGodReady ? '<div class="pet-note ok"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> 终阶 + 成长达标（≥' + minG + '）：满足神级宠条件</div>' : '<div class="pet-note no">已终阶，但成长未达 ' + minG + '（神级宠门槛）</div>')
         : '<div class="pet-note">未终阶（' + mainStage + '/5 阶），与神级宠无缘</div>');
     mb.innerHTML = `<div class="pet-card2 main${mainIsGod ? ' god': ''}">
       <div class="pname">${main.name}${mainIsGod ? ' · 神级' : ''}</div>
@@ -185,8 +185,8 @@
       if (res.error) { showToast('合成失败', res.error); return; }
       if (res.isGod) {
         // 神级宠降世（手册 2.6）：金色特殊提示
-        addLog(`⚡ 神级宠降世！${res.mainName}+${res.subName} 合成出【${res.baby.name}】，成长 ${res.newGrowth.toFixed(1)}！`);
-        showToast('⚡ 神级宠降世！', `${iconHtml(res.baby.name)} <b style="color:#f2b632">【${res.baby.name}】</b>（神级宠 · 成长系数+50% · 可涅槃）<br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> 神级宠降世！${res.mainName}+${res.subName} 合成出【${res.baby.name}】，成长 ${res.newGrowth.toFixed(1)}！`);
+        showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> 神级宠降世！', `${iconHtml(res.baby.name)} <b style="color:#f2b632">【${res.baby.name}】</b>（神级宠 · 成长系数+50% · 可涅槃）<br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);
       } else if (res.mutated) {
         addLog(`合成变异成功！${res.mainName}+${res.subName} 合成了全新稀有宠【${res.baby.name}】成长 ${res.newGrowth.toFixed(1)}！`);
         showToast('合成变异成功！', `${iconHtml(res.baby.name)} <b style="color:#c9a86a">【${res.baby.name}】</b><br><small>成长值 ${res.newGrowth.toFixed(1)}</small>`);

@@ -35,7 +35,15 @@
   }
   // 真正渲染目标页（只做 display 显隐，DOM 常驻，数据不丢）
   function renderPage(page) {
-    page = resolveMarketPage(page); // market-sell → 市集页 + 我的上架视图
+    /* ⚠️ resolveMarketPage 不只是「算页面名」—— 它内部会触发市集整页重绘（renderMarket）。
+     * 放在这里一抛错，下面切换 active 的代码就全执行不到 → 画面停在上一个页面，
+     * 表现就是「点了市集却还是宠物页」，且因为没打断点击流程，很容易被当成没点到。
+     * 切页是骨架、内容渲染是血肉：血肉坏了要能看到（console.error），骨架必须照常落地。 */
+    try {
+      page = resolveMarketPage(page); // market-sell → 市集页 + 我的上架视图
+    } catch (e) {
+      console.error('[shell] 市集视图切换失败，已跳过（页面仍会切过去）：', e);
+    }
     /* 背包 / 装备不是独立 tab，而是浮窗（#bag-window），DOM 里根本没有 #tab-bag / #tab-equip。
      * 以前 switchPage('bag'/'equip') 找不到目标页 → 所有 .tab-page 都被摘掉 active = 整页空白
      * （主城「鉴定」「铸造」两栋建筑，点了就白屏）。现在改成「打开浮窗 + 留在当前页」。 */
@@ -105,18 +113,38 @@
   /* ---------- 顶栏占位气泡（任务/消息） ---------- */
   function showTodoDialog(name) {
     if (!UI.showDialog) return;
-    UI.showDialog({ icon: '📜', speaker: name, text: name + '功能开发中，敬请期待' });
+    UI.showDialog({ icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg>', speaker: name, text: name + '功能开发中，敬请期待' });
   }
   // 设置：锚定按钮的 Popover（右上方弹出 + 尖角箭头 + 点空白关闭 + 防超屏，由 ui-popover 实现）
+  /* 减少动效开关（2026-09-11 UX 审计）：body.rm-anim 全站动画清零（与 prefers-reduced-motion 同策略），
+   * localStorage 持久化；登录态恢复后由 initShell 重新应用。 */
+  const RM_KEY = 'fos_reduce_motion';
+  function rmIsOn() { try { return localStorage.getItem(RM_KEY) === '1'; } catch (e) { return false; } }
+  function rmApply(on) {
+    if (document.body) document.body.classList.toggle('rm-anim', on);
+    try { if (on) localStorage.setItem(RM_KEY, '1'); else localStorage.removeItem(RM_KEY); } catch (e) { /* 隐私模式忽略 */ }
+  }
   function showSettingsDialog() {
     if (!UI.openPopover) return;
+    const rmOn = rmIsOn();
     UI.openPopover({
       anchor: document.getElementById('btn-settings-sidebar'),
       html: `
-        <div class="pop-title">⚙️ 设置</div>
+        <div class="pop-title"><svg viewBox="0 0 24 24" style="width:1em;height:1em;vertical-align:-0.15em;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg> 设置</div>
         <div class="pop-desc">宠物养成循环原型<br><span style="color:var(--text-faint)">本地优先 · 云端存档 · 挂机宠物养成</span></div>
+        <div class="set-row">
+          <div class="set-row-label">减少动效<small>关闭界面动画，长时间挂机更省眼</small></div>
+          <button type="button" class="set-toggle ${rmOn ? 'on' : ''}" id="pop-rm-toggle">${rmOn ? '已开启' : '已关闭'}</button>
+        </div>
         <button class="btn-mini danger" id="pop-logout">登出账号</button>`,
       onClick: async (e) => {
+        if (e.target.closest && e.target.closest('#pop-rm-toggle')) {
+          rmApply(!rmIsOn());
+          const t = document.getElementById('pop-rm-toggle');
+          if (t) { t.classList.toggle('on', rmIsOn()); t.textContent = rmIsOn() ? '已开启' : '已关闭'; }
+          if (e.stopPropagation) e.stopPropagation();
+          return;
+        }
         if (e.target.closest && e.target.closest('#pop-logout')) {
           UI.closePopover();
           if (window.Game) window.Game.onLogout();
@@ -127,6 +155,7 @@
 
   /* ---------- 外壳初始化（绑定侧边栏 + 顶栏按钮） ---------- */
   function initShell() {
+    rmApply(rmIsOn()); // 恢复「减少动效」设置（2026-09-11）
     // 侧边栏 4 主按钮
     const sbBtns = document.querySelectorAll('.sb-btn[data-page], .topbar-btn[data-page]');
     sbBtns.forEach(btn => {

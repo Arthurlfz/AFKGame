@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * ui/ui-battle.js —— 战斗页 UI
  * 职责：
  *  1. 累计统计（战斗场数 / 获得装备数）
@@ -67,7 +67,7 @@
     if (S && !S.isIdle() && !S.is('wild')) return;
     box.innerHTML = area
       ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
-      : '🐣 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
+      : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
     // 切换战斗舞台背景图（data-area-id 设在 .battle-stage，触发 CSS 三层背景）
     const stage = document.querySelector('#tab-battle .battle-stage');
     if (stage && typeof stage.setAttribute === 'function') {
@@ -552,7 +552,7 @@
           return;
         }
         setActive(pet.id);
-        if (UI.addLog) UI.addLog(`🐾 ${pet.name} 出战！`);
+        if (UI.addLog) UI.addLog(` ${pet.name} 出战！`);
         syncCombatantSnapshot(); // 战斗页被占用时它自己会让位（见函数内说明）
         renderRoster();
         if (UI.renderAll) UI.renderAll();

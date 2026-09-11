@@ -5,7 +5,9 @@
  *  2. 魔石来源：自测阶段由管理员 grant_gems 发放（或内部卡密兑换）。
  *     ⚠️ 2026-08-31 用户拍板：不做个人收款码/私下转账，界面上不得出现任何引导付款的内容；
  *        正式收款要接官方支付 SDK（需企业主体 + 版号等资质），到那时再回来做支付入口。
- *  3. 商店：用魔石买材料包（服务端定价，前端只展示）
+ *  3. 商店：用魔石买便利类权益（服务端定价，前端只展示）
+ *     ⚠️ 2026-09-12 拍板：只卖便利，不卖数值。payload 两种——
+ *        materials（材料，后续不再新增）/ perks（权益，如市场挂单额度加成）。
  * 安全边界：余额与价格都在服务端（wallets / products 表 + redeem_code / spend_gems 函数），
  *   前端改 JS 改不了价格和余额；这里只负责发请求和把结果讲清楚。
  * 依赖：config.js（文案与收款信息）、supabase.js（钱包/商品接口）、ui-common.js
@@ -18,6 +20,7 @@
   const Config = window.Config;
   const Supabase = window.Supabase;
   const Materials = window.Materials;
+  const Market = window.Market;
 
   // 高频 renderAll 只重绘界面，网络数据缓存在这里，避免每次刷新都打一次接口
   let wallet = { gems: 0, totalRecharged: 0, missing: false };
@@ -125,7 +128,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 魔石商店<span class="hint">材料直发到背包（与掉落同一条链路）</span></div>
+        <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 魔石商店<span class="hint">只卖便利，不影响战力</span></div>
         <div class="shop-grid">${goodsHtml}</div>
       </div>
 
@@ -137,11 +140,19 @@
     bindShopActions();
   }
 
-  // 商品内容描述：payload.materials = { 材料名: 数量 }
+  /* 商品内容描述。两种 payload：
+   *   materials = { 材料名: 数量 }  → 走 add_material 直发背包
+   *   perks     = { listing_slots: N } → 走 user_perks，改的是市场挂单上限（便利类，不进战力）
+   * ⚠️ 2026-09-12 拍板商店只卖便利不卖数值，所以 materials 类目后续不应再新增。 */
   function goodsDesc(payload) {
     const m = payload && payload.materials;
-    if (!m) return '';
-    return Object.keys(m).map(k => `${k} ×${m[k]}`).join('、');
+    if (m) return Object.keys(m).map(k => `${k} ×${m[k]}`).join('、');
+    const pk = payload && payload.perks;
+    if (pk && pk.listing_slots) {
+      const owned = (Market && Market.getPerks && Market.getPerks().listingSlots) || 0;
+      return `市场挂单上限永久 +${pk.listing_slots}${owned ? `（已拥有 +${owned}）` : ''}`;
+    }
+    return '';
   }
   function orderTitle(o) {
     if (o.provider === 'redeem') return `卡密充值 +${o.gems}`;
@@ -191,11 +202,18 @@
       showToast('❌ 购买失败', msg);
       return;
     }
-    // 材料由服务端 add_material 直接发到云端，本地缓存要拉一次才看得到
-    const { data } = await Supabase.getClient().from('materials').select('name,quantity');
-    if (data) Materials.setCloudMaterials(data);
+    /* 发货落地：服务端已经把东西发出去了，这里只是把本地缓存拉到最新。
+     *   materials 类 → 服务端 add_material 直发云端，本地要重拉材料表才看得到；
+     *   perks 类     → 写的是 user_perks，要重拉 Market 的额度缓存，
+     *                  否则挂单上限还停在旧值，玩家会以为「买了没生效」。 */
+    const isPerk = !!(p.payload && p.payload.perks);
+    if (p.payload && p.payload.materials) {
+      const { data } = await Supabase.getClient().from('materials').select('name,quantity');
+      if (data) Materials.setCloudMaterials(data);
+    }
+    if (isPerk && Market && Market.refreshPerks) await Market.refreshPerks();
     addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买 ${p.title}，花费 ${p.price_gems} ${cur()}`);
-    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买成功！', `${p.title} 已发到背包`);
+    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买成功！', isPerk ? `${p.title} 已生效` : `${p.title} 已发到背包`);
     await Promise.all([refreshWallet(), refreshOrders()]);
     UI.renderAll();
   }

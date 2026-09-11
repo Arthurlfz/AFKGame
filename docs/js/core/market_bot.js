@@ -217,7 +217,7 @@
     return {
       id,                    // 假单 id（购买用）
       isBot: true,           // 假卖家标记：UI 走 buyBotItem 分支
-      isLeak,                // 低价漏标记：UI 显示「💎 捡漏」
+      isLeak,                // 低价漏标记：UI 显示「<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg> 捡漏」
       seller: ps.nickname,   // 卖家显示 = persona 昵称（不标 AI）
       personaId: ps.id,
       item_id: id,           // 虚拟 item id（永不命中「我的挂单」）
@@ -284,7 +284,7 @@
     const id = 'botm-' + (++botUid);
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
-      kind: 'material', good_id: soldMat.id, good_name: soldMat.name, good_qty: 1, good_icon: soldMat.icon || '📦',
+      kind: 'material', good_id: soldMat.id, good_name: soldMat.name, good_qty: 1, good_icon: soldMat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>',
       material_type: payMat.name, material_qty: payQty,
       created_at: Date.now(), // 缺了会让「最新上架」把它们全甩到最后
     };
@@ -302,7 +302,7 @@
     const id = 'bote-' + (++botUid);
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
-      kind: 'egg', egg_type: base.name, egg_icon: base.icon || '🥚',
+      kind: 'egg', egg_type: base.name, egg_icon: base.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg>',
       material_type: payMat.name, material_qty: payQty,
       created_at: Date.now(), // 同上：缺了排序会错乱
     };
@@ -399,9 +399,9 @@
           const nm = pick.good_name + ' ×' + pick.good_qty;
           const pay = pick.material_qty + ' ' + pick.material_type;
           if (String(pick.seller_id) === String(user.id)) {
-            UI.consoleLog('social', '🛒 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
+            UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
           } else {
-            UI.consoleLog('social', '🛒 ' + ps.nickname + ' 收购了 <b>' + nm + '</b>（' + pay + '）');
+            UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 收购了 <b>' + nm + '</b>（' + pay + '）');
           }
         }
         if (window.UI && UI.renderAll) UI.renderAll();
@@ -444,9 +444,9 @@
       const nm = target.item_name || '';
       const pay = (target.material_qty || 0) + ' ' + (target.material_type || '材料');
       if (user && target.seller_id === user.id) {
-        UI.consoleLog('social', '🛒 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
+        UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
       } else {
-        UI.consoleLog('social', '🛒 ' + ps.nickname + ' 购买了 <b>' + nm + '</b>（' + pay + '）');
+        UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 购买了 <b>' + nm + '</b>（' + pay + '）');
       }
     }
     // sink：买入 80% 直接消耗离场；20% 降价再挂（同一 persona 立刻补一件当"转卖"）

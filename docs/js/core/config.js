@@ -546,7 +546,7 @@ window.Config = {
       'echo-cliffs':     ['精粹进化素材', '传说进化素材'],
       'rotfen-bog':      ['精粹进化素材', '传说进化素材'],
       'ember-hollow':    ['精粹进化素材', '传说进化素材'],
-      /* 🔴 2026-09-10 用户报「传说进化素材卡手」→ 图 9~10 从「[]」改成「只出传说」。
+      /*  2026-09-10 用户报「传说进化素材卡手」→ 图 9~10 从「[]」改成「只出传说」。
        * 原来这两个空数组让毕业图**完全不产任何进化素材**，而玩家挂机主力图就是图 9~10 —
        * 结果一只宠到终阶要 2 个传说（三阶×1 + 终阶×1，2026-09-11 取消终阶额外×3 后），在毕业图里一个都刷不到，
        * 必须手动退回图 6~8（低经验、材料也不是自己需要的）。
@@ -703,7 +703,7 @@ window.Config = {
       { id: 'boss9', category: 'main', type: 'boss', area: 'soul-abyss', need: 1, unlockLevel: 49, name: '首通·魂渊', hint: '击败守关 Boss，首通此图', reward: { 魂渊之尘: 20, 重铸石: 3, 合成之石: 3, 至尊神石: 1 } },
       { id: 'boss10', category: 'main', type: 'boss', area: 'blight-heart', need: 1, unlockLevel: 55, name: '首通·腐变之源', hint: '击败守关 Boss，首通此图', reward: { 腐变之心: 20, 重铸石: 3, 合成之石: 3, 至尊神石: 1 } },
 
-      /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「🐾 宠物」分类。
+      /* ---- 宠物专属 24 条（8 宠 × 3 养成链：孵化 → 带它击杀 → 它进化），独立「 宠物」分类。
        * ⚠️ 机制约定（2026-08-31 用户拍板）：
        *   · petName 字段 = 进度只算「该宠出战」时（reportType 带 ctx.petName，quest.js 里过滤）
        *   · 孵化任务「已拥有该宠（含开局选择）」视为 1/1 完成（否则开局宠卡死）
@@ -1108,25 +1108,25 @@ window.Config = {
   craft: {
     // 重铸石：随机重铸装备全部词缀（数量 / 类型 / T 阶 / 数值 全部随机）
     reforge: {
-      name: '重铸石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_whetstone.png" alt="">',
+      name: '重铸石', amount: 1, icon: '<img class="mat-img" src="assets/ui/ic_reforge.png" alt="">',
       effect: '随机重铸全部词缀：数量、类型、T 阶、数值全部重新随机。',
       rule: '会清空并重洗当前词条，组合与数值都不可控，风险远高于收益。'
     },
     // 剥离石：随机移除一条词缀（仅剩 1 条时不可用）
     strip: {
-      name: '剥离石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_flay_shard.png" alt="">',
+      name: '剥离石', amount: 1, icon: '<img class="mat-img" src="assets/ui/ic_scissors.png" alt="">',
       effect: '随机移除装备一条词缀。',
       rule: '装备仅剩 1 条词缀时无法使用。'
     },
     // 神圣石：重 Roll 装备【全部】词缀的数值（类型不变、T 阶不变，数值在该 T 阶范围内重新随机）
     holy: {
-      name: '神圣石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_sacred_stone.png" alt="">',
+      name: '神圣石', amount: 1, icon: '<img class="mat-img" src="assets/ui/ic_holy.png" alt="">',
       effect: '重随全部词缀的数值，词缀类型与 T 阶不变。',
       rule: '适合在词缀组合已确定后追求更高数值。'
     },
     // 增缀石：给装备【新增】一条随机词缀（类型随机不重复、T 阶随机 1~5；满 3 条不可用）
     augment: {
-      name: '增缀石', amount: 1, icon: '<img class="mat-img" src="assets/icons/final/item_rune_stone.png" alt="">',
+      name: '增缀石', amount: 1, icon: '<img class="mat-img" src="assets/ui/ic_rune.png" alt="">',
       effect: '新增一条随机且不重复的词缀。',
       rule: '装备已有 3 条词缀时无法使用。'
     },
@@ -1134,7 +1134,7 @@ window.Config = {
     // 只保【一次】打造：重铸/剥离/神圣/增缀 任一生效后锁定立即失效，再锁需重新消耗 1 颗（expireLock 收口）。
     // 来源 = 副本·淬炼试炼（20 层），不进入普通地图掉落表（config.towerDrops 登记其归属）。
     lock: {
-      name: '锁定石', amount: 1, maxLocked: 1, icon: '<img class="mat-img" src="assets/icons/final/item_fused_stone.png" alt="">',
+      name: '锁定石', amount: 1, maxLocked: 1, icon: '<img class="mat-img" src="assets/ui/ic_lock.png" alt="">',
       effect: '锁定前缀或后缀其中一侧：本次打造不会触及被锁的那一侧。',
       rule: '只保一次打造：重铸、剥离、神圣、增缀 任意一种生效后，锁定立即失效，想继续锁就得再消耗 1 颗锁定石。由副本·淬炼试炼（20 层）产出，不通过普通地图掉落。'
     }
@@ -1158,39 +1158,38 @@ window.Config = {
   trade: {
     // 可作价的材料清单（上架时下拉选择；name 必须与掉落/打造/融合用的材料名一致）
     materials: [
-      { id: 'reforge', name: '重铸石', icon: '🎲', category: 'stone' },
-      { id: 'strip',   name: '剥离石', icon: '✂️', category: 'stone' },
-      { id: 'holy',    name: '神圣石', icon: '🔮', category: 'stone' },
-      { id: 'augment', name: '增缀石', icon: '➕', category: 'stone' },
-      { id: 'synthesize', name: '合成之石', icon: '💠', category: 'stone' },
-      { id: 'evolution', name: '进化素材', icon: '🧬', category: 'evo' },
-      { id: 'evolution-precise', name: '精粹进化素材', icon: '💎', category: 'evo' },
-      { id: 'evolution-legend', name: '传说进化素材', icon: '✨', category: 'evo' },
-      { id: 'egg',     name: '宠物蛋', icon: '🥚', category: 'egg' },
+      { id: 'reforge', name: '重铸石', icon: '<img class="mat-img" src="assets/ui/ic_reforge.png" alt="">', category: 'stone' },
+      { id: 'strip',   name: '剥离石', icon: '<img class="mat-img" src="assets/ui/ic_scissors.png" alt="">', category: 'stone' },
+      { id: 'augment', name: '增缀石', icon: '<img class="mat-img" src="assets/ui/ic_rune.png" alt="">', category: 'stone' },
+      { id: 'synthesize', name: '合成之石', icon: '<img class="mat-img" src="assets/ui/ic_fuse.png" alt="">', category: 'stone' },
+      { id: 'evolution', name: '进化素材', icon: '<img class="mat-img" src="assets/ui/ic_evolve.png" alt="">', category: 'evo' },
+      { id: 'evolution-precise', name: '精粹进化素材', icon: '<img class="mat-img" src="assets/ui/ic_essence.png" alt="">', category: 'evo' },
+      { id: 'evolution-legend', name: '传说进化素材', icon: '<img class="mat-img" src="assets/ui/ic_crown.png" alt="">', category: 'evo' },
+      { id: 'egg',     name: '宠物蛋', icon: '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">', category: 'egg' },
       /* 凝魂晶石【刻意不在这里】（2026-09-09，边界基线 5.3「账号级凝魂晶石不可交易」）：
        * 本表同时用作「上架物」和「收款物」白名单 —— 不进这张表 = 天然不可交易，
        * 与经验包绑定的做法一致（见 tutorialMode.expPacks 注释）。商店直购不受影响。 */
       // 鉴定石：消耗品，鉴定未鉴定装备用（拖到装备上 / 点「鉴定」）。前期好掉、后期稀缺
-      { id: 'identify', name: '鉴定石', icon: '🔍', category: 'stone' },
+      { id: 'identify', name: '鉴定石', icon: '<img class="mat-img" src="assets/ui/ic_magnify.png" alt="">', category: 'stone' },
       // 涅槃丹（2026-09-06 新增，手册 2.6）：合成神级宠的保底道具（持有 1 颗 = 100% 出神级宠）。
       // 来源：图 8-10 的守关 Boss 首通 / 图 8-10 的地图委托 / 成就「涅槃行者」
-      { id: 'nirvanapill', name: '涅槃丹', icon: '💊', category: 'stone' },
+      { id: 'nirvanapill', name: '涅槃丹', icon: '<img class="mat-img" src="assets/ui/ic_phoenix.png" alt="">', category: 'stone' },
       /* ---------- 高价值功能道具（2026-09-10 补登记，万物皆可交易） ----------
        * 问题：这 6 件只存在于 Config.items（玩家背包里真的有），却从来没登记进这张白名单 →
        *   既当不了收款物、更上不了架。玩家辛苦从通天塔 / 守关 Boss / 委托打出来的高价值物，
        *   在交易行里**根本不存在**（买不到也卖不掉）。
        * 现在登记为可作价材料：至尊神石（100% 出神级宠）这类顶价物终于能拿来标价交易。
        * ⚠️ name 必须与 Config.items[].name 完全一致（收发材料都按名字走 materials 表）。 */
-      { id: 'synth_stone',   name: '越龙之石', icon: '💎', category: 'synth' },
-      { id: 'synth_shift',   name: '百变魔石', icon: '🔮', category: 'synth' },
-      { id: 'synth_supreme', name: '至尊神石', icon: '👑', category: 'synth' },
-      { id: 'evo_dan_a',     name: '强化丹A', icon: '💊', category: 'evolve' },
-      { id: 'evo_dan_b',     name: '强化丹B', icon: '💊', category: 'evolve' },
-      { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', category: 'evolve' },
-      { id: 'nir_lock',      name: '锁魂玉', icon: '🪙', category: 'nirvana' },
-      { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', category: 'cultivate' },
-      { id: 'nir_lock',      name: '锁魂玉', icon: '🪙', category: 'nirvana' },
-      { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', category: 'cultivate' },
+      { id: 'synth_stone',   name: '越龙之石', icon: '<img class="mat-img" src="assets/ui/ic_dragon.png" alt="">', category: 'synth' },
+      { id: 'synth_shift',   name: '百变魔石', icon: '<img class="mat-img" src="assets/ui/ic_mask.png" alt="">', category: 'synth' },
+      { id: 'synth_supreme', name: '至尊神石', icon: '<img class="mat-img" src="assets/ui/ic_supreme.png" alt="">', category: 'synth' },
+      { id: 'evo_dan_a',     name: '强化丹A', icon: '<img class="mat-img" src="assets/ui/ic_pill.png" alt="">', category: 'evolve' },
+      { id: 'evo_dan_b',     name: '强化丹B', icon: '<img class="mat-img" src="assets/ui/ic_pill.png" alt="">', category: 'evolve' },
+      { id: 'evo_jade',      name: '天仙玉露', icon: '<img class="mat-img" src="assets/ui/ic_dew.png" alt="">', category: 'evolve' },
+      { id: 'nir_lock',      name: '锁魂玉', icon: '<img class="mat-img" src="assets/ui/ic_souljade.png" alt="">', category: 'nirvana' },
+      { id: 'god_dew',       name: '琼浆玉露', icon: '<img class="mat-img" src="assets/ui/ic_kettle.png" alt="">', category: 'cultivate' },
+      { id: 'nir_lock',      name: '锁魂玉', icon: '<img class="mat-img" src="assets/ui/ic_souljade.png" alt="">', category: 'nirvana' },
+      { id: 'god_dew',       name: '琼浆玉露', icon: '<img class="mat-img" src="assets/ui/ic_kettle.png" alt="">', category: 'cultivate' },
       /* ---------- 通天塔（2026-09-10） ---------- */
       /* 腐印（进塔词缀，消耗品）：用户拍板「塔外产出 + 可交易」→ 必须进这张白名单，
        * 否则市集既不能上架也不能当收款物。产出见 Config.drop.materialWeightsByTier（图 8~10）
@@ -1440,26 +1439,26 @@ window.Config = {
    *       涅槃道具：absorbRatio + type(add 加成 / replace 替换)、requireSubHigher（C3 限定） */
   items: [
     /* ---- 合成（3）---- */
-    { id: 'synth_stone',   name: '越龙之石', icon: '💎', rarity: '普通', category: 'synth',   boost: 0.1, godChance: 0.3, levelRequireReduce: 0,
+    { id: 'synth_stone',   name: '越龙之石', icon: '<img class="mat-img" src="assets/ui/ic_dragon.png" alt="">', rarity: '普通', category: 'synth',   boost: 0.1, godChance: 0.3, levelRequireReduce: 0,
       effect: '提升 +10%，神级宠概率 30%', description: '最常用的合路石。稳，但仅此而已。' },
-    { id: 'synth_shift',   name: '百变魔石', icon: '🔮', rarity: '稀有', category: 'synth',   boost: 0.2, godChance: 0.6, levelRequireReduce: 0,
+    { id: 'synth_shift',   name: '百变魔石', icon: '<img class="mat-img" src="assets/ui/ic_mask.png" alt="">', rarity: '稀有', category: 'synth',   boost: 0.2, godChance: 0.6, levelRequireReduce: 0,
       effect: '提升 +20%，神级宠概率 60%', description: '石心难测，六成天意。' },
-    { id: 'synth_supreme', name: '至尊神石', icon: '👑', rarity: '稀有', category: 'synth',   boost: 0.3, godChance: 1.0, levelRequireReduce: 10,
+    { id: 'synth_supreme', name: '至尊神石', icon: '<img class="mat-img" src="assets/ui/ic_supreme.png" alt="">', rarity: '稀有', category: 'synth',   boost: 0.3, godChance: 1.0, levelRequireReduce: 10,
       effect: '必定出神级宠；终阶等级要求降到 Lv50；副宠词条 100% 继承', description: '一石定乾坤，神位唾手可得。' },
     /* ---- 进化（3）---- */
-    { id: 'evo_dan_a',     name: '强化丹A', icon: '💊', rarity: '普通', category: 'evolve',  boost: 0.1,
+    { id: 'evo_dan_a',     name: '强化丹A', icon: '<img class="mat-img" src="assets/ui/ic_pill.png" alt="">', rarity: '普通', category: 'evolve',  boost: 0.1,
       effect: '进化成长提升 +10%', description: '温和的火候，慢慢来。' },
-    { id: 'evo_dan_b',     name: '强化丹B', icon: '💊', rarity: '稀有', category: 'evolve',  boost: 0.2,
+    { id: 'evo_dan_b',     name: '强化丹B', icon: '<img class="mat-img" src="assets/ui/ic_pill.png" alt="">', rarity: '稀有', category: 'evolve',  boost: 0.2,
       effect: '进化成长提升 +20%', description: '比 A 猛，也更稀罕。' },
-    { id: 'evo_jade',      name: '天仙玉露', icon: '🍶', rarity: '稀有', category: 'evolve',  boost: 0.3, godGrowth: [0.5, 0.8],
+    { id: 'evo_jade',      name: '天仙玉露', icon: '<img class="mat-img" src="assets/ui/ic_dew.png" alt="">', rarity: '稀有', category: 'evolve',  boost: 0.3, godGrowth: [0.5, 0.8],
       effect: '进化成长提升 +30%；神宠培育 +0.5~0.8 成长', description: '一滴玉露，脱胎换骨。' },
     /* ---- 涅槃（1）---- */
-    { id: 'nir_pill',      name: '涅槃丹',   icon: '🔥', rarity: '普通', category: 'nirvana', boostMult: 1.2,
+    { id: 'nir_pill',      name: '涅槃丹',   icon: '<img class="mat-img" src="assets/ui/ic_phoenix.png" alt="">', rarity: '普通', category: 'nirvana', boostMult: 1.2,
       effect: '涅槃吸收 ×1.2（20%额外加乘）', description: '常规涅槃加成丹。火候更猛，吸收更足。' },
     /* ---- 神宠培育 / 定向植入（2026-09-11 新增）---- */
-    { id: 'nir_lock',      name: '锁魂玉',   icon: '🪙', rarity: '稀有', category: 'nirvana_lock', lockTrait: true,
+    { id: 'nir_lock',      name: '锁魂玉',   icon: '<img class="mat-img" src="assets/ui/ic_souljade.png" alt="">', rarity: '稀有', category: 'nirvana_lock', lockTrait: true,
       effect: '涅槃时指定副宠一条特质 100% 植入，其余特质本次不植', description: '锁住一缕魂，稳稳落进主宠血脉里。' },
-    { id: 'god_dew',       name: '琼浆玉露', icon: '🍯', rarity: '传说', category: 'cultivate', godGrowth: [0.8, 1.3],
+    { id: 'god_dew',       name: '琼浆玉露', icon: '<img class="mat-img" src="assets/ui/ic_kettle.png" alt="">', rarity: '传说', category: 'cultivate', godGrowth: [0.8, 1.3],
       effect: '神宠培育成长 +0.8~1.3（仅神级宠可用）', description: '塔顶之酿，一口值半阶。' }
   ],
   // 按 id / 类别取道具（UI 与逻辑统一走这两个，别自己 find）
@@ -1525,10 +1524,15 @@ window.Config = {
    * ⚠️ enabled：魔石系统总开关。false = 顶栏余额、侧边栏「魔石商店」入口、商店页全部隐藏，
    *    且不再请求钱包/商品/订单接口。正式上线（支付 SDK + 资质齐了）改回 true 即可，其余代码不用动。 */
   shop: {
-    enabled: false,
+    /* 2026-09-12 打开：魔石改为「便利货币」，商店只卖不影响战力的东西。
+     * ⚠️ 收款通道仍未开放（没有官方支付 SDK，也不做个人收款码），
+     *    魔石来源只有两条：卡密兑换（redeem_code）、管理员发放（grant_gems）。
+     * ⚠️ 商品定位：payload.perks = 权益（如市场挂单额度加成）。
+     *    payload.materials（卖材料 = 卖数值）与「不学氪金分层」定调冲突，已全部下架，不再新增。 */
+    enabled: true,
     currency: '魔石',
     rmbPerGem: 0.1,            // 1 元 = 10 魔石（仅用于界面换算展示）
-    selfTestNote: '自测阶段：魔石由管理员直接发放（grant_gems），不开放任何收款渠道。正式收款需接入官方支付 SDK，并具备企业主体与版号等资质。',
+    selfTestNote: '魔石当前通过卡密兑换或管理员发放获得，暂不开放收款。商店只卖便利类权益（如市场挂单额度），不卖任何影响战力的数值。',
     // 卡密兑换结果文案（服务端返回码 → 玩家能看懂的话）
     redeemMessages: {
       nologin: '请先登录再兑换',
@@ -1594,9 +1598,9 @@ window.Config = {
      *   未来出非绑定经验包（商店/掉落）走同一个 useExpPack 机制即可，零新增。
      * - 账本按 'expPack:{cap}' 记账：G1/G2 同为 Lv10 共享初阶一份，不重复发。 */
     expPacks: [
-      { cap: 10, name: '初阶经验包', icon: '📘', desc: '使用后名下所有魂兽直升 Lv10（不可超）' },
-      { cap: 40, name: '中阶经验包', icon: '📗', desc: '使用后名下所有魂兽直升 Lv40（不可超）' },
-      { cap: 60, name: '终阶经验包', icon: '📕', desc: '使用后名下所有魂兽直升 Lv60（不可超）' }
+      { cap: 10, name: '初阶经验包', icon: '<img class=\"mat-img\" src=\"assets/ui/ic_box.png\" alt=\"\">', desc: '使用后名下所有魂兽直升 Lv10（不可超）' },
+      { cap: 40, name: '中阶经验包', icon: '<img class=\"mat-img\" src=\"assets/ui/ic_box.png\" alt=\"\">', desc: '使用后名下所有魂兽直升 Lv40（不可超）' },
+      { cap: 60, name: '终阶经验包', icon: '<img class=\"mat-img\" src=\"assets/ui/ic_box.png\" alt=\"\">', desc: '使用后名下所有魂兽直升 Lv60（不可超）' }
     ],
     // 毕业礼包（G9 涅槃完成后自动发，全部绑定、不可交易）
     starterPack: {

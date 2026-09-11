@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * tower/ui-tower-battle.js —— 通天塔·整页战斗驱动（单一职责）
  * 职责：
  *  1. startTowerBattle：详情页「进入」→ 切整页战斗页 → TowerEngine.start → 结算面板
@@ -106,8 +106,8 @@
 
   /* ---------- 掉落日志：金色 + 文字前缀（双编码，不只靠颜色） ---------- */
   function logLootLoot(text) {
-    if (UI.consoleLog) UI.consoleLog('system', `<span class="tw-loot">🎁 ${esc(text)}</span>`);
-    else if (UI.addLog) UI.addLog('🎁 ' + text);
+    if (UI.consoleLog) UI.consoleLog('system', `<span class="tw-loot"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> ${esc(text)}</span>`);
+    else if (UI.addLog) UI.addLog(' ' + text);
   }
   function logEpic(text) {
     if (UI.consoleLog) UI.consoleLog('system', `<span class="tw-epic">${esc(text)}</span>`);
@@ -121,9 +121,9 @@
       if (event.type === 'start') {
         const total = Number(event.total) || Number(cfg().floors) || 30;
         const per = Number(event.mobsPerFloor) || Number(cfg().mobsPerFloor) || 5;
-        if (event.corrosion > 0) logEpic(`🔥 贴入腐印：腐蚀度 ${event.corrosion}（怪物更强、掉落更多）`);
+        if (event.corrosion > 0) logEpic(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 贴入腐印：腐蚀度 ${event.corrosion}（怪物更强、掉落更多）`);
         renderLadder(0, total, false);
-        logEpic(`🕯 每层 ${per} 只怪 · 整局只吃一管血（层间与楼内都不回满）`);
+        logEpic(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12v6"/><path d="M4.077 10.615A1 1 0 0 0 5 12h14a1 1 0 0 0 .923-1.385l-3.077-7.384A2 2 0 0 0 15 2H9a2 2 0 0 0-1.846 1.23Z"/><path d="M8 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z"/></svg> 每层 ${per} 只怪 · 整局只吃一管血（层间与楼内都不回满）`);
       } else if (event.type === 'floor') {
         UI.updateTowerFloor(event);
         if (UI.renderCombatantData) UI.renderCombatantData();
@@ -137,9 +137,9 @@
         const total = Number(cfg().floors) || 30;
         renderLadder(Number(event.floor) || 0, total, false);
       } else if (event.type === 'floorFail') {
-        if (UI.addLog) UI.addLog('💀 守卫拦住了去路……');
+        if (UI.addLog) UI.addLog(' 守卫拦住了去路……');
       } else if (event.type === 'clear') {
-        logEpic(`🏆 通天塔 ${event.total} 层全部通过！`);
+        logEpic(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg> 通天塔 ${event.total} 层全部通过！`);
       } else if (event.type === 'settle') {
         exitTowerView();
         if (UI.showTowerSettle) UI.showTowerSettle(event.result);

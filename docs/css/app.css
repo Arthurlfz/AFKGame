@@ -111,8 +111,9 @@
   color: var(--accent-hi); background: var(--inset);
   border-left-color: var(--accent); border-top-color: var(--line); border-bottom-color: var(--line);
 }
-.sb-btn .sb-icon { font-size: 1.167rem; flex: none; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; }
-.sb-btn .sb-icon img { width: 18px; height: 18px; object-fit: contain; }
+/* 2026-09-11 UX 反馈：侧边栏图标 18px → 26px → 32px */
+.sb-btn .sb-icon { font-size: 1.778rem; flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; }
+.sb-btn .sb-icon img { width: 44px; height: 44px; object-fit: contain; }
 /* 侧边栏分隔线（把主导航和任务/设置隔开） */
 .sb-btn.sb-divider { border-top:1px solid var(--line); margin-top:8px; padding-top:10px; }
 

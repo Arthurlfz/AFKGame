@@ -294,7 +294,7 @@
     }
     // 未鉴定装备不能穿戴（PoE 规则）：词缀未揭晓前穿戴会绕过鉴定，直接泄露属性
     if (eq.identified === false) {
-      if (window.UI && window.UI.showToast) window.UI.showToast('🔒 未鉴定的装备不能穿戴', '先到背包用鉴定石揭晓');
+      if (window.UI && window.UI.showToast) window.UI.showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 未鉴定的装备不能穿戴', '先到背包用鉴定石揭晓');
       return null;
     }
     const old = pet.equipment[eq.slot];

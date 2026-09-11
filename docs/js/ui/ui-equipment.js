@@ -45,7 +45,7 @@
     const chip = (text, active, onClick) => {
       const b = document.createElement('button');
       b.className = 'f-chip' + (active ? ' active' : '');
-      b.textContent = text;
+      b.innerHTML = text;
       b.onclick = onClick;
       return b;
     };

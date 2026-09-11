@@ -365,6 +365,18 @@
         '</div>' +
         '<div class="dev-note">走 grant_gems RPC（仅管理员邮箱可调用），替代手动 SQL</div>' +
       '</div>');
+    /* 生成魔石卡密（2026-09-12）：以前要开 SQL Editor 手搓 insert，现在管理员面板一键出码。
+     * 档位下拉由服务端 products 填充（服务端是定价唯一真源，这里不抄第二份名单）。 */
+    html += groupHtml('生成魔石卡密',
+      '<div class="dev-row">' +
+        '<div class="dev-inline">' +
+          '<select class="dev-input" id="res-code-sku"><option value="gems_60">小袋魔石（60+6）</option></select>' +
+          '<input class="dev-input" id="res-code-amt" type="number" min="1" max="50" value="3" title="张数" style="width:70px">' +
+          '<button class="btn-mini primary" id="res-code-go">生成</button>' +
+        '</div>' +
+        '<textarea class="dev-input" id="res-code-out" rows="3" readonly style="width:100%;margin-top:6px;font-family:monospace" placeholder="生成的卡密显示在这里，可全选复制"></textarea>' +
+        '<div class="dev-note">走 admin_gen_redeem_codes RPC（仅管理员邮箱）。每张一次性，发给试玩的人，对方在游戏内「魔石商店 → 卡密」处兑换</div>' +
+      '</div>');
     // 造装备
     html += groupHtml('造装备（进背包）',
       '<div class="dev-row">' +
@@ -457,6 +469,34 @@
       if (UI.renderAll) UI.renderAll();
       const w = (S.getMyWallet && await S.getMyWallet()) || {};
       toast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 已发放 ' + amt + ' 魔石', '当前余额 ' + (w.gems || '?'));
+    };
+    /* 卡密档位下拉：从服务端 products 拉，避免在这里抄第二份价格名单 */
+    (async () => {
+      const sel = $('res-code-sku');
+      const S = window.Supabase;
+      if (!sel || !S || !S.fetchProducts) return;
+      const r = await S.fetchProducts().catch(() => null);
+      const list = ((r && r.data) || []).filter(p => p.kind === 'recharge');
+      if (!list.length) return;
+      sel.innerHTML = list.map(p =>
+        `<option value="${String(p.sku)}">${String(p.title)}（${(p.gems || 0) + (p.bonus_gems || 0)} 魔石）</option>`
+      ).join('');
+    })();
+    const codeGo = $('res-code-go');
+    if (codeGo) codeGo.onclick = async () => {
+      const S = window.Supabase; if (!S) { toast('❌ 无 Supabase', ''); return; }
+      const sku = ($('res-code-sku') && $('res-code-sku').value) || 'gems_60';
+      const amt = Math.max(1, Math.min(50, Math.floor(num('res-code-amt', 1))));
+      const { data, error } = await S.getClient().rpc('admin_gen_redeem_codes', { p_sku: sku, p_count: amt });
+      if (error) {
+        const m = String(error.message || error);
+        toast('❌ 生成失败', m.indexOf('forbidden') >= 0 ? '仅管理员邮箱可生成' : m);
+        return;
+      }
+      const codes = data || [];
+      const out = $('res-code-out');
+      if (out) out.value = codes.join('\n');
+      toast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 已生成 ' + codes.length + ' 张', '下方文本框可全选复制');
     };
     const eqGo = $('res-eq-go');
     if (eqGo) eqGo.onclick = async () => {
