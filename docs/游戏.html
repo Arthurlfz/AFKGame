@@ -27,11 +27,14 @@
 <!-- ==================== 登录页（全屏，未登录时显示） ==================== -->
 <div id="login-screen" class="login-screen">
   <div class="login-panel">
-    <div class="login-logo">🔥</div>
+    <div class="login-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2.2 3 4.5 4.8 4.5 8.2A4.5 4.5 0 0 1 7.5 11c0-1.8 1-3 2-4.4.5 1.1 1.3 1.8 2.2 2.2C11.7 7.4 11.3 5.2 12 3Z"/></svg></div>
     <div class="login-title">灵魂熔炉</div>
     <div class="login-sub">Forge of Souls · 登录后数据自动云端存档</div>
     <input id="login-email" type="email" placeholder="邮箱" autocomplete="email">
-    <input id="login-pwd" type="password" placeholder="密码" autocomplete="current-password">
+    <div class="login-pwd-wrap">
+      <input id="login-pwd" type="password" placeholder="密码" autocomplete="current-password">
+      <button type="button" id="login-pwd-toggle" class="login-pwd-toggle" title="显示/隐藏密码">显示</button>
+    </div>
     <input id="login-nickname" type="text" placeholder="昵称（注册时需要，留空自动生成）" autocomplete="off" maxlength="12" style="display:none">
     <input id="login-invite" type="text" placeholder="邀请码（注册时需要）" autocomplete="off" style="display:none">
     <div class="login-err" id="login-err"></div>
@@ -54,12 +57,12 @@
 
   <!-- 顶栏：标题 + 账号区（快捷按钮已挪到左侧边栏） -->
   <header class="topbar app-topbar">
-    <div class="title">⚒ 宠物养成循环原型</div>
+    <div class="title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3.5 20.5 10l-2 2-6.5-6.5 2-2Z"/><path d="M15 9.5 3.5 21H3v-.5L14.5 9.5"/></svg>宠物养成循环原型</div>
     <div class="spacer"></div>
-    <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）">🎒 背包</button>
-    <button class="topbar-btn" id="topbar-quest" title="任务（快捷键 Q）">📜 任务</button>
+    <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M4 13h16"/></svg>背包</button>
+    <button class="topbar-btn" id="topbar-quest" title="任务（快捷键 Q）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M4 5a2 2 0 0 1 2-2v2H4ZM20 5a2 2 0 0 0-2-2v2h2Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>任务</button>
     <!-- 魔石余额（ui-shop 渲染；商店 SQL 没跑时自动隐藏） -->
-    <div class="gem-chip" id="gem-balance" title="魔石余额">🪙 0 魔石</div>
+    <div class="gem-chip" id="gem-balance" title="魔石余额"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.2 9.6h5.6M9.2 14.4h5.6"/></svg>0 魔石</div>
     <div id="auth-box"></div>
   </header>
 
@@ -88,7 +91,7 @@
           <div class="worldmap-head">
             <span class="worldmap-title">暗黑大陆 · 世界地图</span>
             <span class="worldmap-hint">点击地图上的标记进入对应区域 · 点击「不归城」进入主城</span>
-            <button type="button" class="fs-btn fs-btn--ghost" id="btn-return-battle">⚔️ 返回战斗</button>
+            <button type="button" class="fs-btn fs-btn--ghost" id="btn-return-battle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/><path d="M8 3l3 3M3 8l3 3M16 21l3-3M21 16l-3-3"/></svg>返回战斗</button>
           </div>
           <div class="resource-trial-panel" id="resource-trial-panel" hidden></div>
           <!-- 上半区：地图主舞台（16:9 底图 + 点位标记；外层 stage 吃掉剩余高度，canvas 等比居中） -->
@@ -128,11 +131,11 @@
         <div class="capital-page" id="capital-page">
           <!-- 页眉：标题 + 副标题（对齐世界地图页排版） -->
           <div class="worldmap-head capital-head">
-            <span class="worldmap-title">🏯 不归城</span>
+            <span class="worldmap-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l3-2.5L9 9v12M15 21V9l3-2.5L21 9v12"/><path d="M3 12h18M6 12V9.5M18 12V9.5"/><path d="M9 21v-5h6v5"/></svg>不归城</span>
             <span class="worldmap-hint">旅者的据点 · 点击城寨中的建筑进入</span>
             <span class="spacer"></span>
-            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-rest">🏥 回城休整</button>
-            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-return-map">🗺️ 回世界地图</button>
+            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-rest"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.5v7M8.5 12h7"/></svg>回城休整</button>
+            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-return-map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2.5 6 2.5 6-2.5v15l-6 2.5-6-2.5-6 2.5V6Z"/><path d="M9 3.5v15M15 6v15"/></svg>回世界地图</button>
           </div>
           <!-- 主城全景舞台：底图 + 动效层 + 建筑热区（ui-capital.js 渲染热区，DOM 常驻） -->
           <div class="capital-stage" id="capital-stage">
@@ -823,7 +826,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260911gear5"></script>
+<script src="js/core/config.js?v=20260911q1"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -864,7 +867,7 @@ window.PetSprites = {
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260911trait5"></script>
 <script src="js/pet/pet_evolve.js?v=20260911evo10"></script>
-<script src="js/core/quest.js?v=20260910egg7"></script>
+<script src="js/core/quest.js?v=20260911q1"></script>
 <script src="js/core/tutorial_mode.js?v=20260909trial1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->

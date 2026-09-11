@@ -535,7 +535,11 @@
       || (Config.equipment.rarities || [])[0];
     const made = [];
     for (let i = 0; i < count; i++) {
-      const eq = E.generateEquipment(rarity, cfg.areaTier || 1, cfg.materialTier || 3);
+      // ⚠️ ilvl 必须能显式传。不传（undefined）会退化成 levelOfAreaTier(areaTier)
+      // （图1 → 1）→ 词缀/底材恒为最低档、颜色恒为白。
+      // 另：自 2026-09-11 起 generateEquipment 已【忽略】rarity / materialTier，颜色由 ilvl 决定，
+      // 所以 cfg.rarity 只是给 UI 展示用的，别指望它真能指定颜色。
+      const eq = E.generateEquipment(rarity, cfg.areaTier || 1, cfg.materialTier || 3, cfg.ilvl != null ? Number(cfg.ilvl) : undefined);
       E.addToInventory(eq);
       if (I && I.saveItem) {
         // 未登录时 saveItem 返回「未登录」，静默忽略（本地照玩，登录后以云端为准）

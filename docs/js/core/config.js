@@ -582,6 +582,11 @@ window.Config = {
     //       unlockLevel 等级解锁（主线日常成就） / requires 前置任务（新手链线性引导）
     //       repeat 每日刷新 / name 任务名 / guide 引导条跳转目标 / reward 奖励材料
     //       rewardGear 奖励装备件数（新手链专用：送实体装备，不是材料）
+    // ⚠️ 2026-09-11 审计：目前**没有任何一条任务配过 rewardGear**（只有这句说明注释 + quest.js 的
+    //    管道代码），即这条能力尚未启用。要用时注意两点：
+    //      ① rarity 会被 generateEquipment 忽略 —— 颜色由 ilvl 决定，想给蓝装就传够 ilvl
+    //      ② 不传 ilvl 会退化成 areaLevels[0]=1 → 恒为最低档白装
+    //    规格：rewardGear: { count, areaTier, materialTier, ilvl }
     /* ⚠️ 任务奖励的资源归属规则（2026-09-09 按《边界基线 v1》第 3 节落地，vtest_resource_matrix.js 守）：
      *   1. 循环任务（repeat / repeatable）只发打造通货与经验 —— 严禁进化和涅槃材料，
      *      否则每日任务会取代地图和试炼成为资源最优解。
