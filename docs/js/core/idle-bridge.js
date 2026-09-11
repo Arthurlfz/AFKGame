@@ -407,7 +407,11 @@
           if (serverReward.type !== 'none' && window.UI && window.UI.showLoot) window.UI.showLoot(serverReward);
         });
       } else if (area && foe && window.Drop && window.Drop.rollReward) {
-        window.Drop.rollReward(foe, area, { boss: !!(row && row.boss), enemyLevel: Number((row && row.lv) || 1) || 1 }).then(function (r2) {
+        /* ⚠️ 必须 dry（2026-09-11 审计）：这个兜底只该负责「演出掉落」。
+         * 发奖权已经归服务端（battle-settle 的 add_material 已入账），客户端再真发一次
+         * 就是【静默双倍产出】—— 而且没有任何日志会提示。
+         * dry:true 仍然返回抽样结果（showLoot 照常展示），只是不落库、不上报。 */
+        window.Drop.rollReward(foe, area, { boss: !!(row && row.boss), enemyLevel: Number((row && row.lv) || 1) || 1, dry: true }).then(function (r2) {
           if (r2 && window.UI && window.UI.showLoot) window.UI.showLoot(r2);
         });
       }
@@ -1036,7 +1040,8 @@
     } else {
       const foe = Object.assign({}, f.enemy, { level: f.enemyLevel });
       if (area && window.Drop && window.Drop.rollReward) {
-        window.Drop.rollReward(foe, area, { boss: !!f.isBoss, enemyLevel: Number(f.enemyLevel) || 1 }).then(function (r) {
+        // dry 同 mountShowEnemy 那条：兜底只演出、不发奖（发奖权在服务端，见上方注释）
+        window.Drop.rollReward(foe, area, { boss: !!f.isBoss, enemyLevel: Number(f.enemyLevel) || 1, dry: true }).then(function (r) {
           if (r && window.UI && window.UI.showLoot) window.UI.showLoot(r);
           if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
         });
