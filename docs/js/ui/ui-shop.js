@@ -97,15 +97,28 @@
     }
 
 
+    /* 限购状态：服务端才是权威（spend_gems 会挡），这里只是把「还剩几次」提前告诉玩家。
+     * 以前 select 漏了 limit_per_user，前端对限购一无所知，玩家点下去才被弹「已达购买上限」。 */
+    function boughtCount(sku) {
+      return orders.filter(o => o.sku === sku && o.status === 'delivered').length;
+    }
     const goodsHtml = products.length
-      ? products.map(p => `
+      ? products.map(p => {
+        const bought = boughtCount(p.sku);
+        const lim = p.limit_per_user || 0;
+        const soldOut = lim > 0 && bought >= lim;
+        const poor = wallet.gems < p.price_gems;
+        const btnText = soldOut ? '已达上限' : poor ? '魔石不足' : '购买';
+        return `
         <div class="shop-card">
           <div class="shop-card-icon">${p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg>'}</div>
           <div class="shop-card-title">${escapeHtml(p.title)}</div>
           <div class="shop-card-desc">${escapeHtml(goodsDesc(p.payload))}</div>
+          ${lim > 0 ? `<div class="shop-card-limit">限购 ${lim} 次 · 已买 ${bought}</div>` : ''}
           <div class="shop-card-price"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> ${p.price_gems}${p.price_cents ? ` <span class="shop-card-rmb">≈ ${(p.price_cents / 100).toFixed(0)} 元</span>` : ''}</div>
-          <button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${wallet.gems < p.price_gems ? 'disabled' : ''}>${wallet.gems < p.price_gems ? '魔石不足' : '购买'}</button>
-        </div>`).join('')
+          <button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${(soldOut || poor) ? 'disabled' : ''}>${btnText}</button>
+        </div>`;
+      }).join('')
       : '<div class="inv-empty">暂无商品</div>';
 
     const ordersHtml = orders.length

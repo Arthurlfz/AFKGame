@@ -44,6 +44,8 @@
   font-family: var(--font-num); font-weight: 700; color: var(--r-gold);
 }
 .shop-card-rmb { font-family: var(--font-body); font-weight: 400; font-size: var(--fs-xs); color: var(--text-faint); }
+/* 限购提示：服务端才是权威，这里只负责让玩家「点之前就知道还剩几次」 */
+.shop-card-limit { font-size: var(--fs-xs); color: var(--text-faint); }
 .shop-card .btn-mini { margin-top: 6px; align-self: flex-start; }
 
 /* ---------- 卡密兑换 ---------- */

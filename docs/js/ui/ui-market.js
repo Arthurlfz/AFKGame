@@ -888,8 +888,18 @@
     if (mats.length) renderMarketSection(box, 'material', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg> 材料', mats, (l, pool) => buildMaterialCard(l, pool), matPool);
     if (eggs.length) renderMarketSection(box, 'egg', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 宠物蛋', eggs, (l, pool) => buildEggCard(l, pool), eggPool);
 
+    /* 零结果要讲清楚是「筛选太窄」还是「真的没货」——
+     * 以前一律写「没有符合条件的商品」，玩家（连作者本人）都会以为市场/商人挂了，
+     * 实际多半是自己勾了「底材 T1」这类极窄条件。改过筛选就给一键清空。 */
     if (!total) {
-      box.innerHTML = '<div class="mk-empty">没有符合条件的商品</div>';
+      const dirty = JSON.stringify(marketFilters) !== JSON.stringify(MARKET_FILTER_DEFAULT);
+      box.innerHTML = marketView === 'mine'
+        ? '<div class="mk-empty">你还没有上架任何商品</div>'
+        : dirty
+          ? '<div class="mk-empty">没有符合当前筛选的商品<small>筛选条件可能太窄了，比如底材 T 阶只勾了 T1</small><button class="btn-mini" id="mk-clear-filters">清空筛选</button></div>'
+          : '<div class="mk-empty">当前没有商品在售</div>';
+      const clearBtn = document.getElementById('mk-clear-filters');
+      if (clearBtn) clearBtn.onclick = resetMarketFilters;
     }
   }
 

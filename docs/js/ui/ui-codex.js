@@ -375,7 +375,8 @@
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 孵化', '无', '宠物蛋 ×1',
         `孵出一只基础宠，成长 ${baby.min} 到 ${baby.max} 随机；孵化时按概率携带血脉特质（${hc[1]}% 一条 / ${hc[2]}% 两条 / ${hc[3]}% 三条，T 阶 T1 ${tr[1]}% / T2 ${tr[2]}% / T3 ${tr[3]}%）`,
         '孵出的是基础形态，高阶形态靠进化'],
-      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 魂铸', '宠物 Lv.40 起（传承档 Lv.60）',
+      // 门槛一律从 config 派生：写死 40/60 时改了 config 这里不会跟着变，也不报错
+      ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 魂铸', `宠物 Lv.${((SC.tiers || {}).elite || {}).minLevel || 40} 起（${((SC.tiers || {}).legend || {}).label || '传承'}档 Lv.${((SC.tiers || {}).legend || {}).minLevel || 60}）`,
         `${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}`,
         '把宠物的血脉 / 觉醒特质铸进装备，让特质跨世代传承',
         `每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀；传承档需终形态、成长 ≥ ${((SC.tiers || {}).legend || {}).minGrowth || 60}`]

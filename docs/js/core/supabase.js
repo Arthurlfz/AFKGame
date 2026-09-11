@@ -503,8 +503,11 @@
   // 商店商品（服务端定价，前端只负责展示）
   async function fetchProducts() {
     try {
+      /* ⚠️ select 漏列 = 静默失效（读回来恒 undefined，不报错）：
+       * limit_per_user / limit_per_day 曾经没查，导致前端永远不知道商品限购，
+       * 玩家只能点了才被服务端弹「已达购买上限」。改这里前先想清楚前端要显示什么。 */
       const { data, error } = await client.from('products')
-        .select('sku,title,kind,price_cents,price_gems,gems,bonus_gems,payload,icon,sort')
+        .select('sku,title,kind,price_cents,price_gems,gems,bonus_gems,payload,icon,sort,limit_per_user,limit_per_day')
         .eq('active', true)
         .order('sort', { ascending: true });
       if (error) return { data: [], error: error.message, missing: isMissingTable(error) };

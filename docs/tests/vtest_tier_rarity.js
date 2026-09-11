@@ -47,7 +47,13 @@ const scan = lv => C(`(function(){
 const g80 = scan(80), g55 = scan(55), g10 = scan(10);
 A(g80.matTier >= 1 && g80.matTier <= 5, `底材 T 来自同一权重池（ilvl 80 实际 T${g80.matTier}）`);
 A(g80.color === 'gold' && g80.count >= 4 && g80.count <= 5, `ilvl 80：4~5 条 → 金色（实际 ${g80.count} 条 ${g80.color}）`);
-A(g55.matTier === 3, `野图图 10（ilvl 55）：底材最高 T3（实际 T${g55.matTier}）—— T1/T2 只在塔（ilvl 60+/70+）`);
+/* ⚠️ 这里以前写的是 `g55.matTier === 3`（要求恰好 T3），被当成 flaky 放了好几轮。
+ * 其实不是 flaky，是断言错了：PoE 规则下 ilvl 55 的池 = T3(门槛25)+T4(1)+T5(1)，
+ * 权重 30:25:25 → 单次抽样出 T4/T5 完全正常，断言却在要求必然 T3，于是三天两头红。
+ * 真要守的不变量是「T1/T2 进不来」（门槛 60/70 未达标），用分布验证才不会误判。 */
+const dist55 = C(`(function(){const c={};for(let i=0;i<300;i++){const t=Equipment.generateEquipment(null,10,0,55).materialTier;c[t]=(c[t]||0)+1;}return c;})()`);
+A(!dist55[1] && !dist55[2], `野图图 10（ilvl 55）抽 300 次：底材一次都没出 T1/T2（分布 ${JSON.stringify(dist55)}）—— T1/T2 只在塔`);
+A((dist55[3] || 0) > 0, 'T3 能出现（门槛没被误伤）');
 A(g10.count >= 1 && g10.count <= 2 && (g10.color === 'white' || g10.color === 'blue'),
   `ilvl 10：1~2 条 → 白/蓝（实际 ${g10.count} 条 ${g10.color}）`);
 

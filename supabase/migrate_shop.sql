@@ -250,12 +250,13 @@ grant execute on function public.grant_gems(uuid, integer, text) to authenticate
 insert into public.products (sku, title, kind, price_cents, price_gems, gems, bonus_gems, payload, icon, sort) values
   ('gems_60',   '小袋魔石', 'recharge',  600, null,  60,   6, '{}', '🪙', 1),
   ('gems_320',  '中袋魔石', 'recharge', 3000, null, 320,  40, '{}', '💰', 2),
-  ('gems_1080', '大袋魔石', 'recharge', 9800, null, 1080, 180, '{}', '👑', 3),
-  ('mat_phoenix_1', '涅磐兽 ×1',      'convenience', null, 30, 0, 0, '{"materials":{"涅磐兽":1}}',                                     '🐉', 10),
-  ('mat_legend_5',  '传说进化素材 ×5', 'convenience', null, 20, 0, 0, '{"materials":{"传说进化素材":5}}',                               '✨', 11),
-  ('mat_soul_20',   '凝魂晶石 ×20',    'convenience', null, 25, 0, 0, '{"materials":{"凝魂晶石":20}}',                                  '🔷', 12),
-  ('mat_stone_bundle', '打造石礼包',   'convenience', null, 20, 0, 0, '{"materials":{"重铸石":5,"剥离石":5,"神圣石":5,"增缀石":5}}',   '🎲', 13),
-  ('mat_egg_1',     '宠物蛋 ×1',      'convenience', null, 40, 0, 0, '{"materials":{"宠物蛋":1}}',                                     '🥚', 14)
+  ('gems_1080', '大袋魔石', 'recharge', 9800, null, 1080, 180, '{}', '👑', 3)
+  /* ⚠️ 这里【故意不再写任何 convenience 商品】。
+   * 2026-09-12 拍板：魔石只卖便利、不卖数值。原先在此处的 5 个卖材料商品
+   * （涅磐兽 ×1 / 传说进化素材 ×5 / 凝魂晶石 ×20 / 宠物蛋 ×1 / 打造石礼包）
+   * 已由 migrate_shop_perks.sql 下架。
+   * 留在本文件里 = 谎言：本脚本重放会把卖数值商品加回来（迁移脚本不幂等，血泪）。
+   * 现在的 convenience 商品统一见 migrate_shop_perks.sql。 */
 on conflict (sku) do update set
   title = excluded.title, kind = excluded.kind, price_cents = excluded.price_cents,
   price_gems = excluded.price_gems, gems = excluded.gems, bonus_gems = excluded.bonus_gems,

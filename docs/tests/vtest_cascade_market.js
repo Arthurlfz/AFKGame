@@ -97,7 +97,9 @@ const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-l
   A(childCount('market-list') >= 1, '部位=头盔：兽皮帽保留');
   reloadMarket({ kind: 'item', slot: '武器', rarity: 'all', tier: 'all', baseTier: 'all', growth: 'desc', sort: 'latest', affixFilters: [], trait: 'all' });
   resetUI(); C('UI.renderMarket()');
-  A(childCount('market-list') === 0 && textOf('market-list').includes('没有符合条件的商品'), '部位=武器：无匹配 → 空态');
+  A(childCount('market-list') === 0 && textOf('market-list').includes('没有符合当前筛选的商品'), '部位=武器：无匹配 → 空态');
+  // 2026-09-12：空态必须说清是「筛选太窄」并给一键清空，否则玩家会以为市场/商人挂了
+  A(textOf('market-list').includes('清空筛选'), '空态给出「清空筛选」入口');
   reloadMarket({ kind: 'item', slot: 'all', rarity: 'blue', tier: 'all', baseTier: 'all', growth: 'desc', sort: 'latest', affixFilters: [], trait: 'all' });
   resetUI(); C('UI.renderMarket()');
   A(childCount('market-list') === 0, '稀有度=蓝装：白装被过滤 → 空态');

@@ -71,6 +71,9 @@
   border-radius:6px;font-weight:700;color:var(--text);}
 .mk-section .mk-count{margin-left:auto;color:var(--text-dim);font-weight:400;font-size:.82rem;}
 .mk-empty{padding:26px;text-align:center;color:var(--text-dim);border:1px dashed var(--line);border-radius:12px;}
+/* 零结果时的「为什么空」说明 + 一键清空筛选 */
+.mk-empty small{display:block;margin-top:6px;font-size:var(--fs-xs);color:var(--text-faint);}
+.mk-empty .btn-mini{margin-top:12px;}
 
 /* ---------- 上架页：卡片流 + 定价弹窗 ---------- */
 #market-sell .mk-card{position:relative;}
