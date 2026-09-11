@@ -124,8 +124,11 @@
       // 装备入包（假单已持有完整装备对象；保存失败只提示，不阻塞——与掉落逻辑一致）
       Equipment.addToInventory(l.eq);
       const saved = await Items.saveItem(l.eq);
+      // ⚠️ 钱已经扣了、货也已经给到本地 —— 假单必须【无条件】下掉。
+      // 以前放在存档成功之后：存档一失败假单就还在，玩家再点一次 = 同一件货收两次材料。
+      // 原则：钱已收，货就算成交；落库失败只能如实提示，不能让同一单还能再卖一次。
+      botListings.splice(idx, 1);
       if (saved.error) return { ok: true, eq: l.eq, saveFailed: true, error: '装备已入包，但云端存档失败：' + saved.error.message };
-      botListings.splice(idx, 1); // 仅购买成功才移除假单
       return { ok: true, itemId: l.eq.cloudId, eq: l.eq };
     })();
   }
@@ -143,10 +146,11 @@
       Pet.addPet(pet); // 本地宠物入列（立即可见）
       const saved = await Supabase.savePet(pet); // 云端建档
       if (!saved.error && saved.data && saved.data.id) pet.cloudId = saved.data.id; // 回写云端 id（与 main.js 建档逻辑一致）
+      // 同 buyBotItem：钱已扣、宠已入本地 → 假单无条件下掉，防同一只宠收两次钱
+      botPetListings.splice(idx, 1);
       if (saved.error) {
         return { ok: true, petId: pet.cloudId || null, pet, saveFailed: true, error: '宠物已入列，但云端存档失败：' + (saved.error.message || '未知错误') };
       }
-      botPetListings.splice(idx, 1); // 仅购买成功才移除假单
       return { ok: true, petId: pet.cloudId, pet };
     })();
   }
