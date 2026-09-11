@@ -232,6 +232,38 @@
       }
     }
 
+    /* ---- 整单失败时把主宠和道具都还原（2026-09-11 修）----
+     * 涅槃要串「扣道具 → 更新主宠 → 删副宠」三步，任一步失败都必须回到起点：
+     *   · 只还原宠物不退道具 → 玩家白亏涅槃丹 / 凝魂晶石 / 锁魂玉
+     *   · 只退道具不还原宠物 → 成长白涨（同一只副宠还能再吃一次）
+     * traits 必须深拷贝：implantNirvanaTraits 在原数组上 push，浅拷贝会被一起改掉。 */
+    const snapshot = {
+      growth: main.growth,
+      traits: JSON.parse(JSON.stringify(main.traits || [])),
+      evolveTimes: main.evolveTimes,
+      evolveStage: main.evolveStage,
+      cultivateUsed: main.cultivateUsed,
+      rebornCount: main.rebornCount,
+      level: main.level,
+      exp: main.exp
+    };
+    const restoreMainLocal = () => {
+      main.growth = snapshot.growth;
+      main.traits = snapshot.traits;
+      main.evolveTimes = snapshot.evolveTimes;
+      main.evolveStage = snapshot.evolveStage;
+      main.cultivateUsed = snapshot.cultivateUsed;
+      main.rebornCount = snapshot.rebornCount;
+      main.level = snapshot.level;
+      main.exp = snapshot.exp;
+      main.curHp = getStats(main).hp;
+    };
+    const refundItems = async () => {
+      if (useCrystal && bonusMult > 1) await Materials.gain(CB.material, CB.amount);
+      if (nirPill) await Materials.gain(nirPill.name, 1);
+      if (lockTraitId && lockItem) await Materials.gain(lockItem.name, 1);
+    };
+
     const oldGrowth = main.growth;
     const { growth: newGrowth } = calcNirvanaGrowth(main, sub, bonusMult);
     main.growth = newGrowth;
@@ -248,24 +280,45 @@
     if (M.resetLevel) { main.level = 1; main.exp = 0; }
     main.curHp = getStats(main).hp;
 
-    // 副宠消失。顺序铁律（2026-09-08）：先删云端、成功才删本地——
-    // 反过来时云端删除失败（网络抖动）副宠会在刷新后"复活"（本地已删、云端还在，
-    // loadPets 全量拉回就凭空多宠）。删除失败保留本地行，玩家资产不凭空消失，可重试放生。
-    const delSub = await Supabase.deletePet(sub.cloudId);
-    if (delSub.error) {
-      console.warn('云端删除副宠失败，本地保留（刷新后仍在，请重试放生）：', delSub.error.message);
-      if (window.UI && window.UI.addLog) window.UI.addLog(`⚠️ 副宠「${sub.name}」云端删除失败，它还在你的列表里，稍后可再试放生`);
-    } else {
-      removePet(sub.id);
-    }
-
-    // 主宠成长/等级同步云端
+    /* ---- 顺序铁律（2026-09-11 修）：主宠先更新（可逆），副宠后删（不可逆）----
+     * 旧顺序是「先删副宠、再更新主宠」，两种失败都会出事：
+     *   · 更新主宠失败 → 副宠已被永久删除、成长没涨，函数却仍返回 {ok:true}（玩家白亏一只副宠）
+     *   · 删副宠失败   → 主宠照样涨，玩家能拿同一只副宠再涅槃一次（白刷成长）
+     * deletePet 是不可逆的，所以它必须排在最后；前面的步骤失败就整单回滚。
+     * （更彻底的做法是这条链走服务端事务 RPC，见 docs/代码审计_2026-09-11.md 第 2 批 P1-3） */
     const patch = { growth: newGrowth, evolve_times: main.evolveTimes, reborn_count: main.rebornCount, traits: main.traits, evolve_stage: main.evolveStage, cultivate_used: 0 };
     // 等级重置时必须连 exp 一起清零并同步：否则云端留着旧经验，
     // 刷新后会变成「Lv1 + 几千经验」，打一场直接连升几十级
     if (M.resetLevel) { patch.level = main.level; patch.exp = 0; }
-    const { error: updErr } = await Supabase.updatePet(main.cloudId, patch);
-    if (updErr) console.warn('云端更新宠物失败：', updErr.message);
+    const { error: updErr } = await Supabase.updatePet(main.cloudId, patch, { verify: true });
+    if (updErr) {
+      // 副宠还没动 → 零损失，退道具后让玩家原样重试
+      restoreMainLocal();
+      await refundItems();
+      return { error: '云端存档失败，本次涅槃未生效（宠物与道具均未损失），请稍后重试：' + (updErr.message || '') };
+    }
+
+    // 副宠消失。顺序铁律（2026-09-08）：先删云端、成功才删本地——
+    // 反过来时云端删除失败（网络抖动）副宠会在刷新后"复活"（本地已删、云端还在，
+    // loadPets 全量拉回就凭空多宠）。删除失败保留本地行，玩家资产不凭空消失。
+    const delSub = await Supabase.deletePet(sub.cloudId);
+    if (delSub.error) {
+      // 副宠没删掉 → 必须把主宠写回旧值，否则同一只副宠能被再吃一次（白刷成长）
+      const rb = await Supabase.updatePet(main.cloudId, {
+        growth: snapshot.growth, traits: snapshot.traits,
+        evolve_times: snapshot.evolveTimes, evolve_stage: snapshot.evolveStage,
+        reborn_count: snapshot.rebornCount, cultivate_used: snapshot.cultivateUsed,
+        level: snapshot.level, exp: snapshot.exp
+      }, { verify: true });
+      restoreMainLocal();
+      await refundItems();
+      console.warn('云端删除副宠失败，已回滚本次涅槃：', delSub.error.message);
+      return {
+        error: '副宠取消失败，已回滚本次涅槃（副宠仍在你的列表里，道具已退回）'
+          + (rb && rb.error ? '；⚠️ 回滚同步也失败，请刷新后核对主宠成长' : '') + '，请稍后重试'
+      };
+    }
+    removePet(sub.id);
 
     // 任务进度上报：所有 type=nirvana 的任务 +1
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('nirvana', 1);
@@ -516,7 +569,7 @@
       pet.growth = Math.min(100, Math.round((pet.growth + add) * 10) / 10);
       pet.cultivateUsed = (pet.cultivateUsed || 0) + 1;
       if (pet.cloudId) {
-        const r = await Supabase.updatePet(pet.cloudId, { growth: pet.growth, cultivate_used: pet.cultivateUsed });
+        const r = await Supabase.updatePet(pet.cloudId, { growth: pet.growth, cultivate_used: pet.cultivateUsed }, { verify: true });
         if (r && r.error) console.warn('云端更新培育成长失败：', r.error.message);
       }
       return { ok: true, pet, oldGrowth, add: Math.round((pet.growth - oldGrowth) * 10) / 10, itemName: item.name, used: pet.cultivateUsed, left: Math.max(0, maxCul - pet.cultivateUsed) };

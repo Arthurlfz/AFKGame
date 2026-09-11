@@ -14,8 +14,8 @@
 |---|---|---|
 | 代码（运行源） | `docs/` | git 提交已声明 "docs as official runtime source" |
 | 数值 | `docs/js/core/config.js` | 旧"数据地图"已废弃归档，不再改 |
-| 测试 | `docs/tests/` | 47 个 vtest，2026-09-03 起 **47/47 全绿** |
-| Supabase 迁移 | `supabase/` | 17 个 SQL（含 migrate_security_hardening.sql） |
+| 测试 | `docs/tests/` | 72 个 vtest，2026-09-11 基线 **66/72**（6 个存量红见文末） |
+| Supabase 迁移 | `supabase/` | 26 个 SQL。⚠️ **不保证幂等/可重放** —— 同一函数被多个文件重复定义，重放旧文件会覆盖新逻辑，见维护规则 6 |
 | 借鉴参考 | `docs/玩法文档/` | 只读参考源，不照抄数值 |
 | 归档区 | `archive/` | 旧物唯一去向，gitignore 不入库 |
 
@@ -86,8 +86,10 @@
 | 2 | 迁移应用记录 | 🟠 待做 | 谁按什么顺序应用了哪些 SQL、当前库停在哪个版本，无记录 |
 | 3 | AI 阶段 2（服务端 AI） | 🟡 待做 | 真共享市场需 Worker；当前阶段 1 各浏览器各自市场 |
 | 4 | 毕业图内容（图 11-17） | 🟡 待做 | 当前锁死占位；AI 毕业档 persona 需毕业装需求 |
-| 5 | 云端 bot 交易记录买家昵称 | 🟡 待做 | `bot_buy_equip` RPC 仍硬编码"流浪商人"，阶段 2 改 persona |
+| 5 | 云端 bot 交易记录买家昵称 | ✅ 已完成（2026-09-11） | 三个 `bot_buy_*` 改为接收 `p_buyer_name`，由客户端在收购那一刻从当次会话的 persona 取（`market.js` 的 `botBuyerName()`）；历史 2 行已回填。服务端不存 persona 名单——它每次会话随机生成、不落库，服务端无从得知「这次是谁来买」 |
 | 6 | **通天塔服务端权威 EF**（塔的奖励与成绩） | ⏸️ 暂停 | 2026-09-10 用户拍板"奖励与成绩都走 EF"；做到一半因「野外战斗经常有问题」**先修野图**而暂停（用户指示先记入本清单）。详见下方备注。 |
+| 7 | **安全守卫收口重放**（`bot_buy_material` 无守卫） | ✅ 已完成（2026-09-11） | 已执行 `supabase/migrate_security_reapply.sql` 到线上。修复前 anon 直调 `bot_buy_material` 返回 `200 "notfound"`（无守卫），修复后三个 `bot_buy_*` 一律 `401 42501`；29 个业务函数权限面回归无误伤。同批修复见 `docs/代码审计_2026-09-11.md` |
+| 8 | **REST 直改资产的剩余面**（`pets`/`equip_items`/`pet_egg`/`quest_progress`/`*_listings`） | 🔴 待做 | 2026-09-11 审计实测：RLS 只控**行归属**（`auth.uid() = user_id`）不控**列/值**，且这些表**无 CHECK、无触发器** → 登录玩家一条 `PATCH` 就能改满成长/伪造 T1 金装/造蛋，再挂市场**换走其他玩家的真材料**。已收口：`materials`（客户端只读，写全走 RPC）+ `profiles.banned`（列级权限，防自解封），见 `migrate_asset_write_hardening.sql`。其余**收掉会直接打断功能**，必须随 #1「服务端权威」把这些写操作搬进 RPC。⚠️ 另注：E1 的措辞"开 DevTools 就能改游戏进程"低估了它 —— 实际成本是**一条 curl**，且能波及他人资产 |
 
 > **#6 备注（2026-09-10 暂停时的进度与前置缺陷）**
 >
@@ -95,7 +97,9 @@
 > - **未开始**：`supabase/functions/_shared/tower-core.mjs`（整局 30 层 × 5 只 = 150 只怪的模拟）、`tower-run` EF（资格校验 / 原子发奖 / runId 幂等 / 周榜写入）、`supabase/migrate_tower.sql`、客户端切权威源（回放服务器录像）。
 > - **必须先修的两个前置缺陷**（都已用代码核对）：
 >   1. `supabase/gen_server_config.js` 的提取白名单**缺 `equipment`** → 服务端没有装备生成能力，塔的"高级装备"发奖落不了地。要么把装备生成器搬到 `_shared`，要么按现有 `battle-settle` 口径**先只发材料**。
->   2. **两份战核已漂移**：神级宠的 `statCoeff` / `speed`，服务器副本 2026-09-06 已修，**前端参考副本（`docs/js/core/battle-sim.mjs`）没同步**；且 `vtest_sim_sync.js` 的函数清单漏了 `getStatCoeff / getBaseSpeed / resolveLineId`，所以漂移一直没报红。塔是"神级宠专属"，这条不修服务端会把神级宠属性算低。
+>   2. ~~**两份战核已漂移**~~ ✅ **已于 2026-09-11 修复**：前端源 `docs/js/core/battle-sim.mjs` 已同步服务端的神级宠修正（`godDefOf` + `resolveLineId`/`getBaseSpeed`/`getStatCoeff` 三处神级宠分支），`battle-sim.global.js` 已重新生成，`vtest_sim_sync.js` 名单补上这 4 个函数（13 → 17 个，现在两份逐函数全等）。
+>   **实际影响（审计确认）**：漂移会让**塔的进塔预估偏低** —— `tower/tower-preview.js:63` 用前端那份战核算 `petStats`，而塔是神级宠专属内容，于是带神级宠的玩家看到"风险：高（会死在半途）"，实际能通。三份战核里**只有前端那份在浏览器里真的被调用**（`window.BattleSim`），其余调用点全是测试。
+>   ⚠️ **根因未除**：服务端副本仍是**手工同步**的（EF 打包不能引用仓库外文件）。`vtest_sim_sync.js` 是唯一的护栏，**它漏了函数就等于没守** —— 以后往战核加函数，必须同步加进该测试的 `NAMES`。
 
 ---
 
@@ -111,6 +115,12 @@
    - **dev 面板** `ui-dev.js`（凡是"预估/模拟"，必须调用唯一定义的函数如 `Battle.calcDamage`，禁止手抄公式）；
    - **归属账本** `docs/资源归属矩阵现状.md` + `vtest_resource_matrix.js`（新增/移除资源来源必须同步）；
    - 原则：**能从 config 派生的展示一律派生，不手写第二份**（先例：market.js 收款白名单、ui-dev 强度模拟）。
+6. **迁移脚本不许重放（2026-09-11 审计立规）**：
+   - 同一函数被多个 `migrate_*.sql` 重复 `create or replace` 过（`bot_buy_equip`/`bot_buy_pet` 各 3 份、`buy_equip`/`buy_pet`/`buy_egg` 各 2 份、`battle_settle` 2 份），**谁后跑谁生效** —— 所以文档里那句"迁移脚本幂等、可重复跑"是假的，已从事实源表格里划掉。
+   - 规则：**安全守卫类函数（`bot_buy_*` + 权限收口）的唯一定义在 `supabase/migrate_security_reapply.sql`**。该文件幂等，任何时候跑完都是对的。
+   - 改函数请**新建文件**，别回头改已执行过的文件；确实要重放旧文件，跑完必须再跑一次 `migrate_security_reapply.sql`。
+   - 已加「🔴 禁止重放」头注释的：`migrate_bot_buy.sql`（最初版无守卫）、`migrate_trade_records_ref.sql`（5 个函数抄的是守卫上线前的旧版）、`migrate_material_listings.sql`（`bot_buy_material` 原文无守卫）。
+7. **测试存量红（2026-09-11 基线 66/72，跑全量时别当成自己改坏的）**：`vtest_action_freeze` / `vtest_boss`(D4) / `vtest_bugfix`(emoji 断言过期) / `vtest_equip_score` / `vtest_pet_skill` / `vtest_tier_rarity`；`vtest_enemy_balance` 是蒙特卡洛 flaky，时红时绿。
 
 ---
-*最后更新：2026-09-03｜来源：Forge_of_Souls_现状地图_v1.md / AI假人经济系统策划_v1.md / 宠物特质与魂铸系统·实施提示词.md + 用户多轮拍板*
+*最后更新：2026-09-11｜来源：Forge_of_Souls_现状地图_v1.md / AI假人经济系统策划_v1.md / 宠物特质与魂铸系统·实施提示词.md + 用户多轮拍板 + 2026-09-11 代码审计（docs/代码审计_2026-09-11.md）*

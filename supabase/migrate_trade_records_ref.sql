@@ -11,8 +11,18 @@
 --
 -- 兼容性：
 --   1. 两列都可为 null，历史记录保持 null，不回填（无法可靠追溯）。
---   2. 下面重定义 5 个会写 trade_records 的函数，让新交易都带上这两列；
---      函数体与现有版本一致，只多了两个字段，行为不变。
+--   2. 下面重定义 5 个会写 trade_records 的函数，让新交易都带上这两列。
+-- ============================================================
+-- 🔴 【禁止重放】2026-09-11 审计发现：上面那句「函数体与现有版本一致，行为不变」是错的。
+--    这 5 个函数（buy_equip / buy_pet / buy_egg / bot_buy_equip / bot_buy_pet）的副本是在
+--    bot_buy 守卫上线（09-03）之后抄的旧版本，**抄丢了 4 个强制点**：
+--      · perform public.bot_buy_guard()   （每日 30 次 / 账号年龄 10 分钟 / 封禁检查）
+--      · seller_id = auth.uid() 的 self 校验（防自己挂单自己召唤商人刷材料）
+--      · insert into security_bot_buy_log （每日额度计数）
+--      · delete from equip_listings/pet_listings（防同一挂单被反复收购）
+--    且末尾 grant 回了 anon。重放本文件 = 上面全部失效。
+--    两个字段（listing_id / counterparty）的列定义是安全的，那两行可以单独执行；
+--    5 个函数体请以 supabase/migrate_security_reapply.sql 为准。
 -- ============================================================
 
 alter table public.trade_records add column if not exists listing_id   uuid;

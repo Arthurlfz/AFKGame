@@ -199,13 +199,18 @@ async function handle(req: Request): Promise<Response> {
     p_session_id: session.id,
     p_fights: plan.result.totalFights,
     p_exp: plan.result.totalExp,
-    p_detail: JSON.stringify(plan.logDetail),
+    // ⚠️ 不要 JSON.stringify！参数声明为 jsonb，传字符串进 PostgREST 会变成
+    //    「JSON 字符串」而不是数组，落库即 jsonb string（2026-09-11 审计踩实）。
+    p_detail: plan.logDetail,
     p_now: now,
     p_expected_last_settled_at: session.last_settled_at,
     p_last_boss_fight: plan.result.bossState && plan.result.bossState.lastBossFight != null
       ? plan.result.bossState.lastBossFight : null,
     p_cursor: untilIso,
-    p_pending_script: JSON.stringify({ id: script.id, until: untilIso, script })
+    // 同上：必须传对象。曾经 JSON.stringify 过 → pending_script 落库成字符串 →
+    // 下面读回来的 pending.script 恒为 undefined → 幂等分支永不命中 →
+    // 每次 settle 都重新入账一个 30 秒剧本窗，产出被放大 1.4~2.1 倍。
+    p_pending_script: { id: script.id, until: untilIso, script }
   });
   if (settleErr) return json({ ok: false, error: 'SETTLE_RPC_FAILED', detail: settleErr.message }, 500);
   if (settleRes && settleRes.error === 'STALE_SETTLE_CURSOR') {

@@ -494,6 +494,8 @@
     start, stop, tick,
     getBotListings: () => (window.Market && window.Market.getBotListings ? window.Market.getBotListings() : []),
     getPersonas: () => personas,
+    // 公开：假买家收购时要用一个 persona 昵称当「谁买的」（交易记录不再显示 NPC 标签）
+    randomPersona,
     tryBuyOnce, pickBuyTarget, pickBuyCandidate,
     guardKeyOf, pauseBuyer,
     isBuyPaused: () => buyPausedUntil > Date.now(),

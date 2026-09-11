@@ -191,18 +191,32 @@
   }
   // 更新宠物字段（融合后成长值/等级变化；RLS 保证只能改自己的）
   // patch 示例：{ growth: 10, level: 1 }
-  async function updatePet(cloudId, patch) {
+  /* opts.verify（2026-09-11 审计第 3 批）：给「先扣东西、后写云端」的不可逆链条用
+   * （涅槃 / 进化 / 培育）。不带 .select() 时 PostgREST 不返回受影响行，
+   * 「行不存在」和「更新成功」都是 {data:null,error:null} —— 于是上层以为落库了，
+   * 继续往下走（涅槃会接着把副宠删掉），玩家丢资产。
+   * 默认【不开】：全项目 14 个调用点里 11 个只是"同步一下，失败下次再来"，
+   * 而测试里有 5 处用假 cloudId 造数据，全局开会让它们因"测试没建档"而变红。 */
+  async function updatePet(cloudId, patch, opts) {
     const p = Object.assign({}, patch);
     for (const c of PET_EXTRA_COLS) if (missingPetCols.has(c)) delete p[c];
-    let res = await client.from('pets').update(p).eq('id', cloudId);
+    const verify = !!(opts && opts.verify);
+    const run = () => {
+      const q = client.from('pets').update(p).eq('id', cloudId);
+      return verify ? q.select('id') : q;
+    };
+    let res = await run();
     // 旧库缺列：定位缺的列去掉重试一次，保证其它字段照常写入
     if (res.error && isMissingPetColumn(res.error)) {
       const msg = String(res.error.message || '');
       const col = PET_EXTRA_COLS.find(c => msg.indexOf(c) >= 0 && c in p);
       if (col) {
         missingPetCols.add(col); delete p[col];
-        res = await client.from('pets').update(p).eq('id', cloudId);
+        res = await run();
       }
+    }
+    if (verify && !res.error && !(res.data && res.data.length)) {
+      return { data: null, error: new Error('这只宠物已不在你的存档里（可能在别的标签页被出售或删除），本次改动未生效') };
     }
     return res;
   }
@@ -301,13 +315,14 @@
   async function buyItem(listingId) {
     return client.rpc('buy_equip', { p_listing_id: listingId });
   }
-  // 流浪商人（系统假买家）购买玩家挂单：调 bot_buy_equip RPC（security definer，
-  // 锁单→卖家材料到账（标价-税）→双写交易记录（买家=「流浪商人」）→删除装备行）
-  async function botBuyEquip(listingId) {
-    return client.rpc('bot_buy_equip', { p_listing_id: listingId });
+  // 假买家（系统）购买玩家挂单：调 bot_buy_equip RPC（security definer，
+  // 锁单→卖家材料到账（标价-税）→双写交易记录（买家= persona 昵称）→删除装备行）
+  // buyerName = 交易记录里显示的买家身份，由调用方从当次会话的 persona 取（见 market.js botBuyerName）
+  async function botBuyEquip(listingId, buyerName) {
+    return client.rpc('bot_buy_equip', { p_listing_id: listingId, p_buyer_name: buyerName || null });
   }
-  async function botBuyPet(listingId) {
-    return client.rpc('bot_buy_pet', { p_listing_id: listingId });
+  async function botBuyPet(listingId, buyerName) {
+    return client.rpc('bot_buy_pet', { p_listing_id: listingId, p_buyer_name: buyerName || null });
   }
   // 取回装备：撤销自己的在售装备挂单
   async function cancelEquipListing(listingId) {
@@ -377,9 +392,9 @@
   async function cancelMaterialListing(listingId) {
     return client.rpc('cancel_material_listing', { p_listing_id: listingId });
   }
-  // 流浪商人（系统假买家）收购玩家材料挂单
-  async function botBuyMaterial(listingId) {
-    return client.rpc('bot_buy_material', { p_listing_id: listingId });
+  // 假买家（系统）收购玩家材料挂单
+  async function botBuyMaterial(listingId, buyerName) {
+    return client.rpc('bot_buy_material', { p_listing_id: listingId, p_buyer_name: buyerName || null });
   }
 
   /* ---------- 交易记录（trade_records 表） ---------- */

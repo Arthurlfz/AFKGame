@@ -102,7 +102,21 @@
   // evolve(petId, routeIndex, boostOverride, boostItemId)：预览定好基础成长，所选道具再按倍率放大。
   // boostItemId 只能来自 Config.pet.evolution.boostItems；不传即不消耗道具，兼容旧调用。
   // 成功返回 { ok, pet, oldGrowth, newGrowth, boost, boostItem, result, material, keepForm }，失败返回 { error }
+  // 防并发重入（2026-09-11，与 pet_merge.js 同一套，直接复用该模式）：
+  // 进化要串「扣素材 → 云端 updatePet」两次往返（约 1 秒）。期间本地 pet 尚未提交，
+  // 连点两次都会通过校验 → 素材扣两份、成长只涨一次 → 玩家白亏一份进化素材。
+  // UI 层的 disabled 只按「能不能进化」置灰，点击后不禁用，挡不住并发。
+  const inFlight = new Set();
+
   async function evolve(petId, routeIndex, boostOverride, boostItemId) {
+    const k = 'evo:' + petId;
+    if (inFlight.has(k)) return { error: '进化进行中，请勿重复点击' };
+    inFlight.add(k);
+    try { return await evolveInner(petId, routeIndex, boostOverride, boostItemId); }
+    finally { inFlight.delete(k); }
+  }
+
+  async function evolveInner(petId, routeIndex, boostOverride, boostItemId) {
     const cfg = E();
     const pet = getPets().find(p => p.id === petId);
     if (!pet) return { error: '宠物不存在' };
@@ -184,7 +198,7 @@
     // ---- 同步云端（含新阶段 evolve_stage，旧库缺列时 Supabase 层自动剔除）；失败则退还素材 ----
     const { error: updErr } = await Supabase.updatePet(pet.cloudId, {
       name: nextName, growth: newGrowth, evolve_times: nextEvolveTimes, evolve_stage: next.stage
-    });
+    }, { verify: true });
     if (updErr) {
       await Materials.gain(materialName, mainTotal);
       if (rm.extra && !sameNameExtra) await Materials.gain(rm.extra.name, rm.extra.amount);

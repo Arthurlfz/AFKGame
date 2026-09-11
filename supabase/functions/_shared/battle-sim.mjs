@@ -738,4 +738,4 @@ function simulateSessionScript(input) {
   return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs };
 }
 
-export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, skillOf, getEquipBonuses, getBloodline, getAwakenState };
+export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, skillOf, getEquipBonuses, getBloodline, getAwakenState, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff };

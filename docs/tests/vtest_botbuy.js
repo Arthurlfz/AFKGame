@@ -97,8 +97,11 @@ const mkB = async (name, rarityId, matType, qty) => {
   assert(!C('Market.getRealItemListings().some(l => l.item_name === "低价的剑")'), '被买走的挂单已从市场消失');
   assert(!ctx.itemsTable.some(x => x.name === '低价的剑'), '装备行已删除（NPC 买走不占玩家账号）');
   const botRecs = ctx.tradeTable.filter(x => x.item_name === '低价的剑');
-  assert(botRecs.some(x => x.player_id === '流浪商人' && x.role === 'buy' && x.price_qty === 5 && x.tax_qty === 0),
-    '交易记录：买家=流浪商人 buy 5（税0）');
+  const buyRec = botRecs.find(x => x.role === 'buy');
+  assert(!!buyRec && buyRec.price_qty === 5 && buyRec.tax_qty === 0, '交易记录：买家 buy 5（税0）');
+  // 宪法 B2：假买家必须以 persona 昵称呈现，记录里不能再出现 NPC 标签「流浪商人」（2026-09-11）
+  assert(!!buyRec && buyRec.player_id !== '流浪商人' && /^[\u4e00-\u9fa5]+\d{4}$/.test(String(buyRec.player_id)),
+    `交易记录：买家显示为 persona 昵称而非 NPC 标签（${buyRec && buyRec.player_id}）`);
   assert(botRecs.some(x => x.player_id === 'user-b' && x.role === 'sell' && x.price_qty === 5 && x.tax_qty === 0 && x.net_qty === 5),
     '交易记录：卖家 sell 5（5<8 不满税）');
 

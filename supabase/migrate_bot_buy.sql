@@ -4,6 +4,11 @@
 -- 用法：Supabase Dashboard → SQL Editor → 整段粘贴 → Run
 -- 注意：本文件的税率常量【必须】与 js/config.js 的 Config.trade 保持一致（每满 8 收 1）
 -- ============================================================
+-- 🔴 【禁止重放】本文件是最初版 bot_buy_equip / bot_buy_pet，**没有安全守卫**
+--    （无 bot_buy_guard、无 self 校验、无 security_bot_buy_log、无挂单行删除）。
+--    重放 = 把线上守卫抹掉。守卫的唯一定义在 supabase/migrate_security_reapply.sql。
+--    历史遗留的 DDL 参考价值保留，不要执行。
+-- ============================================================
 
 -- ---------- bot_buy_equip / bot_buy_pet：流浪商人（系统假买家）购买玩家挂单 ----------
 -- 语义：

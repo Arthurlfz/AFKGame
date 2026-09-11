@@ -245,12 +245,22 @@
     await refresh();
     return { ok: true };
   }
-  // 假买家（流浪商人）购买玩家挂单：调 bot_buy_equip RPC（云端锁单→卖家收材料→删装备行→写记录）
+  /* 假买家在交易记录里的显示身份 —— 取当次会话随机生成的 persona 昵称。
+   * persona 是「阶段 1 前端沙箱」概念（config.nickname 词库运行时生成、不落库），
+   * 服务端查不到"这次是谁来买"，只能由调用方传上去。取不到就退回中性名，
+   * 但绝不再出现 NPC 标签「流浪商人」（宪法 B2）。 */
+  function botBuyerName() {
+    const MB = window.MarketBot;
+    const p = MB && MB.randomPersona ? MB.randomPersona() : null;
+    return (p && p.nickname) || '市场';
+  }
+
+  // 假买家购买玩家挂单：调 bot_buy_equip RPC（云端锁单→卖家收材料→删装备行→写记录）
   // 与真实购买 buyItem 完全分离，不改变现有交易逻辑；成功后本地移除该挂单
   async function buyAsBot(listingId) {
-    const { data, error } = await Supabase.botBuyEquip(listingId);
+    const { data, error } = await Supabase.botBuyEquip(listingId, botBuyerName());
     if (error) return { error: error.message };
-    if (data !== 'ok') return { error: '流浪商人未购买成功（' + data + '）' };
+    if (data !== 'ok') return { error: '收购失败（' + data + '）' };
     itemListings = itemListings.filter(x => x.id !== listingId); // 本地移除，等轮询兜底
     return { ok: true };
   }
@@ -323,11 +333,11 @@
     await refresh();
     return { ok: true };
   }
-  // 假买家（流浪商人）收购玩家材料挂单
+  // 假买家收购玩家材料挂单
   async function buyAsBotMaterial(listingId) {
-    const { data, error } = await Supabase.botBuyMaterial(listingId);
+    const { data, error } = await Supabase.botBuyMaterial(listingId, botBuyerName());
     if (error) return { error: error.message };
-    if (data !== 'ok') return { error: '流浪商人未购买成功（' + data + '）' };
+    if (data !== 'ok') return { error: '收购失败（' + data + '）' };
     materialListings = materialListings.filter(x => x.id !== listingId);
     return { ok: true };
   }
@@ -351,9 +361,9 @@
     // 材料挂单（good_name 是材料的特征字段）走 bot_buy_material，别落到宠物分支
     if (listing && (listing.good_name || listing.kind === 'material')) return buyAsBotMaterial(listing.id);
     return listing.item_id ? buyAsBot(listing.id) : (async () => {
-      const { data, error } = await Supabase.botBuyPet(listing.id);
+      const { data, error } = await Supabase.botBuyPet(listing.id, botBuyerName());
       if (error) return { error: error.message };
-      if (data !== 'ok') return { error: '流浪商人未购买成功（' + data + '）' };
+      if (data !== 'ok') return { error: '收购失败（' + data + '）' };
       listings = listings.filter(x => x.id !== listing.id);
       return { ok: true };
     })();

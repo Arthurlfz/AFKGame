@@ -96,7 +96,7 @@ const mkOwn = async (name, matType, qty) => {
   assert(C('MarketBot.guardKeyOf("ERR_BOT_BUY_BANNED 账号已被封禁")') === 'ERR_BOT_BUY_BANNED', '识别 ERR_BOT_BUY_BANNED');
   assert(C('MarketBot.guardKeyOf("ERR_BOT_BUY_TOO_NEW 账号创建未满10分钟")') === 'ERR_BOT_BUY_TOO_NEW', '识别 ERR_BOT_BUY_TOO_NEW');
   assert(C('MarketBot.guardKeyOf("ERR_BOT_BUY_DAILY_CAP 今日已达上限")') === 'ERR_BOT_BUY_DAILY_CAP', '识别 ERR_BOT_BUY_DAILY_CAP');
-  assert(C('MarketBot.guardKeyOf("流浪商人未购买成功（self）")') === null, '非守卫错误（self）不触发暂停');
+  assert(C('MarketBot.guardKeyOf("收购失败（self）")') === null, '非守卫错误（self）不触发暂停');
   assert(C('MarketBot.isBuyPaused()') === false, '初始未暂停');
 
   // 收到 TOO_NEW → 自动暂停收购；恢复后可再次出手

@@ -15,7 +15,11 @@ const SERVER = import('../../supabase/functions/_shared/battle-sim.mjs');
 const NAMES = [
   'simulateSession', 'simulateSessionScript', 'simulateFight', 'petStats',
   'calcDamage', 'expFromBattle', 'mulberry32', 'pickWeighted',
-  'skillOf', 'getEquipBonuses', 'getBloodline', 'rollBoss', 'bossRand'
+  'skillOf', 'getEquipBonuses', 'getBloodline', 'rollBoss', 'bossRand',
+  // ⚠️ 2026-09-11 审计补：这 4 个曾漏在名单外，而漂移**恰好就在它们身上**
+  // （服务端给神级宠加了 statCoeff / speed / lineId 优先，前端源没同步），
+  // 于是「守护测试」一直绿着。名单必须覆盖所有会被两边分别修改的函数。
+  'resolveLineId', 'godDefOf', 'getBaseSpeed', 'getStatCoeff'
 ];
 
 (async () => {

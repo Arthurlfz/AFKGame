@@ -36,10 +36,21 @@
     return db().from('equip_items').select('*').order('created_at', { ascending: true });
   }
   // 更新云端装备字段（打造后词缀变化；需已登录 + 装备有 cloudId）
-  async function updateCloudItem(eq, patch) {
+  /* opts.verify（2026-09-11 审计第 3 批）：同 updatePet —— 给「先扣通货、后写云端」的
+   * 不可逆链条用（打造 / 魂铸）。不带 .select() 时 0 行更新与成功无法区分，
+   * 打造会报成功但云端词缀没落库，刷新即回退（玩家白花石头）。
+   * 默认【不开】：鉴定/解锁这类"只是没同步"的调用点不需要，
+   * 而测试里有多处直接用假 cloudId 造装备，全局开会让它们因"测试没建档"而变红。 */
+  async function updateCloudItem(eq, patch, opts) {
     if (!eq.cloudId) return { data: null, error: new Error('装备未同步云端') };
     if (patch && patch.affixes) patch.affixes = { ...patch.affixes, _ilvl: eq.ilvl ?? null, _lockPrefix: !!eq.lockPrefix, _lockSuffix: !!eq.lockSuffix };
-    return db().from('equip_items').update(patch).eq('id', eq.cloudId);
+    const verify = !!(opts && opts.verify);
+    const q = db().from('equip_items').update(patch).eq('id', eq.cloudId);
+    const res = verify ? await q.select('id') : await q;
+    if (verify && !res.error && !(res.data && res.data.length)) {
+      return { data: null, error: new Error('这件装备已不在你的存档里（可能在别的标签页被出售或分解），本次改动未生效') };
+    }
+    return res;
   }
   // 批量删除云端装备（分解用；空数组直接返回成功）。
   // 合并为一次 IN 请求（PostgREST），避免逐条删除的网络开销；RLS 保证只能删自己的

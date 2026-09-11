@@ -152,6 +152,77 @@ async function mkPet(name, growth, tag, stage, level) {
   A(nvRej.ok !== true && /神级宠/.test(nvRej.error), '普通宠（终阶也不行）涅槃被拒并给出提示');
   A(C('Materials.getQuantity("涅槃丹")') === before2, '被拒时不扣涅槃丹');
 
+  /* ============ 7. 涅槃失败路径：整单回滚（2026-09-11 审计第 2 批）============
+   * 旧顺序是「先删副宠（不可逆）→ 再更新主宠」，两种失败都会出事：
+   *   · 更新主宠失败 → 副宠已永久删除、成长没涨，函数却仍返回 {ok:true}（玩家白亏一只副宠）
+   *   · 删副宠失败   → 主宠照样涨，同一只副宠能被再吃一次（白刷成长）
+   * 现在要求：更新失败 = 副宠还在 + 道具退回；删副宠失败 = 主宠写回旧值 + 道具退回。 */
+  const mkGod = async (name, growth, tag) => {
+    await mkPet(name, growth, tag, 5, 60);
+    C(`(()=>{const p=Pet.getPets().find(p=>p.id===globalThis.__${tag});p.name="毒渊神蟾";p.lineId="毒渊神蟾";p.isGodPet=true})()`);
+    return C(`globalThis.__${tag}`);
+  };
+  const gainAndFlush = async (name, n) => { await C(`Materials.gain("${name}",${n})`); await S(80); };
+
+  // 7a. 更新主宠失败 → 副宠没动，零损失
+  const f1m = await mkGod('毒沼蛙', 70, 'f1a');
+  await mkPet('幽影兔', 20, 'f1b', 5, 60);
+  const f1s = C('globalThis.__f1b');
+  await gainAndFlush('涅槃丹', 3);
+  const pillB1 = C('Materials.getQuantity("涅槃丹")');
+  const growB1 = C(`Pet.getPets().find(p=>p.id===${f1m}).growth`);
+  C('globalThis.__upBak = Supabase.updatePet; Supabase.updatePet = async () => ({ error: new Error("模拟云端更新失败") })');
+  const f1 = await C(`Merge.nirvana(${f1m},${f1s},false,true)`);
+  C('Supabase.updatePet = globalThis.__upBak');
+  A(f1.ok !== true && /未生效/.test(String(f1.error)), '更新主宠失败 → 如实报错（不再谎报 ok）');
+  A(C('Materials.getQuantity("涅槃丹")') === pillB1, '更新主宠失败 → 涅槃丹已退回');
+  A(C(`Pet.getPets().find(p=>p.id===${f1m}).growth`) === growB1, '更新主宠失败 → 主宠成长未改动');
+  A(C(`Pet.getPets().some(p=>p.id===${f1s})`) === true, '更新主宠失败 → 副宠仍在（零损失）');
+
+  // 7b. 删副宠失败 → 主宠写回旧值，防止同一只副宠被再吃一次
+  const f2m = await mkGod('毒沼蛙', 70, 'f2a');
+  await mkPet('幽影兔', 20, 'f2b', 5, 60);
+  const f2s = C('globalThis.__f2b');
+  await gainAndFlush('涅槃丹', 3);
+  const pillB2 = C('Materials.getQuantity("涅槃丹")');
+  const growB2 = C(`Pet.getPets().find(p=>p.id===${f2m}).growth`);
+  C('globalThis.__delBak = Supabase.deletePet; Supabase.deletePet = async () => ({ data: null, error: new Error("模拟删除失败") })');
+  const f2 = await C(`Merge.nirvana(${f2m},${f2s},false,true)`);
+  C('Supabase.deletePet = globalThis.__delBak');
+  A(f2.ok !== true && /回滚/.test(String(f2.error)), '删副宠失败 → 报错并说明已回滚');
+  A(C('Materials.getQuantity("涅槃丹")') === pillB2, '删副宠失败 → 涅槃丹已退回');
+  A(C(`Pet.getPets().find(p=>p.id===${f2m}).growth`) === growB2, '删副宠失败 → 主宠成长已回滚（防白刷）');
+  A(C(`Pet.getPets().some(p=>p.id===${f2s})`) === true, '删副宠失败 → 副宠仍在');
+
+  /* ============ 8. 进化并发闸门（2026-09-11 审计第 2 批）============
+   * evolve 原本没有模块级 inFlight（nirvana/synthesize/cultivate 都有），
+   * UI 的 disabled 只按「能不能进化」置灰、点击后不禁用 → 连点并发
+   * → 素材扣两份、成长只涨一次（白亏一份素材）。 */
+  await mkPet('血狐', 10, 'evo1', 1, 10);
+  const evoId = C('globalThis.__evo1');
+  await gainAndFlush(C(`Evolve.getEvoTier(Pet.getPets().find(p=>p.id===${evoId}))`), 6);
+  C('globalThis.__upBak2 = Supabase.updatePet; Supabase.updatePet = () => new Promise(r => setTimeout(() => r({ data: null, error: null }), 150))');
+  const e1 = C(`Evolve.evolve(${evoId},0)`);
+  const e2 = C(`Evolve.evolve(${evoId},0)`);
+  const [er1, er2] = await Promise.all([e1, e2]);
+  C('Supabase.updatePet = globalThis.__upBak2');
+  A(!!(er2 && /进行中/.test(String(er2.error))), '进化并发第二次被闸门挡住（不再重复扣素材）');
+  A(!!(er1 && er1.ok === true), '第一次进化正常完成');
+
+  /* ============ 9. updatePet 的 verify 选项（2026-09-11 审计第 3 批）============
+   * 不带 .select() 时，「行不存在」和「更新成功」都表现为 {data:null,error:null}。
+   * verify:true 才加 .select('id') 并把 0 行转成明确错误 —— 只给「先扣东西、后写云端」
+   * 的不可逆链条用（涅槃/进化/培育/打造/魂铸），其余调用点行为不变。 */
+  const gone = '00000000-0000-0000-0000-000000000000';
+  const noRow = await C(`Supabase.updatePet("${gone}", { growth: 1 }, { verify: true })`);
+  A(!!(noRow && noRow.error && /不在你的存档/.test(String(noRow.error.message))),
+    'verify:true 更新不存在的行 → 明确报错（不再静默成功）');
+  const noVerify = await C(`Supabase.updatePet("${gone}", { growth: 1 })`);
+  A(!!(noVerify && !noVerify.error), '不开 verify 时保持原行为（不打扰其余 11 个调用点）');
+  const evoCloud = C(`Pet.getPets().find(p=>p.id===${evoId}).cloudId`);
+  const okRow = await C(`Supabase.updatePet("${evoCloud}", { growth: 5 }, { verify: true })`);
+  A(!!(okRow && !okRow.error), 'verify:true 更新存在的行 → 正常成功（不误报）');
+
   console.log(failures ? 'GOD PET TESTS FAILED: ' + failures : 'ALL GOD PET TESTS PASSED');
   process.exit(failures ? 1 : 0);
 })().catch(e => { console.error('EXC', e && (e.stack || e.message)); process.exit(1) });

@@ -5,6 +5,13 @@
 -- 注意：本文件税率常量【必须】与 docs/js/core/config.js 的 Config.trade 保持一致（每满 8 收 1）
 -- 对应前端：js/core/market.js / js/core/supabase.js / js/ui/ui-market.js / js/ui/ui-market-sell.js
 --
+-- 🔴 【仅 list/buy/cancel_material 可重放，bot_buy_material 禁止】
+--    2026-09-11 审计实测确认：本文件里的 bot_buy_material **没有**任何守卫
+--    （anon 直调返回 200 "notfound"，而不是 ERR_BOT_BUY_ANON）——
+--    玩家可自己挂单自己召唤商人，无限把垃圾材料换成稀缺材料。
+--    带守卫的版本在 supabase/migrate_security_reapply.sql，以那份为准。
+--    其余三个函数（list_material / buy_material / cancel_material_listing）未受影响。
+--
 -- 背景（2026-09-10）：
 --   此前材料只能由 AI 假卖家挂单，玩家**只能买不能卖** —— 通天塔/守关 Boss/委托打出来的
 --   高价值材料（至尊神石、腐印…）在交易行里根本没有出口。

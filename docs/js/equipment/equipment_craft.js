@@ -101,17 +101,27 @@
     // 云端并行同步（材料扣减 + 装备词缀更新，各 1 次请求；附加石头再 +1 次）
     const cloudOps = [
       Materials.cloudSpend(stoneName, stoneAmount),
-      Items.updateCloudItem(eq, { affixes: eq.affixes, rarity: eq.rarity.id })  // 颜色(增缀/剥离后条数变了)一并回写，否则刷新页面颜色回退
+      // verify：石头已经扣了，若这次 0 行（装备在别的标签页被卖掉/分解）必须报错触发回滚，
+      // 否则界面上"打造成功"、云端词缀还是旧的，刷新即回退
+      Items.updateCloudItem(eq, { affixes: eq.affixes, rarity: eq.rarity.id }, { verify: true })  // 颜色(增缀/剥离后条数变了)一并回写，否则刷新页面颜色回退
     ];
     if (extraStone) cloudOps.push(Materials.cloudSpend(extraStone.name, extraStone.amount));
-    const [sp, up] = await Promise.all(cloudOps);
-    let syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null) || (up && up.error);
+    // 三个返回值都要接：附加锁定石（第三个）漏接的话，云端扣失败也无人知，
+    // 刷新后锁定石数量会回涨（本地与云端账目漂移）。
+    const [sp, up, spExtra] = await Promise.all(cloudOps);
+    let syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(`${stoneName} 余额不足（云端）`) : null)
+      || (up && up.error)
+      || (spExtra && spExtra.error)
+      || (spExtra && spExtra.data === false ? new Error(`${extraStone.name} 余额不足（云端）`) : null);
     // 余额不足先重试一次：上面那次 flush 可能撞上限流（ERR_RATE_LIMIT）被退回队列，
     // 云端也就没收到刚掉的那批石头。此时直接回滚，玩家看到的就是「词条跳过去又跳回来」。
     if (syncErr && sp && sp.data === false && !sp.error) {
       await Materials.flushMaterials();
       const again = await Materials.cloudSpend(stoneName, stoneAmount);
-      if (again && again.data !== false && !again.error) syncErr = null;
+      // 只重试「主石头」这一路，所以重试成功也只能清掉这一路的错。
+      // 无条件置 null 会把 up.error（词缀没落库）一起吞掉 —— 界面报打造成功、
+      // 石头扣了、云端词缀还是旧的，刷新就回退，玩家白花一颗石头还丢了刚 roll 的词缀。
+      if (again && again.data !== false && !again.error) syncErr = (up && up.error) || null;
     }
     if (syncErr) {
       // 回滚本地：词缀还原 + 锁定还原 + 材料加回（含附加石头）
@@ -373,7 +383,8 @@
     if (Materials.flushMaterials) await Materials.flushMaterials();
     const [sp, up] = await Promise.all([
       Materials.cloudSpend(S.material, C),
-      Items.updateCloudItem(eq, { soul_affix: eq.soulAffix })
+      // verify：晶石已扣、宠物马上要删，0 行必须报错触发回滚（否则宠没了、词缀没落库）
+      Items.updateCloudItem(eq, { soul_affix: eq.soulAffix }, { verify: true })
     ]);
     const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(S.material + ' 余额不足（云端）') : null) || (up && up.error);
     if (syncErr) {

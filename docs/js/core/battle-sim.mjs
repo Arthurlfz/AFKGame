@@ -79,6 +79,9 @@ function rollBoss(fightNo, state, rand) {
  * ============================================================ */
 function resolveLineId(name, config) {
   if (!name) return null;
+  // 神级宠（2026-09-06）：根源基宠写在 godPets.list[].line
+  const GOD = (config.pet.godPets && config.pet.godPets.list) || [];
+  for (const g of GOD) if (g.name === name) return g.line || name;
   if (name.endsWith('·异变')) return resolveLineId(name.slice(0, -3), config);
   const tree = (config.pet.evolution && config.pet.evolution.tree) || {};
   const starters = (config.pet.starters || []).map(s => s.name);
@@ -97,7 +100,18 @@ function resolveLineId(name, config) {
   for (const base of starters) mark(base);
   return lineMap[name] !== undefined ? lineMap[name] : null;
 }
+// 神级宠定义：按名字匹配；客户端保存的神级宠 lineId = 神级宠名（配合 is_god_pet 标记兜底）
+function godDefOf(pet, config) {
+  const G = config.pet && config.pet.godPets;
+  if (!G || !pet) return null;
+  const list = G.list || [];
+  return list.find(g => g.name === pet.name)
+    || (pet.is_god_pet && pet.lineId ? list.find(g => g.name === pet.lineId) : null)
+    || null;
+}
 function getBaseSpeed(pet, config) {
+  const god = godDefOf(pet, config);
+  if (god && typeof god.speed === 'number' && god.speed > 0) return god.speed;
   const lineId = (pet && pet.lineId) || pet.name;
   const raw = config.pet.speeds[lineId];
   if (typeof raw === 'number' && raw > 0) return raw;
@@ -113,6 +127,9 @@ function getBaseSpeed(pet, config) {
   return typeof fallback === 'number' && fallback > 0 ? fallback : 40;
 }
 function getStatCoeff(pet, config) {
+  // 神级宠：成长系数 = 普通宠 ×1.5（手册 2.6），优先于 starters 查找
+  const god = godDefOf(pet, config);
+  if (god && god.statCoeff) return god.statCoeff;
   const lineId = (pet && pet.lineId) || (pet && pet.name);
   const st = (config.pet.starters || []).find(s => s.name === lineId);
   return (st && st.statCoeff) || config.pet.statCoeff || { hp: 5, atk: 2, def: 1 };
@@ -721,4 +738,4 @@ function simulateSessionScript(input) {
   return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs };
 }
 
-export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN };
+export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff };
