@@ -256,6 +256,15 @@ async function handle(req: Request): Promise<Response> {
       equipDrops.push(reward.eq);
     } else if (reward.type === 'egg' && reward.baseName) {
       eggDrops[reward.baseName] = (eggDrops[reward.baseName] || 0) + 1;
+    } else if (reward.type === 'boss') {
+      // 2026-09-11 对齐前端 drop.js：boss = 必掉一件未鉴定装备 + 本图区域材料×5 + 稀有道具骰
+      if (reward.eq) equipDrops.push(reward.eq);
+      if (reward.material && reward.material.material) {
+        rewardTotals[reward.material.material] = (rewardTotals[reward.material.material] || 0) + Math.max(1, Number(reward.material.qty) || 1);
+      }
+      for (const bi of (reward.bossItems || [])) {
+        if (bi && bi.name) rewardTotals[bi.name] = (rewardTotals[bi.name] || 0) + Math.max(1, Number(bi.qty) || 1);
+      }
     }
   }
   for (const [material, amount] of Object.entries(rewardTotals)) {

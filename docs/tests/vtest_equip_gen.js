@@ -107,7 +107,7 @@ function seqRnd(seed) {
   const cnt = { none: 0, material: 0, equipment: 0, egg: 0 };
   let firstEq = null;
   for (let i = 0; i < N; i++) {
-    const r = rewardForFight({ win: true, lv: 30, enemy, isBoss: false }, areaId, 12345, i, serverCfg, gen);
+    const r = rewardForFight({ win: true, enemyLevel: 30, enemy, isBoss: false }, areaId, 12345, i, serverCfg, gen);
     cnt[r.type] = (cnt[r.type] || 0) + 1;
     if (r.type === 'equipment' && !firstEq) firstEq = r.eq;
   }
@@ -126,11 +126,31 @@ function seqRnd(seed) {
 
   A(!!(firstEq && firstEq.identified === false), 'C5. 掉落的装备是【未鉴定】状态（与前端一致，背包里灰框待鉴定）');
   A(!!(firstEq && firstEq.rarity && firstEq.rarity.id), 'C6. 掉落的装备带 rarity.id（equip_items.rarity 列用）');
+  /* ⚠️ 这条专治一个已经犯过的错：事件字段是 enemyLevel，映射后的战报才叫 lv。
+   * 写成 fight.lv 会永远拿到 1 → 掉的装备全是最低档（T4/T5），等于没掉，
+   * 而且因为测试也照抄了 lv，两边一起错、谁也没发现。这里直接锁死 ilvl == 怪等级。 */
+  A(!!(firstEq && Number(firstEq.ilvl) === 30),
+    `C6b. 装备 ilvl 必须等于击杀怪等级（实得 ${firstEq && firstEq.ilvl} / 期望 30）—— 读到 1 就是字段写成 lv 了`);
 
   // 确定性：同一个 (seed, areaId, index) 必须永远产出同一件
-  const a1 = rewardForFight({ win: true, lv: 30, enemy, isBoss: false }, areaId, 42, 7, serverCfg, gen);
-  const a2 = rewardForFight({ win: true, lv: 30, enemy, isBoss: false }, areaId, 42, 7, serverCfg, gen);
+  const a1 = rewardForFight({ win: true, enemyLevel: 30, enemy, isBoss: false }, areaId, 42, 7, serverCfg, gen);
+  const a2 = rewardForFight({ win: true, enemyLevel: 30, enemy, isBoss: false }, areaId, 42, 7, serverCfg, gen);
   A(JSON.stringify(a1) === JSON.stringify(a2), 'C7. 同游标可重放（确定性保持，服务器可对账）');
+
+  /* ============ D. Boss 掉落（2026-09-11 对齐前端 drop.js）============
+   * 前端：必掉一件未鉴定装备 + 本图区域材料×5 + 百变魔石 10% / 至尊神石 5%。
+   * 服务端以前只给「材料×5」，Boss 打完不掉装备 —— 与前端不一致。 */
+  const b = rewardForFight({ win: true, enemyLevel: 55, enemy, isBoss: true }, areaId, 999, 3, serverCfg, gen);
+  A(b.type === 'boss', `D1. Boss 战走 boss 分支（实得 ${b.type}，修复前是 material）`);
+  A(!!(b.eq && b.eq.identified === false), 'D2. Boss 必掉一件【未鉴定】装备');
+  A(!!(b.material && Number(b.material.qty) === 5), 'D3. Boss 给本图区域材料 ×5');
+  A(!!(b.eq && Number(b.eq.ilvl) === 55), `D4. Boss 装备 ilvl = Boss 等级（实得 ${b.eq && b.eq.ilvl} / 期望 55）`);
+  const bAll = [];
+  for (let i = 0; i < 2000; i++) bAll.push(rewardForFight({ win: true, enemyLevel: 55, enemy, isBoss: true }, areaId, 7, i, serverCfg, gen));
+  const withShift = bAll.filter(r => (r.bossItems || []).some(x => x.name === '百变魔石')).length;
+  const withSup = bAll.filter(r => (r.bossItems || []).some(x => x.name === '至尊神石')).length;
+  A(Math.abs(withShift / 2000 - 0.10) < 0.03 && Math.abs(withSup / 2000 - 0.05) < 0.02,
+    `D5. 稀有道具骰比例贴近前端（百变魔石 ${Math.round(withShift / 20)}% vs 10% ；至尊神石 ${Math.round(withSup / 20)}% vs 5%）`);
 
   console.log('ALL EQUIP GEN TESTS PASSED');
 })().catch(e => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

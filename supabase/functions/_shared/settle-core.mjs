@@ -123,13 +123,28 @@ function areaTierOf(config, areaId) {
   return Math.max(1, Math.min(maxTier, idx >= 0 ? idx + 1 : 1));
 }
 
+// 装备等级 = 实际击杀的怪等级。⚠️ 事件里的字段是 enemyLevel（battle-sim.mjs:721），
+// 不是映射后战报的 lv —— 写成 lv 会永远拿到 1，掉的装备全是最低档（T4/T5），等于没掉。
+function ilvlOfFight(fight) {
+  return Number(fight && (fight.enemyLevel != null ? fight.enemyLevel : fight.lv)) || 1;
+}
+
 function rewardForFight(fight, areaId, seed, index, config, equipGen) {
   if (!fight || !fight.win) return { type: 'none' };
   const material = areaMaterialOf(config, areaId);
-  // 守关 Boss：保持原语义（必给区域材料 ×5），不走单池。
-  // ⚠️ 与前端 drop.js 的 boss 分支（必掉金装 + 材料×5 + 魔石骰）尚未对齐，见审计报告。
+  /* 守关 Boss（2026-09-11 对齐前端 drop.js）：必掉一件【未鉴定】装备 + 本图区域材料 ×5
+   * + 稀有合成道具骰（百变魔石 10% / 至尊神石 5%）。不走单池。 */
   if (fight.isBoss) {
-    return material ? { type: 'material', material, qty: 5, boss: true } : { type: 'none' };
+    const bossItems = [];
+    if (((hashSeed(seed, areaId, index, 'bm') % 1000) / 1000) < 0.10) bossItems.push({ name: '百变魔石', qty: 1 });
+    if (((hashSeed(seed, areaId, index, 'zs') % 1000) / 1000) < 0.05) bossItems.push({ name: '至尊神石', qty: 1 });
+    let eq = null;
+    if (equipGen) {
+      const rnd = mulberry32(hashSeed(seed, areaId, index, 'beq') >>> 0);
+      eq = equipGen(rnd).generateEquipment(null, areaTierOf(config, areaId), 0, ilvlOfFight(fight), 0);
+      eq.identified = false;
+    }
+    return { type: 'boss', eq, material: material ? { material, qty: 5 } : null, bossItems };
   }
   const pool = poolForArea(config, areaId);
   if (!pool) return material ? { type: 'material', material, qty: 1 } : { type: 'none' };
@@ -149,7 +164,7 @@ function rewardForFight(fight, areaId, seed, index, config, equipGen) {
     if (!equipGen) return { type: 'none' };
     // 独立随机流（盐化种子）→ 不掉落装备时也不影响胜负/经验序列
     const rnd = mulberry32(hashSeed(seed, areaId, index, 'eq') >>> 0);
-    const eq = equipGen(rnd).generateEquipment(null, areaTierOf(config, areaId), 0, Number(fight.lv) || 1, 0);
+    const eq = equipGen(rnd).generateEquipment(null, areaTierOf(config, areaId), 0, ilvlOfFight(fight), 0);
     eq.identified = false; // 与前端一致：掉落即未鉴定
     return { type: 'equipment', eq };
   }

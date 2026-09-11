@@ -122,7 +122,8 @@
    - 已加「🔴 禁止重放」头注释的：`migrate_bot_buy.sql`（最初版无守卫）、`migrate_trade_records_ref.sql`（5 个函数抄的是守卫上线前的旧版）、`migrate_material_listings.sql`（`bot_buy_material` 原文无守卫）。
 7. **测试存量红（2026-09-11 基线，跑全量时别当成自己改坏的）**：
    - **稳定红 5 个**：`vtest_action_freeze` / `vtest_boss`(D4) / `vtest_bugfix`(emoji 断言过期) / `vtest_equip_score` / `vtest_pet_skill`
-   - **flaky 2 个**（概率型测试，时红时绿，**别把它的转绿当成自己的功劳**）：`vtest_enemy_balance`（蒙特卡洛）、`vtest_tier_rarity`（掉落底材 T 阶抽样；实测连跑 3 次 = OK/FAIL/FAIL）
+   - **flaky 3 个**（时红时绿，**别把它的转绿当成自己的功劳**）：`vtest_enemy_balance`（蒙特卡洛）、`vtest_tier_rarity`（底材 T 阶抽样；连跑 3 次 = OK/FAIL/FAIL）、`vtest_botbuy`（异步等待，单独跑 4/4 通过但全量里偶发红）
+   - ⚠️ 判定 flaky 的方法：单独连跑 3~4 次，全过 = 大概率是 flaky；再跑一次全量复验。**别急着当成自己改坏了或改好了。**
    - 全量通过数因此会在 **67~69 / 73** 之间浮动（73 个测试，含 2026-09-11 新增的 `vtest_sim_port`）
 
 ---
