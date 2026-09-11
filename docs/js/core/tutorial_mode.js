@@ -471,7 +471,15 @@
             const r = await Supabase.savePet(pet);
             if (!r.error && r.data && r.data.id) pet.cloudId = r.data.id;
           }
-        } catch (e) { console.warn('[guide] 引导经验包等级云端存档失败', e); }
+        } catch (e) {
+          console.warn('[guide] 引导经验包等级云端存档失败', e);
+          // 2026-09-11：这条失败绝不能再静默 —— 本地已顶到目标等级、UI 也弹了"生效"，
+          // 但云端没写进去。玩家一刷新等级回退，而账本已记账（不能再领一次），等于凭空丢了。
+          // 至少要如实告诉玩家，让他知道要重新登录而不是以为游戏坏了。
+          if (window.UI && window.UI.addLog) {
+            window.UI.addLog('⚠️ 引导等级云端存档失败，刷新后可能回退（重新登录可再试）');
+          }
+        }
       }
     }
     if (!boosted) {
