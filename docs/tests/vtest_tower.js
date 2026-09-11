@@ -64,9 +64,11 @@ ctx.Pet = {
   getCurHp: () => pet.curHp,
   setCurHp: (p, hp) => { p.curHp = Math.max(0, Math.min(hp, pet.hp)); setCurHpCalls.push(Math.round(hp)); }
 };
+let flushCount = 0;
 ctx.Materials = {
   getQuantity: name => bag[name] || 0,
   gain: (name, n) => { bag[name] = (bag[name] || 0) + n; },
+  flushMaterials: async () => { flushCount++; },
   spend: async (name, n) => {
     if ((bag[name] || 0) < n) return { ok: false, error: name + ' 不足' };
     bag[name] -= n;
@@ -400,6 +402,74 @@ async function runTower(affixIds, opts) {
   ok((tier30.gear || {}).count >= 4, '第 30 层档位装备件数 ≥4（当前 ' + ((tier30.gear || {}).count) + '）');
   const gearCounts = (TC.floorTiers || []).map(t => (t.gear || {}).count || 0);
   ok(gearCounts.every((c, i) => i === 0 || c >= gearCounts[i - 1]), '档位装备件数随层数单调不减（越深越厚）');
+
+  /* ============ ⑫ 2026-09-11 审计第 9 批：进场守门（sink 不能被绕过 / 开不了场不收费） ============ */
+  ctx.Battle.canBeginTrial = () => true;   // 与 battle.js 同名守卫（预检与开场共用一个，桩里默认可开场）
+
+  /* ⚠️ 今日次数存在模块闭包里（只换日才重置），删 localStorage 不影响它
+   * —— 所以断言一律用「本次 start 前后的差值」，不用绝对值。 */
+  const usedNow = () => ctx.TowerAccess.getDailyInfo().used || 0;
+  const drainFree = async () => { let g = 0; while ((ctx.TowerAccess.getDailyInfo().freeLeft || 0) > 0 && g++ < 12) await ctx.TowerAccess.consumeEntry(); };
+
+  // ① 腐印是材料 sink：库存为 0 必须【在扣任何东西之前】被拒
+  bag['腐印·禁疗'] = 0;
+  const used0 = usedNow();
+  const noAffix = await ctx.TowerEngine.start([silence.id], {});
+  ok(noAffix && noAffix.ok === false && /缺少/.test(noAffix.error || ''),
+    '腐印库存为 0 时进塔被拒绝（' + (noAffix && noAffix.error) + '）');
+  ok(usedNow() === used0, '腐印不足被拒时今日次数没被扣（' + used0 + ' → ' + usedNow() + '）');
+
+  // ② 战斗页开不了场：一个子儿都不收（旧代码先扣资格，开场失败 = 白扣重置卡）
+  bag['腐印·禁疗'] = 3;
+  bag[TC.resetCardName] = 2;
+  await drainFree();                        // 免费次数清空 → 走重置卡路径
+  const used1 = usedNow();
+  ctx.Battle.canBeginTrial = () => false;
+  const busy = await ctx.TowerEngine.start([silence.id], {});
+  ok(busy && busy.ok === false, '战斗页开不了场时进塔被拒绝（' + (busy && busy.error) + '）');
+  ok((bag[TC.resetCardName] || 0) === 2, '开不了场时重置卡没被扣（剩 ' + bag[TC.resetCardName] + '）');
+  ok((bag['腐印·禁疗'] || 0) === 3, '开不了场时腐印没被扣（剩 ' + bag['腐印·禁疗'] + '）');
+  ok(usedNow() === used1, '开不了场时今日次数没被扣（' + used1 + ' → ' + usedNow() + '）');
+  ctx.Battle.canBeginTrial = () => true;
+
+  // ③ 中途失败也要退回：腐印扣成功、但资格扣失败时腐印必须原样回来
+  bag['腐印·禁疗'] = 1;
+  delete bag[TC.resetCardName];             // 免费已清空 + 无重置卡 → consumeEntry 必失败
+  const failMid = await ctx.TowerEngine.start([silence.id], {});
+  ok(failMid && failMid.ok === false, '资格不足时进塔被拒绝（' + (failMid && failMid.error) + '）');
+  ok((bag['腐印·禁疗'] || 0) === 1, '资格扣失败时已扣的腐印被退回（剩 ' + bag['腐印·禁疗'] + '）');
+
+  /* ④ 层掉落的装备：settle 返回前必须写完云端
+   *    （旧代码 rollLayer 是同步的、没有 pending 可传 → 写入被 fire-and-forget，
+   *     玩家在结算面板看到 N 件、一刷新就少几件）
+   * ⚠️ 断言写法：让「层掉落那件」慢 60ms、档位装备立即完成 —— 只看 settle 返回时
+   *    慢的那件有没有落地。若写成「全部都慢」，没人 await 的那件也会在等待档位
+   *    装备的这段时间里自己跑完，断言永远绿（2026-09-11 变异测试抓到的假绿）。 */
+  let calls = 0, slowDone = 0, fastDone = 0;
+  const origSave = ctx.Items.saveItem;
+  ctx.Items.saveItem = async () => {
+    calls++;
+    if (calls === 1) { await new Promise(r => setTimeout(r, 60)); slowDone++; return { ok: true }; }
+    fastDone++;
+    return { ok: true };
+  };
+  ctx.TowerRewards.setRnd(() => 0.999);     // 权重表顺序 none→material→equipment，取值贴近末尾 = 必中装备
+  const forced = ctx.TowerRewards.rollLayer({ floor: 20, ilvl: 90, combo: null, kind: 'guardian' });
+  ok(forced && forced.kind === 'equipment' && !!forced.eq, '守卫池能摇出装备（构造用：' + (forced && forced.kind) + '）');
+  await ctx.TowerRewards.settle({ maxFloor: 20, cleared: false, corrosion: 0, combo: null, ilvl: 90, layerLoot: [forced] });
+  ok(slowDone === 1,
+    'settle 会等层掉落那件装备写完云端才返回（慢件落地 ' + slowDone + '/1，档位件 ' + fastDone + '）');
+  ctx.Items.saveItem = origSave;
+  ctx.TowerRewards.setRnd(seqRnd(1));
+
+  // ⑤ 一局结束必须把攒着的材料补报云端：gain 只入队（4 秒后才上报），
+  //    不 flush 的话玩家看完结算面板就关页面，一局几十分钟的产出凭空消失
+  //    ⚠️ ③ 把重置卡删了、免费次数也耗尽了 —— 这里不补卡的话 start 会在 consumeEntry 就被拒，
+  //    根本进不了塔，finish 一次都不会跑（断言会假绿/假红，先给卡）。
+  bag[TC.resetCardName] = 5;
+  flushCount = 0;
+  await runTower([], { winUntilMobs: 2 * per });
+  ok(flushCount > 0, '一局结束时已把材料补报云端（flush ' + flushCount + ' 次）');
 
   console.log('\nALL TOWER TESTS PASSED (' + passCount + ' asserts)');
 })();

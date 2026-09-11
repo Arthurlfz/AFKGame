@@ -121,23 +121,34 @@
   // 于是"最后一刀还没飘出来怪就没了"。切场前把在飞的这一刀就地结算掉。
   const pendingHits = [];
 
-  /* ---------- 请求 ---------- */
+  /* ---------- 请求 ----------
+   * ⚠️ 必须自带超时（2026-09-11 审计）：裸 fetch 在连接挂起时会永远 pending，
+   * 而调用方 settleNow 用 settling 布尔锁串行化 —— 一次挂起 = 锁永远不释放 =
+   * 拿不到新剧本、兜底 tick 也被同一把锁挡住 → **演出彻底停摆且零日志**
+   * （最难查的一类：画面不动、控制台干净、只能靠 getDebugState 看出卡在 settling）。
+   * 所以要把"未知的挂起"变成"确定的失败"，让上层能重试。 */
+  const REQ_TIMEOUT_MS = 15000;
   async function callFn(body) {
     let s = null;
     try { s = await Supabase.getSession(); } catch (e) { /* 忽略 */ }
     const token = s && s.access_token;
     if (!token) return { error: 'NO_LOGIN' };
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const to = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) { /* 忽略 */ } }, REQ_TIMEOUT_MS) : null;
     try {
       const res = await fetch(FN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: ctrl ? ctrl.signal : undefined
       });
       if (!res.ok) return { error: 'HTTP_' + res.status };
       const j = await res.json();
       return j && j.ok ? j : { error: (j && j.error) || 'EF_ERROR' };
     } catch (e) {
-      return { error: 'NETWORK' };
+      return { error: (e && e.name === 'AbortError') ? 'TIMEOUT' : 'NETWORK' };
+    } finally {
+      if (to) clearTimeout(to);
     }
   }
 
@@ -179,17 +190,32 @@
     if (active) schedule();
   }
 
-  /* ---------- 开始 / 停止 ---------- */
+  /* ---------- 开始 / 停止 ----------
+   * ⚠️ starting 闸门（2026-09-11 审计）：callFn 是一次网络往返，闸门原本只判 active，
+   * 而 active 要等请求回来才置真 —— 连点两次会两次通过、两次 callFn('start')
+   * （服务端执行两遍"停旧建新"）+ 两次 startShow()。startShow 里
+   * gaugeRaf = requestAnimationFrame(...) 会覆盖句柄，第一个循环取消不掉
+   * → 两条 rAF 同时推进行动条、重复结算。 */
+  let starting = false;
   async function start(area, pet) {
     if (!ENABLED) return { error: 'DISABLED' };
-    if (active) return { ok: true };
+    if (active || starting) return { ok: !!active };
     if (!area || !pet || !pet.cloudId) return { error: 'NO_AREA_OR_PET' };
     // 战斗页被副本/塔占着 → 不起（占用权在 battle-session，调用方据此提示玩家）
     const claim = claimPage();
     if (!claim.ok) return { error: claim.reason || 'BUSY', holder: claim.holder };
 
-    const r = await callFn({ action: 'start', areaId: area.id, petId: pet.cloudId });
+    starting = true;
+    let r;
+    try {
+      r = await callFn({ action: 'start', areaId: area.id, petId: pet.cloudId });
+    } finally {
+      starting = false;
+    }
     if (r.error) { releasePage(); return r; }
+    /* 请求期间可能被副本/塔抢占（SESSION.onChange → shutdown）：拿回结果后必须复查占用权，
+     * 否则会在没持有战斗页的情况下起演，与抢占者抢同一套 DOM。 */
+    if (SESSION && !SESSION.is(SESSION_KIND)) { releasePage(); return { error: 'BUSY', holder: SESSION.holder() }; }
 
     petId = pet.cloudId;
     totalFights = 0;
@@ -424,7 +450,7 @@
         : ((window.Battle && window.Battle.pickScaledEnemy) ? window.Battle.pickScaledEnemy() : null);
       if (window.UI && window.UI.addLog && foe) {
         const xpText = row && row.exp != null ? `：经验 +${row.exp}` : '';
-        window.UI.addLog(`⚔️ 击败 ${foe.name} Lv.${foe.level || 1}${xpText}`);
+        window.UI.addLog(`️ 击败 ${foe.name} Lv.${foe.level || 1}${xpText}`);
       }
       const serverReward = row && Object.prototype.hasOwnProperty.call(row, 'reward') ? row.reward : null;
       if (serverReward) {
@@ -479,9 +505,9 @@
     if (r.level != null && !(opts && opts.skipExpLevel)) {
       const wasLevel = pet.level || 1;
       if (r.level > wasLevel) {
-        if (window.UI && window.UI.addLog) window.UI.addLog(`✨ ${pet.name} 升级 Lv.${r.level}！`);
+        if (window.UI && window.UI.addLog) window.UI.addLog(` ${pet.name} 升级 Lv.${r.level}！`);
       } else if (r.level < wasLevel) {
-        if (window.UI && window.UI.addLog) window.UI.addLog(`⚖️ 经验校准 Lv.${wasLevel} → Lv.${r.level}（以服务器真账为准）`);
+        if (window.UI && window.UI.addLog) window.UI.addLog(`️ 经验校准 Lv.${wasLevel} → Lv.${r.level}（以服务器真账为准）`);
       }
       pet.level = r.level;
       if (r.level < maxLevel && r.expLeft != null) pet.exp = r.expLeft;
@@ -568,7 +594,7 @@
     waitingHealAt = performance.now();
     gauge.pet = 0; gauge.enemy = 0;
     if (UI && UI.updateAction) UI.updateAction(0, 0);
-    if (UI && UI.addLog) UI.addLog('💔 血量不足 30%，回血后再战…');
+    if (UI && UI.addLog) UI.addLog(' 血量不足 30%，回血后再战…');
     if (UI && UI.updateStatus) UI.updateStatus('recovering', totalFights);
     dropPendingHits();
     showEnemy = null;
@@ -770,10 +796,18 @@
       UI.updateBars(Math.round(showHp), maxHp, 0, showEnemy.maxHp || 100);
     }
     if (f.win) {
-      settleKill(f);
+      /* ⚠️ 结算异常也必须推进到下一场（推进在下面 showEnemy=null / scriptIdx++）：
+       * 不推进的话下一帧 t >= f.t1 会再次命中本场 → 同一场每帧重复 grantExp +
+       * reportType('kill')（2026-09-11 审计）。所以这里catch 掉异常并留痕，
+       * 让场序照常前进 —— 少播一次掉落播报，远好过刷屏重复结算。 */
+      try {
+        settleKill(f);
+      } catch (e) {
+        try { console.warn('[剧本] 本场结算异常（已跳过，场序照常推进）', e && (e.stack || e.message)); } catch (e2) { /* 忽略 */ }
+      }
       if (UI && UI.animateVictory) UI.animateVictory();
     } else if (UI && UI.addLog) {
-      UI.addLog('💀 战败…');
+      UI.addLog(' 战败…');
     }
     showEnemy = null;
     scriptIdx++;
@@ -871,7 +905,7 @@
       // 超时兜底：正常几秒就回满；卡在异常状态（脏值/属性变大）时不许永久卡住画面
       if (showHp >= maxHp || (now - waitingHealAt) > HEAL_WAIT_MAX_MS) {
         waitingHeal = false;
-        if (UI.addLog) UI.addLog('💚 恢复完毕，遭遇新的野怪！');
+        if (UI.addLog) UI.addLog(' 恢复完毕，遭遇新的野怪！');
         if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
         const ef = document.getElementById('enemy-fighter');
         if (ef) ef.style.display = '';
@@ -1021,7 +1055,9 @@
 
   /* ---------- 本场结算（剧本到点调用）：配额消费 + 经验 + 掉落 + 任务 ---------- */
   function settleKill(f) {
-    const area = window.Battle.getCurrentArea();
+    // 同文件 compensateFights 对 Battle 做了存在性判断，这里必须同口径 ——
+    // 缺失时返回 null 让后面按"无区域"走，而不是抛错打断场序推进。
+    const area = (window.Battle && window.Battle.getCurrentArea) ? window.Battle.getCurrentArea() : null;
     const pet = Pet.getActivePet();
     // Update the visible experience bar immediately for this displayed kill.
     // The next server settle overwrites it with the authoritative level/exp.
@@ -1041,8 +1077,8 @@
       const noticeKey = 'loop_' + area.id;
       if (ready && !settleKill._loopNotice[noticeKey]) {
         settleKill._loopNotice[noticeKey] = true;
-        if (window.UI && window.UI.consoleLog) window.UI.consoleLog('system', `<b>📜 地图委托完成</b> ${ready.name} 已收集 ${ready.need} 个材料`, { action: 'openQuest' });
-        if (window.UI && window.UI.addLog) window.UI.addLog(`📜 ${ready.name} 已完成，可领取奖励`);
+        if (window.UI && window.UI.consoleLog) window.UI.consoleLog('system', `<b><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/></svg> 地图委托完成</b> ${ready.name} 已收集 ${ready.need} 个材料`, { action: 'openQuest' });
+        if (window.UI && window.UI.addLog) window.UI.addLog(` ${ready.name} 已完成，可领取奖励`);
       }
       if (!ready && settleKill._loopNotice) settleKill._loopNotice['loop_' + area.id] = false;
     }
@@ -1051,7 +1087,7 @@
       window.Quest.reportType('boss', 1, { areaId: area ? area.id : null });
     }
     if (window.UI && window.UI.addLog) {
-      window.UI.addLog(`⚔ 击败 ${f.enemyName} Lv.${f.enemyLevel}：经验 +${f.exp}`);
+      window.UI.addLog(` 击败 ${f.enemyName} Lv.${f.enemyLevel}：经验 +${f.exp}`);
     }
     // 新战报的 reward 已由服务器决定；页面只负责入包和展示。
     // 兼容旧版战报（没有 reward 字段）时才走旧掉落逻辑。
@@ -1133,6 +1169,16 @@
     pendingScript = null;
     currentScriptId = null;
     showEnemy = null;
+    /* ⚠️ waitingHeal 必须在这里复位，与 startShow 成对（2026-09-11 审计）。
+     * 不清的话 stopShow 之后 `!showEnemy && !waitingHeal` 这条血量对齐分支永远不成立
+     * → 收尾 settle 时宠物血量对不上服务器真账（endHp 写不回本地）。
+     * 另外怪的立绘也要收起来，否则打怪中途停机/被抢占会留一只怪在画面上。 */
+    waitingHeal = false;
+    waitingHealAt = 0;
+    try {
+      const ef = document.getElementById('enemy-fighter');
+      if (ef) ef.style.display = 'none';
+    } catch (e) { /* DOM 缺失（测试环境）不影响状态复位 */ }
   }
 
   /* ---------- 自我让位：战斗页被更高优先级玩法（副本/塔）抢占 ----------

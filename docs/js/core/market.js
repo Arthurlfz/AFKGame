@@ -53,7 +53,7 @@
   const isPaymentMaterial = name => tradeMaterialNames().includes(name);
   // 材料名称 → 配置项（上架下拉 / 市场显示用）
   function findMaterial(name) {
-    return Config.trade.materials.find(m => m.name === name) || { id: name, name, icon: '📦' };
+    return Config.trade.materials.find(m => m.name === name) || { id: name, name, icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>' };
   }
 
   /* ---------- 刷新（登录后 / 上架购买后 / 轮询调用） ---------- */
@@ -102,6 +102,14 @@
     const max = Number((Config.trade && Config.trade.maxListings) || 5);
     const used = getListedCount();
     return { ok: used < max, used, max, left: Math.max(0, max - used) };
+  }
+
+  /* 上架额度守门（2026-09-11 下沉）：以前只有 ui-market-sell.js 一个入口记得问 listQuota()，
+   * 任何新增入口（快捷上架/批量上架/引导代挂）忘了调就失效；服务端 list_* RPC 也没有
+   * maxListings 兜底。现在四个 listXxx 内部统一先过这道闸，调用方不用记。 */
+  function quotaGuard() {
+    const q = listQuota();
+    return q.ok ? null : { error: `上架额度已满（${q.used}/${q.max}）：先取回或等已有挂单成交` };
   }
 
   /* ---------- 假卖家（流浪商人）挂单 ----------
@@ -190,6 +198,7 @@
   /* ---------- 宠物上架 / 购买 / 取回 ---------- */
   async function listPet(pet, materialType, materialQty) {
     if (!pet.cloudId) return { error: '这只宠物还没有云端存档，刷新一下再上架' };
+    const qe = quotaGuard(); if (qe) return qe;
     const { data, error } = await Supabase.listPet(pet, materialType, materialQty);
     if (error) return { error: error.message };
     // 立即本地标记已上架（不依赖 refresh 异步拉回，避免锁定判定空窗）
@@ -223,6 +232,7 @@
   /* ---------- 装备上架 / 购买 / 取回 ---------- */
   async function listItem(eq, materialType, materialQty) {
     if (!eq.cloudId) return { error: '这件装备还没有云端存档，刷新一下再上架' };
+    const qe = quotaGuard(); if (qe) return qe;
     const { data, error } = await Supabase.listItem(eq, materialType, materialQty);
     if (error) return { error: error.message };
     if (data && data.id) myListedItems.push({ listingId: data.id, itemId: data.item_id || eq.cloudId, materialType, materialQty });
@@ -286,6 +296,7 @@
   const getMyListedEggs = () => myListedEggs;
   const isMyEggListed = (eggType) => myListedEggs.some(l => l.eggType === eggType);
   async function listEgg(eggType, materialType, materialQty) {
+    const qe = quotaGuard(); if (qe) return qe;
     const { data, error } = await Supabase.listEgg(eggType, materialType, materialQty);
     if (error) return { error: error.message };
     if (data && data.id) myListedEggs.push({ listingId: data.id, eggType });
@@ -311,6 +322,7 @@
   /* ---------- 材料上架 / 购买 / 取回（2026-09-10） ---------- */
   // 上架：云端 list_material 原子扣卖家库存 → 建挂单；成功后本地标记（材料本地计数由调用方 spendLocal 同步）
   async function listMaterial(goodName, goodQty, materialType, materialQty) {
+    const qe = quotaGuard(); if (qe) return qe;
     const { data, error } = await Supabase.listMaterial(goodName, goodQty, materialType, materialQty);
     if (error) return { error: error.message };
     if (data && data.id) {

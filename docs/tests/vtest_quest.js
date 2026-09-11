@@ -21,6 +21,22 @@ vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
 for (const f of ['../js/core/config.js', '../js/core/quest-config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/quest.js', '../js/core/battle.js', '../js/ui/ui-common.js', '../js/ui/ui-battle.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-codex.js', '../js/ui/ui-quest.js', '../js/main.js']) VTF.load(ctx, f);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
+
+/* 服务端领取记录（complete_quest RPC）桩 —— 测试环境没有真实服务端。
+ * 这里模拟它的真实语义：同一个 (任务, 周期) 只允许成功一次，第二次 ALREADY_CLAIMED。
+ * ⚠️ 必须覆盖真实的 Supabase.completeQuest：那个会走网络，测试里必挂。 */
+C(`
+  window.__questClaims = {};
+  window.__claimCalls = [];
+  Supabase.completeQuest = async function (qid, periodKey) {
+    window.__claimCalls.push(qid + '|' + (periodKey || ''));
+    const k = qid + (periodKey ? '@' + periodKey : '');
+    if (window.__questClaims[k]) return { data: 'ALREADY_CLAIMED', error: null };
+    window.__questClaims[k] = 1;
+    return { data: 'OK', error: null };
+  };
+`);
+
 (async () => {
   await C('Game.onLogin("quest@test.com","123456")');
   // 建一只出战宠物：主线/日常/成就按出战宠物等级解锁（真实流程开局必选宠）
@@ -154,6 +170,16 @@ const C = code => vm.runInContext(code, ctx);
   C(`Quest.reportType('kill', 2, { areaId: 'corrupted-forest' })`);
   const r1 = await C(`Quest.completeQuest('n1')`);
   A(r1 && r1.ok, '提交 n1 成功（' + ((r1.rewards || []).join('、') || '无奖励') + '）');
+
+  /* ---------- 服务端领取记录（2026-09-12 堵「改本地 completed 无限重领」） ---------- */
+  const calls = C(`JSON.stringify(window.__claimCalls || [])`);
+  A(/n1\|/.test(calls), '交任务会向服务端登记领取记录（' + calls + '）');
+  const cc1 = await C(`Supabase.completeQuest('__probe','')`);
+  const cc2 = await C(`Supabase.completeQuest('__probe','')`);
+  A(cc1 && cc1.data === 'OK', '服务端领取记录：首次占位成功');
+  A(cc2 && cc2.data === 'ALREADY_CLAIMED', '服务端领取记录：同一条第二次被拒（ALREADY_CLAIMED）');
+  const cc3 = await C(`Supabase.completeQuest('__probe','2026-9-12')`);
+  A(cc3 && cc3.data === 'OK', '带周期键的是另一条记录（日常/周常每个周期各一次）');
   A(r1 && r1.exp > 0, `任务奖励经验为主（n1 给 经验 +${r1.exp || 0}，材料为辅助）`);
   // 新手档=固定 300 经验：交 n1 后经验应累加或触发升级，两者都算"经验生效"。
   A(C(`Pet.getActivePet().level`) > lvBefore0 || C(`Pet.getActivePet().exp`) >= expBefore0 + (r1.exp || 0),
@@ -210,10 +236,13 @@ const C = code => vm.runInContext(code, ctx);
   // 真实流程是登出走 clearAccountState → Quest.reset()，再登录走 restoreCloudPets → loadCloudProgress。
   // 只 reset 不重拉的话 cloudLoaded 仍为 false，提交会被「进度还在加载」拦下——这是设计使然，不是 bug。
   const hardReset = async () => {
-    C(`Quest.reset(); if (globalThis.questTable) globalThis.questTable.length = 0;`);
+    /* __questClaims 必须一起清：它模拟的是【服务端】的领取记录，
+     * hardReset 模拟换号 —— 新号在服务端当然是空的，不清就变成"换号也领不了"。 */
+    C(`Quest.reset(); if (globalThis.questTable) globalThis.questTable.length = 0; window.__questClaims = {};`);
     await C(`Quest.loadCloudProgress()`);
   };
   // 模拟刷新页面：只清内存，云端留着，再从云端读回来
+  // （__questClaims 故意不清 —— 它就是"云端留着"的那部分，刷新不该让它失效）
   const reload = async () => {
     C(`Quest.reset()`);
     await C(`Quest.loadCloudProgress()`);
@@ -285,7 +314,7 @@ const C = code => vm.runInContext(code, ctx);
   A(panel().indexOf('第 1 章') !== -1, '旧 id "main" 自动映射到「系列」分类');
   A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('quest-tab-cnt') !== -1,
     '分类 tab 角标已渲染（可提交=红 / 未完成=灰）');
-  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('♻️ 循环') !== -1,
+  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('循环') !== -1,
     'tab 栏出现「循环」分类');
   // 打够进度让它变成可交
   // m1 需求量已从 30 提到 180（2026-09-10），这里要打够 180 才算"进度满"
@@ -392,7 +421,7 @@ const C = code => vm.runInContext(code, ctx);
   const exHtml = C(`document.getElementById('quest-body').innerHTML`);
   A(exHtml.indexOf('每日兑换') !== -1 && exHtml.indexOf('每周兑换') !== -1,
     '兑换面板渲染出「每日兑换 / 每周兑换」两组');
-  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('🔄 兑换') !== -1,
+  A(C(`document.getElementById('quest-tabs').innerHTML`).indexOf('兑换') !== -1,
     'tab 栏出现「🔄 兑换」分类');
 
   console.log('ALL QUEST TESTS PASSED');

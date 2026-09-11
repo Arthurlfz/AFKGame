@@ -57,7 +57,7 @@
 
   <!-- 顶栏：标题 + 账号区（快捷按钮已挪到左侧边栏） -->
   <header class="topbar app-topbar">
-    <div class="title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3.5 20.5 10l-2 2-6.5-6.5 2-2Z"/><path d="M15 9.5 3.5 21H3v-.5L14.5 9.5"/></svg>宠物养成循环原型</div>
+    <div class="title">宠物养成循环原型</div>
     <div class="spacer"></div>
     <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M4 13h16"/></svg>背包</button>
     <button class="topbar-btn" id="topbar-quest" title="任务（快捷键 Q）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M4 5a2 2 0 0 1 2-2v2H4ZM20 5a2 2 0 0 0-2-2v2h2Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>任务</button>
@@ -73,7 +73,7 @@
       <button class="sb-btn" data-page="worldmap"><span class="sb-icon"><img src="assets/ui/nav/worldmap.png" alt=""></span><span class="sb-label">世界地图</span></button>
       <button class="sb-btn" data-page="pet"><span class="sb-icon"><img src="assets/ui/nav/pet.png" alt=""></span><span class="sb-label">宠物资料</span></button>
       <button class="sb-btn" data-page="market"><span class="sb-icon"><img src="assets/ui/nav/market.png" alt=""></span><span class="sb-label">市集</span></button>
-      <button class="sb-btn" data-page="shop"><span class="sb-icon">🪙</span><span class="sb-label">魔石商店</span></button>
+      <button class="sb-btn" data-page="shop"><span class="sb-icon"><img class="eic-img" src="assets/ui/ic_gem.png" alt=""></span><span class="sb-label">魔石商店</span></button>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon"><img src="assets/ui/nav/chat.png" alt=""></span><span class="sb-label">聊天</span></button>
       <button class="sb-btn" data-page="codex"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">百科</span></button>
       <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon"><img src="assets/ui/nav/settings.png" alt=""></span><span class="sb-label">设置</span></button>
@@ -193,7 +193,7 @@
                         <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-pet"></div></div>
                       </div>
                     </div>
-                    <div class="stage-avatar pet" id="pet-icon">❔</div>
+                    <div class="stage-avatar pet" id="pet-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
                   </div>
                   <!-- 中央飘字区 -->
                   <div class="stage-mid"></div>
@@ -209,7 +209,7 @@
                         <div class="hp-shell atk-shell"><div class="atk-bar" id="atk-bar-enemy"></div></div>
                       </div>
                     </div>
-                    <div class="stage-avatar enemy" id="enemy-icon">❔</div>
+                    <div class="stage-avatar enemy" id="enemy-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
                     <div id="enemy-tip" class="enemy-tip" hidden></div>
                     <!-- 战斗页宠物竖列共享 tooltip：移入 #tab-battle 内，复用 .enemy-tip 同款样式（body 层时作用域套不到） -->
                     <div class="roster-tooltip enemy-tip" id="roster-tooltip"></div>
@@ -218,8 +218,8 @@
                 <!-- 最右 32px：行动条轨道（贴容器右缘，0 顶部 → 100 底部，先到底者出手） -->
                 <div class="at-track">
                   <div class="at-fill"></div>
-                  <div class="at-racer" id="at-racer-pet">❔</div>
-                  <div class="at-racer at-racer--enemy" id="at-racer-enemy">❔</div>
+                  <div class="at-racer" id="at-racer-pet"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
+                  <div class="at-racer at-racer--enemy" id="at-racer-enemy"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
                   <div class="at-finish"></div>
                 </div>
               </div>
@@ -290,7 +290,7 @@
                 <!-- 立绘主视觉：居中大立绘 + 金色光晕 + 名字/等级/转生徽章 -->
                 <div class="pet-hero">
                   <div class="pet-hero-art">
-                    <div class="pet-avatar" id="pet-avatar">❔</div>
+                    <div class="pet-avatar" id="pet-avatar"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
                   </div>
                   <div class="pet-hero-title">
                     <div class="pet-name-row">
@@ -490,7 +490,7 @@
 
       <!-- ============ 市集页（交易市场 + 我的上架 合并：顶部级联筛选 + 视图切换） ============ -->
       <section class="tab-page" id="tab-market">
-        <div class="guide-bar" style="margin:0 0 10px">💰 <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
+        <div class="guide-bar" style="margin:0 0 10px"><img class="eic-img" src="assets/ui/ic_brush.png" alt=""> <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
         <div class="market-page">
           <!-- 顶部级联筛选条 -->
           <aside class="market-filters cascade-filters" id="market-filters">
@@ -530,17 +530,17 @@
           </section>
           <!-- 交易信息（材料 / 税收 / 交易记录）：可折叠 -->
           <div class="panel market-info" id="market-info">
-            <div class="panel-title market-info-head" id="infoToggle">📦 交易信息<span class="hint">材料 / 税收 / 交易记录</span><span class="info-arrow" id="infoArrow">▸</span></div>
+            <div class="panel-title market-info-head" id="infoToggle"><img class="eic-img" src="assets/ui/ic_info.png" alt=""> 交易信息<span class="hint">材料 / 税收 / 交易记录</span><span class="info-arrow" id="infoArrow">▸</span></div>
             <div class="market-info-body" id="infoBody">
               <div class="info-inner">
                 <div class="panel">
                   <div class="panel-title">材料<span class="hint">交易货币</span></div>
                   <div class="materials-row">
-                    <span class="mat-chip stone">🎲 重铸石 <b id="reforge-num">0</b></span>
-                    <span class="mat-chip stone strip">✂️ 剥离石 <b id="strip-num">0</b></span>
-                    <span class="mat-chip material holy">🔮 神圣石 <b id="holy-num">0</b></span>
+                    <span class="mat-chip stone"><img class="eic-img" src="assets/ui/ic_reforge.png" alt=""> 重铸石 <b id="reforge-num">0</b></span>
+                    <span class="mat-chip stone strip"><img class="eic-img" src="assets/ui/ic_scissors.png" alt="">️ 剥离石 <b id="strip-num">0</b></span>
+                    <span class="mat-chip material holy"><img class="eic-img" src="assets/ui/ic_holy.png" alt=""> 神圣石 <b id="holy-num">0</b></span>
                     <span class="mat-chip material augment">➕ 增缀石 <b id="augment-num">0</b></span>
-                    <span class="mat-chip material">🐉 涅磐兽 <b id="phoenix-num">0</b></span>
+                    <span class="mat-chip material"><img class="eic-img" src="assets/ui/ic_phoenix.png" alt=""> 涅磐兽 <b id="phoenix-num">0</b></span>
                   </div>
                 </div>
                 <div class="panel">
@@ -592,7 +592,7 @@
 <div id="dialog-box" class="dialog-box">
   <div class="dialog-bubble">
     <div class="dialog-head">
-      <span class="dialog-icon" id="dialog-icon">💬</span>
+      <span class="dialog-icon" id="dialog-icon"><img class="eic-img" src="assets/ui/ic_chat.png" alt=""></span>
       <span class="dialog-speaker" id="dialog-speaker">系统</span>
       <button class="dialog-close" id="dialog-close">✕</button>
     </div>
@@ -614,7 +614,7 @@
   <aside class="quest-drawer" aria-label="任务面板">
     <header class="quest-drawer-header">
       <div class="quest-drawer-heading">
-        <div class="quest-drawer-title">📜 任务</div>
+        <div class="quest-drawer-title"><img class="eic-img" src="assets/ui/ic_quest.png" alt=""> 任务</div>
         <div class="quest-drawer-subtitle">主线推进 · 日常补给 · 宠物养成</div>
       </div>
       <button class="quest-drawer-close" id="quest-cancel" type="button" aria-label="关闭任务面板">×</button>
@@ -632,14 +632,14 @@
   <aside class="bag-window" aria-label="背包窗口">
     <header class="bag-window-header">
       <div class="bag-window-heading">
-        <div class="bag-window-title">🎒 背包</div>
+        <div class="bag-window-title"><img class="eic-img" src="assets/ui/ic_bag.png" alt=""> 背包</div>
         <div class="bag-window-subtitle">装备 / 素材 / 消耗品 / 宠物蛋 分类查看</div>
       </div>
       <button class="bag-window-close" id="bag-cancel" type="button" aria-label="关闭背包">×</button>
     </header>
     <div class="bag-window-tabs">
-      <button class="bag-subtab active" data-bag-subtab="bag">📦 背包</button>
-      <button class="bag-subtab" data-bag-subtab="equip">⚔️ 装备</button>
+      <button class="bag-subtab active" data-bag-subtab="bag"><img class="eic-img" src="assets/ui/ic_bag.png" alt=""> 背包</button>
+      <button class="bag-subtab" data-bag-subtab="equip"><img class="eic-img" src="assets/ui/ic_equip.png" alt="">️ 装备</button>
     </div>
     <div class="bag-window-body">
       <div class="bag-subpane active" data-bag-subpane="bag">
@@ -656,7 +656,7 @@
               <div class="panel-title">出战宠物<span class="hint">属性含装备加成</span></div>
               <div class="pet-hero">
                 <div class="pet-hero-art">
-                  <div class="pet-avatar" id="eqp-avatar">❔</div>
+                  <div class="pet-avatar" id="eqp-avatar"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div>
                 </div>
                 <div class="pet-hero-info">
                   <div class="pet-name"><span id="eqp-name">我的宠物</span><span class="lv" id="eqp-level">Lv.1</span></div>
@@ -709,13 +709,13 @@
   </aside>
 </div>
 
-<!-- 聊天弹窗（底部居中滑出、透明可调，与右侧装备打造抽屉不重叠；点侧边栏/消息条「💬 聊天」打开） -->
+<!-- 聊天弹窗（底部居中滑出、透明可调，与右侧装备打造抽屉不重叠；点侧边栏/消息条「<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg> 聊天」打开） -->
 <div class="chat-drawer-host" id="chat-modal" style="display:none">
   <div class="chat-drawer-scrim" id="chat-scrim"></div>
   <aside class="chat-drawer" id="chat-drawer" aria-label="聊天面板">
     <header class="chat-drawer-header">
       <div class="chat-drawer-heading">
-        <div class="chat-drawer-title">💬 聊天</div>
+        <div class="chat-drawer-title"><img class="eic-img" src="assets/ui/ic_chat.png" alt=""> 聊天</div>
         <div class="chat-drawer-subtitle">世界频道 · 实时广播 · 登录后发送</div>
       </div>
       <button class="chat-drawer-close" id="chat-cancel" type="button" aria-label="关闭聊天面板">×</button>
@@ -742,7 +742,7 @@
   <aside class="craft-drawer" id="craft-drawer" aria-label="装备打造面板">
     <header class="craft-drawer-header">
       <div class="craft-drawer-heading">
-        <div class="modal-title">🔨 装备打造</div>
+        <div class="modal-title"><img class="eic-img" src="assets/ui/ic_craft.png" alt=""> 装备打造</div>
         <div class="craft-drawer-subtitle">强化词缀 · 重铸数值 · 增加词缀</div>
       </div>
       <button class="craft-drawer-close" id="craft-cancel" type="button" aria-label="关闭打造面板">×</button>
@@ -757,7 +757,7 @@
   <aside class="dev-drawer" aria-label="开发者面板">
     <header class="dev-drawer-header">
       <div class="dev-drawer-heading">
-        <div class="dev-drawer-title">🛠 开发者面板</div>
+        <div class="dev-drawer-title"><img class="eic-img" src="assets/ui/ic_wrench.png" alt=""> 开发者面板</div>
         <div class="dev-drawer-subtitle">数值实时调参 · 改完立即生效</div>
       </div>
       <button class="dev-drawer-close" id="dev-cancel" type="button" aria-label="关闭开发者面板">×</button>
@@ -769,7 +769,7 @@
 <!-- 一键分解确认面板（默认隐藏，点装备页「一键分解」打开） -->
 <div class="modal-mask" id="salvage-modal" style="display:none">
   <div class="modal">
-    <div class="modal-title">🗑 一键分解</div>
+    <div class="modal-title"><img class="eic-img" src="assets/ui/ic_shred.png" alt=""> 一键分解</div>
     <div class="modal-body" id="salvage-body"></div>
     <div class="modal-actions">
       <button class="btn-mini ghost" id="salvage-cancel">取消</button>
@@ -781,7 +781,7 @@
 <!-- 购买确认面板（显示商品价格 / 交易税 / 买家需支付 / 卖家将收到） -->
 <div class="modal-mask" id="trade-modal" style="display:none">
   <div class="modal">
-    <div class="modal-title">💰 确认购买</div>
+    <div class="modal-title"><img class="eic-img" src="assets/ui/ic_stall.png" alt=""> 确认购买</div>
     <div class="modal-body" id="trade-body"></div>
     <div class="modal-actions">
       <button class="btn-mini ghost" id="trade-cancel">取消</button>
@@ -851,7 +851,7 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260910tower2"></script>
-<script src="js/core/supabase.js?v=20260911persona2"></script>
+<script src="js/core/supabase.js?v=20260912quest1"></script>
 <!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
 <script src="js/core/auth-session.js?v=20260910sess1"></script>
 <!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
@@ -861,35 +861,35 @@ window.PetSprites = {
 <script src="js/core/items.js?v=20260911verify1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=20260911gear2"></script>
-<script src="js/core/market.js?v=20260911q2"></script>
+<script src="js/core/market.js?v=20260911q3"></script>
 <script src="js/core/market_bot.js?v=20260911persona1"></script>
 <script src="js/equipment/equipment_craft.js?v=20260911gear5"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260911trait5"></script>
 <script src="js/pet/pet_evolve.js?v=20260911evo10"></script>
-<script src="js/core/quest.js?v=20260911q1"></script>
+<script src="js/core/quest.js?v=20260912quest1"></script>
 <script src="js/core/tutorial_mode.js?v=20260911q1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
-<script src="js/core/battle.js?v=20260911skill4"></script>
+<script src="js/core/battle.js?v=20260911skill5"></script>
 <script src="js/trial/trial-config.js?v=20260910fx7"></script>
 <!-- 任务表结构规范化层（2026-09-10）：给任务补 kind(一级分类) / group(二级分组) / chapter / reset。
      放在 config 与 trial-config 之后（它们才是任务表的写入方），quest.js 读表是懒加载所以顺序安全。 -->
 <script src="js/core/quest-config.js?v=20260910egg7"></script>
 <script src="js/trial/trial-access.js?v=20260910trial1"></script>
 <script src="js/trial/trial-rewards.js?v=20260910trial1"></script>
-<script src="js/trial/trial-engine.js?v=20260910egg7"></script>
+<script src="js/trial/trial-engine.js?v=20260911trial2"></script>
 <!-- 通天塔（2026-09-10）：一个文件一个职责。顺序 = 依赖方向：
      config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
 <script src="js/tower/tower-config.js?v=20260911trait1"></script>
 <script src="js/tower/tower-affix.js?v=20260910tower2"></script>
 <script src="js/tower/tower-access.js?v=20260910tower2"></script>
-<script src="js/tower/tower-rewards.js?v=20260911tower1"></script>
+<script src="js/tower/tower-rewards.js?v=20260911tower2"></script>
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
-<script src="js/tower/tower-engine.js?v=20260910egg7"></script>
+<script src="js/tower/tower-engine.js?v=20260911tower3"></script>
 <script src="js/core/battle-sim.global.js?v=20260911simsync1"></script>
-<script src="js/core/idle-bridge.js?v=20260911gear1"></script>
+<script src="js/core/idle-bridge.js?v=20260911idle3"></script>
 <script src="js/ui/ui-common.js?v=20260911dragfix"></script>
 <script src="js/ui/ui-console.js?v=20260910sess1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
@@ -916,16 +916,16 @@ window.PetSprites = {
 <script src="js/ui/ui-pet-merge.js?v=20260911trait3"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260911trait1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
-<script src="js/ui/ui-bag.js?v=20260911dragfix"></script>
-<script src="js/ui/ui-equipment.js?v=20260910craft4"></script>
+<script src="js/ui/ui-bag.js?v=20260911ident1"></script>
+<script src="js/ui/ui-equipment.js?v=20260911ident1"></script>
 <script src="js/ui/ui-craft.js?v=20260911craft5"></script>
 <script src="js/ui/ui-market.js?v=20260910mt4"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=20260910mt4"></script>
 <script src="js/ui/ui-market-notify.js?v=20260910mt2"></script>
 <script src="js/ui/ui-codex.js?v=20260911trait1"></script>
-<script src="js/ui/ui-shop.js?v=6097ac8d"></script>
-<script src="js/ui/ui-dev.js?v=20260911trait1"></script>
+<script src="js/ui/ui-shop.js?v=20260911buy1"></script>
+<script src="js/ui/ui-dev.js?v=20260911dev1"></script>
 <script src="js/main.js?v=20260910sess2"></script>
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
 <script src="js/ui-fixes.js?v=20260911dragfix"></script>

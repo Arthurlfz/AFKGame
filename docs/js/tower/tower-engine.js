@@ -155,7 +155,7 @@
       mob, mobsPerFloor: per, isGuardian: mob >= per,
       enemy, petHp, petMaxHp, corrosion: state.combo ? state.combo.corrosion : 0
     });
-    log(`⚔ 第 ${floor}/${cfg().floors || 30} 层 · 第 ${mob}/${per} 只 · ${enemy.name} Lv.${enemy.level}`
+    log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg> 第 ${floor}/${cfg().floors || 30} 层 · 第 ${mob}/${per} 只 · ${enemy.name} Lv.${enemy.level}`
       + `（血 ${enemy.hp} 攻 ${enemy.atk} 防 ${enemy.def}）`
       + (enemy._towerSkillName ? ` · 会放「${enemy._towerSkillName}」` : ''));
 
@@ -178,7 +178,7 @@
 
     if (!win) {
       emit({ type: 'floorFail', floor: state.floor, mob: state.mob, mobsPerFloor: per, petHp: 0, petMaxHp });
-      log(`💀 第 ${state.floor} 层第 ${state.mob} 只守住…… 塔行结束`);
+      log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z"/></svg> 第 ${state.floor} 层第 ${state.mob} 只守住…… 塔行结束`);
       finish(false);
       return;
     }
@@ -207,7 +207,7 @@
     if (state.floor >= total) {
       state.cleared = true;
       emit({ type: 'clear', floor: state.floor, total });
-      log(`🏆 通天塔 ${total} 层全部通过！`);
+      log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/></svg> 通天塔 ${total} 层全部通过！`);
       finish(true);
       return;
     }
@@ -230,10 +230,10 @@
     state.layerLoot.push(loot);
     if (loot.kind === 'material' && loot.name && window.Materials && window.Materials.gain) {
       window.Materials.gain(loot.name, loot.qty);
-      log(`🎁 掉落 ${loot.name} ×${loot.qty}${isGuardian ? '（守卫掉落）' : ''}`);
+      log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 掉落 ${loot.name} ×${loot.qty}${isGuardian ? '（守卫掉落）' : ''}`);
       emit({ type: 'loot', loot, isGuardian: !!isGuardian });
     } else if (loot.kind === 'equipment' && loot.eq) {
-      log(`🎁 掉落装备：${(loot.eq.rarity && loot.eq.rarity.label) || ''}${loot.eq.slot || ''}（未鉴定）${isGuardian ? '（守卫掉落）' : ''}`);
+      log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 掉落装备：${(loot.eq.rarity && loot.eq.rarity.label) || ''}${loot.eq.slot || ''}（未鉴定）${isGuardian ? '（守卫掉落）' : ''}`);
       emit({ type: 'loot', loot, isGuardian: !!isGuardian });
     }
   }
@@ -253,6 +253,13 @@
           ilvl: floorLevelOf(Math.max(1, state.maxFloor || 1)),
           layerLoot: state.layerLoot
         });
+      }
+      /* 一局几十分钟的材料产出全是 `Materials.gain` 入队的（4 秒后才上报）。
+       * 结算后必须立刻落盘 —— 否则玩家看完结算面板就关页面，这批收益凭空消失。
+       * visibilitychange 只是兜底（关标签页时的异步请求常被浏览器掐掉）。
+       * 只在这里调一次（一局一次），层掉落那几十次 gain 保持入队不阻塞演出。 */
+      if (window.Materials && window.Materials.flushMaterials) {
+        await window.Materials.flushMaterials();
       }
     } catch (e) {
       log(`⚠️ 结算异常：${(e && e.message) || '未知'}（奖励可能未发放，已按基础结果结算）`);
@@ -302,27 +309,57 @@
     const check = window.TowerAffix ? window.TowerAffix.validate(ids) : { ok: true, errors: [] };
     if (!check.ok) return { ok: false, error: check.errors.join('；') };
 
+    /* 腐印是材料 sink：必须【先确认拿得出，再收资格】。
+     * 旧代码在 consumeEntry 之后才扣腐印，且扣失败只 log 继续 —— 结算面板「再打一次」
+     * 沿用本局腐印时库存必为 0，于是从第二局起腐印永久免费、掉率增益照拿、sink 归零
+     * （2026-09-11 审计第 9 批 P0-4）。预校验按【名字聚合】（同名贴多条只算一次总量）。 */
+    const M = window.Materials;
+    const affixNeed = {};
+    for (const id of ids) {
+      const it = window.TowerAffix && window.TowerAffix.itemOf(id);
+      const name = (it && it.name) || id;
+      affixNeed[name] = (affixNeed[name] || 0) + 1;
+    }
+    for (const name of Object.keys(affixNeed)) {
+      const own = (M && M.getQuantity) ? M.getQuantity(name) : 0;
+      if (own < affixNeed[name]) {
+        return { ok: false, error: `缺少「${name}」×${affixNeed[name] - own}（腐印进入时消耗）` };
+      }
+    }
+
     const pet = window.Pet && window.Pet.getActivePet && window.Pet.getActivePet();
     if (!pet) return { ok: false, error: '请先选择出战宠物' };
     if (!window.TowerAccess) return { ok: false, error: '塔模块未加载（缺 tower-access.js）' };
 
     const page = claimPage();
     if (!page.ok) return { ok: false, error: page.error };
+    /* 开不了场就一个子儿都不收。canBeginTrial 与 battle.js 的开场守卫是同一个函数
+     * （预检与开场共用，不会漂移）。旧代码把「扣资格」排在「开场」之前且开场失败不退款
+     * —— 与 nirvana「不可逆操作排在前面」是同一个结构性错误。 */
+    if (window.Battle && window.Battle.canBeginTrial && !window.Battle.canBeginTrial()) {
+      releasePage();
+      return { ok: false, error: '战斗页尚未就绪（上一场战斗正在收尾），请稍后再试' };
+    }
+    // 已扣腐印的回退表：任何一步失败都要原样退回去，不能让玩家白损失消耗品
+    const spentAffix = [];
+    const refundAffix = () => {
+      for (const s of spentAffix) { if (M && M.gain) M.gain(s.name, s.qty); }
+      spentAffix.length = 0;
+    };
     try {
-      const access = await window.TowerAccess.consumeEntry();
-      if (!access.ok) return { ok: false, error: access.error };
-
-      // 腐印是一次性消耗品：进入时扣掉（校验已过，这里按条扣）
-      if (ids.length && window.Materials && window.Materials.spend) {
-        for (const id of ids) {
-          const it = window.TowerAffix && window.TowerAffix.itemOf(id);
-          const name = (it && it.name) || id;
-          const spent = await window.Materials.spend(name, 1);
-          if (spent && spent.ok === false) {
-            log(`⚠️ ${name} 扣除失败：${spent.error || '数量不足'}`);
-          }
+      // 腐印是一次性消耗品：进入时扣掉（预校验已过，这里按名聚合扣）
+      for (const name of Object.keys(affixNeed)) {
+        const qty = affixNeed[name];
+        const spent = (M && M.spend) ? await M.spend(name, qty) : { ok: false, error: '材料系统不可用' };
+        if (!spent || spent.ok === false) {
+          refundAffix();
+          return { ok: false, error: `扣除「${name}」失败：${(spent && spent.error) || '数量不足'}` };
         }
+        spentAffix.push({ name, qty });
       }
+
+      const access = await window.TowerAccess.consumeEntry();
+      if (!access.ok) { refundAffix(); return { ok: false, error: access.error }; }
 
       state.running = true;
       state.floor = 1;

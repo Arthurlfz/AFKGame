@@ -73,7 +73,7 @@
   function renderGemChip() {
     const chip = $('gem-balance');
     if (chip) {
-      chip.textContent = `🪙 ${wallet.gems} ${cur()}`;
+      chip.innerHTML = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> ${wallet.gems} ${cur()}`;
       chip.title = `魔石余额 ${wallet.gems} · 累计充值 ${wallet.totalRecharged}`;
     }
     applyVisibility();
@@ -87,7 +87,7 @@
     if (!enabled()) { root.innerHTML = ''; return; }
     if (shopMissing) {
       root.innerHTML = `<div class="shop-missing">
-        <div class="shop-missing-title">🪙 魔石商店尚未开通</div>
+        <div class="shop-missing-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 魔石商店尚未开通</div>
         <div>需要先在 Supabase 执行 <b>docs/supabase/migrate_shop.sql</b>（建钱包 / 商品 / 卡密表与四个函数），刷新页面后即可使用。</div>
       </div>`;
       return;
@@ -97,10 +97,10 @@
     const goodsHtml = products.length
       ? products.map(p => `
         <div class="shop-card">
-          <div class="shop-card-icon">${escapeHtml(p.icon || '🪙')}</div>
+          <div class="shop-card-icon">${p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg>'}</div>
           <div class="shop-card-title">${escapeHtml(p.title)}</div>
           <div class="shop-card-desc">${escapeHtml(goodsDesc(p.payload))}</div>
-          <div class="shop-card-price">🪙 ${p.price_gems}${p.price_cents ? ` <span class="shop-card-rmb">≈ ${(p.price_cents / 100).toFixed(0)} 元</span>` : ''}</div>
+          <div class="shop-card-price"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> ${p.price_gems}${p.price_cents ? ` <span class="shop-card-rmb">≈ ${(p.price_cents / 100).toFixed(0)} 元</span>` : ''}</div>
           <button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${wallet.gems < p.price_gems ? 'disabled' : ''}>${wallet.gems < p.price_gems ? '魔石不足' : '购买'}</button>
         </div>`).join('')
       : '<div class="inv-empty">暂无商品</div>';
@@ -111,12 +111,12 @@
 
     root.innerHTML = `
       <div class="shop-head">
-        <div class="shop-balance">🪙 <b>${wallet.gems}</b> ${cur()}</div>
+        <div class="shop-balance"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> <b>${wallet.gems}</b> ${cur()}</div>
         <div class="hint">累计获得 ${wallet.totalRecharged} ${cur()}（自测阶段由管理员发放）</div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">🪙 魔石来源<span class="hint">自测阶段，不对外收费</span></div>
+        <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 魔石来源<span class="hint">自测阶段，不对外收费</span></div>
         <div class="shop-pay-note">${escapeHtml(Config.shop.selfTestNote || '')}</div>
         <div class="shop-redeem">
           <input id="shop-code" class="shop-code-input" placeholder="卡密（内部测试用）" autocomplete="off">
@@ -125,12 +125,12 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">🏪 魔石商店<span class="hint">材料直发到背包（与掉落同一条链路）</span></div>
+        <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 魔石商店<span class="hint">材料直发到背包（与掉落同一条链路）</span></div>
         <div class="shop-grid">${goodsHtml}</div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">🧾 交易记录</div>
+        <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 17V7"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg> 交易记录</div>
         ${ordersHtml}
       </div>`;
 
@@ -167,20 +167,25 @@
     if (!r.ok) { showToast('❌ 兑换失败', msg); return; }
     const input = $('shop-code');
     if (input) input.value = '';
-    addLog(`🪙 充值成功，到账 ${r.gained} ${cur()}`);
-    showToast('🪙 充值成功！', `到账 ${r.gained} ${cur()}`);
+    addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 充值成功，到账 ${r.gained} ${cur()}`);
+    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 充值成功！', `到账 ${r.gained} ${cur()}`);
     await refreshWallet();
     await refreshOrders();
     UI.renderAll();
   }
 
+  let buying = false; // 购买闸门：spendGems 是一次云端往返，期间连点会重复扣魔石
   async function doBuy(sku) {
     const p = products.find(x => x.sku === sku);
-    if (!p) return;
+    if (!p || buying) return;
     if (wallet.gems < p.price_gems) { showToast('❌ 魔石不足', `还差 ${p.price_gems - wallet.gems} ${cur()}`); return; }
-    // 幂等键：同一人 + 同一商品 + 同一秒只成一单，连点不会重复扣
-    const ref = `${sku}-${Date.now()}`;
-    const r = await Supabase.spendGems(sku, ref);
+    /* 幂等键：同一人 + 同一商品 + 同一【秒】只成一单。
+     * ⚠️ 原来写的是 `${sku}-${Date.now()}` —— Date.now() 是**毫秒**，每次点击都是新键，
+     * 注释里那句「连点不会重复扣」根本不成立（连点 N 次 = N 单 = 扣 N 份魔石）。 */
+    const ref = `${sku}-${Math.floor(Date.now() / 1000)}`;
+    buying = true;
+    const r = await Supabase.spendGems(sku, ref).catch(e => ({ ok: false, message: (e && e.message) || '购买失败' }));
+    buying = false;
     if (!r.ok) {
       const msg = r.code === 'insufficient' ? '魔石不足' : r.code === 'limit' ? '已达购买上限' : (r.message || '购买失败');
       showToast('❌ 购买失败', msg);
@@ -189,8 +194,8 @@
     // 材料由服务端 add_material 直接发到云端，本地缓存要拉一次才看得到
     const { data } = await Supabase.getClient().from('materials').select('name,quantity');
     if (data) Materials.setCloudMaterials(data);
-    addLog(`🏪 购买 ${p.title}，花费 ${p.price_gems} ${cur()}`);
-    showToast('🏪 购买成功！', `${p.title} 已发到背包`);
+    addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买 ${p.title}，花费 ${p.price_gems} ${cur()}`);
+    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买成功！', `${p.title} 已发到背包`);
     await Promise.all([refreshWallet(), refreshOrders()]);
     UI.renderAll();
   }

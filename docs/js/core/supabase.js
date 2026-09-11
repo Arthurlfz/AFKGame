@@ -107,7 +107,7 @@
   function petToRow(pet, includeExp) {
     const row = {
       name: pet.name,
-      // icon 列是 NOT NULL 且有默认 '🟢'；2026-09-10 起客户端不再用 emoji（立绘走 PetSprites），
+      // icon 列是 NOT NULL 且有默认 ''；2026-09-10 起客户端不再用 emoji（立绘走 PetSprites），
       // 新宠物 icon 为 null → 显式发 null 会撞 23502（PostgREST 400）→ 建档永远失败 →
       // 宠物拿不到 cloudId，30 秒补建档自愈又不停重试（控制台刷屏 400）。
       // 空 icon 就不带这一列，让 DB 走默认值。
@@ -536,11 +536,30 @@
     return { data: (data && data.progress) || {}, error: null };
   }
   // 写任务进度到当前账号（未登录静默忽略；upsert 保证首次也写入）
+  // ⚠️ claimed 列【不要】写进来：它是服务端持有的领取记录，客户端没有该列的写权限
+  //    （列级 revoke，见 migrate_quest_claim.sql）。upsert 不含它就不会覆盖它。
   async function saveQuestProgress(progress) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: null };
     return client.from('quest_progress')
       .upsert({ user_id: user.id, progress, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  }
+
+  /* 任务奖励的【服务端领取记录】（2026-09-12）：
+   * 本地 quest_progress 的 completed / dailyDone / weeklyDone 客户端可改 ——
+   * 清一下就能无限重领任务奖励（材料有 add_material 限流兜着，装备走 saveItem 没有）。
+   * 现在由服务端持有「这条任务领过没有」这个判定事实（quest_progress.claimed 列，
+   * 客户端只有 SELECT 权限），本函数就是唯一写入口。
+   * periodKey：一次性任务传 ''；日常传当天、周常传本周一（与 quest.js 的 markFinished 同口径）。
+   * 返回 'OK' / 'ALREADY_CLAIMED' / 'ERR_NO_LOGIN' … */
+  async function completeQuest(questId, periodKey) {
+    const user = await getCurrentUser();
+    /* 未登录 = 纯本地模式（数据只在本机，换设备就没了，玩家本来就能随便改）→
+     * 服务端领取记录无从谈起，【跳过而不是报错】。
+     * ⚠️ 这里如果返回 error，会把未登录也拦死 —— 而任务的云进度加载（cloudLoaded）
+     *    另有守门，不该由本函数重复拦截。 */
+    if (!user) return { data: null, error: null, offline: true };
+    return client.rpc('complete_quest', { p_quest_id: questId, p_period_key: periodKey || '' });
   }
 
   /* ---------- 聊天（chat_messages 表 + Realtime 广播） ---------- */
@@ -629,7 +648,7 @@
     getMyWallet, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
-    fetchQuestProgress, saveQuestProgress,
+    fetchQuestProgress, saveQuestProgress, completeQuest,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
     loadMyProfile, setMyNickname, getMyProfile
   };

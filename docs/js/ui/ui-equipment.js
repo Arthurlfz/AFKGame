@@ -68,7 +68,7 @@
       chip('T' + t, invFilter.tier === t, () => { invFilter.tier = invFilter.tier === t ? null : t; applyFilter(); })
     )));
     box.appendChild(group('锁定', [
-      chip('🔒 已锁', invFilter.lock === 'locked', () => { invFilter.lock = invFilter.lock === 'locked' ? null : 'locked'; applyFilter(); }),
+      chip('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁', invFilter.lock === 'locked', () => { invFilter.lock = invFilter.lock === 'locked' ? null : 'locked'; applyFilter(); }),
       chip('未锁', invFilter.lock === 'unlocked', () => { invFilter.lock = invFilter.lock === 'unlocked' ? null : 'unlocked'; applyFilter(); })
     ]));
     box.appendChild(chip('重置', false, () => { invFilter = { rarity: null, tier: null, lock: null }; applyFilter(); }));
@@ -115,14 +115,14 @@
       card.className = 'equip-card' + (eq.locked ? ' locked' : '') + (selected ? ' selected' : '') + (active ? ' active' : '') + (unid ? ' q-unid' : '');
       // 卡片只显示核心信息；详情与打造统一进右侧面板（2026-09-04 主从式，去掉 hover 浮层）
       const affRows = unid
-        ? '<div class="ec-unid">🔒 未鉴定 · 词缀封印</div>'
+        ? '<div class="ec-unid"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 未鉴定 · 词缀封印</div>'
         : (window.Equipment.flattenAffixes ? window.Equipment.flattenAffixes(eq.affixes) : [])
           .filter(a => !a.base)
           .map(a => window.Equipment.formatAffixHtml(a, 'tip-affix'))
           .join('');
       card.innerHTML = `
         <div class="ec-name" style="color:${r.color}">
-          ${eq.fresh ? '<span class="eq-new">新</span>' : ''}${escapeHtml(eq.name || '未知装备')}${eq.locked ? '<span class="eq-lock">🔒</span>' : ''}
+          ${eq.fresh ? '<span class="eq-new">新</span>' : ''}${escapeHtml(eq.name || '未知装备')}${eq.locked ? '<span class="eq-lock"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>' : ''}
         </div>
         <div class="ec-meta">${r.label}装 · T${eq.tier ?? 4}</div>
         <div class="ec-slot">${eq.slot || '武器'}｜${b.label}+${b.value}</div>
@@ -163,8 +163,8 @@
         const changes = equipDeltas(pet, eq);
         const res = equipItem(pet, eq.id);
         if (res) {
-          addLog(`⚔️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
-          if (changes.length) showToast('⚔️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ ${pet.name} 装备了 ${res.equipped.name}（${describeItem(res.equipped)}）`);
+          if (changes.length) showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ 换装完成', changes.map(c => `${c.label} ${fmtDelta(c)}`).join('　'));
           UI.renderAll();
         }
       };
@@ -172,14 +172,14 @@
       if (unid) {
         const idBtn = document.createElement('button');
         idBtn.className = 'btn-sm id';
-        idBtn.textContent = '🔍 鉴定';
+        idBtn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 鉴定';
         idBtn.title = '消耗 1 鉴定石揭晓词缀';
         idBtn.onclick = (e) => { e.stopPropagation(); identifyEq(eq); };
         actions.appendChild(idBtn);
       }
       const lockBtn = document.createElement('button');
       lockBtn.className = 'btn-sm lock' + (eq.locked ? ' on' : '');
-      lockBtn.textContent = eq.locked ? '🔒' : '🔓';
+      lockBtn.innerHTML = eq.locked ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
       lockBtn.title = eq.locked ? '已锁定（分解跳过）' : '锁定（防分解）';
       lockBtn.onclick = async (e) => {
         e.stopPropagation();
@@ -214,7 +214,7 @@
     try {
       const body = $('salvage-body');
       const inv = getInventory();
-      if (!inv.length) { showToast('🗑 背包没有装备', '去战斗页刷点掉落吧'); return; }
+      if (!inv.length) { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 背包没有装备', '去战斗页刷点掉落吧'); return; }
       // 默认阈值 = 背包评分中位数：清理垫底的一半，保守不误杀
       const sorted = inv.map(scoreOf).sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)];
@@ -258,8 +258,8 @@
         if (res.error) { showToast('❌ 分解失败', res.error); return; }
         const parts = [`清理了 ${res.count} 件装备（低于 ${res.threshold} 分）`];
         for (const [k, n] of Object.entries(res.gains || {})) parts.push(`${Config.craft[k]?.name || k} ×${n}`);
-        addLog(`🗑 一键清理：${parts.join('，')}`);
-        showToast('🗑 清理完成', parts.join('<br>'));
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 一键清理：${parts.join('，')}`);
+        showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 清理完成', parts.join('<br>'));
         UI.renderAll();
       };
     } catch (err) {
@@ -301,9 +301,9 @@
       const parts = [`分解了 ${res.count} 件装备`];
       for (const [k, n] of Object.entries(res.gains || {})) parts.push(`${Config.craft[k]?.name || k} ×${n}`);
       if (res.skipped) parts.push(`跳过 ${res.skipped} 件锁定`);
-      addLog(`🗑 批量分解：${parts.join('，')}`);
-      showToast('🗑 分解完成', parts.join('<br>'));
-      if (UI.showDialog) UI.showDialog({ icon: '🗑', speaker: '分解', text: parts.join('<br>') });
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 批量分解：${parts.join('，')}`);
+      showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 分解完成', parts.join('<br>'));
+      if (UI.showDialog) UI.showDialog({ icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>', speaker: '分解', text: parts.join('<br>') });
       selectedEqIds.clear();
       UI.renderAll();
     };
@@ -371,7 +371,7 @@
     if (eq.identified === false) {
       const r2 = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
       const mt = eq.materialTier ?? eq.tier ?? 4;
-      return '<div class="tip-icon"><span class="ico"><span class="emoji">🔒</span></span></div>' +
+      return '<div class="tip-icon"><span class="ico"><span class="emoji"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></span></div>' +
         '<div class="tip-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
         '<div class="tip-line"><span>底材</span><b>T' + mt + '</b></div>' +
         '<div class="tip-line"><span>物品等级</span><b>' + (window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.level ?? eq.itemLevel ?? 1)) + '</b></div>' +
@@ -387,7 +387,7 @@
     const line = (a, cls) => a.map(x => window.Equipment.formatAffixHtml(x, cls)).join('') || '<div class="tip-empty">无</div>';
     // PoE 式顶部大图标（部位映射与背包共用 UI.EQUIP_ICON），描边随稀有度色
     const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
-    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + r.color + '"><span class="emoji">' + (ICONS[eq.slot] || '🛡') + '</span></span></div>';
+    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + r.color + '"><span class="emoji">' + (ICONS[eq.slot] || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>') + '</span></span></div>';
     return `
       ${iconHtml}
       <div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}</div>
@@ -438,7 +438,7 @@
         for (const _k in _gates) { const _t = Number(_k), _g = Number(_gates[_k]); if (ilvl >= _g && _t < _maxT) _maxT = _t; }
         craftEl.innerHTML =
           '<div class="eq-unid-block">' +
-            '<div class="eq-unid-icon">🔒</div>' +
+            '<div class="eq-unid-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>' +
             '<div class="eq-unid-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
             '<div class="eq-unid-line">未鉴定的 ' + escapeHtml(eq.slot || '装备') + ' · 底材 T' + mt + '</div>' +
             '<div class="eq-unid-line hint">词缀被封印，鉴定后揭晓</div>' +
@@ -446,7 +446,7 @@
               '<div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">物品等级</span><b style="font-size:14px;">' + ilvl + '</b></div>' +
               '<div class="ceh-stat" style="display:flex; flex-direction:column;"><span style="font-size:11px; color:#8a8478;">词缀 T 阶上限</span><b style="font-size:14px;">T' + _maxT + '</b></div>' +
             '</div>' +
-            '<button class="btn-sm id" id="eq-unid-btn">🔍 鉴定（消耗 1 鉴定石）</button>' +
+            '<button class="btn-sm id" id="eq-unid-btn"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 鉴定（消耗 1 鉴定石）</button>' +
           '</div>';
         const idBtn = craftEl.querySelector('#eq-unid-btn');
         if (idBtn) idBtn.onclick = () => identifyEq(eq);
@@ -461,17 +461,25 @@
   async function identifyEq(eq) {
     if (!eq || eq.identified !== false) return;
     const have = window.Materials && window.Materials.getQuantity ? window.Materials.getQuantity('鉴定石') : 0;
-    if (!have || have <= 0) { showToast('🔍 没有鉴定石', '去挂机捡鉴定石'); return; }
+    if (!have || have <= 0) { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 没有鉴定石', '去挂机捡鉴定石'); return; }
     const r = await window.Materials.spend('鉴定石', 1);
     if (!r || !r.ok) { showToast('❌ 鉴定失败', (r && r.error) || '鉴定石不足'); return; }
     eq.identified = true;
-    // 鉴定状态同步云端（不同步 → 刷新后 fromCloud 读回 false，又变回未鉴定且白扣鉴定石）
+    /* 鉴定状态同步云端（不同步 → 刷新后 fromCloud 读回 false，又变回未鉴定且白扣鉴定石）。
+     * ⚠️ 原来是 fire-and-forget（失败只 addLog）：鉴定石已经真扣了、状态没落库 = 玩家白亏一颗。
+     * 改成 await + 失败回滚（与 ui-pet-awaken.js 觉醒失败退石头同一口径）。 */
     if (eq.cloudId && window.Items) {
-      window.Items.updateCloudItem(eq, { identified: true })
-        .then(({ error } = {}) => { if (error && window.UI && window.UI.addLog) window.UI.addLog('⚠️ 鉴定状态云端同步失败：' + (error.message || '未知错误')); })
-        .catch(e => { if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 鉴定状态云端同步失败：' + ((e && e.message) || e)); });
+      let up = null;
+      try { up = await window.Items.updateCloudItem(eq, { identified: true }); } catch (e) { up = { error: e }; }
+      if (up && up.error) {
+        eq.identified = false;
+        if (window.Materials && window.Materials.gain) window.Materials.gain('鉴定石', 1);
+        showToast('❌ 鉴定失败', '云端同步失败，鉴定石已退还（' + ((up.error && up.error.message) || '未知错误') + '）');
+        UI.renderAll();
+        return;
+      }
     }
-    showToast('✨ 鉴定完成', eq.name);
+    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 鉴定完成', eq.name);
     UI.renderAll();
     if (activeEqId === eq.id) renderBagEqDetail(eq);
   }

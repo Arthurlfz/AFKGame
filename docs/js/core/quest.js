@@ -581,6 +581,16 @@
     else if (q.reset === 'daily' || q.repeat) delete dailyDone[q.id];
     else delete completed[q.id];
   }
+  /* 服务端领取记录的周期键（2026-09-12）—— 分流口径必须与 isFinished/markFinished 完全一致：
+   * 一次性任务传 ''（键 = 任务 id 本身，永久唯一，玩家伪造周期键也没用）；
+   * 日常传当天、周常传本周一。
+   * repeatable 不会走到这里（completeQuest 里已跳过）。 */
+  function claimPeriodKeyOf(q) {
+    if (q.repeatable) return '';
+    if (q.reset === 'weekly') return weekKeyOf();
+    if (q.reset === 'daily' || q.repeat) return todayStr();
+    return '';
+  }
 
   /* ---------- 任务经验奖励（2026-08-31 用户拍板「固定值 · 大方档」：经验是奖励主体，材料是辅助） ----------
    * 完成一次任务 = 给当前出战宠物【固定】经验（与等级无关）：
@@ -613,11 +623,12 @@
     submitting.add(id);
     markFinished(q);
     try {
-      // 收集类先扣材料：扣失败说明没货，此时奖励一份未发，回滚是安全的
+      // 已扣材料登记表：后任何一步失败都要按它原样退回（宁多还不少扣）
+      const spentList = [];
+      // ① 收集类先扣材料：扣失败说明没货，此时【奖励一份未发、服务端也未占位】，回滚完全安全
       if (q.type === 'collect' || q.type === 'collect_loop') {
-        // matList：每种都要扣 need 个；中途失败把已扣的补回来（宁多还不少扣）
+        // matList：每种都要扣 need 个；中途失败把已扣的补回来
         if (q.type === 'collect' && Array.isArray(q.matList)) {
-          const spentList = [];
           for (const name of q.matList) {
             const sp = await Materials.spend(name, q.need);
             if (!sp.ok) {
@@ -633,6 +644,38 @@
             unmarkFinished(q);
             return { error: spent.error || '材料扣减失败' };
           }
+          spentList.push([q.matName, q.need]);
+        }
+      }
+      /* ② 服务端权威的领取记录（2026-09-12 新增，堵「改本地 completed 无限重领」）：
+       * 本地 quest_progress 客户端可改 → 清掉 completed 刷新一下就能再领一次。
+       * 现在由服务端持有「领过没有」（quest_progress.claimed，客户端只有 SELECT 权限）。
+       * ⚠️ 顺序为什么在扣材料之后：材料【能退回】，占位【退不回】—— 退回去等于又能重领一次。
+       *    所以「容易退的先扣、难退的后扣」；占位失败必须把材料原样退回。 */
+      /* ⚠️ repeatable（loop 类）【不参与】领取记录：它们设计上就是无限重复做的
+       * （交完立刻又能接），给它占位等于把这类任务改成一次性 —— 那是过度堵住。 */
+      if (window.Supabase && window.Supabase.completeQuest && !q.repeatable) {
+        let claim = null;
+        try {
+          claim = await window.Supabase.completeQuest(q.id, claimPeriodKeyOf(q));
+        } catch (e) {
+          /* 网络层异常（≠「已领过」）→ 降级放行 + 留痕。
+           * 权衡：宁可在断网时放一次，也不要让正常玩家在弱网下交不了任务
+           * （断网时 Materials.spend 同样会失败，收集类任务本来也过不去，
+           *  这个降级换不来多少收益，但能救回弱网体验）。 */
+          try { console.warn('[quest] 领取记录登记失败（已降级放行）', e && (e.message || e)); } catch (e2) { /* 忽略 */ }
+        }
+        /* 只有服务端【明确】说"领过"才拦 —— 那是权威答复，正是堵漏洞的那一句。
+         * 网络错误 / 未登录这类"没拿到确定答复"的情况一律降级放行（只留痕）：
+         * 断网时 Materials.spend 同样会失败、收集类任务本来也过不去，
+         * 所以这个降级换不来多少收益，却能救回弱网下交不了任务的体验。 */
+        if (claim && claim.data === 'ALREADY_CLAIMED') {
+          for (const [n, amt] of spentList) Materials.gain(n, amt);
+          unmarkFinished(q);
+          return { error: '这个任务已经交过了' };
+        }
+        if (claim && claim.error) {
+          try { console.warn('[quest] 领取记录登记失败（已降级放行）', (claim.error && claim.error.message) || claim.error); } catch (e2) { /* 忽略 */ }
         }
       }
       const pairs = Object.entries(q.reward || {});

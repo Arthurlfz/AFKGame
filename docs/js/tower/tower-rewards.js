@@ -87,6 +87,12 @@
     return { kind: 'none' };
   }
 
+  /* 云端存档待办队列（模块级）。
+   * 为什么不能只靠调用方传的 pending：rollLayer 是同步的、没有 pending 可传，
+   * 旧代码因此把层掉落的装备写成「发起写入但不等待」—— 玩家在结算面板看到 N 件、
+   * 立刻刷新就少几件（写入还没落地就被云端快照覆盖）。settle 里统一 await 清空。 */
+  const SAVING = [];
+
   /* 造一件装备并落到背包（本地 + 云端存档）。
    * 云端存档是异步的：把 Promise 收集起来由调用方 await（层掉落一次 30 件不能逐件 await，
    * 但也不能丢 —— 丢写入 = 刷新后装备消失）。 */
@@ -100,6 +106,7 @@
     const I = window.Items;
     if (I && I.saveItem) {
       const p = Promise.resolve(I.saveItem(eq)).catch(() => { /* 未登录/失败：本地保留，等补建档 */ });
+      SAVING.push(p);
       if (pending) pending.push(p);
     }
     return eq;
@@ -185,7 +192,8 @@
       mats[l.name] = (mats[l.name] || 0) + num(l.qty, 0);
     }
 
-    await Promise.all(pending);
+    // 档位装备（pending）+ 全局层掉落的装备（SAVING）一起等落地，再让结算面板弹出来
+    await Promise.all(SAVING.splice(0, SAVING.length).concat(pending));
 
     return {
       maxFloor, cleared: !!ctx.cleared, tierFloor: tier ? num(tier.floor, 0) : 0,

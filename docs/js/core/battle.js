@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * battle.js —— 连续挂机战斗系统
  * 职责：
  *  1. 自动战斗循环：一场接一场打怪，无需玩家操作
@@ -70,7 +70,7 @@
     fightCount = 0;
     onFightEnd = callback;
     window.UI.updateStatus('fighting', fightCount);
-    window.UI.addLog('🕹 开始自动战斗！');
+    window.UI.addLog(' 开始自动战斗！');
     beginFight();
     return { ok: true };
   }
@@ -88,7 +88,7 @@
     setTimeout(() => {
       if (state.pet) setCurHp(state.petRef || getActivePet(), state.pet.hp);
     }, 250);
-    window.UI.addLog('🛑 停止自动战斗');
+    window.UI.addLog(' 停止自动战斗');
     window.UI.updateStatus('stopped', fightCount);
   }
   const isRunning = () => autoRunning;
@@ -108,7 +108,7 @@
         clearInterval(recoverTimer);
         recoverTimer = null;
         waitingRecover = false;
-        window.UI.addLog('💚 恢复完毕，自动继续挂机！');
+        window.UI.addLog(' 恢复完毕，自动继续挂机！');
         beginFight();
       }
     }, 500);
@@ -445,7 +445,7 @@
    * 命中和闪避均为固定值，命中率 = 命中 ÷ (命中 + 闪避)，并保留 5%~95% 边界。
    * 2026-09-04 新增三个纯数值词缀结算（怪物侧字段缺省=0，行为不变）：
    *   穿透 pen：无视 pen 点防御；伤害加成 dmgBonus/100：结果乘 (1+x)；受伤减免 dr/100：受击侧乘 (1-x)，最低承伤 clamp 10%。
-   * ⭐2026-09-09 攻防层由【减法】改为【递减对抗】（见 docs/战斗公式重设计_v1.md）：
+   * 2026-09-09 攻防层由【减法】改为【递减对抗】（见 docs/战斗公式重设计_v1.md）：
    *     dmg = atk × atk / (atk + effDef)     等价写法：atk × (1 − effDef/(atk + effDef))
    *   直觉：防御与攻击力相等时正好挡掉一半；防御再高也挡不完，防御为 0 时吃满攻击。
    *   为什么换掉减法：玩家穿装后 def 反超写死的怪攻 → 净伤恒为 0（实测 10 图 9 图「挨打 0.0%」），
@@ -517,7 +517,7 @@
     fightCount++;
     totalFights++; // 累计战斗场数（跨挂机累计）
     // 胜利不单独播报：每场的「经验 +N」已经代表打赢了；战败是异常事件，必须让玩家看见。
-    if (!win) window.UI.addLog('💀 战斗失败……');
+    if (!win) window.UI.addLog(' 战斗失败……');
     window.UI.updateStatus('fighting', fightCount);
     if (win && window.UI.animateVictory) window.UI.animateVictory(); // 胜利演出：敌人淡出（表现层）
 
@@ -526,13 +526,13 @@
 
     // 战败（宠物死亡）→ 自动等待回血，回满继续挂机，无需手动操作
     if (!win) {
-      enterRecover('💀 战败，等待恢复后自动再战…');
+      enterRecover('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z"/></svg> 战败，等待恢复后自动再战…');
       return;
     }
     // 血量低于阈值 → 自动回血后再战（阈值在 config.js）
     const pet = state.petRef || getActivePet();
     if (getCurHp(pet) <= getStats(pet).hp * Config.battle.stopHpRatio) {
-      enterRecover(`💤 血量低于 ${Math.round(Config.battle.stopHpRatio * 100)}%，等待恢复后自动再战…`);
+      enterRecover(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5h4"/><path d="M20 3v4"/><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> 血量低于 ${Math.round(Config.battle.stopHpRatio * 100)}%，等待恢复后自动再战…`);
       return;
     }
     // 血量健康 → 接下一场（场间隔在 config.js；下一场自动用当前出战的宠物）
@@ -571,9 +571,16 @@
   let trialOnEnd = null; // 当前层的结算回调（TrialEngine / TowerEngine 注入，层结束即清空）
   // 开打爬塔的一层。占用中/缺宠物/缺敌人返回 false，由调用引擎兜底处理。
   // floorCtx.mode：'trial'（副本，缺省）| 'tower'（通天塔）；floorCtx.healBlock：本局禁疗（塔腐印）。
+  /* 战斗页是否空得出来（副本/塔开场的唯一守卫）。
+   * 抽成独立函数是因为【进副本/进塔前要先用它预检一次】：资格（门票/重置卡/腐印）
+   * 必须在确认「开得了场」之后才扣，否则开不了场 = 玩家白扣一张重置卡
+   * （2026-09-11 审计第 9 批）。预检与开场共用这一个守卫，避免两处各写一份后漂移。 */
+  const canBeginTrial = () => state.mode === 'wild' && !autoRunning && !waitingRecover
+    && !interval && !nextFightTimer && !recoverTimer;
+
   function beginTrialFloor(floorCtx) {
     if (!floorCtx || !floorCtx.enemy || !floorCtx.onEnd) return false;
-    if (state.mode !== 'wild' || autoRunning || waitingRecover || interval || nextFightTimer || recoverTimer) return false;
+    if (!canBeginTrial()) return false;
     const pet = getActivePet();
     if (!pet) return false;
     state.mode = floorCtx.mode === 'tower' ? 'tower' : 'trial';
@@ -608,5 +615,5 @@
     });
   }
 
-  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage, beginTrialFloor, isTrialMode, isTowerMode };
+  window.Battle = { startAutoBattle, stopAutoBattle, isRunning, isWaitingRecover, getTotalFights: () => totalFights, selectArea, getAreas, getCurrentArea, useActiveSkill, pickEnemy, pickScaledEnemy, scaleEnemyOf, state, calcDamage, beginTrialFloor, canBeginTrial, isTrialMode, isTowerMode };
 })();

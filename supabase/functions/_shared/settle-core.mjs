@@ -240,8 +240,12 @@ function settlePlan({ session, petRow, equipItems, config, enemyList,
     },
     // 补账明细（客户端只负责展示掉落，经验已在基线里，不再重复给）
     detail: gapDetail.slice(-50),
-    // 审计日志明细（补账 + 剧本窗全部场次）
-    logDetail: gapDetail.concat(scriptDetail).slice(-100),
+    /* 发奖明细（补账窗 + 剧本窗全部场次）—— ⚠️ 这里【不能截断】。
+     * 以前写的是 `.concat(scriptDetail).slice(-100)`，而 battle-settle/index.ts 的
+     * 发奖归集（rewardTotals / equipDrops / eggDrops）正是读这个字段 →
+     * 单窗场次 >100 时，被切掉的那部分掉落会**静默消失**（不报错、不记日志）。
+     * 截断只是审计日志的存储上限，应该在写入 battle_logs 时才做（见 index.ts 的 p_detail）。 */
+    logDetail: gapDetail.concat(scriptDetail),
     exp: g,
     petPatch: {
       cur_hp: Math.round(scriptRaw.endHp),

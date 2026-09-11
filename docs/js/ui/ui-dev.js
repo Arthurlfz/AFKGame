@@ -1,6 +1,6 @@
 /* ============================================================
  * ui/ui-dev.js —— 开发者面板（仅管理员账号可见入口）
- * 入口：登录且邮箱 ∈ Config.dev.adminEmails 时，左侧边栏显示「🛠 开发者」按钮
+ * 入口：登录且邮箱 ∈ Config.dev.adminEmails 时，左侧边栏显示「 开发者」按钮
  * 面板用 Tab 分块：
  *  - 数值调参：滑杆改 Config 内存值立即生效（战/经/掉/怪均实时读 Config）
  *  - 资源发放：发材料/魔石/造装备/发蛋/给当前宠加经验·等级·成长（替代改库和 SQL）
@@ -170,8 +170,8 @@
       '<div class="dev-actions-row">' +
         '<button class="btn-mini ghost" id="dev-reset-all">一键复原全部</button>' +
         '<button class="btn-mini primary" id="dev-export">导出当前配置 JSON</button>' +
-        '<button class="btn-mini primary" id="dev-cloud-save" title="把当前调参保存到 Supabase">☁ 保存到云端</button>' +
-        '<button class="btn-mini ghost" id="dev-cloud-load" title="从 Supabase 读取调参">☁ 读取云端配置</button>' +
+        '<button class="btn-mini primary" id="dev-cloud-save" title="把当前调参保存到 Supabase"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 保存到云端</button>' +
+        '<button class="btn-mini ghost" id="dev-cloud-load" title="从 Supabase 读取调参"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 读取云端配置</button>' +
       '</div>' +
       '<div class="dev-export-box" id="dev-export-box" style="display:none">' +
         '<div class="dev-export-hint">当前 Config 完整 JSON（复制后手动合并回 config.js）：</div>' +
@@ -456,7 +456,7 @@
       if (UI.refreshShop) await UI.refreshShop(); // 刷新顶栏余额
       if (UI.renderAll) UI.renderAll();
       const w = (S.getMyWallet && await S.getMyWallet()) || {};
-      toast('🪙 已发放 ' + amt + ' 魔石', '当前余额 ' + (w.gems || '?'));
+      toast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> 已发放 ' + amt + ' 魔石', '当前余额 ' + (w.gems || '?'));
     };
     const eqGo = $('res-eq-go');
     if (eqGo) eqGo.onclick = async () => {
@@ -991,7 +991,7 @@
       const res = await Merge.synthesize(p.id, subId);
       if (res && res.error) { toast('❌ ' + res.error, ''); return; }
       if (UI.renderAll) UI.renderAll();
-      toast(res && res.mutated ? '✨ 合成成功（变异！）' : '合成成功', (res && res.baby && res.baby.name) || '');
+      toast(res && res.mutated ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 合成成功（变异！）' : '合成成功', (res && res.baby && res.baby.name) || '');
     };
     const nirGo = $('fast-nir-go');
     if (nirGo) nirGo.onclick = async () => {
@@ -1124,14 +1124,20 @@
         ? await client.rpc('admin_search_users', { q })
         : await client.rpc('admin_list_users');
       if (error) { listEl.innerHTML = '<div class="dev-kv warn">RPC 错误：' + (error.message || String(error)) + '</div>'; return; }
-      if (!data || !data.length) { listEl.innerHTML = '<div class="dev-kv">无玩家数据' + (q ? '（未匹配「' + q + '」）' : '') + '</div>'; return; }
+      const eq2 = v => (UI.escapeHtml ? UI.escapeHtml(v == null ? '' : v) : String(v == null ? '' : v));
+      if (!data || !data.length) { listEl.innerHTML = '<div class="dev-kv">无玩家数据' + (q ? '（未匹配「' + eq2(q) + '」）' : '') + '</div>'; return; }
       listEl.innerHTML = data.map(playerRow).join('');
       listEl.querySelectorAll('[data-act]').forEach(btn => { btn.onclick = () => playerAct(btn, client); });
     } catch (e) { listEl.innerHTML = '<div class="dev-kv warn">加载失败：' + (e && e.message) + '</div>'; }
   }
   function playerRow(u) {
     const fmt = t => { if (!t) return '—'; try { return new Date(t).toLocaleString('zh-CN', { hour12: false }); } catch (e) { return String(t); } };
-    const safe = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+    /* ⚠️ 只转义引号是不够的：昵称是玩家自填的，会被拼进 <span> 的内容区 ——
+     * `<img src=x onerror=...>` 会被当成 HTML 执行（存储型 XSS）。
+     * 统一用项目的 UI.escapeHtml（& < > " ' 全转，与 ui-console 聊天防 XSS 同一套）。 */
+    const safe = v => (UI.escapeHtml
+      ? UI.escapeHtml(v == null ? '' : v)
+      : String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
     const label = safe(u.nickname || u.email || '?');
     // 删除按钮：管理员主号与「当前登录的自己」都不给删（后端另有 protected/self 兜底），防手滑
     const me = (UI.getAuthUser && UI.getAuthUser()) || {};

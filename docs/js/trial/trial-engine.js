@@ -100,7 +100,7 @@
     const petMaxHp = (pet && Pet.getStats) ? Pet.getStats(pet).hp : 1;
     const petHp = (pet && Pet.getCurHp) ? Pet.getCurHp(pet) : petMaxHp;
     emit({ type: 'floor', route, floor: state.floor, total: cfg().floors || 20, enemy, petHp, petMaxHp });
-    log(`⚔ 第 ${state.floor}/${cfg().floors || 20} 层 · ${enemy.name} Lv.${enemy.level}（血 ${enemy.hp} 攻 ${enemy.atk} 防 ${enemy.def}）`);
+    log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg> 第 ${state.floor}/${cfg().floors || 20} 层 · ${enemy.name} Lv.${enemy.level}（血 ${enemy.hp} 攻 ${enemy.atk} 防 ${enemy.def}）`);
     const ok = window.Battle && window.Battle.beginTrialFloor({
       enemy,
       onEnd: onFloorEnd
@@ -120,7 +120,7 @@
       state.timer = setTimeout(() => { state.timer = null; if (state.running) beginFloor(); }, cfg().floorDelayMs || 700);
     } else {
       emit({ type: 'floorFail', route: state.route, floor: state.floor, petHp: 0, petMaxHp });
-      log(`💀 第 ${state.floor} 层倒下…… 爬塔结束`);
+      log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z"/></svg> 第 ${state.floor} 层倒下…… 爬塔结束`);
       finish(false);
     }
   }
@@ -128,9 +128,22 @@
   /* ---------- 终局结算 ---------- */
   async function finish(cleared, error) {
     const route = state.route;
-    const info = window.TrialRewards
-      ? window.TrialRewards.settle(route, { maxFloor: state.maxFloor, cleared })
-      : { maxFloor: state.maxFloor, tierFloor: 0, cleared, reward: [] };
+    /* 发奖异常也必须走到「弹结算面板」这一步 —— 与 tower-engine 同口径：
+     * 否则玩家打完一局什么都没有，而且异常被静默吞掉、浏览器里连报错都查不到。 */
+    const fallback = { maxFloor: state.maxFloor, tierFloor: 0, cleared, reward: [] };
+    let info = fallback;
+    try {
+      info = window.TrialRewards
+        ? window.TrialRewards.settle(route, { maxFloor: state.maxFloor, cleared })
+        : fallback;
+    } catch (e) {
+      try { console.warn('[trial] settle 异常:', e && (e.stack || e.message)); } catch (e2) { /* ignore */ }
+    }
+    /* 发完奖立刻落盘：Materials.gain 只入队（4 秒后才上报），玩家一关页面这批奖励就没了。
+     * 与 tower-engine 同口径（一局一次）。 */
+    if (window.Materials && window.Materials.flushMaterials) {
+      try { await window.Materials.flushMaterials(); } catch (e2) { /* 落盘失败不阻塞结算面板 */ }
+    }
     state.result = Object.assign({}, info, {
       error: error || null,
       floors: cfg().floors || 20,
@@ -170,6 +183,12 @@
 
     const page = claimPage();
     if (!page.ok) return { ok: false, error: page.error };
+    /* 开不了场就不扣门票/免费次数。canBeginTrial 与 battle.js 的开场守卫是同一个函数
+     * （预检与开场共用，不会漂移）—— 旧代码先扣票再开场，开场失败票就白扣了。 */
+    if (window.Battle && window.Battle.canBeginTrial && !window.Battle.canBeginTrial()) {
+      releasePage();
+      return { ok: false, error: '战斗页尚未就绪（上一场战斗正在收尾），请稍后再试' };
+    }
     try {
       const access = await window.TrialAccess.consumeEntry(routeId);
       if (!access.ok) return { ok: false, error: access.error };

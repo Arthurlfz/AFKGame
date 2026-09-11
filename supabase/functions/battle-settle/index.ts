@@ -201,7 +201,9 @@ async function handle(req: Request): Promise<Response> {
     p_exp: plan.result.totalExp,
     // ⚠️ 不要 JSON.stringify！参数声明为 jsonb，传字符串进 PostgREST 会变成
     //    「JSON 字符串」而不是数组，落库即 jsonb string（2026-09-11 审计踩实）。
-    p_detail: plan.logDetail,
+    // ⚠️ 截断只在这里（写入审计日志时）做：logDetail 同时被上面的发奖归集读取，
+    //    若在 settle-core 里就截断，场次 >100 时被切掉的掉落会静默不发（2026-09-11 第 1 批 P2）。
+    p_detail: (plan.logDetail || []).slice(-100),
     p_now: now,
     p_expected_last_settled_at: session.last_settled_at,
     p_last_boss_fight: plan.result.bossState && plan.result.bossState.lastBossFight != null

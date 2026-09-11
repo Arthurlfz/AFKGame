@@ -62,7 +62,7 @@ const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-l
   reloadMarket({ kind: 'egg', slot: 'all', rarity: 'all', tier: 'all', baseTier: 'all', growth: 'desc', sort: 'latest', affixFilters: [], trait: 'all', priceMin: null, priceMax: null });
   resetUI(); C('UI.renderMarket()');
   sec = textOf('market-list');
-  A(sec.includes('🥚 宠物蛋'), '类型=宠物蛋：蛋分区渲染');
+  A(sec.includes('宠物蛋'), '类型=宠物蛋：蛋分区渲染');
   A(!sec.includes('进化素材'), '类型=宠物蛋：材料被筛掉');
   let kinds = textOf('cfSteps');
   A(kinds.includes('材料') && kinds.includes('宠物蛋'), '筛选条类型选项已含「材料」「宠物蛋」');
@@ -129,6 +129,19 @@ const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-l
   // 上架入口拦截：openSellModal 在满额时直接 toast 返回，不建弹窗
   C('UI.openSellForItem({cloudId:"zz1",name:"测试剑",slot:"武器",tier:2,rarity:{id:"white"}})');
   A(!textOf('mk-sell-body').includes('上架定价'), '满额时上架弹窗不会被打开');
+  /* 2026-09-11：额度守门已从 UI 下沉到 Market.listXxx 内部 ——
+   * 以前只有上架弹窗记得问 listQuota()，绕过弹窗直接调 API 就能突破上限
+   * （且服务端 list_* RPC 也没有 maxListings 兜底）。 */
+  const blockedPet = await C('Market.listPet({cloudId:"zz9",name:"越界宠"},"重铸石",5).then(r=>JSON.stringify(r||{}))');
+  A(/额度已满/.test(blockedPet), '绕过上架弹窗直接调 Market.listPet 也被额度拦下（' + blockedPet + '）');
+  const blockedMat = await C('Market.listMaterial("重铸石",1,"重铸石",5).then(r=>JSON.stringify(r||{}))');
+  A(/额度已满/.test(blockedMat), '绕过上架弹窗直接调 Market.listMaterial 也被额度拦下（' + blockedMat + '）');
+  /* 复原：这一节为了测「满额」塞了 5 条假挂单，不清掉会把额度占满，
+   * 后面「材料上架成功」那条用例会被守卫连坐（2026-09-11 踩到：
+   * 断言留下的状态会污染后面的断言，副作用必须自己收拾）。 */
+  C('for (let i = listingsTable.length - 1; i >= 0; i--) if (String(listingsTable[i].id).indexOf("mine") === 0) listingsTable.splice(i, 1)');
+  await C('Market.refresh()'); await S(100);
+  A(C('Market.listQuota().ok') === true, '清掉测试挂单后额度恢复（后续用例不会被连坐）');
 
   /* ============ 8. 离线成交汇总 ============ */
   ctx.tradeTable.push({ id: 't1', player_id: uid, role: 'sell', item_name: '兽皮帽', material_type: '重铸石', price_qty: 20, tax_qty: 2, net_qty: 18, counterparty: '流浪商人', created_at: now });

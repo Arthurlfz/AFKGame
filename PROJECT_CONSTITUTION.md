@@ -14,7 +14,7 @@
 |---|---|---|
 | 代码（运行源） | `docs/` | git 提交已声明 "docs as official runtime source" |
 | 数值 | `docs/js/core/config.js` | 旧"数据地图"已废弃归档，不再改 |
-| 测试 | `docs/tests/` | 72 个 vtest，2026-09-11 基线 **66/72**（6 个存量红见文末） |
+| 测试 | `docs/tests/` | 75 个 vtest，2026-09-11 基线 **70/75**（5 个稳定红 + 3 个 flaky，见文末维护规则 7） |
 | Supabase 迁移 | `supabase/` | 26 个 SQL。⚠️ **不保证幂等/可重放** —— 同一函数被多个文件重复定义，重放旧文件会覆盖新逻辑，见维护规则 6 |
 | 借鉴参考 | `docs/玩法文档/` | 只读参考源，不照抄数值 |
 | 归档区 | `archive/` | 旧物唯一去向，gitignore 不入库 |
@@ -124,7 +124,7 @@
    - **稳定红 5 个**：`vtest_action_freeze` / `vtest_boss`(D4) / `vtest_bugfix`(emoji 断言过期) / `vtest_equip_score` / `vtest_pet_skill`
    - **flaky 3 个**（时红时绿，**别把它的转绿当成自己的功劳**）：`vtest_enemy_balance`（蒙特卡洛）、`vtest_tier_rarity`（底材 T 阶抽样；连跑 3 次 = OK/FAIL/FAIL）、`vtest_botbuy`（异步等待，单独跑 4/4 通过但全量里偶发红）
    - ⚠️ 判定 flaky 的方法：单独连跑 3~4 次，全过 = 大概率是 flaky；再跑一次全量复验。**别急着当成自己改坏了或改好了。**
-   - 全量通过数因此会在 **67~69 / 73** 之间浮动（73 个测试，含 2026-09-11 新增的 `vtest_sim_port`）
+   - 全量通过数因此会在 **70~72 / 75** 之间浮动（75 个测试，含 2026-09-11 新增的 `vtest_sim_port` / `vtest_quest_config` / `vtest_equip_gen`）
 
 ---
 *最后更新：2026-09-11｜来源：Forge_of_Souls_现状地图_v1.md / AI假人经济系统策划_v1.md / 宠物特质与魂铸系统·实施提示词.md + 用户多轮拍板 + 2026-09-11 代码审计（docs/代码审计_2026-09-11.md）*
