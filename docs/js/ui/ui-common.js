@@ -91,7 +91,12 @@
    * 于是全项目 50+ 处播报（升级/进化/打造/登录/读档失败…）全部掉进黑洞，
    * 隐藏 DOM 还跟着每回合战斗无限增长（挂机一小时 = 几千个废节点）。
    * 现在只有一条路：控制台。一处可见、上限 100 条、自动滚动。
-   * addLog = 纯文本日志（内部转义，防 XSS）；showToast = 富文本提示（调用方负责 HTML 安全）。
+   * ⚠️ 2026-09-13 修正（原注释说反了）：**addLog 与 showToast 都是富文本**。
+   *    `UI.consoleLog(cat, html, …)` 第二个参数就叫 html（定义在 ui-console.js:34），**内部不转义**。
+   *    实测 65 处 addLog 调用里有 **16 处直接传 `<svg>` 图标**（ui-bag / ui-craft 等）——
+   *    若在这里转义，图标会整段显示成源码文本。所以**不能**给 addLog 加 escapeHtml。
+   *    → **调用方负责 HTML 安全**：拼进来的玩家可控内容（昵称 / 宠物名等）必须自己先 escapeHtml。
+   *    （聊天、社交分类走 ui-console.js 的 escHtml，那是另一条路，别混。）
    */
   function addLog(text) {
     if (!UI.consoleLog) return;
