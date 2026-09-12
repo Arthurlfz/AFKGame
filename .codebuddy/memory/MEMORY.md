@@ -23,6 +23,16 @@
 - 🔴 push 被掐 → `git -c http.version=HTTP/1.1 -c http.postBuffer=524288000 push origin main`。配套多文件提交必须一起推，推前 `git log --oneline @{u}..HEAD`。
 - ⚠️ **多会话并发写同一工作区**：共享文件（`config.js`/`游戏.html`/`battle.js`/`pet*.js`）**改前必须重读**；`?v=` 会互相覆盖；测试在**加载阶段**集体报错先怀疑别人改到一半。
 - ✅ 2026-09-13 起 `.codebuddy/memory/` **放行入库**（`skills/`/`agents/` 仍忽略）→ AI 记忆终于有版本历史。验证：`git status -uall .codebuddy` 应恰好 20 个文件。
+- 🔴 **远端 `Arthurlfz/AFKGame` 是 public 仓库，且开着 GitHub Pages（`has_pages: true`）。**
+  ⛔ **永远不要转私有** —— 免费账户的私有仓库不支持 Pages，一转游戏立刻下线、朋友当场打不开。
+  要隔离笔记就**另开私有仓库**放 `memory/`。
+  部署现状：根目录**无 `.github/`**（零 CI）；实际部署 = **GitHub Pages 发布 main 分支的 `/docs` 目录**
+  （根上没有 index.html，靠 `docs/index.html` 跳 `游戏.html`）。仓库约 117MB（图片资产为主）。
+  `netlify.toml`/`wrangler.toml` 用户确认**暂未启用**，但 2026-09-13 已把发布目录从废弃的 `新demo/Mvp/原型代码`
+  **改为 `docs`** —— ⭐ 留着 `wrangler.toml` 的意义：**Cloudflare Pages 免费版支持私有仓库**，这是将来真要私有化时
+  唯一不用花钱的出路，别删。
+  🔴 **`git status` 里中文路径会被转义成八进制**（如 `docs/\346\270\270...`），用 `Select-String '游戏.html'` 过滤会匹配失败，
+  查特定文件请直接 `git status --short -- "docs/游戏.html"`。
 - 🔴 **gitignore 父子目录陷阱**：`.codebuddy/**` + `!.codebuddy/memory/` **无效** —— 父目录一旦被排除，其中内容无法 re-include（`git check-ignore` 会误报成"命中放行规则"）。可用写法是 `.codebuddy/*` + `!.codebuddy/memory/` + `!.codebuddy/memory/**`。**判生效必须看 `git status`，不能看 check-ignore。**
 - ⚠️ **「没接/没做」必须现场核代码，不许引记忆**。取证用 PowerShell `Select-String` 复检；按行号删码后 `node --check`（**对 0 字节文件也通过**，须校验行数/字节）。`??` 新增文件也要看。
 
