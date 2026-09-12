@@ -2,4 +2,9 @@
 # pages_build_output_dir 告诉 Cloudflare Pages 静态文件在哪
 name = "afkgame"
 compatibility_date = "2026-08-27"
-pages_build_output_dir = "新demo/Mvp/原型代码"
+# ⚠️ 2026-09-13 修正：原来指向已废弃的 新demo/Mvp/原型代码，当前运行源是 docs/
+#   （权威源见 PROJECT_CONSTITUTION.md §一）
+# 为什么还留着本文件：目前实际部署走的是 GitHub Pages（发布 main 分支的 /docs 目录），
+#   但 GitHub Pages 不支持私有仓库；**Cloudflare Pages 免费版支持**。
+#   → 这是将来真要把仓库私有化时，唯一不用花钱的部署出路。别删。
+pages_build_output_dir = "docs"

@@ -1,7 +1,9 @@
 # Netlify 部署配置（放在仓库根）
 # 发布目录 = 游戏代码根（含 index.html 和 游戏.html）
+# ⚠️ 2026-09-13 修正：原来指向已废弃的 新demo/Mvp/原型代码，当前运行源是 docs/
+#   注：本文件暂未启用（实际部署走 GitHub Pages），留着是备用方案。
 [build]
-  publish = "新demo/Mvp/原型代码"
+  publish = "docs"
 
 # 所有 HTML 不缓存：保证玩家每次拉到最新版本，避免改了不刷新
 [[headers]]
