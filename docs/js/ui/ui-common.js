@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
  * ui/ui-common.js —— UI 通用组件与渲染枢纽（不绑定任何具体页面）
  * 职责：
  *  1. 共享底层工具：escapeHtml / $ / showToast / addLog
@@ -95,7 +95,7 @@
    */
   function addLog(text) {
     if (!UI.consoleLog) return;
-    UI.consoleLog('system', escapeHtml(text == null ? '' : String(text)));
+    UI.consoleLog('system', text == null ? '' : String(text));
   }
   function showToast(title, msg) {
     if (!UI.consoleLog) return;
