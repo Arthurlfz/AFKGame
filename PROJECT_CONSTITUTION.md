@@ -1,4 +1,4 @@
-# Forge of Souls · 项目宪法（PROJECT CONSTITUTION）
+# 永夜灵市（Evernight Bazaar）· 项目宪法（PROJECT CONSTITUTION）
 
 > **定位：唯一的"已拍板决策账本"。** 任何 Agent（CodeBuddy / WorkBuddy / ZCode / 豆包 / 未来所有工具链）开工前**必须先读本文件**。你记不住的东西，这里替所有人记。
 >
