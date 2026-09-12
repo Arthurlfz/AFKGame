@@ -1,0 +1,14 @@
+{
+  "name": "forge-of-souls",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Forge of Souls —— 暗黑风挂机养宠 + 宠物/装备真实交易。运行源是 docs/，别去根目录找。",
+  "scripts": {
+    "test": "node tests/run_all.js",
+    "test:v": "node tests/run_all.js --verbose",
+    "check": "node tests/diff_baseline.js --run",
+    "baseline": "node tests/diff_baseline.js --save",
+    "serve": "python -m http.server 8030"
+  },
+  "//": "用法：cd docs && npm run check  ← 改完代码跑这个，它会告诉你有没有新搞红的测试。详细规矩见根目录 AGENTS.md"
+}

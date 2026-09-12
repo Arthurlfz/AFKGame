@@ -1,0 +1,21 @@
+{
+  "alwaysUpdateLinks": true,
+  "useMarkdownLinks": false,
+  "newLinkFormat": "relative",
+  "attachmentFolderPath": "_attachments",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "/",
+  "showUnsupportedFiles": true,
+  "promptDelete": false,
+  "trashOption": "local",
+  "userIgnoreFilters": [
+    "docs/assets",
+    "archive",
+    "_backup_rollbackB_20260904",
+    "node_modules",
+    ".git",
+    ".tmp-cli",
+    ".workbuddy",
+    "supabase/functions/node_modules"
+  ]
+}

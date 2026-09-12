@@ -83,4 +83,22 @@ if (bad.length) {
   console.log('');
   console.log('（已知存量红：vtest_bugfix=emoji 断言过期 / vtest_enemy_balance=蒙特卡洛 flaky）');
 }
+/* 2026-09-13 加：可选的结果落盘（给基线对比 / CI 用）。
+ * ⚠️ 不传 --json 时行为与以前完全一致，老习惯不受影响。
+ * 为什么放在这里而不是另写一个 collect 脚本：另写就等于把「怎么判定失败」复制第二份，
+ * 而同一份逻辑复制两份、只有一份对，正是本项目审计出来的头号病因。 */
+const jsonArg = (process.argv.find(a => /^--json=/.test(a)) || '').split('=')[1];
+if (jsonArg) {
+  const payload = {
+    date: new Date().toISOString(),
+    total: files.length,
+    pass: pass.length,
+    fail: bad.length,
+    secs: Number(secs),
+    failed: bad.map(b => b.f).sort(),
+    passed: pass.slice().sort()
+  };
+  fs.writeFileSync(path.resolve(__dirname, jsonArg), JSON.stringify(payload, null, 2), 'utf8');
+  console.log('结果 JSON 已写入 ' + jsonArg);
+}
 process.exit(bad.length ? 1 : 0);

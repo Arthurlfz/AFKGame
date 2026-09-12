@@ -23,9 +23,19 @@ relay-selfcheck.*
 新demo/战斗界面-怪物悬浮提示需求.md
 新demo/Mvp/原型代码/装备打造多样性方案*.md
 
-# ===== CodeBuddy / WorkBuddy 内部记忆与配置（不入库）=====
-.codebuddy/
+# ===== CodeBuddy / WorkBuddy 内部配置（不入库）=====
+# ⚠️ 2026-09-13 改动：把 .codebuddy/memory/ 单独放行入库。
+#    原因：那里存着 19 天 735KB 的排障记录与决策依据，是全项目唯一的「纠错账本」，
+#    原先整目录被忽略 → 零备份零版本历史，一次误删/重装全没。
+#    其余子目录（skills/agents/teams，含本地会话残留）继续忽略，保持最小作用域。
+.codebuddy/*
+!.codebuddy/memory/
+!.codebuddy/memory/**
 .workbuddy/
+
+# ===== Obsidian vault 本地配置（编辑器状态 / 工作区，不入库）=====
+.obsidian/workspace*
+.obsidian/workspace.json
 
 # ===== 本地密钥（Meowa API key，绝不入库）=====
 .env
@@ -71,6 +81,7 @@ _backup_rollback*/
 supabase/.temp/
 $null
 docs/tests/_*.txt
+docs/tests/_current.json
 docs/tests/out_*.txt
 docs/tests/result.txt
 /screenshot*.png
