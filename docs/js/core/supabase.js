@@ -94,8 +94,6 @@
     }
     return res;
   }
-  // 装备槽列查询：单独查（兼容旧库未执行迁移时列不存在 → 返回空，不影响宠物本体读取）
-  const PET_EQUIP_QUERY = async (builder) => builder.select('equipment');
   async function loadPets() {
     return queryPets(cols => client.from('pets').select(cols).order('created_at', { ascending: true }));
   }

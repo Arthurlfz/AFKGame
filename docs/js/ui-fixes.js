@@ -251,28 +251,6 @@
     obs.observe(preview, { childList: true, subtree: true });
   }
 
-  /* ============================================================
-   * 8. 提高新手期（Lv1-6地图）装备掉率
-   * ============================================================ */
-  function boostEarlyDropRate() {
-    // 在 drop.js 加载后 hook 装备掉落判定
-    const origRoll = window.Drop && window.Drop.roll;
-    if (!origRoll) return;
-    window.Drop.roll = function () {
-      const result = origRoll.apply(this, arguments);
-      // 如果当前地图是新手图（枯荣之地 Lv1-6），提高装备掉率
-      // 这里不直接改返回值，而是确保新手前 10 场必掉一件白装
-      try {
-        const area = (window.Battle && window.Battle.state && window.Battle.state.areaId) || '';
-        const fightCount = (window.Battle && window.Battle.state && window.Battle.state.totalFights) || 0;
-        if (fightCount < 10 && !result.equip) {
-          // 前10场没掉装备时，补一个白装
-          // 不直接注入（避免破坏掉落表逻辑），只在日志提示
-        }
-      } catch (e) {}
-      return result;
-    };
-  }
 
   /* ============================================================
    * 初始化
@@ -284,7 +262,6 @@
     initSettingsPanel();
     initTutorialEndCard();
     initEvolutionCards();
-    boostEarlyDropRate();
     // 货币 tooltip 延迟再跑一次（等市集内容渲染完）
     setTimeout(initCurrencyTooltips, 2000);
     // 延迟再 patch 一次（等 main.js 加载完 UI 对象）

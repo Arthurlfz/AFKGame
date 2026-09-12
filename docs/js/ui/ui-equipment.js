@@ -366,45 +366,6 @@
     return `<div class="tip-section">对比身上装备</div>${html}`;
   }
 
-  // 装备详情浮层内容：按“等级 / 基底词缀 / 前缀 / 后缀 / 对比身上装备”分段展示
-  function buildEquipTip(eq, pet) {
-    if (eq.identified === false) {
-      const r2 = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
-      const mt = eq.materialTier ?? eq.tier ?? 4;
-      return '<div class="tip-icon"><span class="ico"><span class="emoji"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></span></div>' +
-        '<div class="tip-name" style="color:' + r2.color + '">' + escapeHtml(eq.name || '未知装备') + '</div>' +
-        '<div class="tip-line"><span>底材</span><b>T' + mt + '</b></div>' +
-        '<div class="tip-line"><span>物品等级</span><b>' + (window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : (eq.level ?? eq.itemLevel ?? 1)) + '</b></div>' +
-        '<div class="tip-section">词缀</div><div class="tip-empty">未鉴定 · 需要鉴定石揭晓</div>';
-    }
-    const affixes = window.Equipment.normalizeAffixes ? window.Equipment.normalizeAffixes(eq.affixes) : (eq.affixes || { prefix: [], suffix: [] });
-    const prefix = affixes.prefix || [];
-    const suffix = affixes.suffix || [];
-    const r = (eq.rarity && eq.rarity.id) ? eq.rarity : { id: 'white', label: '白色', color: '#b2aa9c' };
-    const b = (eq.base && eq.base.label) ? eq.base : { type: 'atk', label: '攻击', value: 0 };
-    const itemLevel = eq.level ?? eq.itemLevel ?? eq.ilvl ?? eq.areaTier ?? 1;
-    // 词缀行统一走 Equipment.formatAffixHtml（POE 式：label +值 (该T阶区间 min~max)，T1/满roll 金色）
-    const line = (a, cls) => a.map(x => window.Equipment.formatAffixHtml(x, cls)).join('') || '<div class="tip-empty">无</div>';
-    // PoE 式顶部大图标（部位映射与背包共用 UI.EQUIP_ICON），描边随稀有度色
-    const ICONS = (window.UI && window.UI.EQUIP_ICON) || {};
-    const iconHtml = '<div class="tip-icon"><span class="ico" style="border-color:' + r.color + '"><span class="emoji">' + (ICONS[eq.slot] || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>') + '</span></span></div>';
-    return `
-      ${iconHtml}
-      <div class="tip-name" style="color:${r.color}">${escapeHtml(eq.name || '未知装备')}</div>
-      <div class="tip-line"><span>底材</span><b>T${eq.materialTier ?? eq.tier ?? 4}</b></div>
-      <div class="tip-line"><span>物品等级</span><b>${window.Equipment.ilvlOf ? window.Equipment.ilvlOf(eq) : itemLevel}</b></div>
-      <div class="tip-section">基底词缀</div>
-      <div class="tip-base">${escapeHtml(b.label)} +${b.value} <span class="tip-tier">T${eq.materialTier ?? eq.tier ?? 4}</span></div>
-      <div class="tip-section">词缀</div>
-      ${line(prefix, 'tip-prefix')}
-      <hr class="tip-divider">
-      ${line(suffix, 'tip-suffix')}
-      <div class="tip-section">魂铸</div>
-      ${eq.soulAffix
-        ? '<div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>'
-        : '<div class="tip-empty">无</div>'}
-      ${buildEquipCompare(pet, eq)}`;
-  }
 
   /* ---------- 主从式右侧面板：装备详情 + 打造（2026-09-04） ---------- */
   /* ---------- 详情+打造面板（2026-09-04 容器化）

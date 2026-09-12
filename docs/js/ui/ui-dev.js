@@ -316,9 +316,6 @@
     push('其他材料', rest);
     return groups;
   }
-  function collectMaterialNames() {
-    return collectMaterialGroups().reduce((all, g) => all.concat(g.names), []);
-  }
   function collectEggSpecies() {
     const sp = (Config.pet && Config.pet.starters) || [];
     return sp.map(s => s.name).filter(Boolean);
@@ -736,7 +733,6 @@
       critRate: b.critRate || 0.1, critDamage: b.critMultiplier || 1.5, lifesteal: 0
     };
   }
-  function strengthHitChance(h, d) { return Math.max(0.05, Math.min(0.95, h / (h + d))); }
   function strengthFight(pet, enemy) {
     let pA = 0, eA = 0, php = pet.hp, ehp = enemy.hp, guard = 0;
     while (php > 0 && ehp > 0 && guard++ < 5000) {

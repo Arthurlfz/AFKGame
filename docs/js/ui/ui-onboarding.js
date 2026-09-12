@@ -66,10 +66,6 @@
     }
     return host;
   }
-  function clearHost() {
-    const h = getHost();
-    h.innerHTML = '';
-  }
   function tickerRun(fn) {
     tickerStop();
     if (!RE_MOTION || !RE_MOTION.matches) { // 即使关闭动效，定位仍需每帧同步
@@ -84,21 +80,7 @@
   function tickerStop() {
     if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
   }
-  /* target 每帧重新 query：页面切换/DOM 重建后仍能跟随最新元素 */
-  function resolveTarget(spec) {
-    return qs(spec && spec.sel);
-  }
-
-  /* ---------- avatar 渲染 ---------- */
-  function avatarHtml(av) {
-    if (!av) return '';
-    if (typeof av === 'string') {
-      return av.charAt(0) === '<' ? av : '<img class="ob-avatar-img" src="' + av + '" alt="">';
-    }
-    return '';
-  }
   function setName(n, fallback) { return n || fallback || '引路人'; }
-  function setTitle(t) { return t || ''; }
 
   /* ---------- 共享：单条气泡内容（NPC 名 / 标题 / 台词） ---------- */
   function bubbleInner(opts) {

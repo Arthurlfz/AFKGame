@@ -184,11 +184,6 @@
     }
     return null;
   }
-  function guideAllDone() {
-    const quests = Config.drop && Config.drop.quests ? Config.drop.quests : [];
-    return quests.every(q => q.category !== 'tutorial'|| !q.isGuide ||
-      (window.Quest && window.Quest.isFinished ? window.Quest.isFinished(q) : true));
-  }
 
   /* ---------- 加速道具「引导祝福」（2026-09-02 用户拍板：加速=绑定道具，用掉才生效） ----------
    * 规则：

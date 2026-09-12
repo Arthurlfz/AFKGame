@@ -852,7 +852,7 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260910tower2"></script>
-<script src="js/core/supabase.js?v=20260912gem3"></script>
+<script src="js/core/supabase.js?v=20260912tomb1"></script>
 <!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
 <script src="js/core/auth-session.js?v=20260910sess1"></script>
 <!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
@@ -862,14 +862,14 @@ window.PetSprites = {
 <script src="js/core/items.js?v=20260911verify1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=20260911gear2"></script>
-<script src="js/core/market.js?v=20260912gem1"></script>
+<script src="js/core/market.js?v=20260912tomb1"></script>
 <script src="js/core/market_bot.js?v=20260911persona1"></script>
 <script src="js/equipment/equipment_craft.js?v=20260911gear5"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
 <script src="js/pet/pet_merge.js?v=20260911trait5"></script>
 <script src="js/pet/pet_evolve.js?v=20260911evo10"></script>
 <script src="js/core/quest.js?v=20260912quest3"></script>
-<script src="js/core/tutorial_mode.js?v=20260911q1"></script>
+<script src="js/core/tutorial_mode.js?v=20260912tomb1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
@@ -891,7 +891,7 @@ window.PetSprites = {
 <script src="js/tower/tower-engine.js?v=20260911tower3"></script>
 <script src="js/core/battle-sim.global.js?v=20260911simsync1"></script>
 <script src="js/core/idle-bridge.js?v=20260911idle3"></script>
-<script src="js/ui/ui-common.js?v=20260911dragfix"></script>
+<script src="js/ui/ui-common.js?v=20260912fix2"></script>
 <script src="js/ui/ui-console.js?v=20260910sess1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260912gem1"></script>
@@ -901,7 +901,7 @@ window.PetSprites = {
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
 <script src="js/ui/ui-dialog.js?v=b24849c2"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
-<script src="js/ui/ui-onboarding.js?v=20260903l"></script>
+<script src="js/ui/ui-onboarding.js?v=20260912tomb1"></script>
 <script src="js/ui/ui-quest.js?v=20260912fix1"></script>
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
 <script src="js/trial/ui-trial-battle.js?v=20260910fx12"></script>
@@ -913,12 +913,12 @@ window.PetSprites = {
 <script src="js/ui/ui-battle.js?v=20260911skill4"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260911trait1"></script>
-<script src="js/ui/ui-pet-evolve.js?v=20260911trait3"></script>
+<script src="js/ui/ui-pet-evolve.js?v=20260912tomb1"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260911trait3"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260911trait1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
 <script src="js/ui/ui-bag.js?v=20260911ident1"></script>
-<script src="js/ui/ui-equipment.js?v=20260912fix1"></script>
+<script src="js/ui/ui-equipment.js?v=20260912tomb1"></script>
 <script src="js/ui/ui-craft.js?v=20260911craft5"></script>
 <script src="js/ui/ui-market.js?v=20260912gem3"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
@@ -926,10 +926,10 @@ window.PetSprites = {
 <script src="js/ui/ui-market-notify.js?v=20260910mt2"></script>
 <script src="js/ui/ui-codex.js?v=20260912gem3"></script>
 <script src="js/ui/ui-shop.js?v=20260912gem3"></script>
-<script src="js/ui/ui-dev.js?v=20260912gem1"></script>
+<script src="js/ui/ui-dev.js?v=20260912tomb1"></script>
 <script src="js/main.js?v=20260912gem1"></script>
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
-<script src="js/ui-fixes.js?v=20260911dragfix"></script>
+<script src="js/ui-fixes.js?v=20260912tomb1"></script>
 <script src="js/skill-effects.js?v=20260910fx11"></script>
 <!-- 战斗页宠物竖列共享 tooltip 已移入 #tab-battle 内（见战斗舞台 enemy-tip 下方），复用 .enemy-tip 样式 -->
 <!-- 背包页格子共享 tooltip（body 层 fixed，悬停显示物品完整信息；复用 .equip-tip 打造页样式） -->

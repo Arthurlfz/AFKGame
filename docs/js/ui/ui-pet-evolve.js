@@ -22,9 +22,6 @@
   // 阶段总数（从 config 推导；别再硬写 5 —— 改阶段表时界面要跟着走）
   const stageCount = () => (((Config.pet && Config.pet.evolution && Config.pet.evolution.stages) || []).length) || 5;
 
-  function evoStatRows(s) {
-    return `<div><span>生命</span><b>${s.hp}</b></div><div><span>攻击</span><b>${s.atk}</b></div><div><span>防御</span><b>${s.def}</b></div><div><span>速度</span><b>${s.spd}</b></div>`;
-  }
 
   function renderEvolveTab() {
     const list = $('evolve-pet-list');

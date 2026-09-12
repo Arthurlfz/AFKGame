@@ -80,7 +80,6 @@
   }
   // 在售宠物 = 真实玩家挂单 + 假卖家（流浪商人）挂单（假单排前面，市场打开就有货）
   const getListings = () => [...botPetListings, ...listings];
-  const getRealListings = () => listings;
   const getBotPetListings = () => botPetListings;
   function addBotPetListing(l) { botPetListings.unshift(l); }
   // 在售装备 = 真实玩家挂单 + 假卖家（流浪商人）挂单（假单排前面，市场打开就有货）
