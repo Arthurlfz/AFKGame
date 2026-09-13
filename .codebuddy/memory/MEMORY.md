@@ -27,6 +27,8 @@
 - 🔴 远端 `Arthurlfz/AFKGame` 是 public + GitHub Pages → ⛔ **永不转私有**。部署 = Pages 发布 main 的 `/docs`。**写 memory 避开明文邮箱/密钥**。
 - 🔴 gitignore 陷阱：用 `.codebuddy/*` + `!.codebuddy/memory/` + `!.codebuddy/memory/**`（`.codebuddy/**` 写法无效）；判生效看 `git status`，不看 check-ignore。
 - ⚠️ `git status` 中文路径转成八进制 → `git status --short -- "docs/游戏.html"`。⚠️「没接/没做」必须现场核代码取证。⚠️ PowerShell `Set-Content` 会被拦 → 用编辑工具或 node 写。
+- 🔴 **核实"线上是不是我刚推的"**：**只信线上文件的内容**（搜这一版独有的字符串），**不信时间戳** —— 实测 `Last-Modified` 与 GitHub API `pushed_at` 都会返回陈旧值（2026-09-14 验证）。做法：先 `git ls-remote --heads origin main` 确认提交号，再抓线上文件搜特征串。
+  ⚠️ 抓含 `%` 编码的 URL 时，本环境 shell 会被 cmd 吞字符导致管道断裂 → 挑不含 `%` 的路径（如 `css/game.css`）验。Node 的 fetch 在本机 TLS 验证不过，用 PowerShell `Invoke-WebRequest`。
 
 ## 4 云端约定
 - Supabase ref `asklogeayzlqpeejuvjj`（`core/supabase.js`）。EF 部署：`npx -y supabase functions deploy <name>`。🔴 **EF 不会自动部署** → 改了 `supabase/functions/**` 收尾必须提醒用户部署，否则等于没上线。
