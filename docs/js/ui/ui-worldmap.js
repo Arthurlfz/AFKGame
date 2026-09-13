@@ -331,7 +331,16 @@
     });
     dropNames.push('装备（未鉴定）');
     dropNames.push('宠物蛋');
-    const dropHtml = dropNames.map(d => `<span class="nd-drop-chip">${esc(d)}</span>`).join('');
+    /* 掉落预览也按档位分级（2026-09-14）：**复用掉落播报那套档位表**（UI.lootTierOf，
+     * 定义在 ui-battle.js），不在这里另抄一份名单 —— 抄了就是第二份事实源，改档位表时会漏。
+     * 装备 / 宠物蛋不在材料档位表里，单独定档：宠物蛋=3（惊喜档），装备=2。 */
+    const tierOf = n => (n === '宠物蛋' ? 3
+      : (n === '装备（未鉴定）' ? 2
+        : (UI.lootTierOf ? UI.lootTierOf(n) : 1)));
+    const dropHtml = dropNames.map(d => {
+      const t = tierOf(d);
+      return `<span class="nd-drop-chip${t > 1 ? ' hi' + t : ''}">${esc(d)}</span>`;
+    }).join('');
 
     // 出战宠物选择：pendingId = 详情页里刚点选、还没生效的宠物（点「只进战斗/开始挂机」才真正切换，
     // 不然 setActive 会换掉正在挂机的宠物，下一个战报回来 IdleBridge 就把挂机停了）

@@ -8,6 +8,7 @@
 - 暗黑风「挂机养宠 + 宠物/装备真实交易」网页游戏，名 **永夜灵市 / Evernight Bazaar**；⛔ 旧名 `Soulforge`/`Forge of Souls` 已废弃（含 Soul/Forge 组合禁用）。
 - 循环：挂机→材料→合成/进化/涅槃→打造→P2P 市场。三爽点 **掉宝/鉴定 > 市场捡漏 > 成长跳变**。不学氪金分层/品级/五行。
 - 运行源 `docs/`（`js/` + `游戏.html`；CSS 序 vars→design-tokens→app→game→ui-polish）。`新demo/` 不开发。图 1-10 覆盖 Lv1-60（maxLevel=60）。
+- 🔴 **浮层层级（z-index）唯一权威 = `docs/css/game.css` 顶部的「层级表」注释**（2026-09-14 立：100 普通浮窗 / 200+ 模态 / 300 tooltip / 500 系统级）。加新浮层前先去挑一档，**别自己编数字**。⭐ CSS 老坑（已踩两次）：**父容器缺 `height:100%` → 子级 `flex:1` 失效**，内容长高把底部元素顶出可视区（症状"XX 不见了"）。CSS 细则见 `forge-of-souls-dev` skill。
 - ⚠️ 根 `js` 是 Junction → `docs/js`，丢了重建：`New-Item -ItemType Junction -Path 'd:/Ai/游戏原型/js' -Target 'd:/Ai/游戏原型/docs/js'`。
 - 治理四件套（**不新建第 5 份**）：宪法/导航/AGENTS/任务单；冲突立刻对齐。⭐ 病因=决策前后打架，解药=宪法给人 + AGENTS 给 AI + `vtest_*` 让代码自己拦。
 
@@ -18,6 +19,7 @@
 - ⭐ 不要过度堵住：收紧类改动先列全量消费方，选**最小作用域**；判据「失败会丢资产吗？」。
 - ⭐ **「再建一个」默认答案是不建**（同一逻辑两份、只有一份对 = 头号病因）。一文件一职责；旧代码不回头重构；复杂修复分批；数值定死不引动态难度。
 - 宠物图标走立绘/头像，不回退 emoji。⭐ 知识必须有载体（只在对话里答过 = 没有）。禁令类拍板必须全仓扫描确认。
+- 🔴 **用户会盯着"你有没有走 skill"**：动 `config.js`/数值 → 先加载 `fos-balance`（它带「改 config 必查的联动清单」，漏一个就线上线下不一致）；交付前 → 走 `fos-verify` §7 自查清单。**别凭记忆干活，用户会直接点出来。**
 
 ## 3 Git / 并发
 - 改前 commit+push 当安全点；**只 add 自己改的路径**（`git add -A` 出过事故）；提交前看 `git status --short` 有无意外 `D`。不主动 push。push 被掐 → `git -c http.version=HTTP/1.1 -c http.postBuffer=524288000 push origin main`。
@@ -36,7 +38,7 @@
 ## 5 游戏定调与消息中心
 - 无第一/第二幕，一条连续进度；任务链一环套一环，新手引导不许卡手。守关 Boss 是服务端权威稀有事件，引导/任务不许拿它当条件。
 - 美术：古典水墨山水 + 羊皮纸做旧；墨黑灰白为主，暗紫/锈红/病绿点缀，几乎不用亮金。
-- 消息中心 `ui/ui-console.js`：3 频道 **世界(social)/系统(system)/掉落(loot)**；5 个内嵌 console（世界地图/主城/战斗/宠物页）+ 底部抽屉**共享同一份 history**（上限 100 条）与同一个 `activeTab`（默认世界）。⚠️ `addLog`/`showToast` 把分类**写死 system** → **频道归属由调用方负责**。
+- 消息中心 `ui/ui-console.js`：**4 频道 世界(social)/掉落(loot)/战斗(battle)/系统(system)**（09-13 立规，**规则表在文件顶部常量块 = 唯一权威**）。5 个内嵌 console + 底部抽屉共享同一份 history（上限 100 条）与同一个 activeTab（**默认「掉落」**，localStorage `fof_console_tab` 记住上次）。⚠️ `addLog`/`showToast`/`consoleLog` 的 cat **默认 system** → **频道归属由调用方负责**：战斗流水必须显式传 `'battle'`、获得物传 `'loot'`。守值 `vtest_capital.js` 第 5/5.5 段。
 
 ## 6 易错数值/规则
 - `evolve_times = evolveStage − 1`；进化上限只认 `nextStageOf` 为 null；进化**不改等级**；终阶只收传说×1；涅槃清 `evolveTimes`/`cultivateUsed`、等级回 1、保留形态。

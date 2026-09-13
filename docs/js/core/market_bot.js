@@ -399,9 +399,9 @@
           const nm = pick.good_name + ' ×' + pick.good_qty;
           const pay = pick.material_qty + ' ' + pick.material_type;
           if (String(pick.seller_id) === String(user.id)) {
-            UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
+            UI.consoleLog('system', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
           } else {
-            UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 收购了 <b>' + nm + '</b>（' + pay + '）');
+            UI.consoleLog('system', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 收购了 <b>' + nm + '</b>（' + pay + '）');
           }
         }
         if (window.UI && UI.renderAll) UI.renderAll();
@@ -444,9 +444,9 @@
       const nm = target.item_name || '';
       const pay = (target.material_qty || 0) + ' ' + (target.material_type || '材料');
       if (user && target.seller_id === user.id) {
-        UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
+        UI.consoleLog('system', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 你的 <b>' + nm + '</b> 被 ' + ps.nickname + ' 买走了（收到 ' + pay + '）');
       } else {
-        UI.consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 购买了 <b>' + nm + '</b>（' + pay + '）');
+        UI.consoleLog('system', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> ' + ps.nickname + ' 购买了 <b>' + nm + '</b>（' + pay + '）');
       }
     }
     // sink：买入 80% 直接消耗离场；20% 降价再挂（同一 persona 立刻补一件当"转卖"）

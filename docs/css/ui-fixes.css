@@ -92,7 +92,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 200;
+  z-index: 230; /* 层级表 230 档：模态（引导「下一步」卡片），见 game.css 顶部层级表 */
   width: 480px;
   max-width: 90vw;
   background: var(--panel, #1a2223);

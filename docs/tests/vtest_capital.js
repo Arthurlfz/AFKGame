@@ -17,6 +17,10 @@ els['capital-stage']=el();                 // 主城舞台
 els['capital-tip']=el();
 els['btn-capital-return-map']=el();
 els['btn-capital-rest']=el();
+// 本用例第 4 段断言的是「世界频道」的消息流，所以先把频道钉死在世界。
+// （ui-console.js 2026-09-13 起默认频道=掉落，并记住玩家上次的选择：localStorage 的 fof_console_tab。
+//   不钉的话用例会跟着默认值飘 —— 这正是它当时变红的原因。）
+mem.setItem('fof_console_tab','social');
 // document.querySelectorAll('.inline-console') → 返回两个内嵌容器（世界地图/战斗页各一）
 const inlineConsoles=[makeConsole(),makeConsole()];
 const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelectorAll:sel=>sel==='.inline-console'?inlineConsoles:[],querySelector:()=>null,addEventListener(){},documentElement:{style:{setProperty(){}}}},els:els,session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
@@ -76,7 +80,24 @@ A(inline1.indexOf('测试世界消息')>=0,'内嵌 console（战斗页）收到�
 
 /* ============ 5. 频道 tab 渲染到所有容器（activeTab 单一来源） ============ */
 const tabsHtml=inlineConsoles[0]._q['.chat-tabs'].innerHTML;
-A(tabsHtml.indexOf('世界')>=0&&tabsHtml.indexOf('系统')>=0&&tabsHtml.indexOf('掉落')>=0,'内嵌 console 频道 tab 渲染完整');
+A(tabsHtml.indexOf('世界')>=0&&tabsHtml.indexOf('系统')>=0&&tabsHtml.indexOf('掉落')>=0&&tabsHtml.indexOf('战斗')>=0,'内嵌 console 四频道 tab 渲染完整（世界/掉落/战斗/系统）');
+
+/* ============ 5.5 频道分隔：战斗流水 / 获得物不落进系统频道（2026-09-13 分类修正） ============
+ * 挂机的战斗流水是 100+ 条/小时级别的量，必须进「战斗」频道；获得物进「掉落」频道。
+ * 不分开的话它们以默认 system 落进系统频道，而 history 上限只有 100 条 ——
+ * 登录失败、存档失败这类要紧提示几秒就被冲没了。
+ * 断法：读频道 tab 上的计数角标（.chat-tab-cnt），它每次 consoleLog 都会重算。 */
+const cntOf=cat=>{
+  const html=inlineConsoles[0]._q['.chat-tabs'].innerHTML;
+  const m=new RegExp('data-cat="'+cat+'"[\\s\\S]*?chat-tab-cnt">(\\d+)<').exec(html);
+  return m?Number(m[1]):-1;
+};
+const systemBefore=cntOf('system');
+C('UI.consoleLog("battle"," 击败 测试怪 Lv.3：经验 +12")');
+C('UI.consoleLog("loot","测灵草 ×1")');
+A(cntOf('battle')>=1,'战斗流水进「战斗」频道');
+A(cntOf('loot')>=1,'获得物进「掉落」频道');
+A(cntOf('system')===systemBefore,'系统频道不收纳战斗流水与掉落（'+systemBefore+' → '+cntOf('system')+'）');
 
 /* ============ 6. 幂等性：重复调用 renderCapitalPage 不重复渲染（DOM 常驻） ============ */
 C('UI.renderCapitalPage()');

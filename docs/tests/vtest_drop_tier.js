@@ -16,6 +16,10 @@ const ctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, nav
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/equipment/equipment.js', 'utf8'), ctx);
+// 第 7 段要直接调 UI.showLoot 验「播报档位真的生效」，需要 UI / Pet 两个命名空间先存在
+vm.runInContext(fs.readFileSync('../js/pet/pet.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/ui-common.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/ui-battle.js', 'utf8'), ctx);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 
@@ -107,6 +111,90 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   // 静态防回归：drop.js 必须读 materialWeightsByTier，不能再读旧全局 materialWeights
   const src = fs.readFileSync('../js/core/drop.js', 'utf8');
   A(/materialWeightsByTier/.test(src) && !/D\.materialWeights\b/.test(src), 'drop.js 已改用 materialWeightsByTier（旧全局 materialWeights 已弃用）');
+}
+
+// 6. 掉落播报档位表（2026-09-13 新增）
+//    守的是「档位表里的名字必须真的会掉落」—— 否则有人改了材料名却忘了改档位表，
+//    表就变成一堆对不上的死名字（本项目高发病：同一逻辑两份、只有一份对），
+//    而症状是"某件稀有的东西掉下来没人注意到"，非常难被发现。
+{
+  const mw2 = JSON.parse(C('JSON.stringify(Config.drop.materialWeightsByTier)'));
+  const tiers = JSON.parse(C('JSON.stringify(Config.drop.lootTiers || {})'));
+  const names = new Set();
+  for (const t of Object.keys(mw2)) for (const k of Object.keys(mw2[t])) names.add(k);
+  // 进化素材在 materialWeightsByTier 里是占位键，实际名字在 evoMaterialWeights
+  const evo = JSON.parse(C('JSON.stringify(Config.drop.evoMaterialWeights || {})'));
+  for (const k of Object.keys(evo)) names.add(k);
+
+  const keys = Object.keys(tiers);
+  A(keys.length > 0, `掉落播报档位表非空（${keys.length} 条）`);
+  const badV = Object.entries(tiers).filter(([, v]) => ![1, 2, 3].includes(Number(v)));
+  A(!badV.length, `播报档位只许取 1/2/3${badV.length ? '，越界：' + JSON.stringify(badV) : ''}`);
+  const stale = keys.filter(n => !names.has(n));
+  A(!stale.length, `档位表里的名字都真的会掉落（改材料名忘了改这张表 = 档位静默失效）${stale.length ? '，对不上的：' + stale.join('、') : ''}`);
+  A(Number(tiers['涅磐兽']) === 3 && Number(tiers['腐印·天罚']) === 3,
+    '表内最稀的两件（涅磐兽 / 腐印·天罚）必须挂着最亮档 3');
+  // 刻意守反例：日常材料不许挂高亮档，否则"提亮一切 = 没提亮"
+  A(!tiers['重铸石'] && !tiers['鉴定石'] && !tiers['区域材料'],
+    '日常材料（重铸石/鉴定石/区域材料）不进档位表（不抢注意力）');
+}
+
+// 7. 播报档位真的打到消息上（不只要表好看，要 UI 真用上它）
+//    断法：接管 UI.consoleLog 把产物收下来，逐条看有没有挂上 .hi2 / .hi3。
+{
+  C('globalThis.__cap = []; window.UI.consoleLog = (cat, html) => { globalThis.__cap.push([String(cat), String(html)]); };');
+  C('UI.showLoot({ type:"material", material:"涅磐兽", qty:1 })');   // 档 3
+  C('UI.showLoot({ type:"material", material:"腐印·暴怒", qty:1 })'); // 档 2
+  C('UI.showLoot({ type:"material", material:"重铸石", qty:1 })');     // 档 1（不提亮）
+  C('UI.showLoot({ type:"egg" })');                                    // 档 3
+  C('UI.showLoot({ type:"equipment", eq:{ name:"测试剑", rarity:{ id:"gold", label:"金色" } } })'); // 档 3
+  C('UI.showLoot({ type:"equipment", eq:{ name:"测试甲", rarity:{ id:"white", label:"白色" } } })');// 档 1
+  const rows = JSON.parse(C('JSON.stringify(globalThis.__cap)'));
+  A(rows.length === 6, `6 条掉落都进了消息控制台（实际 ${rows.length} 条）`);
+  A(rows.every(r => r[0] === 'loot'), '掉落播报全部进 loot 频道（没漏回 system）');
+  const htmlOf = i => rows[i][1];
+  A(/hi3/.test(htmlOf(0)), '涅磐兽挂着最亮档 hi3');
+  A(/hi2/.test(htmlOf(1)), '腐印·暴怒挂 hi2');
+  A(!/hi[23]/.test(htmlOf(2)), '重铸石不挂档位（日常材料不提亮，提亮一切=没提亮）');
+  A(/hi3/.test(htmlOf(3)) && /loot-egg/.test(htmlOf(3)), '宠物蛋挂 hi3 且带幽蓝 .loot-egg');
+  A(/hi3/.test(htmlOf(4)), '金装挂 hi3');
+  A(!/hi[23]/.test(htmlOf(5)), '白装不挂档位');
+  // 🔴 顶档流光靠 currentColor 取色 → 档位 class 与颜色 class **必须在同一个 span**。
+  //    拆成两层（外层档位、内层颜色）的话外层取到的是继承色，金装会变成默认字色，看不出来。
+  A((htmlOf(4).match(/<span/g) || []).length === 1 && /hi3/.test(htmlOf(4)) && /fs-q--gold/.test(htmlOf(4)),
+    '金装：档位与颜色 class 在【同一个 span】上（流光取色靠它，拆两层会取错）');
+}
+
+// 8. 材料用途配色（2026-09-13 用户拍板：区域材料无所谓，**打造 / 进化必须有区别**）
+//    分工：**字号 = 稀有度，颜色 = 用途** —— 两条线不能互相抢。
+{
+  C('globalThis.__cap = [];');
+  C('UI.showLoot({ type:"material", material:"进化素材", qty:1 })');
+  C('UI.showLoot({ type:"material", material:"传说进化素材", qty:1 })');
+  C('UI.showLoot({ type:"material", material:"重铸石", qty:1 })');
+  C('UI.showLoot({ type:"material", material:"枯荣种荚", qty:1 })'); // 区域材料
+  const rows8 = JSON.parse(C('JSON.stringify(globalThis.__cap)'));
+  const h = i => rows8[i][1];
+  const clsOf = s => (s.match(/loot-c-(evo|stone|affix)/) || [''])[0];
+  A(clsOf(h(0)) === 'loot-c-evo', '进化素材上「进化系」色');
+  A(clsOf(h(1)) === 'loot-c-evo' && /hi2/.test(h(1)),
+    '传说进化素材 = 进化系色 + 档 2（颜色标用途、字号标稀有度，两条线不互相抢）');
+  A(clsOf(h(2)) === 'loot-c-stone', '重铸石上「打造石」色');
+  A(clsOf(h(0)) !== clsOf(h(2)), '进化与打造两种用途颜色不同（玩家一眼能分开）');
+  A(clsOf(h(3)) === '', '区域材料不上色（用户明确说无所谓；且每图不同、没有跨图可比性）');
+}
+
+// 9. 静态防回归：别处（地图掉落预览 / 鉴定 / 打造）必须**复用**同一套档位，不许各抄一份
+//    —— 抄了就是第二份事实源，改档位表时必然漏，症状是"这处还亮着那处不亮"。
+{
+  const wm = fs.readFileSync('../js/ui/ui-worldmap.js', 'utf8');
+  A(/UI\.lootTierOf/.test(wm), '地图节点掉落预览复用 UI.lootTierOf（不另抄档位名单 → 不出现第二份事实源）');
+  const bag = fs.readFileSync('../js/ui/ui-bag.js', 'utf8');
+  A(/hi3/.test(bag), '鉴定揭晓用顶档 hi3（金装才有完整演出）');
+  const craft = fs.readFileSync('../js/ui/ui-craft.js', 'utf8');
+  A(/hi3/.test(craft), '打造出 T1 顶级词缀用顶档 hi3');
+  const synth = fs.readFileSync('../js/ui/ui-pet-synth.js', 'utf8');
+  A(/broadcastAnnounce/.test(synth), '神级宠 / 变异宠合成成功会发全服通告');
 }
 
 console.log('ALL DROP TIER TESTS PASSED');

@@ -104,14 +104,16 @@
     }
   };
 
-  /* ---------- 掉落日志：金色 + 文字前缀（双编码，不只靠颜色） ---------- */
+  /* ---------- 掉落日志：金色 + 文字前缀（双编码，不只靠颜色） ----------
+   * 2026-09-13 修正频道：塔的掉落以前写进「系统」，跟战斗流水混一起 —— 掉落归「掉落」频道，
+   * 其余塔内事件归「战斗」频道（见 ui-console.js 的频道规则）。 */
   function logLootLoot(text) {
-    if (UI.consoleLog) UI.consoleLog('system', `<span class="tw-loot"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> ${esc(text)}</span>`);
-    else if (UI.addLog) UI.addLog(' ' + text);
+    if (UI.consoleLog) UI.consoleLog('loot', `<span class="tw-loot"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> ${esc(text)}</span>`);
+    else if (UI.addLog) UI.addLog(' ' + text, 'loot');
   }
   function logEpic(text) {
-    if (UI.consoleLog) UI.consoleLog('system', `<span class="tw-epic">${esc(text)}</span>`);
-    else if (UI.addLog) UI.addLog(text);
+    if (UI.consoleLog) UI.consoleLog('battle', `<span class="tw-epic">${esc(text)}</span>`);
+    else if (UI.addLog) UI.addLog(text, 'battle');
   }
 
   /* ---------- 引擎事件 → 战斗页表现 ---------- */

@@ -3,6 +3,25 @@
  * 来源：由游戏.html 内嵌 <style> 整体搬移而来（原样，未改任何规则）
  * 注：:root 设计变量已迁移至 css/vars.css，此处仅保留组件类样式
  * ============================================================ */
+
+/* ===================== 🔴 层级表（z-index）—— 唯一权威 =====================
+ * 2026-09-14 立。为什么要有这张表：以前**没人管过层级顺序**，每个新浮层随手挑一个
+ * 大数字（任务追踪 280 / tooltip 300 / 副本结算 500），于是**后加的东西把先加的压在下面**
+ * —— 表现就是"背包窗口（装备/孵化 tab）怎么被别的浮层盖住了一半"。
+ * 这不是哪个数字写错了，是**没有顺序**。加新浮层前先来这里挑一档，**别自己编数字**。
+ *
+ *   0     页面内容（.tab-page 等，不设 z-index）
+ *   80    顶栏（sticky）
+ *   90    常驻悬浮小条（右上角任务追踪 .quest-tracker）—— 会被浮窗盖住，这是对的
+ *   100   普通浮窗（背包窗口 .bag-window-host / 打造抽屉 / 市集 / 节点详情 .area-detail）
+ *   105   任务面板（可拖动，与背包窗口同级、略高一点）
+ *   200+  模态层：必须盖住所有浮窗
+ *      200  装备详情 / 鉴定揭晓卡（.equip-detail-modal）—— 它在背包窗口里弹出，必须比窗口高
+ *      220  开局选宠（#starter-screen）
+ *      230  引导「下一步」卡片（.next-step-card）
+ *   300   浮在一切之上的 tooltip（背包 / 宠物 / 战斗竖列）—— 必须在模态之上
+ *   500   系统级全屏结算（副本结算 .trial-settle）—— 盖住所有东西
+ * ======================================================================== */
 * { margin:0; padding:0; box-sizing:border-box; }
 /* 全局宽度：页面随视口自适应（不强制 1280px）。
  * 根因说明：旧写法 min-width:1280px 会让视口不足 1280px 时 body 仍被撑到 1280px 宽，
@@ -1556,7 +1575,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   #tab-battle .stat-row { margin-left:0; }
 }
 #starter-screen {
-  position:fixed; inset:0; z-index:110; display:none; align-items:center; justify-content:center;
+  /* 层级表 220 档：模态层，必须盖住背包窗口等浮窗 */
+  position:fixed; inset:0; z-index:220; display:none; align-items:center; justify-content:center;
   background:rgba(8,9,11,.88);
 }
 .starter-panel { width:min(1320px,94vw); padding:24px; background:var(--panel); border:1px solid var(--line-hi); box-shadow:0 12px 40px rgba(0,0,0,.6); text-align:center; }
@@ -2000,9 +2020,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .chat-tab.on { border-color:var(--accent); color:var(--accent-hi); box-shadow:0 0 0 1px rgb(var(--action-gold-rgb) / .25) inset; }
 .chat-tab-cnt { color:var(--text-faint); font-size:0.722rem; margin-left:3px; }
 .chat-tab-dot { display:inline-block; width:5px; height:5px; border-radius:50%; margin-right:4px; vertical-align:1px; }
+/* 频道色标（顺序与 ui-console.js 的 TAB_META 一致：世界 / 掉落 / 战斗 / 系统） */
 .chat-tab[data-cat="social"] .chat-tab-dot { background:#79a3a0; }
-.chat-tab[data-cat="system"] .chat-tab-dot { background:var(--accent); }
 .chat-tab[data-cat="loot"] .chat-tab-dot { background:var(--r-gold); }
+.chat-tab[data-cat="battle"] .chat-tab-dot { background:var(--danger-hi); }
+.chat-tab[data-cat="system"] .chat-tab-dot { background:var(--accent); }
 
 /* 消息流 */
 .chat-list { flex:1; min-height:0; overflow:auto; margin:0 -2px; padding-right:2px; }
@@ -2018,11 +2040,66 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .chat-msg.system .chat-text { color:var(--text-dim); }
 .chat-msg.system .chat-ic { color:var(--accent); flex:none; }
 .chat-msg.loot .chat-ic { color:var(--r-gold); flex:none; }
+/* 战斗频道：一行一条流水，量大 → 压暗一档，别把掉落/系统的重点盖过去 */
+.chat-msg.battle .chat-ic { color:var(--danger-hi); flex:none; }
+.chat-msg.battle .chat-text { color:var(--text-dim); }
 .chat-msg.loot .chat-text b { color:var(--text-hi); }
-.chat-msg.loot .loot-name.white { color:var(--r-white); }
-.chat-msg.loot .loot-name.blue { color:var(--r-blue); }
-.chat-msg.loot .loot-name.gold { color:var(--r-gold); }
-.chat-msg.loot .loot-name.purple { color:var(--r-purple); }
+/* 掉落播报的视觉语言（2026-09-13）：挂机没有"地上的东西"可以踩，掉宝只能靠消息控制台拉注意力。
+ * 分工：**字号 = 稀有度**（档位表 config.js 的 drop.lootTiers），**颜色 = 用途 / 东西本身**。
+ *   · 装备 → 沿用白/蓝/金三档稀有度色（.loot-q + fs-q--*）
+ *   · 宠物蛋 → 幽蓝 .loot-egg
+ *   · 材料 → 按用途：进化系病绿 / 打造与功能石暗紫；区域材料、腐印不上色（靠档位字号区分）
+ * 配色只用本作已有的点缀色（病绿 --exp / 暗紫 --r-purple），**不新造主色、不抢白蓝金三档稀有度色**。
+ * 档 1（日常）不套 hi2/hi3 → 跟普通消息同字号，不抢注意力（提亮一切 = 没提亮）。
+ * 删掉的 .loot-name.white/blue/gold/purple 是死规则：代码里从来没有 loot-name 这个 class（用的是 .loot-q）。 */
+/* 字号只做**轻微**分档（1.05 / 1.16em）—— 2026-09-13 二版：
+ * 用户原话「字体夸张了」，原来的 1.15/1.5em 太吵。抓眼睛的活交给下面的流光，不靠把字撑大。 */
+/* 档位 class 是**通用的**（hi2 / hi3），掉落、鉴定揭晓、打造出 T1、地图掉落预览共用一套，
+ * 所以选择器只挂 .chat-msg，不限制在掉落频道里。 */
+.chat-msg .hi2 { font-size:1.05em; font-weight:600; }
+.chat-msg .hi3 { font-size:1.16em; font-weight:700; }
+.chat-msg.loot .loot-egg { color:var(--r-blue); }
+/* 顶档流光：一道亮光从字上横扫过去。底色仍取 currentColor（就是这行本来的颜色：
+ * 金装=金、宠物蛋=幽蓝、材料=用途色），**只叠一层高光**，不抢白/蓝/金三档稀有度色。
+ * @supports 包住：不支持 background-clip:text 的浏览器自动退回「放大一点的字」，不会变透明看不见。 */
+@supports ((background-clip:text) or (-webkit-background-clip:text)) {
+  .chat-msg .hi3 {
+    background-image:linear-gradient(100deg, currentColor 0 32%, #fffdf0 44% 56%, currentColor 68% 100%);
+    background-size:280% 100%;
+    background-repeat:no-repeat;
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+    /* 常态：一道光慢慢扫；入场：掉下来那一下过曝一下再收回本色（只播一次） */
+    animation:loot-shimmer 2.2s linear infinite, loot-drop-in .75s cubic-bezier(.2,.8,.3,1) 1;
+  }
+}
+@keyframes loot-shimmer { from { background-position:0% 0 } to { background-position:100% 0 } }
+/* 入场那一下 = "捡到的瞬间"：从过曝白光收回到本来的颜色
+ * ⚠️ 能成立的前提：ui-console.js 的 renderList 已改成增量渲染 —— 整列重刷的话它会反复重播 */
+@keyframes loot-drop-in {
+  0%   { opacity:.2; filter:brightness(3.4) saturate(1.7); }
+  40%  { opacity:1;  filter:brightness(2.3) saturate(1.35); }
+  100% { opacity:1;  filter:none; }
+}
+/* 尊重系统的「减少动态效果」设置：关掉流光，退回普通颜色 */
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg .hi3 {
+    animation:none; background-image:none;
+    -webkit-text-fill-color:currentColor;
+  }
+/* ===== 档位在别处的用法（同样语义：越大 = 越难出 / 越值钱） ===== */
+/* 世界地图节点·掉落预览：控制台那条 .chat-msg .hi3 管不到地图页，样式单独写一份 */
+.nd-drop-chip.hi2 { color:var(--r-gold); font-weight:600; }
+.nd-drop-chip.hi3 { color:var(--r-gold); font-weight:700; text-shadow:0 0 8px rgb(var(--r-gold-rgb) / .6); }
+/* 全服通告（神级宠 / 变异宠合成成功） */
+.chat-msg .ann { display:flex; align-items:center; gap:6px; }
+.chat-msg .ann-pet { width:1.6em; height:1.6em; object-fit:contain; border-radius:2px; flex:none; }
+.chat-msg .ann-txt { min-width:0; }
+}
+/* 材料用途配色：进化系（进化素材 / 精粹 / 传说）病绿；打造与功能石（重铸 / 增缀 / 剥离 / 合成 / 鉴定）暗紫 */
+.chat-msg.loot .loot-c-evo { color:var(--exp); }
+.chat-msg.loot .loot-c-stone { color:var(--r-purple); }
 
 /* 快捷短语 */
 .chat-quick { flex:none; display:flex; gap:4px; flex-wrap:wrap; padding:8px 0 6px; border-top:1px solid var(--line-weak); margin-top:8px; }
@@ -2136,7 +2213,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 2026-09-10：从「页面容器顶部占文档流的一条」改为 **body 层右上悬浮**（hotspot 式：
    不占布局、不把舞台往下挤）。收起后只剩一枚胶囊（带可提交数），点一下展开任务列表。 */
 .quest-tracker {
-  position: fixed; right: 14px; top: 74px; width: 302px; z-index: 280; margin: 0;
+  /* 层级表 90 档：常驻悬浮小条 —— 会被浮窗（100）盖住，这是刻意的 */
+  position: fixed; right: 14px; top: 74px; width: 302px; z-index: 90; margin: 0;
   display: flex; flex-direction: column; align-items: stretch; gap: 6px;
 }
 /* 整条标题栏 = 拖动把手（move 光标 + 悬停描边，让玩家一眼看出"这玩意能挪"） */
@@ -2347,9 +2425,15 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   min-height: 0;
 }
 .bag-window .bag-main-left {
+  /* 🔴 height:100% + min-height:0 是**必需的**（2026-09-14 修）：
+   * 缺了它，下面的 .bag-grid-area 的 `flex:1` 就失效 —— 网格会跟着内容一路长高，
+   * 把底部的统计条 / 鉴定石 / 分解台**顶出可视区**（表现：鉴定石"不见了"）。
+   * 这是本项目 CSS 铁律里的老坑：父容器缺 height:100% 致 flex:1 失效。 */
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   gap: 8px;
 }
 .bag-window .bag-filter-bar {
@@ -3516,7 +3600,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * ============================================================ */
 /* 2026-09-08 v2：全屏平铺（用户要求第一个页面平铺，不再居中弹窗） */
 .area-detail {
-  position: fixed; inset: 0; z-index: 60;
+  /* 层级表 100 档：普通浮窗（全屏平铺的选图详情页） */
+  position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: stretch; justify-content: stretch;
   padding: 0;
   background: rgb(6 9 10 / .96);

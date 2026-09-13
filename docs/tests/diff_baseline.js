@@ -34,7 +34,7 @@ if (!SAVE && !fs.existsSync(BASE_FILE)) {
 }
 
 if (RUN || SAVE) {
-  console.log('先跑一次全量回归（约 2~3 分钟，中途有进度行）…\n');
+  console.log('先跑一次全量回归（并发跑，约 1 分钟，中途有进度行）…\n');
   const r = spawnSync(process.execPath, ['run_all.js', '--json=_current.json'], {
     cwd: __dirname, stdio: 'inherit', timeout: 900000
   });

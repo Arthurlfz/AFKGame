@@ -414,15 +414,21 @@
       }
     }
     const s = document.createElement('div'); s.className = 'bc-scan'; card.appendChild(s);
+    // 揭晓演出（2026-09-14）：只有金装走完整那套（卡片流光 + 词缀逐条亮起）。
+    // 白/蓝装鉴定太频繁，每次都演一遍会烦 —— 它们只保留背包格上的扫光。
+    const rar = rarityOf(eq);
+    const isGold = !!(rar && rar.id === 'gold');
+    if (isGold) addLog('<span class="hi3">鉴定揭晓 · ' + escapeHtml(eq.name) + '（金装）</span>');
     setTimeout(() => {
       renderBag();
-      showEquipDetail(eq); // 鉴定完成弹出词缀详情（与装备打造同款 .craft-affix-group 样式）
+      showEquipDetail(eq, isGold); // 鉴定完成弹出词缀详情（与装备打造同款 .craft-affix-group 样式）
       showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 鉴定完成', eq.name);
     }, 600);
   }
 
   // 装备详情面板：词缀区复用装备打造页的 .craft-affix-group（前缀绿/后缀蓝，同款样式）
-  function showEquipDetail(eq) {
+  // reveal=true → 走「鉴定揭晓」演出：卡片一道光扫过 + 词缀一条条亮起（只给金装用）
+  function showEquipDetail(eq, reveal) {
     let modal = $('equip-detail-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -433,12 +439,17 @@
     const unid = eq.identified === false;
     const pfx = (eq.affixes && eq.affixes.prefix) || [];
     const sfx = (eq.affixes && eq.affixes.suffix) || [];
+    // 揭晓时给每条词缀排一个递增的延迟（写在行内 style 上，比 nth-child 稳）
+    let revealIdx = 0;
     const affix = (arr, cls) => arr.length
-      ? arr.map(a => `<div class="grp-line ${cls}">${Craft.affixText ? Craft.affixText(a) : (Equipment.formatAffix ? Equipment.formatAffix(a) : a.label + '+' + a.value + '%')}</div>`).join('')
+      ? arr.map(a => {
+          const d = reveal ? ' style="animation-delay:' + (0.28 + revealIdx++ * 0.13).toFixed(2) + 's"' : '';
+          return `<div class="grp-line ${cls}"${d}>${Craft.affixText ? Craft.affixText(a) : (Equipment.formatAffix ? Equipment.formatAffix(a) : a.label + '+' + a.value + '%')}</div>`;
+        }).join('')
       : '<span class="hint">无</span>';
     modal.innerHTML = `
       <div class="ed-overlay" data-close="1"></div>
-      <div class="ed-card" style="border-color:${rarityOf(eq).color}">
+      <div class="ed-card${reveal ? ' ed-reveal' : ''}" style="border-color:${rarityOf(eq).color}">
         <div class="ed-head" style="color:${rarityOf(eq).color}">${escapeHtml(eq.name)}
           <span class="ed-sub">${rarityOf(eq).label}装 · T${eq.tier ?? 4} · ${eq.slot}</span></div>
         ${unid

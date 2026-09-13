@@ -59,10 +59,13 @@
   /* ---------- 队列驱动 ---------- */
   function showDialog(opt) {
     opt = opt || {};
-    // 对话同步写入消息控制台（社交分类），气泡本身行为不变
+    // 对话同步写入消息控制台（系统频道），气泡本身行为不变。
+    // 2026-09-13 修正：此前这条写进「世界」频道，于是「铁匠铺功能开发中」「分解得到 X」
+    // 这类系统提示全跟玩家聊天混在一起，世界频道看着不像聊天。
+    // 世界频道只留玩家自己说的话；对话框里的图标由气泡负责，控制台靠频道图标区分。
     if (UI.consoleLog) {
       const text = String(opt.text || '').replace(/<[^>]*>/g, ''); // 控制台只留纯文本
-      UI.consoleLog('social', (opt.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>') + ' <b>' + (opt.speaker || '系统') + '</b>：' + text);
+      UI.consoleLog('system', '<b>' + (opt.speaker || '系统') + '</b>：' + text);
     }
     queue.push(opt);
     if (!showing) {

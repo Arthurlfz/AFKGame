@@ -86,7 +86,8 @@
     } else if (UI.showToast) {
       UI.showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 离线成交', `${fresh.length} 笔挂单被买走，材料已入包`);
     }
-    if (UI.consoleLog) UI.consoleLog('social', `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 离线期间挂单成交 ${fresh.length} 笔，共入账 ${sumHtml.replace(/<[^>]*>/g, '')}`);
+    // 市场成交通知 → 系统频道（不是玩家聊天，别混进世界频道）
+    if (UI.consoleLog) UI.consoleLog('system', `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m2.05 2.05 1.099-.028a1 1 0 0 1 1.008.815l2.69 14.347A1 1 0 0 0 7.83 18H18"/><path d="M4.563 5h16.435a1 1 0 0 1 .981 1.204l-1.026 6.226A2 2 0 0 1 18.962 14H6.25"/></svg> 离线期间挂单成交 ${fresh.length} 笔，共入账 ${sumHtml.replace(/<[^>]*>/g, '')}`);
   }
 
   UI.checkMarketOfflineSales = check;

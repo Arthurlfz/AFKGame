@@ -53,11 +53,15 @@
 ## 四、干完活必做
 
 - **跑测试**：`cd docs && npm run check`
-  ✅ **2026-09-13 实测基线：70 通过 / 5 失败（共 75 个 vtest），约 2.6 分钟。**
+  ✅ **2026-09-13 实测：71 通过 / 5 失败（共 76 个 vtest），约 65 秒**（`run_all.js` 已并发，默认 6 路）。
   这条命令会自动跟 `docs/tests/baseline.json` 对比，**明确告诉你有没有新搞红的**，不用自己记数字。
   - 存量红 5 个（**不是你的锅，别去修**）：`action_freeze` / `boss`(D4) / `bugfix`(emoji 断言过期) / `equip_score` / `pet_skill`
   - flaky 2 个（时红时绿）：`enemy_balance` / `botbuy` —— 报红先单独连跑 3~4 次，全绿才算真回归
   - 其它：`npm run test`（只跑，不对比）｜`npm run test:v`（看失败详情）｜`npm run baseline`（**把当前设为新基线 —— 只在确认过的健康状态用**）
+  - 调并发：`cd docs/tests && node run_all.js --jobs=4`
+  - ⚠️ **剩余耗时的大头是「测试在等真实时间」**（`vtest_fun.js` 直接睡 60 秒模拟挂机一分钟，
+    `enemy_level` / `newbie` / `deep` 也在等战斗打完）—— **这不是卡住，别去"修"它**。
+    想再往下压只能压战斗 delay 常量（会动到 `speedScale` 节奏），**属高风险改动，先问人**。
 - **提交只 add 你自己的路径**，`git add -A` 出过事故。
   提交前必看 `git status --short` 有没有意外出现的 `D`（删除）。
 - **改完要在浏览器里真看一眼**。测试是跑 JS 逻辑的，**测不出 CSS 不存在**。

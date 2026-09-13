@@ -39,8 +39,9 @@
         try { UI.renderCombatantData(); } catch (e) { /* 表现层异常不中断 */ }
       }
     }
-    if (event.type === 'log' && UI.addLog) UI.addLog(event.text);
-    if (event.type === 'floorFail' && UI.addLog) UI.addLog(' 战斗失败……');
+    // 副本过程与胜负都是「战斗」频道（见 ui-console.js 的频道规则）
+    if (event.type === 'log' && UI.addLog) UI.addLog(event.text, 'battle');
+    if (event.type === 'floorFail' && UI.addLog) UI.addLog(' 战斗失败……', 'battle');
   };
 
   /* ---------- 主流程：进副本 = 切整页战斗页 + 引擎逐层推进 ----------

@@ -194,6 +194,17 @@
         addLog(`合成成功！${res.mainName}+${res.subName} 合成了新宠 ${res.baby.name}（成长 ${res.newGrowth.toFixed(1)}）`);
         showToast('合成成功！', `${iconHtml(res.baby.name)} ${res.baby.name}｜成长值 ${res.newGrowth.toFixed(1)}`);
       }
+      // 全服通告（2026-09-14）：神级宠 / 变异宠合成成功 → 广播给所有在线玩家（消息里带宠物形象）
+      if ((res.isGod || res.mutated) && UI.broadcastAnnounce) {
+        const dn = (window.Supabase && window.Supabase.getMyDisplayName) ? (window.Supabase.getMyDisplayName() || '') : '';
+        UI.broadcastAnnounce({
+          id: 'pet' + Date.now() + Math.random().toString(36).slice(2, 7),
+          kind: res.isGod ? 'god' : 'mutant',
+          petName: res.baby.name,
+          growth: res.newGrowth,
+          owner: dn
+        });
+      }
       synthMainId = res.baby && res.baby.id ? res.baby.id : null;
       synthSubId = null;
       UI.renderAll();

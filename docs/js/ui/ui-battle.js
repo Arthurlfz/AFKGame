@@ -96,27 +96,59 @@
     $('stat-equips').textContent = String(totalEquipDrops);
   }
 
-  /* ---------- 掉落播报（main.js 编排后调用；只显示掉落物品，不显示战斗过程） ---------- */
-  function addLootEntry(html, cls) {
+  /* ---------- 掉落播报（main.js 编排后调用；只显示掉落物品，不显示战斗过程） ----------
+   * 挂机没有「地上的东西」可以踩（不像别的游戏能走过去捡），所以掉宝的信息只能落在消息控制台里——
+   * 于是靠【字号 + 字重 + 辉光】把三档拉开，档位表在 config.js 的 `drop.lootTiers`。
+   * 判据：越难出 / 越关键，字越大越亮；**日常材料不套档位 class = 不提亮**（提亮一切等于没提亮）。
+   * 颜色不在这里定：装备沿用白/蓝/金三档稀有度色，宠物蛋走 .loot-egg 幽蓝。 */
+  function lootTierOf(name) {
+    const t = (Config && Config.drop && Config.drop.lootTiers) ? Config.drop.lootTiers[name] : 0;
+    return Number(t) || 1;
+  }
+  /* 材料名 → 用途配色 class：现读 Config.trade.materials（那里是材料名的唯一定义处），
+   * **不在这里另抄一份名单** —— 抄了就是第二份事实源，改了材料表忘了改这儿就静默失效。
+   * 分工：**字号 = 稀有度（lootTiers），颜色 = 用途（这里）**，两者不重叠。
+   * 区域材料（枯荣种荚等）不进 trade.materials → 拿不到类别 → 不上色（用户 2026-09-13：无所谓）。 */
+  let matCatMap = null;
+  function matClassOf(name) {
+    if (!matCatMap) {
+      matCatMap = Object.create(null);
+      const list = (Config && Config.trade && Config.trade.materials) || [];
+      for (const m of list) if (m && m.name && m.category) matCatMap[m.name] = m.category;
+    }
+    const c = matCatMap[name];
+    if (c === 'evo') return 'loot-c-evo';     // 进化系 · 病绿
+    if (c === 'stone') return 'loot-c-stone'; // 打造 / 功能石 · 暗紫
+    return '';                                 // 腐印、区域材料等：不上色（靠档位字号区分）
+  }
+  /* 🔴 档位 class 与颜色 class **必须在同一个 span 上**：顶档的流光靠 `currentColor` 取色，
+   * 拆成两层（外层档位、内层颜色）的话，外层取到的是继承色而不是装备/材料的颜色 → 金装会变成默认色。 */
+  function addLootEntry(html, tier, colorCls) {
+    if (!UI.consoleLog) return;
+    const t = Math.max(1, Math.min(3, Number(tier) || 1));
+    // 档位 class 用通用的 hi2 / hi3（不是 loot-t*）：鉴定揭晓、打造出 T1、地图掉落预览都要复用同一套
+    const cls = [colorCls || '', t > 1 ? 'hi' + t : ''].filter(Boolean).join(' ');
     // 掉落消息统一进消息控制台（loot 分类）；时间戳与滚动由控制台负责
-    if (UI.consoleLog) UI.consoleLog('loot', html);
+    UI.consoleLog('loot', cls ? '<span class="' + cls + '">' + html + '</span>' : html);
   }
   function showLoot(reward) {
     // 改法一·单池：reward.type ∈ none/material/equipment/egg，一场最多一件。
     // 仍只保留掉落日志记录（不引入 toast / 中间弹窗）；金装/蛋保留全屏光效。
     if (!reward || reward.type === 'none') return;
     if (reward.type === 'material') {
-      addLootEntry(`${escapeHtml(reward.material)} ×${reward.qty || 1}`, 'mat');
+      addLootEntry(`${escapeHtml(reward.material)} ×${reward.qty || 1}`, lootTierOf(reward.material), matClassOf(reward.material));
       return;
     }
     if (reward.type === 'equipment') {
       const r = reward.eq.rarity;
-      addLootEntry(`<span class="loot-q ${r.id === 'gold' ? 'fs-q--gold' : r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white'}">${r.label}·${escapeHtml(reward.eq.name)}</span>`, r.id);
+      const q = r.id === 'gold' ? 'fs-q--gold' : (r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white');
+      addLootEntry(`${r.label}·${escapeHtml(reward.eq.name)}`,
+        r.id === 'gold' ? 3 : (r.id === 'blue' ? 2 : 1), 'loot-q ' + q);
       if (r.id === 'gold') flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
       return;
     }
     if (reward.type === 'egg') {
-      addLootEntry('宠物蛋 ×1（孵化去「背包 → 宠物蛋」）');
+      addLootEntry('宠物蛋 ×1（孵化去「背包 → 宠物蛋」）', 3, 'loot-egg');
       flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
       return;
     }
@@ -552,7 +584,7 @@
           return;
         }
         setActive(pet.id);
-        if (UI.addLog) UI.addLog(` ${pet.name} 出战！`);
+        if (UI.addLog) UI.addLog(` ${pet.name} 出战！`, 'battle');
         syncCombatantSnapshot(); // 战斗页被占用时它自己会让位（见函数内说明）
         renderRoster();
         if (UI.renderAll) UI.renderAll();
@@ -635,6 +667,8 @@
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
   UI.showLoot = showLoot;
+  // 档位对外：世界地图的「掉落预览」要用同一套（不另抄一份名单 → 不会出现第二份事实源）
+  UI.lootTierOf = lootTierOf;
   UI.resetBattle = resetBattle;
   UI.updateBars = updateBars;
   UI.updateAction = updateAction;

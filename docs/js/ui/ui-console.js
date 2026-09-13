@@ -1,10 +1,11 @@
 /* ============================================================
  * ui/ui-console.js —— 消息中心（底部聊天弹窗 + 页面内嵌 console）
  * 职责：
- *  1. 统一消息入口：UI.consoleLog(category, html)，category ∈ system / social / loot
- *  2. 底部聊天弹窗（2026-08-31 用户拍板）：世界 / ️系统 / 掉落 三频道 + 输入发送
- *  3. 页面内嵌 console（2026-09-01）：世界地图页 / 战斗页下半区，与抽屉共享同一份 history，
- *     三频道消息流 + 输入框；比例可拖拽（默认 65/35，localStorage 记忆）
+ *  1. 统一消息入口：UI.consoleLog(category, html)，category ∈ social / loot / battle / system
+ *     （四个频道分别收什么，见下方「频道规则」常量块——那是全项目唯一权威）
+ *  2. 底部聊天弹窗（2026-08-31 用户拍板）：四频道 + 输入发送
+ *  3. 页面内嵌 console（2026-09-01）：世界地图/主城/战斗/宠物页下半区，与抽屉共享同一份 history，
+ *     四频道消息流 + 输入框；比例可拖拽（默认 65/35，localStorage 记忆）
  *  4. 实时聊天：Supabase Realtime 订阅广播，玩家互相能看到
  *  5. 消息最多保留 100 条；弹窗透明可调（底部 ◐ 滑块）
  * 注：常驻底部消息条已于 2026-08-31 移除（旧聊天输入一并移除），消息只进弹窗/内嵌 console。
@@ -17,13 +18,41 @@
   const $ = id => document.getElementById(id);
 
   const MAX = 100;
-  const history = [];                 // { cat, time, html, ...structured }
-  let activeTab = 'social';           // 当前频道（单选视图，抽屉与内嵌 console 共享）
+  const history = [];                 // { cat, time, html, seq, ...structured }
+  let seq = 0;                        // 流水号：renderList 靠它做增量渲染（别删，删了流光就废了）
   const QUICK_PHRASES = ['求组队 刷精英！', '收进化素材，价可谈', '求带新图，等级不够', '刚才那件装备谁捡了？', '这波掉落给力！'];
+
+  /* ---------- 频道规则（全项目唯一权威：加消息前先看这里） ----------
+   *  social  世界：只放「人说的话」——玩家聊天、全服公告。
+   *  loot    掉落：一切「我获得了什么」——材料 / 装备 / 宠物蛋（野图、副本、塔、离线补账）。
+   *  battle  战斗：打斗流水——出手、击败、经验、升级、战败、回血、挂机开关。
+   *  system  系统：其余一切事务提示——账号 / 存档 / 报错 / 任务 / 打造 / 市场 / 成长操作 / 引导。
+   * ⚠️ 三个入口（UI.consoleLog / UI.addLog / UI.showToast）的 cat **默认都是 system**，
+   *    不显式指定就等于扔进系统频道，没有任何自动猜分类。
+   *    （2026-09-13 立规：此前战斗流水 100+ 条/小时全堆在系统频道，
+   *      history 上限 100 条，登录失败这类要紧提示几秒就被冲没了。） */
+  const TABS = ['social', 'loot', 'battle', 'system'];
+  const TAB_KEY = 'fof_console_tab';
+  // 默认「掉落」：挂机时最想盯的就是它；之后记住玩家自己上次选的频道
+  let activeTab = (function () {
+    try { const v = localStorage.getItem(TAB_KEY); if (TABS.indexOf(v) >= 0) return v; } catch (e) { /* 隐私模式取不到，用默认值 */ }
+    return 'loot';
+  })();
+  function saveActiveTab() { try { localStorage.setItem(TAB_KEY, activeTab); } catch (e) { /* 存不下不影响使用 */ } }
+
+  /* 频道图标：一处定义，tab 条与消息行共用（别在别处再抄一份 SVG） */
+  const CHAT_ICON = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>';
+  const CAT_ICON = {
+    social: CHAT_ICON,
+    loot: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg>',
+    battle: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 21 6V3h-3L6.5 14.5"/></svg>',
+    system: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg>'
+  };
   const TAB_META = [
-    { id: 'social', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>', label: '世界' },
-    { id: 'system', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg>️', label: '系统' },
-    { id: 'loot', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg>', label: '掉落' }
+    { id: 'social', icon: CAT_ICON.social, label: '世界' },
+    { id: 'loot', icon: CAT_ICON.loot, label: '掉落' },
+    { id: 'battle', icon: CAT_ICON.battle, label: '战斗' },
+    { id: 'system', icon: CAT_ICON.system, label: '系统' }
   ];
 
   const timeNow = () => new Date().toTimeString().slice(0, 5);
@@ -32,7 +61,8 @@
    * structured：可选结构化字段（如社交消息的 {name,self,text}），弹窗优先用它排版
    * （名字/内容分离），没有就退回 html。 */
   function consoleLog(cat, html, structured) {
-    history.push(Object.assign({ cat, time: timeNow(), html }, structured || {}));
+    // seq：单调递增的流水号，renderList 靠它判断"哪些行是新的"，才能增量渲染（见 renderList 注释）
+    history.push(Object.assign({ cat, time: timeNow(), html, seq: ++seq }, structured || {}));
     if (history.length > MAX) history.shift();
     renderChatPanel();
   }
@@ -51,7 +81,7 @@
   // 渲染一条聊天消息进社交分类（name 已转义；同时存结构化字段供弹窗排版）
   function renderChatMessage(name, text, isSelf) {
     const tag = isSelf ? '<b style="color:var(--accent)">' + escHtml(name) + '</b>' : '<b>' + escHtml(name) + '</b>';
-    consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg> ' + tag + '：' + escHtml(text), { name: escHtml(name), self: isSelf, text: escHtml(text) });
+    consoleLog('social', CHAT_ICON + ' ' + tag + '：' + escHtml(text), { name: escHtml(name), self: isSelf, text: escHtml(text) });
   }
 
   // 加载最近聊天历史（进游戏先显示）
@@ -86,6 +116,62 @@
       .subscribe();
   }
 
+  /* ---------- 全服通告（2026-09-14）----------
+   * 神级宠 / 变异宠合成成功 → 全服广播，所有在线玩家的消息框都能看到（带宠物形象）。
+   * 走 Supabase Realtime 的 **broadcast**（不建表、不改数据库、不用部署 EF）：
+   *   · 发送方 = 合成成功的那个客户端（纯展示，不涉及资产，所以客户端可发）。
+   *   · 接收方订阅同一频道，按 payload.id 去重（防自己发的回灌造成重复显示）。
+   * ⚠️ 广播失败不影响本地显示 —— 自己那份一定看得到。 */
+  const announceSeen = new Set();
+  let announceChannel = null;
+
+  function announceHtml(p) {
+    const av = (window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(p.petName) : '';
+    const img = av ? '<img class="ann-pet" src="' + String(av).replace(/"/g, '&quot;') + '" alt="">' : '';
+    const who = p.owner ? '<b>' + escHtml(p.owner) + '</b>' : '有人';
+    const name = p.kind === 'god'
+      ? '<span class="hi3">【' + escHtml(p.petName) + '】</span>'   // 神级宠：顶档流光
+      : '【' + escHtml(p.petName) + '】';
+    const growth = (p.growth != null) ? ' · 成长 ' + Number(p.growth).toFixed(1) : '';
+    return '<span class="ann">' + img + '<span class="ann-txt">' + who + ' 合成出' + name +
+      '（' + (p.kind === 'god' ? '神级宠' : '变异宠') + growth + '）</span></span>';
+  }
+
+  UI.announce = function (p) {
+    if (!p || !p.id || announceSeen.has(p.id)) return;
+    announceSeen.add(p.id);
+    // 进「世界」频道：按频道规则，世界 = 人说的话 + 全服公告
+    consoleLog('social', announceHtml(p));
+  };
+
+  UI.broadcastAnnounce = function (p) {
+    if (!p || !p.id) return;
+    UI.announce(p); // 本地先显示：广播挂了至少自己那一份看得到
+    try {
+      const client = window.Supabase && window.Supabase.getClient && window.Supabase.getClient();
+      if (!client) return;
+      const ch = client.channel('public:announcements');
+      ch.subscribe(status => {
+        if (status !== 'SUBSCRIBED') return;
+        ch.send({ type: 'broadcast', event: 'pet', payload: p });
+        // 发完就退订，别给自己留一个常驻频道
+        window.setTimeout(() => { try { client.removeChannel(ch); } catch (e) { /* 已被移除 */ } }, 1000);
+      });
+    } catch (e) { /* 广播失败：本地已显示，不影响流程 */ }
+  };
+
+  function initAnnounceRealtime() {
+    if (!window.Supabase || !window.Supabase.getClient) return;
+    const client = window.Supabase.getClient();
+    if (!client || announceChannel) return;
+    announceChannel = client
+      .channel('public:announcements')
+      .on('broadcast', { event: 'pet' }, payload => {
+        if (payload && payload.payload) UI.announce(payload.payload);
+      })
+      .subscribe();
+  }
+
   // 发送社交消息（玩家在任意输入框打字，回车 / 点发送）
   async function sendSocialFrom(inputEl) {
     if (!inputEl) return;
@@ -104,7 +190,7 @@
     let user = null;
     try { user = await (window.Supabase.getCurrentUser && window.Supabase.getCurrentUser()); } catch (e) { /* ignore */ }
     if (!user || !window.Supabase || !window.Supabase.sendChatMessage) {
-      consoleLog('social', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg> <b>我</b>：' + escHtml(text), { name: '我', self: true, text: escHtml(text) });
+      consoleLog('social', CHAT_ICON + ' <b>我</b>：' + escHtml(text), { name: '我', self: true, text: escHtml(text) });
       inputEl.value = '';
       inputEl.focus();
       return;
@@ -152,7 +238,7 @@
     }
     return '<div class="chat-msg ' + m.cat + '">' +
       '<span class="chat-time">' + m.time + '</span>' +
-      '<span class="chat-ic">' + (m.cat === 'loot' ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg>' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg>️') + '</span>' +
+      '<span class="chat-ic">' + (CAT_ICON[m.cat] || CAT_ICON.system) + '</span>' +
       '<span class="chat-text">' + m.html + (m.action === 'openQuest' ? ' <button class="chat-action" data-chat-action="openQuest">去领取</button>' : '') + '</span></div>';
   }
 
@@ -166,15 +252,41 @@
         '<span class="chat-tab-cnt">' + n + '</span></button>';
     }).join('');
     tabsEl.querySelectorAll('.chat-tab').forEach(btn => {
-      btn.onclick = () => { activeTab = btn.dataset.cat; renderChatPanel(); };
+      btn.onclick = () => { activeTab = btn.dataset.cat; saveActiveTab(); renderChatPanel(); };
     });
   }
 
-  /* 渲染单个容器的消息流（当前 activeTab 频道） */
+  /* 渲染单个容器的消息流（当前 activeTab 频道）
+   * 🔴 增量渲染（2026-09-14）：原来是「来一条消息 → 整列 innerHTML 重刷」。
+   *   问题在于 consoleLog 是**任何频道**共用入口 —— 战斗流水每 6 秒一条，
+   *   就会把掉落频道整列重建一次，**顶档的流光动画每次都被打回起点**，
+   *   玩家看到的是"闪一下就重来"，根本流不起来（用户反馈"一般"的真因）。
+   *   改法：能追加就只追加新增的那几行，老节点原样留着 → 动画持续播放。
+   *   ⚠️ 唯一能整列重建的情况：切频道 / 老消息被 100 条上限挤掉 / 环境没有 insertAdjacentHTML（测试桩）。 */
   function renderList(listEl) {
     if (!listEl) return;
     const rows = history.filter(m => m.cat === activeTab);
-    listEl.innerHTML = rows.length ? rows.map(chatMsgHtml).join('') : '<div class="chat-empty">该频道暂无消息</div>';
+    const seqs = rows.map(m => m.seq);
+    const prev = listEl.__seqs;
+    const canAppend = !!prev && listEl.__cat === activeTab &&
+      typeof listEl.insertAdjacentHTML === 'function' &&
+      seqs.length >= prev.length && prev.every((s, i) => seqs[i] === s);
+
+    if (canAppend) {
+      const fresh = rows.slice(prev.length);
+      if (fresh.length) {
+        if (listEl.__empty) { listEl.innerHTML = ''; listEl.__empty = false; }
+        listEl.insertAdjacentHTML('beforeend', fresh.map(chatMsgHtml).join(''));
+      }
+      // history 上限 100 条：老行被挤掉时从头删掉对应节点
+      for (let i = listEl.children.length - rows.length; i > 0; i--) listEl.removeChild(listEl.firstChild);
+      listEl.__seqs = seqs;
+    } else {
+      listEl.innerHTML = rows.length ? rows.map(chatMsgHtml).join('') : '<div class="chat-empty">该频道暂无消息</div>';
+      listEl.__empty = !rows.length;
+      listEl.__cat = activeTab;
+      listEl.__seqs = seqs;
+    }
     listEl.querySelectorAll('[data-chat-action]').forEach(btn => {
       btn.onclick = () => { if (btn.dataset.chatAction === 'openQuest' && UI.openQuestPanel) UI.openQuestPanel(); };
     });
@@ -345,6 +457,7 @@
   UI.initChat = function () {
     loadChatHistory();
     initChatRealtime();
+    initAnnounceRealtime();
   };
   // 登出 / 被其他标签页接管时调用：退订 Realtime 频道并清掉身份缓存。
   // 不退订的后果：换号后还在用旧身份收消息，且 chatChannel 非空导致新号永远订阅不上。
@@ -357,6 +470,14 @@
         if (client && client.removeChannel) client.removeChannel(chatChannel);
       } catch (e) { /* 忽略 */ }
       chatChannel = null;
+    }
+    if (announceChannel) {
+      try { announceChannel.unsubscribe(); } catch (e) { /* 忽略 */ }
+      try {
+        const client = window.Supabase && window.Supabase.getClient && window.Supabase.getClient();
+        if (client && client.removeChannel) client.removeChannel(announceChannel);
+      } catch (e) { /* 忽略 */ }
+      announceChannel = null;
     }
     window.__chatMyId = null;
     myName = '玩家';

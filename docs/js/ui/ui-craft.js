@@ -142,8 +142,10 @@
         (onApplied) => Craft.reforge(eq, onApplied),
         (r) => {
           const ns = flattenAffixes(r.changed.new);
-          const text = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}`;
-          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}`);
+          // T1 = 顶级词缀（2026-09-14）：重洗出 T1 值得顶档高光
+          const t1Tag = ns.some(a => Number(a.tier) === 1) ? ' <span class="hi3">T1 顶级词缀！</span>' : '';
+          const text = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸完成：${lockActive ? '锁定侧保留，未锁侧已重洗 · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效（需重新上锁定石）' : '全部词缀已重洗（数量 / 类型 / T 阶 / 数值 随机）'}<br>${ns.length ? ns.map(Craft.affixText).join('<br>') : '（无词缀）'}${t1Tag}`;
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸成功：${eq.name} ${lockActive ? '未锁侧词缀已重洗（锁定' + (lockPrefix ? '前缀' : '后缀') + '保留，锁定已失效）' : '词缀全部重洗'}${t1Tag}`);
           showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg> 重铸完成', `词条已全部随机重洗`);
           renderCraftInto(el, eq);
           setResult(text); // 必须在 renderCraftInto 之后写：重建面板会丢掉旧结果区
@@ -192,8 +194,11 @@
         (onApplied) => Craft.augment(eq, onApplied),
         (r) => {
           const n = r.changed.new;
-          const text = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）${lockActive ? ' · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效' : ''}`;
-          addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）`);
+          // T1 = 顶级词缀（2026-09-14）：出 T1 是打造里最该"哇"一下的时刻，用顶档高光标出来
+          const isT1 = Number(n.tier) === 1;
+          const t1Tag = isT1 ? ' <span class="hi3">T1 顶级词缀！</span>' : '';
+          const text = `➕ 增缀成功：新增 ${Craft.affixText(n)}（前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3）${lockActive ? ' · <svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>锁定已失效' : ''}${t1Tag}`;
+          addLog(`➕ 增缀成功：${eq.name} 新增词缀 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + '+' + n.value + '%'}（T${n.tier}）${t1Tag}`);
           showToast('➕ 增缀成功', `新增 ${Equipment.formatAffix ? Equipment.formatAffix(n) : n.label + ' +' + n.value + '%'}<br><small>T${n.tier} · 前缀 ${eq.affixes.prefix.length}/3 · 后缀 ${eq.affixes.suffix.length}/3</small>`);
           renderCraftInto(el, eq);
           setResult(text);

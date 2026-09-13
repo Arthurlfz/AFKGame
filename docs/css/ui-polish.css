@@ -208,7 +208,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .salvage-drop .sd-sub { font-size:10.5px; color:var(--faint); margin-top:3px; line-height:1.4; }
 
 /* 装备详情 modal：词缀区复用全局 .craft-affix-group（前缀绿 / 后缀蓝） */
-.equip-detail-modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; }
+/* 层级表 200 档：模态。它在**背包窗口里**弹出（鉴定揭晓 / 看详情），
+   所以必须比背包窗口（100）高 —— 以前是 60，会被窗口压在下面。 */
+.equip-detail-modal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; }
 .equip-detail-modal.open { display: flex; }
 .equip-detail-modal .ed-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
 .equip-detail-modal .ed-card { position: relative; width: min(420px, 92vw); background: var(--panel, #1d1a16);
@@ -220,6 +222,22 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .equip-detail-modal .ed-base { font-size: 0.85rem; color: var(--text-dim, #8a8068); margin-bottom: 6px; }
 .equip-detail-modal .ed-actions { display: flex; gap: 8px; margin-top: 14px; }
 .equip-detail-modal .ed-actions .btn-mini { flex: 1; }
+
+/* ===== 鉴定揭晓（2026-09-14）=====
+ * 只给金装用（白/蓝装鉴定太频繁，每次都演一遍会烦）。
+ * 两段叠加：① 卡片上一道光横扫过 ② 词缀一条条亮起（延迟由 ui-bag.js 写在行内 style 上）。 */
+.equip-detail-modal .ed-card.ed-reveal { overflow: hidden; }
+.equip-detail-modal .ed-card.ed-reveal::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  background: linear-gradient(115deg, transparent 34%, rgba(231,211,154,.6) 50%, transparent 66%);
+  transform: translateX(-130%); animation: edReveal .9s ease-out .06s 1;
+}
+@keyframes edReveal { to { transform: translateX(130%); } }
+.equip-detail-modal .ed-card.ed-reveal .grp-line { animation: edAffixIn .42s ease-out both; }
+@keyframes edAffixIn {
+  from { opacity: 0; transform: translateY(4px); filter: brightness(2.4); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
 
 #tab-worldmap { display: none; }
 #tab-worldmap.active { display: flex; flex-direction: column; height: 100%; min-height: 0; }
