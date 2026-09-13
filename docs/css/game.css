@@ -680,6 +680,25 @@ body {
 }
 .f-chip:hover { border-color:var(--accent); color:var(--accent-hi); }
 .f-chip.active { border-color:var(--accent); color:var(--accent-hi); background:rgba(201,141,79,.12); }
+/* 筛选下拉（2026-09-14）：部位 12 项 / 词缀类型 8+ 项，chip 摆不下 → 用下拉（与宠物页换装背包同口径） */
+.inv-filter .f-select {
+  padding:3px 6px; background:var(--inset); border:1px solid var(--line); border-radius:1px;
+  color:var(--text-dim); font-size:0.833rem; cursor:pointer; max-width:132px;
+}
+.inv-filter .f-select:hover { border-color:var(--accent); color:var(--accent-hi); }
+/* 选择角标：多选只走这里（点卡片 = 只看详情，不再误选进批量分解） */
+.equip-card .ec-sel {
+  position:absolute; left:6px; top:6px; width:16px; height:16px; z-index:2;
+  border:1px solid var(--line); border-radius:3px; background:rgba(0,0,0,.35); cursor:pointer;
+}
+.equip-card .ec-sel:hover { border-color:var(--accent); }
+.equip-card .ec-sel.on { background:var(--action-gold); border-color:var(--action-gold); }
+.equip-card .ec-sel.on::after {
+  content:'✓'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  color:#000; font-size:12px; font-weight:700; line-height:1;
+}
+.equip-card .ec-sel.off { opacity:.35; cursor:not-allowed; }
+.equip-card .ec-name { padding-left:20px; }  /* 给角标让位，别压住装备名 */
 .f-chip.lock-on.active { border-color:var(--accent); color:var(--accent-hi); }
 .f-chip.reset { color:var(--text-faint); }
 
@@ -2467,6 +2486,31 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   color: #000;
   font-weight: 700;
 }
+/* 素材二级分区（2026-09-14）：复用 .bag-cat，只是更小一号；选项来自 Config.materialInfoGroups */
+.bag-window .bag-sub-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.bag-window .bag-sub-cats .bag-cat { padding: 2px 9px; font-size: var(--fs-2xs); }
+
+/* ---------- 材料词条页（2026-09-14）：复用装备详情模态的壳，只是更宽、可滚动 ---------- */
+.equip-detail-modal .ed-card.me-card { width: min(600px, 94vw); max-height: 84vh; overflow-y: auto; }
+.me-sec { margin-top: 12px; }
+.me-sec-h {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  font-size: var(--fs-sm); font-weight: 700; color: var(--accent);
+  border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .25);
+  padding-bottom: 5px; margin-bottom: 6px;
+}
+.me-sec-h .n { font-size: var(--fs-2xs); font-weight: 400; color: var(--text-faint); }
+.me-row { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgb(255 255 255 / .05); font-size: var(--fs-xs); line-height: 1.5; }
+.me-row .k { flex: 0 0 172px; color: var(--text-hi); }
+.me-row .v { flex: 1; color: var(--text-dim); }
+.me-row .q { flex: 0 0 auto; color: var(--r-gold); font-weight: 700; }
+.me-empty { font-size: var(--fs-xs); color: var(--text-faint); padding: 3px 0; }
 .bag-window .bag-search-input {
   flex: 1;
   min-width: 120px;
@@ -2685,20 +2729,12 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   color: var(--text);
   margin-top: 1px;
 }
-.bag-window .pet-hero-panel .pstat-growth .pstat-value { color: var(--accent-hi); }
-.bag-window .pet-hero-panel .pstat-hp .pstat-value { color: #ff6b6b; }
-.bag-window .pet-hero-panel .pstat-atk .pstat-value { color: #ffd93d; }
-.bag-window .pet-hero-panel .pstat-def .pstat-value { color: #6bcfff; }
-.bag-window .pet-hero-panel .pstat-spd .pstat-value { color: #a8e6cf; }
-.bag-window .pet-hero-panel .pstat-bonus {
-  grid-column: 1 / -1;
-  cursor: help;
-}
-.bag-window .pet-hero-panel .pstat-bonus .pstat-value {
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--text-dim);
-}
+/* 属性配色：**不再单独写**（2026-09-14）。
+ * 旧版这里给了 4 个硬编码亮色（#ff6b6b / #ffd93d / #6bcfff / #a8e6cf），
+ * 结果同一个属性在「宠物页资料卡」和「背包装备 tab」是两个颜色，而且比调色板更扎眼。
+ * 现在统一走 game.css 里的基础属性配色（`--hp-hi` / `--accent-hi` / `--r-blue` / `--energy` …）。 */
+.bag-window .pet-hero-panel .pstat-bonus { cursor: help; }
+.bag-window .pet-hero-panel .pstat-bonus .pstat-value { font-weight: 400; color: var(--text-dim); }
 
 /* ===== 出战宠物资料卡 · 网游徽章化（血统/特质/觉醒胶囊 + 技能条 + 属性层级） ===== */
 .pet-badges { display:flex; flex-direction:column; gap:6px; width:100%; padding:0 2px; }
@@ -2840,11 +2876,60 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 一屏看完：压缩左栏宠物卡、orbit 槽位、右栏打造区 */
 .bag-window .ew-pet .pet-hero-panel .pet-hero { padding:6px 8px 4px; gap:4px; }
 .bag-window .ew-pet .pet-hero-panel .pet-hero-art { width:52px; height:52px; border-width:1px; }
-.bag-window .ew-pet .pet-hero-panel .pet-stats { flex-direction:row; flex-wrap:wrap; gap:4px; padding:6px 6px; }
-.bag-window .ew-pet .pet-hero-panel .pstat { flex:1 1 20%; min-width:56px; padding:4px 2px 5px; gap:1px; }
-.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size:0.667rem; }
-.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size:0.833rem; }
-.bag-window .ew-pet .pet-hero-panel .bonus-tip { flex:1 1 100%; }
+/* 属性区（2026-09-14 重构）：**分组 + 分隔线，数字不再各套一个盒子**。
+ * 旧版 11 个小盒子硬塞进 240px 宽的列，只能靠 `flex:1 1 20% + min-width:56px + 字号压到 0.667rem` 撑，
+ * 越压越挤。层级改由「分组标题 / 字重 / 字号 / 颜色」表达（数据面板常规做法）。 */
+.bag-window .ew-pet .pet-hero-panel .pet-stats { display:block; padding:6px 2px 2px; }
+.bag-window .ew-pet .pet-hero-panel .pstat-group { margin-bottom:8px; }
+/* 分组标题：暗金 + 左侧短竖线（有质感的"标签"，不是一行灰字） */
+.bag-window .ew-pet .pet-hero-panel .pstat-group-h {
+  display:flex; align-items:center; gap:6px;
+  font-size:var(--fs-2xs); letter-spacing:3px; color:var(--accent);
+  padding-bottom:3px; margin-bottom:5px;
+  border-bottom:1px solid rgb(var(--action-gold-rgb) / .22);
+}
+.bag-window .ew-pet .pet-hero-panel .pstat-group-h::before {
+  /* ⚠️ 必须用 background-color（不能用 background 简写 + var()：按 CSS 铁律会被当成第二层图，
+   * 颜色拿不到 → 竖线透明消失）。宽度也用 flex-basis 钉死，别指望 auto。 */
+  content:''; flex:0 0 2px; width:2px; height:9px;
+  background-color:rgb(var(--action-gold-rgb) / .6);
+}
+/* 主属性组＝一个"内嵌面板"（分组容器可以有；逐个描边才叫挤）。
+ * 底纹 + 金色浅边给这一组重量，机制组保持轻 → 层次靠对比出来。 */
+.bag-window .ew-pet .pet-hero-panel .pstat-group--main {
+  padding:6px 8px 7px; border:1px solid rgb(var(--action-gold-rgb) / .18); border-radius:var(--radius-sm);
+  background-color: rgb(0 0 0 / .2);
+  background-image: linear-gradient(180deg, rgb(var(--action-gold-rgb) / .08), transparent 62%);
+  box-shadow: var(--shadow-inset);
+}
+.bag-window .ew-pet .pet-hero-panel .pstat-grid { display:grid; gap:2px 10px; }
+.bag-window .ew-pet .pet-hero-panel .pstat-grid--main { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.bag-window .ew-pet .pet-hero-panel .pstat-grid--sub { grid-template-columns:repeat(3, minmax(0,1fr)); }
+/* 单行式：标签左 · 数值右（tab 对齐）。旧版是"标签上/数值下"两行 + 描边盒子 → 又挤又高。 */
+.bag-window .ew-pet .pet-hero-panel .pstat {
+  display:flex; flex-direction:row; align-items:baseline; justify-content:space-between; gap:6px;
+  min-width:0; padding:1px 0; background:none; border:0; box-shadow:none;
+}
+.bag-window .ew-pet .pet-hero-panel .pstat::after { display:none; } /* 去掉旧格子的底部金线 */
+.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size:0.7rem; letter-spacing:0; white-space:nowrap; color:var(--text-dim); }
+.bag-window .ew-pet .pet-hero-panel .pstat-value { font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* 主属性数值：加粗 + 暗金微光（项目既有的做法：内敛的光，不是霓虹外发光） */
+.bag-window .ew-pet .pet-hero-panel .pstat-grid--main .pstat-value {
+  font-size:1rem; font-weight:800; text-shadow:0 0 10px rgb(var(--action-gold-rgb) / .22);
+}
+.bag-window .ew-pet .pet-hero-panel .pstat-grid--sub .pstat-label { font-size:0.66rem; color:var(--text-faint); }
+.bag-window .ew-pet .pet-hero-panel .pstat-grid--sub .pstat-value { font-size:0.8rem; color:var(--text-soft); }
+/* 装备加成 = 汇总条：一条内嵌横条（比正式属性轻，比纯文字重） */
+.bag-window .ew-pet .pet-hero-panel .pstat-bonus {
+  flex-direction:row; align-items:baseline; justify-content:space-between; gap:8px; width:100%;
+  padding:4px 8px; border:1px solid rgb(var(--action-gold-rgb) / .14); border-radius:var(--radius-xs);
+  background-color: rgb(0 0 0 / .18);
+}
+/* 转生徽章：只在转生过之后出现（0 次时 JS 给 hidden） */
+.reborn-chip {
+  margin-left:6px; padding:0 6px; font-size:var(--fs-2xs); line-height:1.6;
+  color:var(--r-purple); border:1px solid rgb(var(--r-purple-rgb) / .5); border-radius:var(--radius-xs);
+}
 .bag-window .equip-orbit > .equip-slot { padding:3px 3px; }
 .bag-window .equip-orbit .slot-name { font-size:0.75rem; }
 /* 打造区紧凑 */
@@ -2888,20 +2973,14 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .bag-window .equip-orbit-name { margin-top: 2px !important; font-size: 0.75rem !important; }
 .bag-window .equip-orbit > .equip-slot { padding: 2px 3px !important; }
 .bag-window .equip-orbit .slot-item { min-height: 24px !important; margin-top: 1px !important; }
-/* 宠物卡：属性改为 flex 换行（3 列 × 4 行），压缩到一屏 */
-.bag-window .ew-pet .pet-hero-panel .pet-stats { display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 4px !important; padding: 6px 6px !important; }
-.bag-window .ew-pet .pet-hero-panel .pstat { flex: 1 1 30% !important; min-width: 56px !important; padding: 3px 4px 4px !important; gap: 1px !important; }
-.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size: 0.667rem !important; }
-.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size: 0.8rem !important; }
+/* 属性区（2026-09-14）：原先这里有 4 条 `!important` 把 11 个盒子强行 flex 换行 + 压字号。
+ * **已删** —— 那是"越挤越压、越压越挤"的补丁；现在属性区是分组网格，本身就不需要挤压。 */
 .bag-window .ew-pet .pet-hero-panel .pet-hero { padding: 5px 8px 3px !important; gap: 4px !important; }
 .bag-window .ew-pet .pet-hero-panel .pet-hero-art { width: 48px !important; height: 48px !important; border-width: 1px !important; }
-.bag-window .ew-pet .pet-hero-panel .bonus-tip { flex: 1 1 100% !important; }
 
 /* ============ 一屏兜底 + 宠物卡二次压缩（2026-09-04） ============ */
 .equip-workbench .ew-col { min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.bag-window .ew-pet .pet-hero-panel .pstat { flex: 1 1 23% !important; min-width: 0 !important; padding: 2px 3px 3px !important; }
-.bag-window .ew-pet .pet-hero-panel .pstat-value { font-size: 0.75rem !important; line-height: 1.2 !important; }
-.bag-window .ew-pet .pet-hero-panel .pstat-label { font-size: 0.625rem !important; }
+/* 属性区的「二次压缩」补丁（2026-09-14 已删）—— 同上，分组网格不需要它 */
 .bag-window .ew-pet .pet-hero-panel .pet-hero { padding: 4px 8px 2px !important; }
 .bag-window .ew-pet .pet-hero-panel .pet-hero-art { width: 44px !important; height: 44px !important; }
 .bag-window .ew-pet .pet-hero-panel .pet-name .lv { font-size: 0.75rem !important; }
@@ -4177,15 +4256,19 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .tw-affix:hover, .tw-affix:focus-visible { border-color: var(--accent-dim); background-color: rgb(var(--action-gold-rgb) / .08); }
 .tw-affix.is-on { border-color: var(--r-gold); background-color: rgb(var(--r-gold-rgb) / .14); box-shadow: inset 0 0 0 1px rgb(var(--r-gold-rgb) / .35); }
 .tw-affix.is-ownless { opacity: .45; cursor: not-allowed; }
-.tw-affix-h { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-xs); }
-.tw-affix-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent-hi); }
-.tw-affix-hot { font-size: var(--fs-xs); font-weight: 700; color: var(--danger-hi); }
+/* 卡片头：名字 + 类型徽章 + 腐蚀度（允许换行：窄卡片下徽章自己落行，不许压到别人身上） */
+.tw-affix-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px var(--gap-xs); }
+.tw-affix-name { font-size: var(--fs-sm); font-weight: 700; color: var(--accent-hi); white-space: nowrap; }
+/* 「禁忌」= 腐印的类型徽章，跟名字走。
+ * 旧写法是绝对定位钉在右下角 → 正好压住「持有 N」（2026-09-14 真机实测确认重叠）。 */
+.tw-affix-tag { padding: 0 4px; border: 1px solid rgb(var(--r-purple-rgb) / .6); border-radius: var(--radius-sm); color: var(--r-purple); font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; }
+.tw-affix-hot { margin-left: auto; font-size: var(--fs-xs); font-weight: 700; color: var(--danger-hi); }
 .tw-affix-desc { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.4; }
 .tw-affix-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--gap-xs); font-size: var(--fs-xs); color: var(--text-faint); }
 .tw-affix-drop { color: var(--r-gold); }
 .tw-affix-own.warn { color: var(--danger-hi); }
-.tw-affix-flag { position: absolute; right: var(--gap-sm); bottom: var(--gap-sm); padding: 0 4px; border: 1px solid rgb(var(--r-purple-rgb) / .6); border-radius: var(--radius-sm); color: var(--r-purple); font-size: var(--fs-xs); font-weight: 700; }
-.tw-affix-flag.warn { border-color: rgb(var(--hp-hi-rgb) / .6); color: var(--danger-hi); }
+/* 灰卡的说明与来源（告诉玩家「为什么不能用」「去哪拿」，别让人干瞪眼） */
+.tw-affix-note { margin-top: var(--gap-xs); font-size: var(--fs-2xs); color: var(--text-faint); line-height: 1.5; }
 
 /* ---------- 难度预估（风险有文字标签，不只靠颜色） ---------- */
 .tw-est { margin-top: var(--gap-md); padding: var(--gap-sm); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: rgb(0 0 0 / .22); }

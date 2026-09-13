@@ -14,7 +14,9 @@
   'use strict';
   const UI = window.UI = window.UI || {};
   const $ = id => document.getElementById(id);
-  const esc = v => UI.escapeHtml ? UI.escapeHtml(String(v || '')) : String(v || '');
+  /* ⚠️ 不要写成 `v || ''`：0 是合法显示值（「持有 0」「腐蚀度 0」「第 0 层」），
+   * 用 || 会把 0 当空值吞掉 → 卡片上「持有 0」渲染成「持有 」（2026-09-14 真机实测抓到）。 */
+  const esc = v => UI.escapeHtml ? UI.escapeHtml(String(v != null ? v : '')) : String(v != null ? v : '');
 
   // 页面内已选腐印（进入时才真正消耗；点卡片即改，重渲染保留）
   let picked = [];
@@ -42,18 +44,21 @@
     const A = window.TowerAffix;
     if (!A) return '<div class="tw-empty">腐印模块未加载</div>';
     const items = A.items();
-    const used = A.validate(picked);
     return items.map(it => {
       const own = matQty(it.name);
       const on = picked.indexOf(it.id) >= 0;
       const unreadable = A.isUnreadable(it);
-      const blocked = !on && (!used.ok && used.errors.length && own <= 0);
       const d = it.dropBonus || {};
+      /* 为什么没有库存多少：卡片只说实话——
+       *   「持有 0」+ 卡片变灰 = 仓库里没有（不再另挂「无库存」徽章：那是同一件事，
+       *   而它原来绝对定位在右下角，正好压住「持有 N」→ 玩家只看到红字，看不到自己有几张）。
+       *   「禁忌」是类型徽章，跟着名字走，见下。 */
       return `<button type="button" class="tw-affix${on ? ' is-on' : ''}${unreadable ? ' is-unreadable' : ''}${own <= 0 ? ' is-ownless' : ''}"
         data-affix="${esc(it.id)}" ${own <= 0 ? 'disabled' : ''}
-        title="${esc(it.desc || '')}（${on ? '已贴，点击取下' : '点击贴上'}）">
+        title="${esc(it.desc || '')}（${own <= 0 ? '仓库里没有' : (on ? '已贴，点击取下' : '点击贴上')}）">
         <span class="tw-affix-h">
           <span class="tw-affix-name">${esc(it.name)}</span>
+          ${unreadable ? `<span class="tw-affix-tag" title="禁忌腐印：这一局最多只能贴 ${esc(A.unreadableLimit())} 条（它们本身已经很强，全贴上去会打不过）">禁忌</span>` : ''}
           <span class="tw-affix-hot" title="腐蚀度">腐 ${esc(A.corrosionOf(it))}</span>
         </span>
         <span class="tw-affix-desc">${esc(it.desc || '')}</span>
@@ -61,8 +66,6 @@
           <span class="tw-affix-drop">装备 +${esc(d.equipPct || 0)}% · 材料 +${esc(d.matPct || 0)}%</span>
           <span class="tw-affix-own${own > 0 ? '' : ' warn'}">持有 ${esc(own)}</span>
         </span>
-        ${unreadable ? '<span class="tw-affix-flag">不可读</span>' : ''}
-        ${blocked ? '<span class="tw-affix-flag warn">无库存</span>' : ''}
       </button>`;
     }).join('');
   }
@@ -185,6 +188,7 @@
           <div class="nd-card-title">腐印（腐蚀度）<span class="hint">最多贴 ${esc(X ? X.maxPerRun() : 3)} 条 · 进入时消耗</span></div>
           ${hotPanelHTML()}
           <div class="tw-affix-grid">${affixHTML()}</div>
+          <div class="tw-affix-note">灰掉的＝仓库里没有（卡片上写着「持有 0」）。来源：地图 8~10 掉落 · 副本·淬炼 15/20 层档 · 通天塔 21 层起的材料池。</div>
         </div>
       </div>
       <div class="nd-foot">
@@ -236,6 +240,33 @@
     }
   }
 
+  /* ---------- 库存自愈：打开塔页时后台校正一次 ----------
+   * 为什么需要（2026-09-14 用户实报：「我明明有腐印，塔页却全灰点不动」）：
+   *   本页只在【打开那一刻】读一次库存（Materials.getQuantity）。
+   *   如果那一刻材料还没从云端到账（刚登录 / 刚刷新 / 拉取慢），12 张腐印会全都
+   *   显示「持有 0」+ 卡片全灰 —— 玩家看到的是「我有货却用不了」这种假象。
+   * 做法：本地先渲染（0 感知延迟，守项目「本地先行」的口径），后台再拉一次云端库存，
+   *   真有变化才重渲染。空表（未登录会返回空表）绝不覆盖本地，防误清库存。
+   * 代价：一次后台查询（不再阻塞界面），失败静默 —— 界面永远先出。 */
+  let stockSyncing = false;
+  function syncStock() {
+    const M = window.Materials;
+    if (stockSyncing || !M || !M.loadCloudMaterials || !M.setCloudMaterials || !M.getLocal) return;
+    stockSyncing = true;
+    const before = JSON.stringify(M.getLocal());
+    Promise.resolve()
+      .then(() => M.loadCloudMaterials())
+      .then(res => {
+        if (!res || res.error) return;
+        const rows = res.data;
+        if (!Array.isArray(rows) || rows.length === 0) return; // 未登录 / 空表：不动本地
+        M.setCloudMaterials(rows);
+        if (JSON.stringify(M.getLocal()) !== before && UI.renderTowerDetail) UI.renderTowerDetail();
+      })
+      .catch(() => { /* 后台校正失败：不影响已渲染的界面 */ })
+      .then(() => { stockSyncing = false; });
+  }
+
   function showTowerDetail() {
     const el = $('tower-detail');
     if (!el) {
@@ -245,6 +276,7 @@
     pendingPetId = null;
     render();
     el.hidden = false;
+    syncStock();
   }
 
   UI.showTowerDetail = showTowerDetail;

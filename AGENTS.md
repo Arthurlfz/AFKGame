@@ -122,3 +122,9 @@
 
 详细写作/样式/云端规范在 4 个 skill 里：`fos-cloud`（数据库）、`fos-balance`（改数值）、
 `fos-verify`（跑测试排障）、`forge-of-souls-dev`（总纲）。
+
+> 🎨 **改 UI / 美化页面时，除 `forge-of-souls-dev` 外还要走设计规范**（2026-09-14 用户点名要求）：
+> `ardot-design-generator` 的 `rules/style-guide.md`（视觉方向：数据面板**不要给每个数字套盒子**，
+> 用分组/分隔线/字重分层；最多 1 个强调色；禁纯黑、禁霓虹外发光、禁硬编码色）
+> 与 `skills/ardot-design-assistant/references/guidelines-code.md`（设计→代码：**用项目已有 token**、
+> **更新现有组件而不是新建**、**不许破坏既有功能**）。

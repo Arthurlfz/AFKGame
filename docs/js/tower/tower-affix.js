@@ -1,7 +1,7 @@
 /* ============================================================
  * tower/tower-affix.js —— 腐印（词缀）纯函数（单一职责）
  * 职责：
- *  1. 校验贴法（≤maxPerRun 条、不可读组合同局最多 1 条、不许重复贴同一条）
+ *  1. 校验贴法（≤maxPerRun 条、禁忌组合最多 1 条、不许重复贴同一条）
  *  2. 把已贴的腐印合成一份「怪修正 + 掉率增益 + 腐蚀度」汇总
  *  3. 把汇总作用到怪身上（返回新对象，不改原对象）
  * 不负责：资格/消耗（tower-access.js）、层推进（tower-engine.js）、发奖（tower-rewards.js）。
@@ -59,7 +59,7 @@
     if (cap > 0 && picked.length > cap) errors.push(`最多只能贴 ${cap} 条腐印（当前 ${picked.length} 条）`);
     const unreadable = picked.filter(isUnreadable);
     if (unreadable.length > unreadableLimit()) {
-      errors.push(`「不可读」腐印同局最多 ${unreadableLimit()} 条（当前 ${unreadable.length} 条：${unreadable.map(i => i.name).join('、')}）`);
+      errors.push(`「禁忌」腐印最多贴 ${unreadableLimit()} 条（当前 ${unreadable.length} 条：${unreadable.map(i => i.name).join('、')}）`);
     }
     const sum = summarize(picked);
     return {

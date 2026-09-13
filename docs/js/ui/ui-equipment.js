@@ -6,7 +6,8 @@
  *  3. 一键分解确认框 + 批量分解确认框
  *  4. 装备详情浮层（前后缀分组）
  * 依赖：equipment / market / salvage（只读查询与流程接口）；通用组件来自 ui-common
- * 注：打造按钮点击后调用 ui-craft 的 UI.openCraftPanel（跨文件走公共命名空间）
+ * ⚠️ 2026-09-14 更正：旧注释写着「打造按钮点击后调用 ui-craft 的 openCraftPanel」——
+ *    本文件里【没有】这个调用，打造走的是右侧详情面板里的 UI.renderCraftInto（注释在说假话，已删）。
  * ============================================================ */
 (function () {
   'use strict';
@@ -20,34 +21,80 @@
   const Materials = window.Materials;
   const Salvage = window.Salvage;
 
-  /* ---------- 装备筛选 + 多选（仅装备页，不影响数据结构） ---------- */
-  let invFilter = { rarity: null, tier: null, lock: null }; // lock: 'locked' | 'unlocked' | null
-  let selectedEqIds = new Set(); // 选中的装备本地 id
+  /* ---------- 装备筛选 + 多选（仅装备页，不影响数据结构） ----------
+   * 2026-09-14 改版（用户拍板「跟宠物页对齐」）：
+   *   旧版只有 稀有度 / T阶 / 锁定 三组；那组「T阶」筛的其实是**底材 T**（eq.tier = materialTier），
+   *   而页面上每件装备又都标着词缀的 T → 名不对实，看着像 bug；且缺「部位」「未鉴定」这两个天天要用的维度。
+   *   现在与宠物页换装背包同一套口径：部位 / 稀有度 / 底材T / 词缀T / 词缀类型 / 鉴定 / 锁定。
+   * 控件分工：选项多的（部位 12 / 词缀T 5 / 词缀类型 8+）走下拉，选项少的走 chip。 */
+  let invFilter = { slot: 'all', rarity: null, baseTier: null, affixTier: 'all', affixType: 'all', ident: null, lock: null };
+  let selectedEqIds = new Set(); // 选中的装备本地 id（只由角上的勾选框改，点卡片不再误选）
   let activeEqId = null; // 右侧详情面板当前聚焦的装备 id（主从式 2026-09-04）
+  let invRenderSig = ''; // 内容签名：没变就不重建 DOM（装备页挂在 renderAll 里，每秒会调一次 → 旧写法每秒重建卡片，点着卡）
 
-  // 按当前筛选条件过滤背包
+  const highestAffixTier = eq => {
+    let best = Infinity;
+    for (const a of window.Equipment.flattenAffixes(eq.affixes)) best = Math.min(best, a.tier || 5);
+    return best === Infinity ? 5 : best;
+  };
+  const hasAffixType = (eq, type) => window.Equipment.flattenAffixes(eq.affixes).some(a => a.type === type);
+
+  // 按当前筛选条件过滤背包（所有分支都做字段兜底：旧数据可能缺 rarity/affixes）
   function getFilteredInventory() {
     const F = invFilter;
-    return getInventory().filter(eq =>
-      (!F.rarity || eq.rarity.id === F.rarity) &&
-      (!F.tier || eq.tier === F.tier) &&
-      (!F.lock || (F.lock === 'locked' ? eq.locked : !eq.locked))
-    );
+    return getInventory().filter(eq => {
+      if (!eq) return false;
+      if (F.slot !== 'all' && eq.slot !== F.slot) return false;
+      if (F.rarity && (!eq.rarity || eq.rarity.id !== F.rarity)) return false;
+      if (F.baseTier != null && Number(eq.materialTier != null ? eq.materialTier : eq.tier) !== Number(F.baseTier)) return false;
+      if (F.affixTier !== 'all' && highestAffixTier(eq) > Number(F.affixTier)) return false;
+      if (F.affixType !== 'all' && !hasAffixType(eq, F.affixType)) return false;
+      if (F.ident === 'unid' && eq.identified !== false) return false;
+      if (F.ident === 'id' && eq.identified === false) return false;
+      if (F.lock && (F.lock === 'locked' ? !eq.locked : !!eq.locked)) return false;
+      return true;
+    });
+  }
+  /* 把「哪个 chip 是选中的」就地同步（**不重建 DOM**，保留焦点、不闪）。
+   * 为什么必须有这一步：点 chip 只改了 invFilter 状态，如果不同步，chip 的 .active
+   * 要等下一次 renderAll（挂机时每秒一次）才更新 —— 表现就是「点 T4 亮一下又跳回 T5 高亮」。
+   * 每个 chip/select 上都挂了 data-fk（状态字段）；值从 invFilter 现场读，不存第二份。 */
+  function syncFilterUI() {
+    const box = $('inv-filter');
+    if (!box || typeof box.querySelectorAll !== 'function') return;
+    box.querySelectorAll('.f-chip').forEach(b => {
+      const k = b.dataset ? b.dataset.fk : null;
+      if (!k) return;
+      b.classList.toggle('active', invFilter[k] != null && String(invFilter[k]) === String(b.dataset.fv));
+    });
+    box.querySelectorAll('.f-select').forEach(s => {
+      const k = s.dataset ? s.dataset.fk : null;
+      if (k) s.value = invFilter[k] == null ? 'all' : String(invFilter[k]);
+    });
   }
   function applyFilter() {
+    invRenderSig = ''; // 筛选变了必须重建列表
+    syncFilterUI();    // 筛选条自身的选中态也要立刻跟上
     renderInventory();
     renderInvToolbar();
   }
-  // 筛选栏（稀有度 / T 阶 / 锁定状态 / 重置）
+  // 筛选栏（部位 / 稀有度 / 底材T / 词缀T / 词缀类型 / 鉴定 / 锁定 / 重置）
   function renderInvFilter() {
     const box = $('inv-filter');
+    if (!box) return;
     box.innerHTML = '';
-    const chip = (text, active, onClick) => {
+    // 每个控件都带上「它代表哪个状态字段 + 值」→ 选中态由 syncFilterUI 从 invFilter 现场算，不存第二份
+    const chip = (key, value, text, onClick) => {
       const b = document.createElement('button');
-      b.className = 'f-chip' + (active ? ' active' : '');
+      b.className = 'f-chip';
+      if (key) { b.dataset.fk = key; b.dataset.fv = String(value); }
       b.innerHTML = text;
       b.onclick = onClick;
       return b;
+    };
+    const toggle = (key, value) => () => {
+      invFilter[key] = invFilter[key] === value ? null : value;
+      applyFilter();
     };
     const group = (label, chips) => {
       const g = document.createElement('div');
@@ -59,19 +106,54 @@
       for (const c of chips) g.appendChild(c);
       return g;
     };
+    const sel = (key, label, options, onChange) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'f-group';
+      const l = document.createElement('span');
+      l.className = 'f-label';
+      l.textContent = label;
+      wrap.appendChild(l);
+      const s = document.createElement('select');
+      s.className = 'f-select';
+      s.dataset.fk = key;
+      for (const [v, t] of options) {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = t;
+        s.appendChild(o);
+      }
+      s.onchange = () => onChange(s.value);
+      wrap.appendChild(s);
+      return wrap;
+    };
+    const SLOTS = window.Equipment.SLOTS || [];
+    const POOL = window.Equipment.AFFIX_POOL || [];
+    box.appendChild(sel('slot', '部位', [['all', '部位全部']].concat(SLOTS.map(s => [s, s])),
+      v => { invFilter.slot = v; applyFilter(); }));
     box.appendChild(group('稀有度', [
-      chip('白', invFilter.rarity === 'white', () => { invFilter.rarity = invFilter.rarity === 'white' ? null : 'white'; applyFilter(); }),
-      chip('蓝', invFilter.rarity === 'blue', () => { invFilter.rarity = invFilter.rarity === 'blue' ? null : 'blue'; applyFilter(); }),
-      chip('金', invFilter.rarity === 'gold', () => { invFilter.rarity = invFilter.rarity === 'gold' ? null : 'gold'; applyFilter(); })
+      chip('rarity', 'white', '白', toggle('rarity', 'white')),
+      chip('rarity', 'blue', '蓝', toggle('rarity', 'blue')),
+      chip('rarity', 'gold', '金', toggle('rarity', 'gold'))
     ]));
-    box.appendChild(group('T阶', [1, 2, 3, 4, 5].map(t =>
-      chip('T' + t, invFilter.tier === t, () => { invFilter.tier = invFilter.tier === t ? null : t; applyFilter(); })
+    box.appendChild(group('底材T', [1, 2, 3, 4, 5].map(t =>
+      chip('baseTier', t, 'T' + t, toggle('baseTier', t))
     )));
-    box.appendChild(group('锁定', [
-      chip('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁', invFilter.lock === 'locked', () => { invFilter.lock = invFilter.lock === 'locked' ? null : 'locked'; applyFilter(); }),
-      chip('未锁', invFilter.lock === 'unlocked', () => { invFilter.lock = invFilter.lock === 'unlocked' ? null : 'unlocked'; applyFilter(); })
+    box.appendChild(sel('affixTier', '词缀T', [['all', '词缀全部']].concat([1, 2, 3, 4, 5].map(t => [String(t), '含 T' + t])),
+      v => { invFilter.affixTier = v; applyFilter(); }));
+    box.appendChild(sel('affixType', '词缀类型', [['all', '类型全部']].concat(POOL.map(a => [a.type, a.label])),
+      v => { invFilter.affixType = v; applyFilter(); }));
+    box.appendChild(group('鉴定', [
+      chip('ident', 'unid', '未鉴定', toggle('ident', 'unid')),
+      chip('ident', 'id', '已鉴定', toggle('ident', 'id'))
     ]));
-    box.appendChild(chip('重置', false, () => { invFilter = { rarity: null, tier: null, lock: null }; applyFilter(); }));
+    box.appendChild(group('锁定', [
+      chip('lock', 'locked', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁', toggle('lock', 'locked')),
+      chip('lock', 'unlocked', '未锁', toggle('lock', 'unlocked'))
+    ]));
+    box.appendChild(chip(null, null, '重置', () => {
+      invFilter = { slot: 'all', rarity: null, baseTier: null, affixTier: 'all', affixType: 'all', ident: null, lock: null };
+      applyFilter();
+    }));
+    syncFilterUI(); // 初始选中态与 invFilter 对齐（唯一真源）
   }
   // 工具栏：计数 / 全选(清空) / 批量分解
   function renderInvToolbar() {
@@ -95,12 +177,25 @@
   }
 
   /* ---------- 背包（穿装备 / 多选批量分解） ---------- */
+  // 内容签名：装备页挂在 renderAll 里（挂机时每秒被调一次），内容没变就别重建 DOM，
+  // 否则「切筛选/点卡片」时会跟每秒的重建互相打架 —— 表现就是用户说的"卡呼呼的"。
+  function invSig(filtered) {
+    return filtered.map(e => e.id + (e.locked ? 'L' : '') + (e.fresh ? 'F' : '') + (e.identified === false ? 'U' : '') + (e.soulAffix ? 'S' : '')).join(',')
+      + '|a' + activeEqId + '|s' + [...selectedEqIds].sort().join(',') + '|n' + getInventory().length;
+  }
   function renderInventory() {
     const list = $('inv-list');
-    list.innerHTML = '';
-
+    if (!list) return;
     const pet = getActivePet();
     const filtered = getFilteredInventory();
+    const sig = invSig(filtered);
+    if (sig === invRenderSig && list.firstChild) return; // 一模一样 → 不重建
+    invRenderSig = sig;
+    // 滚动容器在上一级（⚠️ 测试桩没有 .closest，必须做能力判断，否则测试集体在渲染期抛错）
+    const scroller = (typeof list.closest === 'function' ? list.closest('.ew-col') : null) || list.parentElement;
+    const keepScroll = scroller ? scroller.scrollTop : 0;
+    list.innerHTML = '';
+
     const grid = document.createElement('div');
     grid.className = 'equip-grid';
     for (const eq of filtered) {
@@ -124,23 +219,28 @@
         <div class="ec-name" style="color:${r.color}">
           ${eq.fresh ? '<span class="eq-new">新</span>' : ''}${escapeHtml(eq.name || '未知装备')}${eq.locked ? '<span class="eq-lock"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>' : ''}
         </div>
-        <div class="ec-meta">${r.label}装 · T${eq.tier ?? 4}</div>
+        <div class="ec-meta">${r.label}装 · 底材T${eq.materialTier ?? eq.tier ?? 4}</div>
         <div class="ec-slot">${eq.slot || '武器'}｜${b.label}+${b.value}</div>
         <div class="ec-affixes">${affRows || '<div class="tip-empty">无词缀</div>'}</div>`;
-      card.onclick = () => {
-        // 锁定装备：可查看/打造，但不参与多选分解
-        if (eq.locked) {
-          activeEqId = eq.id;
-          renderInventory();
-          renderInvToolbar();
-          renderBagEqDetail(eq);
-          return;
-        }
+      // 选择角标（多选只走这里；点卡片本身 = 只看详情）
+      const selBox = document.createElement('div');
+      selBox.className = 'ec-sel' + (selected ? ' on' : '') + (eq.locked ? ' off' : '');
+      selBox.title = eq.locked ? '已锁定（不参与批量分解）' : (selected ? '取消选中' : '选中用于批量分解');
+      selBox.onclick = (e) => {
+        e.stopPropagation();
+        if (eq.locked) { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 已锁定', '锁定装备不参与批量分解'); return; }
         if (selectedEqIds.has(eq.id)) selectedEqIds.delete(eq.id);
-        else {
-          selectedEqIds.add(eq.id);
-          if (eq.fresh) eq.fresh = false;
-        }
+        else selectedEqIds.add(eq.id);
+        activeEqId = eq.id;
+        renderInventory();
+        renderInvToolbar();
+      };
+      card.appendChild(selBox);
+      card.onclick = () => {
+        /* 2026-09-14 改：点卡片 = 只看详情。
+         * 旧写法顺带把装备塞进「批量分解」的选中集（再点取消）→ 玩家"点一下看看"就变成了待分解，
+         * 再点批量分解就真分解了（锁定装备之外没有任何保护）= 误分解好装备。 */
+        if (eq.fresh) eq.fresh = false;
         activeEqId = eq.id;
         renderInventory();
         renderInvToolbar();
@@ -203,6 +303,8 @@
       empty.textContent = '没有符合筛选条件的装备（点「重置」查看全部）';
       list.appendChild(empty);
     }
+    // 重建后把滚动位置放回去（否则穿上/筛选一次就被弹回顶部，像"跳了一下"）
+    if (scroller && keepScroll) scroller.scrollTop = keepScroll;
   }
 
   /* ---------- 一键清理（按评分阈值，确认框 → 执行） ----------

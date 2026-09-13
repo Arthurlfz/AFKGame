@@ -142,12 +142,22 @@
   // rows: [{ name, quantity }, ...] → 整体替换本地（云端权威）
   function setCloudMaterials(rows) {
     const next = {};
-    for (const r of rows || []) next[r.name] = (next[r.name] || 0) + r.quantity;
+    for (const r of rows || []) {
+      const q = Number(r && r.quantity) || 0;
+      /* 只收正数：云端会留着 quantity=0 的空行（扣到 0 不删行），
+       * 收进来就在本地凭空造出一个「数量 0」的键 → 背包素材区出现「×0 的图标」
+       * （2026-09-14 用户实报：「用掉之后图标还在，显示 0」）。
+       * gain / spend / spendLocal 一直都是「到 0 就删键」，这里补齐同一条不变式。 */
+      if (q <= 0) continue;
+      next[r.name] = (next[r.name] || 0) + q;
+    }
     // 把还没上报的补回去：那是当前这个号已经拿到、但云端还没记账的部分。
     // 不加回去的话，玩家在上报窗口（4 秒）内刷新页面，这批掉落就凭空没了
     // ——云端查不到（还没报），本地又被云端快照覆盖。
     // 换号走 clearAll()（先补报再清空），不会串到别的号上。
     for (const n of Object.keys(pending)) next[n] = (next[n] || 0) + pending[n];
+    // 不变式：local 里只存正数（数量为 0 的品种 = 没有这个品种）
+    for (const n of Object.keys(next)) if (!(next[n] > 0)) delete next[n];
     local = next;
   }
 

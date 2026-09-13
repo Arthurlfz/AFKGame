@@ -3,7 +3,8 @@
  * 职责：
  *  1. 锁定/解锁装备（locked 状态存库 equip_items.locked，防分解）
  *  2. 一键分解预览：统计可分解件数与预计产出（按稀有度，config.salvage）
- *  3. 一键分解执行：只分解「未锁定 且 未在售」的装备
+ *  3. 一键分解执行：只分解「未锁定 且 未在售 且 没穿在任何宠物身上」的装备
+ *     ⚠️ 「穿着不可分解」是硬保护（2026-09-14 加，见 isWorn 注释：旧写法漏了非出战宠 / 批量分解那条路）
  *     - 白装 → 无产出；蓝装 → 强化石；金装 → 祝福石（通货已移除）
  *     - 材料经 Materials.gain 本地 + 云端原子累加；装备云端行批量删除
  * 依赖：equipment.js（背包）、materials.js（材料）、
@@ -22,9 +23,24 @@
   const isItemListed = () => window.Market && window.Market.isItemListed ? window.Market.isItemListed.apply(window.Market, arguments) : false;
   const Items = window.Items;
 
-  // 可分解判定：未锁定 且 未在售（在售装备分解会让挂单快照失效）
+  /* 是否穿在某只宠物身上（**查全部宠物**，不只是出战那只）。
+   * 为什么要有这一条（2026-09-14 用户报「一键分解把宠物身上的装备分解了」，已复现）：
+   *   旧写法只在 `belowThreshold` 里拿 `getActivePet()` 比同部位评分，且「批量分解」那条路
+   *   （isSalvageable）压根不看宠物槽。一旦出现「宠物槽里有引用、背包里也还有本体」的形态
+   *   （云端装备槽读取异常 / 多宠引用同一件时就会这样），身上穿的装备就会被分解掉 —— 资产损失。
+   * 现在把「穿着不可分解」收在唯一判定点上，两条路（一键清理 / 批量分解）自动都受保护。 */
+  function isWorn(eq) {
+    if (!eq) return false;
+    const pets = (window.Pet && window.Pet.getPets) ? window.Pet.getPets() : [];
+    return pets.some(p => p && p.equipment && Object.keys(p.equipment).some(slot => {
+      const w = p.equipment[slot];
+      return !!w && (w === eq || (w.id != null && w.id === eq.id));
+    }));
+  }
+
+  // 可分解判定：未锁定 且 未在售 且 没穿在宠物身上
   function isSalvageable(eq) {
-    return !eq.locked && !isItemListed(eq.cloudId);
+    return !eq.locked && !isItemListed(eq.cloudId) && !isWorn(eq);
   }
 
   /* ---------- 锁定 / 解锁 ---------- */
@@ -107,8 +123,9 @@
   function belowThreshold(threshold) {
     const pet = (window.Pet && window.Pet.getActivePet) ? window.Pet.getActivePet() : null;
     return getInventory().filter(eq => {
-      if (!isSalvageable(eq)) return false;
+      if (!isSalvageable(eq)) return false; // 锁定 / 在售 / 任何宠物穿着 —— 一律跳过
       if (scoreOf(eq) >= threshold) return false;
+      // 额外一层：出战宠同部位、且不比身上差的，留着（防把升级品清掉；穿着那件本身已被 isSalvageable 挡住）
       const worn = pet && pet.equipment ? pet.equipment[eq.slot] : null;
       return !(worn && scoreOf(eq) >= scoreOf(worn)); // 比身上好 → 留着
     });
@@ -131,5 +148,5 @@
   }
 
   /* ---------- 对外 API ---------- */
-  window.Salvage = { isSalvageable, toggleLock, getSalvagePreview, previewEquips, salvageBelow, belowThreshold, salvageList };
+  window.Salvage = { isSalvageable, isWorn, toggleLock, getSalvagePreview, previewEquips, salvageBelow, belowThreshold, salvageList };
 })();

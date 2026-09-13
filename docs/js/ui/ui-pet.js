@@ -249,7 +249,12 @@
     const eb = $id('exp-bar'); if (eb) eb.style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
     const et = $id('exp-text'); if (et) et.textContent = `${pet.exp}/${expNeed(pet.level)}`;
     const gr = $id('growth'); if (gr) gr.textContent = pet.growth.toFixed(1);
-    const rn = $id('reborn'); if (rn) rn.textContent = `转生 ${pet.rebornCount || 0} 次`;
+    const rn = $id('reborn');
+    if (rn) {
+      const rebornN = Number(pet.rebornCount) || 0;
+      rn.textContent = `转生 ${rebornN} 次`;
+      rn.hidden = rebornN <= 0; // 没转生过就不显示（旧版永远挂着一行"转生 0 次"= 白占地方，还像玩法入口）
+    }
     const hp = $id('hp'); if (hp) hp.textContent = `${Math.round(getCurHp(pet))}/${Math.round(s.hp)}`;
     // 攻击/防御/速度：取整显示（基底经 materialTier 相乘为小数，取整更干净）
     ['atk', 'def', 'spd'].forEach(k => { const el = $id(k); if (el) el.textContent = Math.round(s[k]); });
@@ -348,18 +353,24 @@
       const item = div.querySelector('.slot-item');
       if (eq) {
         item.style.color = rarity.color;
-        item.innerHTML = `<span class="slot-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span><span class="sub">${escapeHtml(describeItem(eq))}</span></span>`;
-        // 点槽位 → 右侧面板显示穿戴详情（可脱下）；不再挂 hover 浮层（根治遮挡）
+        /* 格子里只放「图标 + 装备名」。
+         * 旧写法还塞了一整行 describeItem（部位｜基底｜全部词缀）—— 那行必定被 ellipsis 截成半句话，
+         * 既挤又没信息量；详情本来就在右侧面板/悬停里（2026-09-14 用户反馈"左边挺挤的"）。 */
+        item.innerHTML = `<span class="slot-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span></span>`;
+        // 单击槽位 → 右侧面板显示穿戴详情（可脱下）；不再挂 hover 浮层（根治遮挡）
         item.onclick = (e) => { e.stopPropagation(); bagActiveEqId = eq.id; if (UI.renderBagEqDetail) UI.renderBagEqDetail(eq); };
         const takeBtn = document.createElement('button');
         takeBtn.className = 'btn-sm ghost slot-unequip';
         takeBtn.textContent = '脱下';
+        takeBtn.title = '放回背包（也可以直接双击这个槽位）';
         takeBtn.onclick = (e) => { e.stopPropagation(); const taken = unequip(pet, slot); if (taken) { addLog(`脱下 ${taken.name}，放回背包`); UI.renderAll(); } };
         item.appendChild(takeBtn);
-        div.title = '点击看详情';
+        // 双击槽位 = 脱下（2026-09-14 用户要的快捷操作）
+        div.ondblclick = (e) => { e.stopPropagation(); takeBtn.onclick(e); };
+        div.title = '单击看详情 · 双击脱下';
       } else {
-        item.textContent = '空槽';
-        div.title = '空装备槽';
+        item.textContent = ''; // 空槽不再写"空槽"两个字（12 格里 9 格是废话，一格两行才是"挤"的主因）
+        div.title = '空装备槽 · 从背包里穿装备进来';
       }
       orbit.appendChild(div);
     });

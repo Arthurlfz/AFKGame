@@ -210,7 +210,7 @@ async function runTower(affixIds, opts) {
   const evBad = items.filter(i => (i.dropBonus.equipPct || 0) <= ((i.ev && i.ev.approvalFailPct) || 0) * 2);
   ok(evBad.length === 0, '每条腐印的期望掉率增益 > 失败概率增量 × 2（负项不得入库；违规 ' + evBad.map(i => i.name).join('/') + '）');
   const unreadable = items.filter(i => A.isUnreadable(i));
-  ok(unreadable.length >= 1 && unreadable.length <= 4, '「不可读」腐印数量受控（' + unreadable.length + ' 条）');
+  ok(unreadable.length >= 1 && unreadable.length <= 4, '「禁忌」腐印数量受控（' + unreadable.length + ' 条）');
 
   const vEmpty = A.validate([]);
   ok(vEmpty.ok && vEmpty.corrosion === 0, '白图（0 腐印）永远合法（这是核心设计：不加腐也能通）');
@@ -223,9 +223,9 @@ async function runTower(affixIds, opts) {
   const unreadIds = unreadable.map(i => i.id);
   if (unreadIds.length >= 2) {
     const vUn = A.validate(unreadIds.slice(0, 2));
-    ok(!vUn.ok && /不可读/.test(vUn.errors.join()), '「不可读」腐印超限被拒（同局最多 ' + A.unreadableLimit() + ' 条）');
+    ok(!vUn.ok && /禁忌/.test(vUn.errors.join()), '「禁忌」腐印超限被拒（最多 ' + A.unreadableLimit() + ' 条）');
   } else {
-    ok(true, '「不可读」腐印只有 1 条，超限规则天然成立');
+    ok(true, '「禁忌」腐印只有 1 条，超限规则天然成立');
   }
   const unknown = A.validate(['not-exist-id']);
   ok(!unknown.ok && /未知腐印/.test(unknown.errors.join()), '未知腐印 id 被拒');

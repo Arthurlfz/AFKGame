@@ -310,45 +310,20 @@
   }
 
   /* ============ Tab 2：资源发放 ============ */
-  /* 材料/道具清单：全部从 Config 汇总并分组，新增道具或新材料自动出现在下拉里，不用改这里。
-   * 排除：'区域材料'（掉落表占位键，不是真材料）、'宠物蛋'（有专门的发蛋入口，走 pet_egg 表）。 */
-  const MATERIAL_SKIP = { '区域材料': 1, '宠物蛋': 1 };
+  /* 材料清单 = Config.materialInfo（唯一真源，按分区聚合）。
+   * 2026-09-14 合并：以前这里自己从 craft/drop/items 现推一套分类，和背包各写一份
+   * ——「同一逻辑两份」是项目头号病因，现在两处都读同一张表，加材料只改一处。 */
   function collectMaterialGroups() {
-    const groups = [], seen = {};
-    const push = (label, rawNames) => {
-      const list = [];
-      (rawNames || []).forEach(n => {
-        if (!n || seen[n] || MATERIAL_SKIP[n] || list.indexOf(n) >= 0) return;
-        seen[n] = 1; list.push(n);
-      });
-      if (list.length) groups.push({ label: label, names: list });
-    };
-    const C = Config.craft || {}, D = Config.drop || {};
-    // 三系道具（Config.items 是唯一定义处）
-    const byCat = cat => (Config.itemsOf ? Config.itemsOf(cat) : []).map(i => i.name);
-    push('合成道具', byCat('synth'));
-    push('进化道具', byCat('evolve'));
-    push('涅槃道具', byCat('nirvana'));
-    push('打造石', Object.keys(C).map(k => C[k] && C[k].name));
-    push('进化素材', Object.keys(D.evoMaterialWeights || {}));
-    // 通天塔（2026-09-10）：腐印（进塔词缀，消耗品）+ 重置卡（额外进入次数）
-    const TW = Config.tower || {};
-    push('通天塔·腐印', ((TW.affix && TW.affix.items) || []).map(i => i.name));
-    push('通天塔·门票', [TW.resetCardName]);
-    push('区域材料', Object.keys(D.areaMaterials || {}).map(k => D.areaMaterials[k] && D.areaMaterials[k].name));
-    // 其余：可作价材料 + 掉落表里出现的任何新材料 + 涅磐兽 / 合成之石 / 凝魂晶石
-    const rest = [];
-    const addRest = n => {
-      if (!n || seen[n] || MATERIAL_SKIP[n] || rest.indexOf(n) >= 0) return;
-      rest.push(n);
-    };
-    ((Config.trade && Config.trade.materials) || []).forEach(m => addRest(m.name));
-    Object.keys(D.materialWeightsByTier || {}).forEach(t => Object.keys(D.materialWeightsByTier[t] || {}).forEach(addRest));
-    addRest(D.phoenixName);
-    addRest(D.synthesizeName);
-    if (Config.pet && Config.pet.expPool) addRest(Config.pet.expPool.material);
-    push('其他材料', rest);
-    return groups;
+    const ids = Config.materialInfoGroups || [];
+    const groups = ids.map(g => ({ label: g.label, names: [] }));
+    const byId = {};
+    ids.forEach((g, i) => { byId[g.id] = groups[i]; });
+    const info = Config.materialInfo || {};
+    Object.keys(info).sort().forEach(n => {
+      const g = byId[(info[n] || {}).group] || byId.misc || groups[groups.length - 1];
+      if (g && g.names.indexOf(n) < 0) g.names.push(n);
+    });
+    return groups.filter(g => g.names.length);
   }
   function collectEggSpecies() {
     const sp = (Config.pet && Config.pet.starters) || [];

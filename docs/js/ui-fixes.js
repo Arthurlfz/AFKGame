@@ -86,19 +86,11 @@
   }
 
   /* ============================================================
-   * 4. 背包物品点选：点击背包中的装备卡片时高亮选中
+   * 4. （已删除 2026-09-14）背包物品点选
+   *    这段是死代码：#inv-list 里现在放的是 ui-equipment.js 渲染的 `.equip-card`，
+   *    而它找的是 `.poe-item`（背包弹窗那套）→ 永远匹配不上，什么都不做。
+   *    选择逻辑已收在 ui-equipment.js 的 `.ec-sel` 角标上（点卡片=只看详情）。
    * ============================================================ */
-  function initBagItemSelect() {
-    const invList = $('inv-list');
-    if (!invList) return;
-    invList.addEventListener('click', function (e) {
-      const card = e.target.closest('.poe-item');
-      if (!card) return;
-      // 清除其他选中
-      invList.querySelectorAll('.poe-item.selected').forEach(el => el.classList.remove('selected'));
-      card.classList.add('selected');
-    });
-  }
 
   /* ============================================================
    * 5. 设置按钮：弹一个真正的设置面板
@@ -258,7 +250,6 @@
   function init() {
     patchBagOpen();
     initCurrencyTooltips();
-    initBagItemSelect();
     initSettingsPanel();
     initTutorialEndCard();
     initEvolutionCards();

@@ -405,8 +405,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 #tab-pet .equip-slot .slot-copy, .bag-window .equip-slot .slot-copy { min-width: 0; flex: 1; }
 #tab-pet .equip-slot .slot-name, .bag-window .equip-slot .slot-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 #tab-pet .equip-slot .slot-item .sub, .bag-window .equip-slot .slot-item .sub { display: block; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
-#tab-pet .equip-slot .slot-unequip, .bag-window .equip-slot .slot-unequip { display: none; }
+/* 「脱下」按钮（2026-09-14 重做）：绝对定位钉在槽位右上角。
+ * 旧写法是普通流里的一个按钮 → 悬停出现时会把格子内容顶一下（"挤"的另一半原因）。 */
+#tab-pet .equip-slot .slot-unequip, .bag-window .equip-slot .slot-unequip {
+  position: absolute; right: 4px; top: 4px; z-index: 3; display: none;
+  margin: 0; padding: 0 4px; font-size: var(--fs-2xs); line-height: 1.6;
+  background-color: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-xs);
+  color: var(--text-dim); cursor: pointer;
+}
 #tab-pet .equip-slot:hover .slot-unequip, .bag-window .equip-slot:hover .slot-unequip { display: block; }
+#tab-pet .equip-slot .slot-unequip:hover, .bag-window .equip-slot .slot-unequip:hover { border-color: var(--danger); color: var(--danger-hi); }
+/* 空槽：不写字，用淡虚线框表示"这里能装"（格子里只留部位名一行，左边立刻松一截） */
+#tab-pet .equip-orbit > .equip-slot.empty, .bag-window .equip-orbit > .equip-slot.empty {
+  border-style: dashed; background-color: rgb(0 0 0 / .18);
+}
 
 #pet-list:empty::before, #evolve-pet-list:empty::before, #synth-pet-list:empty::before, #merge-pet-list:empty::before, #market-list:empty::before { content: "暂无内容 · 去野外挂机刷一刷吧"; display: block; padding: 30px 10px; text-align: center; color: var(--text-faint); border: 1px dashed var(--line); border-radius: var(--radius-sm); }
 /* 装备资料页：属性 | 当前装备 | 换装背包，三列必须保留 */

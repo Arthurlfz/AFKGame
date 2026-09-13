@@ -33,12 +33,11 @@
   const EQUIP_ICON = { 武器:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 单手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 双手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️', 长剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 弓:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="22" x2="18" y1="12" y2="12" /><line x1="6" x2="2" y1="12" y2="12" /><line x1="12" x2="12" y1="6" y2="2" /><line x1="12" x2="12" y1="22" y2="18" /></svg>', 法杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 盾:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>', 胸甲:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>', 头盔:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 帽:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 手套:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>', 靴:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 鞋:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 戒指:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 项链:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 护符:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 腰带:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' };
   UI.EQUIP_ICON = EQUIP_ICON;
 
-  const CONSUMABLES = [
-    { name: Config.craft.reforge.name, icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8h.01"/><path d="M8 8h.01"/><path d="M8 16h.01"/><path d="M16 16h.01"/><path d="M12 12h.01"/></svg>', desc: '重铸全部词缀' },
-    { name: Config.craft.strip.name, icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><path d="M14.8 14.8 20 20"/></svg>️', desc: '移除一条词缀' },
-    { name: Config.craft.holy.name, icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', desc: '重 Roll 词缀数值' },
-    { name: Config.craft.augment.name, icon: '➕', desc: '新增词缀' }
-  ];
+  /* 打造通货（重铸 / 剥离 / 神圣 / 增缀 + 锁定 / 鉴定）2026-09-14 起归到
+   * 「素材」页签的【打造与鉴定】分区 —— 它们和鉴定石本来就是同一类东西，
+   * 以前被拆在「消耗品」里是历史遗留（用户报「背包分类笼统」）。
+   * 分区真源 = Config.materialInfo（唯一一份，UI 不许另写名单）。
+   * 「消耗品」页签现在只放绑定的一次性道具（引导经验包等）。 */
   // 背包搜索词 / 品质筛选 / 当前 tab（renderAll 高频重建，用 state 保存）
   const RARITY_ORDER = { gold: 0, blue: 1, white: 2 };
   const EQUIP_SLOTS = window.Equipment.SLOTS || [];
@@ -50,6 +49,7 @@
   let bagBaseTier = 'all'; // all / '1'~'5'（底材T阶）
   let bagAffixTier = 'all'; // all / '1'~'5'（最高词缀T阶）
   let bagAffixType = 'all'; // all / 词缀类型（atk/dropQty等）
+  let bagGroup = 'all';  // 素材二级分区：all / Config.materialInfoGroups 的 id
   let identifyMode = false;  // 手持鉴定模式：开启后点未鉴定装备即连续鉴定
 
   // 通用格子 tooltip 浮层（悬停显示完整信息，body 层 fixed 不被裁）
@@ -160,12 +160,19 @@
 
     const equipList = getInventory();
     const localMats = Materials.getLocal ? Materials.getLocal() : {};
-    // 引导经验包（2026-09-08）单独走"消耗品"栏，别在素材里重复出现
+    // 素材分区真源（唯一一份：Config.materialInfo / materialInfoGroups），UI 不另写名单
+    const matInfo = Config.materialInfo || {};
+    const matGroups = Config.materialInfoGroups || [];
+    const groupLabel = id => { const g = matGroups.find(x => x.id === id); return g ? g.label : '其他'; };
+    // 引导经验包（2026-09-08）走「消耗品」栏，不在素材里重复出现
     const EXP_PACK_NAMES = ((Config.tutorialMode && Config.tutorialMode.expPacks) || []).map(p => p.name);
     const matEntries = Object.entries(localMats).sort((a, b) => a[0].localeCompare(b[0]))
-      .filter(([name]) => !CONSUMABLES.some(c => c.name === name) && !EXP_PACK_NAMES.includes(name))
-      .map(([name, qty]) => ({ name, qty }));
-    const consEntries = CONSUMABLES.map(c => ({ ...c, qty: Materials.getQuantity(c.name) })).filter(x => x.qty > 0);
+      .filter(([name]) => !EXP_PACK_NAMES.includes(name))
+      .map(([name, qty]) => ({ name, qty, group: (matInfo[name] || {}).group || 'misc' }));
+    // 「消耗品」= 绑定的一次性道具（引导经验包）；打造石已归「素材 · 打造与鉴定」
+    const consEntries = EXP_PACK_NAMES
+      .map(n => ({ name: n, qty: Materials.getQuantity(n) || 0 }))
+      .filter(x => x.qty > 0);
     const eggCount = getEggCount();
     const eggEntries = Object.entries(getEggs()).filter(([, c]) => c > 0);
     const totalCount = equipList.length + matEntries.length + consEntries.length + eggCount;
@@ -207,6 +214,21 @@
     searchInput.oninput = () => { bagSearch = searchInput.value.trim().toLowerCase(); renderBag(); };
     filterBar.appendChild(searchInput);
     left.appendChild(filterBar);
+
+    // 素材二级分区（2026-09-14）：只在「素材」页签里出现，选项来自唯一真源 Config.materialInfoGroups
+    if (bagCat === 'material') {
+      const subBar = document.createElement('div');
+      subBar.className = 'bag-sub-cats';
+      const subCats = [{ id: 'all', label: '全部素材' }].concat(matGroups.map(g => ({ id: g.id, label: g.label })));
+      for (const g of subCats) {
+        const btn = document.createElement('button');
+        btn.className = 'bag-cat' + (bagGroup === g.id ? ' active' : '');
+        btn.textContent = g.label;
+        btn.onclick = () => { bagGroup = g.id; renderBag(); };
+        subBar.appendChild(btn);
+      }
+      left.appendChild(subBar);
+    }
 
     // 物品网格区域
     const gridArea = document.createElement('div');
@@ -292,36 +314,38 @@
       }
     }
 
-    // 素材
+    // 素材（二级分区按 Config.materialInfo.group；「全部」页签下不受分区筛选影响）
     if (bagCat === 'all' || bagCat === 'material') {
-      const matList = matEntries.filter(m => !bagSearch || m.name.toLowerCase().includes(bagSearch));
+      const matList = matEntries.filter(m => (bagCat !== 'material' || bagGroup === 'all' || m.group === bagGroup)
+        && (!bagSearch || m.name.toLowerCase().includes(bagSearch)));
       for (const m of matList) {
+        // 悬停短版：一句"怎么用" + 来源前 2 处 + 点开看全（长词条走 MatWiki 的模态，见 ui-mat-entry.js）
+        const e = (window.MatWiki && window.MatWiki.entry) ? window.MatWiki.entry(m.name) : null;
+        const clip = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+        const useLine = e && e.uses.length ? (e.handUse || (e.uses[0].where + '：' + e.uses[0].what)) : '';
+        const srcLine = e && e.sources.length
+          ? e.sources.slice(0, 2).map(s => s.where).join(' / ') + (e.sources.length > 2 ? ' 等 ' + e.sources.length + ' 处' : '')
+          : '';
         const card = document.createElement('div');
         card.className = 'poe-item q-mat';
         card.innerHTML = '<div class="ico">' + matIcon(m.name) + '</div><div class="nm">' + escapeHtml(m.name) + '</div><div class="corner">×' + m.qty + '</div>';
-        const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div><div class="tip-line"><span>素材</span><b>×' + m.qty + '</b></div><div class="tip-line hint">用于合成/涅槃/进化/打造等消耗</div>';
+        const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div>'
+          + '<div class="tip-line"><span>' + escapeHtml(groupLabel(m.group)) + '</span><b>×' + m.qty + '</b></div>'
+          + (useLine ? '<div class="tip-line hint">怎么用：' + escapeHtml(clip(useLine, 72)) + '</div>' : '')
+          + (srcLine ? '<div class="tip-line hint">来源：' + escapeHtml(srcLine) + '</div>' : '')
+          + '<div class="tip-line hint">点一下看完整词条（用途 ' + (e ? e.uses.length : 0) + ' · 来源 ' + (e ? e.sources.length : 0) + '）</div>';
         bindTip(card, tip);
+        card.style.cursor = 'pointer';
+        card.onclick = () => { if (UI.openMatEntry) UI.openMatEntry(m.name); else hideBagTip(); };
         bagItems.push(card);
       }
     }
 
-    // 消耗品
+    // 消耗品（绑定的一次性道具：引导经验包等）
     if (bagCat === 'all' || bagCat === 'consume') {
-      const consList = consEntries.filter(c => !bagSearch || c.name.toLowerCase().includes(bagSearch));
-      for (const c of consList) {
-        const card = document.createElement('div');
-        card.className = 'poe-item q-cons';
-        card.innerHTML = '<div class="ico">' + c.icon + '</div><div class="nm">' + escapeHtml(c.name) + '</div><div class="corner">×' + c.qty + '</div>';
-        const tip = '<div class="tip-name">' + c.icon + ' ' + escapeHtml(c.name) + '</div><div class="tip-line"><span>' + c.desc + '</span><b>×' + c.qty + '</b></div><div class="tip-line hint">用于装备改造</div>';
-        bindTip(card, tip);
-        bagItems.push(card);
-      }
-      // 引导经验包（2026-09-08）：分档锁死的真实道具，点卡片使用（直升到档位上限，不超）
-      const packs = ((Config.tutorialMode && Config.tutorialMode.expPacks) || []);
+      const packs = consEntries.filter(p => !bagSearch || p.name.toLowerCase().includes(bagSearch));
       for (const p of packs) {
-        const qty = Materials.getQuantity(p.name) || 0;
-        if (qty <= 0) continue;
-        if (bagSearch && !p.name.toLowerCase().includes(bagSearch)) continue;
+        const qty = p.qty;
         const card = document.createElement('div');
         card.className = 'poe-item q-cons';
         card.innerHTML = '<div class="ico">' + (p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>') + '</div><div class="nm">' + escapeHtml(p.name) + '</div><div class="corner">×' + qty + '</div>';
