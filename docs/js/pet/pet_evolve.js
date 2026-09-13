@@ -108,11 +108,19 @@
   // UI 层的 disabled 只按「能不能进化」置灰，点击后不禁用，挡不住并发。
   const inFlight = new Set();
 
+  /* 托管挂机中改宠物：先让服务器把挂机账结清（本地等级/经验被真账校准），改完自动重新挂上。
+   * ⚠️ 为什么必须这样（2026-09-13 用户实测"进化成功后等级突然变回去"）：
+   *   托管挂机期间本地 pet.level 是**演出预演值**（回放基线 + 每场击杀往上加），
+   *   服务器真账领先本地最多一个窗口。直接用预演等级判门槛 → 操作完成后真账把等级写回来 → 玩家看到等级跳回去。
+   * IdleBridge 不在（测试桩）/ 没在挂机 → 直接执行，零影响。 */
+  const withIdleHold = fn => (window.IdleBridge && window.IdleBridge.duringPetEdit)
+    ? window.IdleBridge.duringPetEdit(fn) : fn();
+
   async function evolve(petId, routeIndex, boostOverride, boostItemId) {
     const k = 'evo:' + petId;
     if (inFlight.has(k)) return { error: '进化进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await evolveInner(petId, routeIndex, boostOverride, boostItemId); }
+    try { return await withIdleHold(() => evolveInner(petId, routeIndex, boostOverride, boostItemId)); }
     finally { inFlight.delete(k); }
   }
 

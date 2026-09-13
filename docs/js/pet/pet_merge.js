@@ -32,6 +32,15 @@
   // → 产出两只新宠、材料扣两份。玩家视角是"我只合成了一次，却多出一只"。
   const inFlight = new Set();
 
+  /* 托管挂机中改宠物：先让服务器把挂机账结清（本地等级/经验被真账校准），改完自动重新挂上。
+   * ⚠️ 为什么必须这样（2026-09-13 用户实测"操作成功后等级突然变回去"）：
+   *   托管挂机期间本地 pet.level 是**演出预演值**（回放基线 + 每场击杀往上加），
+   *   服务器真账领先本地最多一个窗口；而合成/涅槃的等级门槛读的正是这个预演值，
+   *   涅槃还会把等级写回云端 → 用落后的预演值覆盖真账（经验倒退），随后又被真账校准回去。
+   * IdleBridge 不在（测试桩）/ 没在挂机 → 直接执行，零影响。 */
+  const withIdleHold = fn => (window.IdleBridge && window.IdleBridge.duringPetEdit)
+    ? window.IdleBridge.duringPetEdit(fn) : fn();
+
   // 获取可作素材的候选宠（等级足够 + 不是自身 + 云端在档 + 不在售 + 没穿装备）
   function getMergeCandidates(mainId, cfg) {
     const minLv = (cfg && cfg.minLevel) || 40;
@@ -144,7 +153,7 @@
     const k = 'nir:' + mainId + ':' + subId;
     if (inFlight.has(k)) return { error: '涅槃进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await nirvanaInner(mainId, subId, useCrystal, useNirvanaPill, lockTraitId); }
+    try { return await withIdleHold(() => nirvanaInner(mainId, subId, useCrystal, useNirvanaPill, lockTraitId)); }
     finally { inFlight.delete(k); }
   }
   async function nirvanaInner(mainId, subId, useCrystal, useNirvanaPill, lockTraitId) {
@@ -333,7 +342,7 @@
     const k = 'syn:' + mainId + ':' + subId;
     if (inFlight.has(k)) return { error: '合成进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await synthesizeInner(mainId, subId, itemId); }
+    try { return await withIdleHold(() => synthesizeInner(mainId, subId, itemId)); }
     finally { inFlight.delete(k); }
   }
   async function synthesizeInner(mainId, subId, itemId) {

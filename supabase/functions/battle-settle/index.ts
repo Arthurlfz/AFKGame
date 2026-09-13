@@ -6,8 +6,10 @@
  * 设计（2026-09-04 最终口径）：
  *   - 「页面活着就挂」：start 记 started_at，前端每 5~10s settle 一次；
  *     切后台 / 最小化 / 被遮挡都不影响（前端不因可见性暂停，服务器惰性结算兜住）。
- *   - 「关了就没有」：页面关闭后无人结算；下次回来只补最近 GRACE 秒（2 分钟），
- *     更早的离线时间作废 → 不需要离线收益，也不需要前端可见性暂停机制。
+ *   - 「客户端没来也不白挂」：页面关闭 / 标签页被浏览器冻结 / 电脑休眠 → 心跳会停很久，
+ *     下次结算把没结算的时间按真实经过秒数补回来，上限 MAX_CATCHUP_SECONDS（8 小时），
+ *     更早的离线时间作废（避免"关几天回来补三天收益"）。
+ *     游标只按「真正算掉的时间」推进，所以补不完的部分会留到下次继续补，不会凭空消失。
  *   - 时间权威：全部由服务器 now() 驱动，客户端时间一律忽略。
  *   - 结算权威：场数/经验由 battle-sim（与前端同种子一致的数值引擎）算出，
  *     写入 battle_logs（幂等 batch_seq）与 pets（cur_hp / exp / level）。
@@ -35,10 +37,14 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
-// 结算宽限窗口：页面关闭后回来，只补最近这一段的挂机时间（秒）。
-// 在线时前端每 5~10s 结算一次，远小于宽限 → 全算；切后台被浏览器节流（最多 1 分钟 1 次）也覆盖；
-// 关页面回来后间隔远超宽限 → 只补最后 2 分钟（= 最后在线段），离线部分作废。
-const GRACE_SETTLE_SECONDS = 120;
+/* 最多能把多久「客户端没来结算」的时间补回来（秒）。
+ * ⚠️ 2026-09-13 改（用户实测：挂了一整夜几乎没收益）：原来这里是 120 秒 ——
+ *   浏览器会把后台标签页冻结（Edge 睡眠标签页 / Chrome 内存节省），电脑还会休眠，
+ *   这时客户端的心跳能停几十分钟到几小时；120 秒的上限 = 这段时间**直接作废**。
+ *   现在放宽到 8 小时，配合下面「游标只按真正算掉的时间推进」，
+ *   没算完的时间留在账上、下次继续补 —— 挂机时间不再凭空消失。
+ *   留上限的意义：关掉页面很久（几天）后回来只补最近 8 小时，不是"补三天收益"。 */
+const MAX_CATCHUP_SECONDS = 8 * 3600;
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -126,8 +132,10 @@ async function handle(req: Request): Promise<Response> {
   // 2) 结算（2026-09-09 架构改版：服务器唯一模拟器 + 先记账后放片）
   //    - pending_script 未到期 → 幂等原样再发（刷新/重连不重复记账）；
   //    - 到期/不存在 → 补账窗（游标到现在的真实时间）+ 剧本窗（接下来 SCRIPT_WINDOW_SECONDS）
-  //      一次算好、一次入账，游标直接跳到剧本窗尾，录像下发客户端纯回放。
+  //      一次算好、一次入账，录像下发客户端纯回放。
   //      玩家看到的每场战斗/每个数字 = 服务器已入账的数字（实时结算，无校准无漂移）。
+  //    - 游标按「真正算掉的时间」推进（见 cursorIso）：补账窗一次最多跑 200 场，
+  //      没算完的秒数留在游标后面，下次继续补 —— 客户端不在线也不丢挂机时间。
   const SCRIPT_WINDOW_SECONDS = 30; // 剧本窗时长（客户端回放时长 = 服务器的记账步长）
   const PENDING_GRACE_MS = 2000;    // 剧本到期宽容（客户端回放节奏有毫秒级抖动）
   const pending: any = (session as any).pending_script || null;
@@ -143,7 +151,10 @@ async function handle(req: Request): Promise<Response> {
       totalFights: session.total_fights, totalExp: session.total_exp
     });
   }
-  const gapSec = Math.min(Math.max(0, Math.floor((nowMs - lastSettledMs) / 1000)), GRACE_SETTLE_SECONDS);
+  /* 补账起点：离线超过 MAX_CATCHUP_SECONDS 的部分作废（把起点抬到"最多 8 小时前"），
+   * 其余按真实经过秒数补 —— 客户端被冻结半小时、电脑睡了一夜，回来都能算上。 */
+  const fromMs = Math.max(lastSettledMs, nowMs - MAX_CATCHUP_SECONDS * 1000);
+  const gapSec = Math.max(0, Math.floor((nowMs - fromMs) / 1000));
 
   // 3) 读出战宠物
   const { data: petRow, error: petErr } = await supabase
@@ -193,6 +204,12 @@ async function handle(req: Request): Promise<Response> {
   script.levelBefore = plan.result.scriptLevelBefore; // 窗前真值（回放起点基线）
   script.expBefore = plan.result.scriptExpBefore;
 
+  /* 游标推进（2026-09-13 修）：只按【真正算掉的时间】推进，不是 now。
+   * 补账窗撞上模拟器 200 场上限时只算掉了一部分秒数 —— 写 now 就把剩下那段一步跨过、永久作废，
+   * 这正是"客户端被冻结/电脑休眠时挂机时间凭空消失"的那一刀。现在差额留在游标后面，
+   * 下一次 settle 继续补（每次补一段，直到追平现实时间）。 */
+  const cursorIso = new Date(fromMs + (Number(plan.result.coveredMs) || 0)).toISOString();
+
   /* 归集本窗奖励（补账窗 + 剧本窗一起）。
    * ⚠️ 为什么挪到 battle_settle 【之前】：奖励现在作为参数随结算 RPC 一起入库，
    *    这样发奖与「游标推进」在同一个事务里 —— 任一失败整单回滚、下次 settle 重试，
@@ -237,7 +254,7 @@ async function handle(req: Request): Promise<Response> {
     p_expected_last_settled_at: session.last_settled_at,
     p_last_boss_fight: plan.result.bossState && plan.result.bossState.lastBossFight != null
       ? plan.result.bossState.lastBossFight : null,
-    p_cursor: untilIso,
+    p_cursor: cursorIso,   // = 上次游标 + 本次真正算掉的时间（不是 now，见上方注释）
     // 同上：必须传对象。曾经 JSON.stringify 过 → pending_script 落库成字符串 →
     // 下面读回来的 pending.script 恒为 undefined → 幂等分支永不命中 →
     // 每次 settle 都重新入账一个 30 秒剧本窗，产出被放大 1.4~2.1 倍。

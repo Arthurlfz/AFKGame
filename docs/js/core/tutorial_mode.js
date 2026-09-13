@@ -438,6 +438,18 @@
    * 结果每用一次经验包，名下每只宠都被再插一行，刷新后 loadPets 全量拉回 =
    * 「莫名多出一堆重复宠」。顶等级是"更新已有宠"，必须走 updatePet；无 cloudId 才建档。 */
   async function boostGuidePetToLevel(target) {
+    /* ⚠️ 托管挂机中顶等级：先把挂机的账结清再顶（顶完自动重新挂上，2026-09-13）。
+     * 为什么：托管期间本地 level/exp 是**演出预演值**（云端真账领先本地最多一个窗口），
+     * 而这里正是"按本地等级判断要不要顶 + 把 level/exp 写回云端"——预演值一掺进来，
+     * 要么把云端真账改小（经验倒退），要么顶完被下一次真账校准回去（等级乱跳）。
+     * 结清真账后本地 = 服务器那一份，写的才是"该写的那一份"。
+     * IdleBridge 不在（测试桩）/ 没在挂机 → 直接执行，零影响。 */
+    const IB = window.IdleBridge;
+    return (IB && IB.duringPetEdit)
+      ? IB.duringPetEdit(() => boostGuidePetToLevelInner(target))
+      : boostGuidePetToLevelInner(target);
+  }
+  async function boostGuidePetToLevelInner(target) {
     const lv = Number(target) || 0;
     if (!lv) return { ok: false, error: '目标等级为空' };
     const Pet = window.Pet;

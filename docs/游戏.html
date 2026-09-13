@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260903c">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260910quest1">
-<link rel="stylesheet" href="css/game.css?v=20260912gem2">
+<link rel="stylesheet" href="css/game.css?v=20260913console1">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260911cssfix">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260903l">
@@ -856,7 +856,7 @@ window.PetSprites = {
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260910tower2"></script>
-<script src="js/core/supabase.js?v=20260912tomb1"></script>
+<script src="js/core/supabase.js?v=20260913botswitch1"></script>
 <!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
 <script src="js/core/auth-session.js?v=20260910sess1"></script>
 <!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
@@ -866,18 +866,19 @@ window.PetSprites = {
 <script src="js/core/items.js?v=20260911verify1"></script>
 <script src="js/core/materials.js?v=20260903sec"></script>
 <script src="js/core/drop.js?v=20260911gear2"></script>
-<script src="js/core/market.js?v=20260912tomb1"></script>
-<script src="js/core/market_bot.js?v=20260911persona1"></script>
+<script src="js/core/market.js?v=20260913botswitch1"></script>
+<script src="js/core/market_bot.js?v=20260913console1"></script>
+<script src="js/core/server-config.js?v=20260913botswitch1"></script>
 <script src="js/equipment/equipment_craft.js?v=20260911gear5"></script>
 <script src="js/equipment/salvage.js?v=6ffcf876"></script>
-<script src="js/pet/pet_merge.js?v=20260911trait5"></script>
-<script src="js/pet/pet_evolve.js?v=20260911evo10"></script>
+<script src="js/pet/pet_merge.js?v=20260913idlehold1"></script>
+<script src="js/pet/pet_evolve.js?v=20260913idlehold1"></script>
 <script src="js/core/quest.js?v=20260912quest3"></script>
-<script src="js/core/tutorial_mode.js?v=20260912tomb1"></script>
+<script src="js/core/tutorial_mode.js?v=20260913dualwrite1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
-<script src="js/core/battle.js?v=20260911skill5"></script>
+<script src="js/core/battle.js?v=20260913console1"></script>
 <script src="js/trial/trial-config.js?v=20260910fx7"></script>
 <!-- 任务表结构规范化层（2026-09-10）：给任务补 kind(一级分类) / group(二级分组) / chapter / reset。
      放在 config 与 trial-config 之后（它们才是任务表的写入方），quest.js 读表是懒加载所以顺序安全。 -->
@@ -893,30 +894,30 @@ window.PetSprites = {
 <script src="js/tower/tower-rewards.js?v=20260911tower2"></script>
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
 <script src="js/tower/tower-engine.js?v=20260911tower3"></script>
-<script src="js/core/battle-sim.global.js?v=20260911simsync1"></script>
-<script src="js/core/idle-bridge.js?v=20260911idle3"></script>
-<script src="js/ui/ui-common.js?v=20260912fix2"></script>
-<script src="js/ui/ui-console.js?v=20260910sess1"></script>
+<script src="js/core/battle-sim.global.js?v=20260913consumed1"></script>
+<script src="js/core/idle-bridge.js?v=20260913console1"></script>
+<script src="js/ui/ui-common.js?v=20260913console1"></script>
+<script src="js/ui/ui-console.js?v=20260913console1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260912gem1"></script>
-<script src="js/ui/ui-worldmap.js?v=20260910session1"></script>
+<script src="js/ui/ui-worldmap.js?v=20260913switch1"></script>
 <script src="js/ui/ui-capital.js?v=20260910egg7"></script>
 
 <script src="js/ui/ui-login.js?v=82c7e7a9"></script>
-<script src="js/ui/ui-dialog.js?v=b24849c2"></script>
+<script src="js/ui/ui-dialog.js?v=20260913console1"></script>
 <script src="js/ui/ui-popover.js?v=6f7b6320"></script>
 <script src="js/ui/ui-onboarding.js?v=20260912tomb1"></script>
 <script src="js/ui/ui-quest.js?v=20260912fix1"></script>
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
-<script src="js/trial/ui-trial-battle.js?v=20260910fx12"></script>
+<script src="js/trial/ui-trial-battle.js?v=20260913console1"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
 <!-- 通天塔 UI（2026-09-10）：详情页 → 整页战斗驱动 → 结算面板 -->
 <script src="js/tower/ui-tower-entry.js?v=20260910tower5"></script>
-<script src="js/tower/ui-tower-battle.js?v=20260911tower1"></script>
+<script src="js/tower/ui-tower-battle.js?v=20260913console1"></script>
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
-<script src="js/ui/ui-battle.js?v=20260911skill4"></script>
+<script src="js/ui/ui-battle.js?v=20260913console1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260911trait1"></script>
+<script src="js/ui/ui-pet.js?v=20260913console1"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260912tomb1"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260911trait3"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260911trait1"></script>
@@ -927,11 +928,11 @@ window.PetSprites = {
 <script src="js/ui/ui-market.js?v=20260912gem3"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=20260910mt4"></script>
-<script src="js/ui/ui-market-notify.js?v=20260910mt2"></script>
+<script src="js/ui/ui-market-notify.js?v=20260913console1"></script>
 <script src="js/ui/ui-codex.js?v=20260912gem3"></script>
 <script src="js/ui/ui-shop.js?v=20260912gem3"></script>
-<script src="js/ui/ui-dev.js?v=20260912tomb1"></script>
-<script src="js/main.js?v=20260912gem1"></script>
+<script src="js/ui/ui-dev.js?v=20260913idleguard1"></script>
+<script src="js/main.js?v=20260913console1"></script>
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
 <script src="js/ui-fixes.js?v=20260912tomb1"></script>
 <script src="js/skill-effects.js?v=20260910fx11"></script>

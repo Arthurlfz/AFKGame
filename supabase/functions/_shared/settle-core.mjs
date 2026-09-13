@@ -230,6 +230,12 @@ function settlePlan({ session, petRow, equipItems, config, enemyList,
 
   const totalFights = gapEvents.length + scriptEvents.length;
   const totalExp = gapExp + scriptExp;
+  /* 本窗真正"算掉"了多久的会话时间（补账窗 + 剧本窗各自的 consumedMs）。
+   * ⚠️ 调用方据此推进结算游标 —— **不能**直接用 now：补账窗撞上模拟器的 200 场上限时，
+   * 只算掉了其中一部分秒数，剩下的必须留在账上等下次继续补。
+   * 以前游标写死 = now + 剧本窗（把没算的时间一步跨过）→ 客户端被冻结/休眠的那段挂机时间永久作废
+   * （2026-09-13 用户实测"挂了一整夜几乎没收益"的根因之一）。 */
+  const coveredMs = (gap ? (Number(gap.consumedMs) || 0) : 0) + (Number(scriptRaw.consumedMs) || 0);
   return {
     // 演出录像（客户端纯回放；EF 再装饰 id/until/expLeft/level/expBefore/levelBefore）
     script: {
@@ -269,7 +275,8 @@ function settlePlan({ session, petRow, equipItems, config, enemyList,
       petMaxHp: scriptRaw.petMaxHp,
       bossState: scriptRaw.bossState,
       scriptExpBefore: gGap.exp,
-      scriptLevelBefore: gGap.level
+      scriptLevelBefore: gGap.level,
+      coveredMs
     }
   };
 }

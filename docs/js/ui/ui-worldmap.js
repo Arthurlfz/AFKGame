@@ -461,29 +461,46 @@
       } catch (e) { /* 停挂机失败不阻断进图 */ }
       enterBattle();
     };
-    // 开始挂机：换图/换宠时先停旧挂机（先结算，收益不丢），再选图并走主启动流程。
-    // 本图已在挂且没换宠 = 重复点击：直接进战斗页看，绝不能再点挂机按钮（那会停掉挂机）。
+    /* 开始挂机：换图/换宠时先停旧挂机（先结算，收益不丢），再选图并**直接**启动。
+     * 本图已在挂且没换宠 = 重复点击：直接进战斗页看，绝不能再启动一次（那会停掉挂机）。
+     * ⚠️ 2026-09-13 三处改动（用户实测"换图挂机后过几分钟失效、要重新进图再点"）：
+     *   ① 不再 `setTimeout(150)` 去点主按钮 —— 那等于把"能不能挂起来"交给按钮那一刻的
+     *      状态机（占用权是否为空 / 血量是否 >0），任一条不满足就静默失败或走成"停止"分支。
+     *      现在直接调 window.Game.startIdleAt（主按钮用的是同一个函数，门槛只有一份）。
+     *   ② 启动结果如实回报（toast + 日志），不再"看起来挂上了其实没有"。
+     *   ③ 整个切换期间按钮禁用 + 显示"切换中…"：这段要等一次网络结算（几百毫秒到 1 秒），
+     *      以前界面毫无反馈 → 玩家必然再点一次，两次点击会在不同时刻停/起会话，正是散架来源。 */
     const idle = body.querySelector('#nd-idle');
     if (idle) idle.onclick = async () => {
-      const changed = applyPendingPet();
-      const cur = Battle && Battle.getCurrentArea && Battle.getCurrentArea();
-      const sameMap = !!(cur && cur.id === point.areaId);
-      const running = !!((window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive())
-        || (Battle && Battle.isRunning && Battle.isRunning()));
+      if (idle.dataset && idle.dataset.busy === '1') return;   // 防连点
+      if (idle.dataset) idle.dataset.busy = '1';
+      const keepHtml = idle.innerHTML;
+      idle.disabled = true;
+      idle.textContent = '切换中…';
       try {
+        const changed = applyPendingPet();
+        const cur = Battle && Battle.getCurrentArea && Battle.getCurrentArea();
+        const sameMap = !!(cur && cur.id === point.areaId);
+        const running = !!((window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive())
+          || (Battle && Battle.isRunning && Battle.isRunning()));
         if (running && sameMap && !changed) { enterBattle(); return; }
         if (running) await stopRunningIdle();
         if (!sameMap && Battle && !Battle.selectArea(point.areaId)) {
           UI.showToast && UI.showToast('无法进入', '该图暂不可用。');
           return;
         }
+        enterBattle();
+        const G = window.Game;
+        const r = (G && G.startIdleAt) ? await G.startIdleAt(point.areaId) : null;
+        if (r && r.error && UI.showToast) {
+          UI.showToast('挂机没起来', (G && G.startIdleErrorText) ? G.startIdleErrorText(r) : '请再点一次「开始挂机」');
+        }
       } catch (e) { /* 停挂机失败不阻断启动 */ }
-      enterBattle();
-      // 走主按钮的启动分支（门槛已放宽为「活着就能开」，低血量由托管自动等回血）
-      setTimeout(() => {
-        const b = document.getElementById('btn-battle');
-        if (b && typeof b.click === 'function') b.click();
-      }, 150);
+      finally {
+        if (idle.dataset) idle.dataset.busy = '0';
+        // 详情页可能已重渲染（原节点已脱离文档）→ 那种情况下不用还原
+        if (idle.parentNode) { idle.disabled = false; idle.innerHTML = keepHtml; }
+      }
     };
   }
 

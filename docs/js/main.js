@@ -45,6 +45,40 @@
     return '⚠️ 挂机启动失败，请刷新后重试';
   }
 
+  /* ---------- 统一的「开始挂机」入口：主按钮 与 世界地图详情页共用（2026-09-13） ----------
+   * 以前世界地图的「开始挂机」是 `setTimeout(150)` 之后点一下主按钮 —— 能不能挂起来
+   * 取决于按钮被点那一刻的状态机（占用权是否为空 / 血量是否 >0），任一条不满足就静默失败，
+   * 甚至走成"停止"分支。表现就是"点了挂机、过一会儿才发现根本没挂上 / 挂机散了，
+   * 要重新进图再点一次"。现在两边走同一个函数：门槛只有一份，失败原因如实回报。 */
+  async function startIdleAt(areaId) {
+    const B = window.Battle;
+    if (!B) return { error: 'NO_BATTLE' };
+    if (areaId && (!B.getCurrentArea() || B.getCurrentArea().id !== areaId)) {
+      if (!B.selectArea || !B.selectArea(areaId)) return { error: 'AREA_UNAVAILABLE' };
+    }
+    const area = B.getCurrentArea();
+    if (!area) { addLog('⚠️ 请先选择挂机地图。'); return { error: 'NO_AREA' }; }
+    const pet = getActivePet();
+    if (!pet) { addLog('⚠️ 没有可出战的宠物。'); return { error: 'NO_PET' }; }
+    // 0 血不开局（2026-09-09 定的门槛：活着就能开，低血由托管自动等回血）
+    if (getCurHp(pet) <= 0) {
+      addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5h4"/><path d="M20 3v4"/><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> 出战宠物气血见底，恢复一些后再开始挂机。');
+      return { error: 'NO_HP' };
+    }
+    if (IdleBridge && IdleBridge.enabled) {
+      // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
+      addLog('⏳ 正在开始挂机…');
+      const r = await IdleBridge.start(area, pet);
+      if (r && r.error) addLog(startIdleErrorText(r));
+      syncButton();
+      return r || { error: 'UNKNOWN' };
+    }
+    const r = startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
+    if (r && r.ok === false) addLog('⚠️ ' + ownerText() + '进行中，先打完再挂机。');
+    syncButton();
+    return r || { error: 'UNKNOWN' };
+  }
+
   /* ---------- 累计统计（战斗场数/获得装备数） ---------- */
   function refreshStats() {
     // 服务器托管挂机：本地战斗循环不跑 → Battle.getTotalFights() 永远停在进托管前的值，
@@ -73,6 +107,11 @@
   }
   async function flushPetProgress() {
     if (expSyncTimer) { clearTimeout(expSyncTimer); expSyncTimer = null; }
+    /* ⚠️ 收口（2026-09-13）：托管挂机期间本地 level/exp 是**演出预演值**（服务器真账领先本地最多一个窗口），
+     * 这时写云端 = 用落后值覆盖真账 → 经验/等级倒退（白丢收益），随后又被下一次真账校准 → 玩家看到"等级跳回去"。
+     * 本文件开头 serverManaged() 的注释早就写明"本地不许再写"，但只挡住了 visibilitychange 一处；
+     * 把判断放进 flushPetProgress 本身，所有调用方（停运行时 / 换图 / 切后台）自动生效，不用各自记得判断。 */
+    if (serverManaged()) return;
     const pet = expSyncPet;
     if (!pet || !pet.cloudId) return;
     const { error } = await Supabase.updatePet(pet.cloudId, {
@@ -90,8 +129,8 @@
       const xp = expFromBattle(enemy, area); // 经验唯一来源（与怪物 tooltip 预览同源）
       const info = grantExp(pet, xp);
       if (info.leveled) {
-        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`);
-        if (info.maxed) addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`);
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`, 'battle');
+        if (info.maxed) addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`, 'battle');
         // 升级是大事：等级 + 经验立即写云端，刷新页面都不丢
         syncPetProgress(pet, true);
       } else {
@@ -101,9 +140,9 @@
           const EP = Config.pet.expPool;
           addLog(info.crystal
             ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41l-7.59-7.59a2.41 2.41 0 0 0-3.41 0Z"/></svg> ${pet.name} 满级经验凝成 ${EP.material} ×${info.crystal}（持有 ${Materials.getQuantity(EP.material)}）`
-            : `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 已满级，经验 +${xp} 转入经验池（${Math.round(pet.expPool || 0)}/${EP.perCrystal}）`);
+            : `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 已满级，经验 +${xp} 转入经验池（${Math.round(pet.expPool || 0)}/${EP.perCrystal}）`, 'battle');
         } else {
-          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`);
+          addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></svg> ${pet.name} 经验 +${xp}（${Math.round(pet.exp)}/${expNeed(pet.level)}）`, 'battle');
         }
       }
       showLoot(await rollReward(enemy, area, { boss: false, enemyLevel: (enemy && enemy.level) || undefined })); // 掉率与怪的稀有度倾向都在 config.js；装备登录则写库；area 用于按图掉专属材料；ilvl 挂钩实际怪等级
@@ -261,6 +300,9 @@
     }
     stopAutoBattle();
     flushPetProgress();                                // 停手前把经验补写云端
+    // 用 window. 前缀而不是裸标识符：测试桩的加载清单里没有 server-config.js，
+    // 裸写会 ReferenceError 直接崩掉整个 main.js（2026-09-13 踩过）。
+    if (window.ServerConfig) window.ServerConfig.stop();  // 离线：停掉服务端配置轮询
     if (MarketBot && MarketBot.stop) MarketBot.stop(); // 离线：停掉流浪商人补货与收购
     if (UI.destroyChat) UI.destroyChat();              // 聊天 Realtime 频道要退订，否则换号后还在用旧身份收消息
     runtimeStarted = false;                            // 允许下次登录重新启动运行时
@@ -675,7 +717,10 @@
     // 放这里而不是各个调用点，是因为「启动运行时」是所有登录路径的唯一收口
     // （会话恢复 / 登录 / 注册 / 选宠完成 / 遮罩接管）都必经此处。
     if (AuthSession) AuthSession.claim('runtime-start');
-    if (MarketBot) MarketBot.start();    // 市场冷启动：流浪商人自动挂单 + 定时补货
+    // 市场冷启动：流浪商人自动挂单 + 定时补货。
+    // 走 ServerConfig 而不是直接 start —— 服务器上把机器人关掉时，这里就不该再跑起来。
+    if (window.ServerConfig) window.ServerConfig.start();
+    else if (MarketBot) MarketBot.start();
     if (window.UI && window.UI.initChat) window.UI.initChat();  // 登录后加载聊天历史 + 订阅实时消息
 
     // 服务器托管挂机：战报到账 → 刷新界面（每场的经验/掉落已由击杀即时结算，见 idle-bridge settleKill）
@@ -719,23 +764,8 @@
        * 挂机本身自带「血量见底 → 等待回血 → 自动再战」，低血量开局与打输一场后没有区别；
        * 旧满血门槛的真实效果是：挂过一场血没回满就点开始 = 静默无响应（连提示都没有），
        * 换图重开时旧挂机已停、新挂机又起不来 = 玩家两头空。 */
-      } else if (getCurHp(getActivePet()) > 0) {
-        const area = window.Battle.getCurrentArea();
-        if (!area) {
-          addLog('⚠️ 请先选择挂机地图。');
-          return;
-        }
-        if (IdleBridge && IdleBridge.enabled) {
-          // 服务器托管：本地战斗循环完全不参与，画面是装饰演出，数据只来自战报
-          addLog('⏳ 正在开始挂机…');
-          const r = await IdleBridge.start(area, getActivePet());
-          if (r && r.error) addLog(startIdleErrorText(r));
-        } else {
-          const r = startAutoBattle(handleFightEnd); // ?noidle=1 纯本地挂机（老流程）
-          if (r && r.ok === false) addLog('⚠️ ' + ownerText() + '进行中，先打完再挂机。');
-        }
       } else {
-        addLog('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5h4"/><path d="M20 3v4"/><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg> 出战宠物气血见底，恢复一些后再开始挂机。');
+        await startIdleAt();   // 启动逻辑收口到这里（低血/地图缺失的提示也在里面）
       }
       syncButton();
     });
@@ -862,6 +892,8 @@
   // refreshStats 必须导出：idle-bridge.js 战报到账后会调 window.Game.refreshStats()，
   // 之前这里漏了 → 那行一直是空调用（有判空所以不报错，但顶栏统计不刷新）
   // flushPetProgress 导出：ui-worldmap 详情页停本地挂机时也要把经验补写云端（与主按钮同一份逻辑）
-  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats, flushPetProgress };
+  // startIdleAt / startIdleErrorText 导出：世界地图详情页的「开始挂机」直接调它们
+  // （不再"延时点击主按钮"—— 那要靠按钮那一刻的状态机，任一条不满足就静默失败）
+  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats, flushPetProgress, startIdleAt, startIdleErrorText };
   init();
 })();

@@ -38,11 +38,21 @@
    *      先【同步】拆演出让出画面，再【异步】把最后一段账结回来（见 endSession）。 */
   const SESSION = window.BattleSession;
   const SESSION_KIND = 'wild';
+  // 本模块是否持有战斗页占用权：只交还自己那一份（见 releasePage 的注释）
+  let pageClaimed = false;
   function claimPage() {
     if (!SESSION) return { ok: false, reason: 'NO_SESSION' };
-    return SESSION.claim(SESSION_KIND);
+    const r = SESSION.claim(SESSION_KIND);
+    if (r.ok) pageClaimed = true;
+    return r;
   }
-  function releasePage() { if (SESSION) SESSION.release(SESSION_KIND); }
+  /* ⚠️ 只交还【自己确实持有】的那一份（2026-09-13 修）：BattleSession.release(kind) 只比 kind，
+   * 不比"这是不是我这轮占的" —— 于是任何一次迟到的释放都可能把**刚起来的新占用者**踢出战斗页。
+   * 这条链本身（换图 handoff、被副本抢占、停机）到处都会调 releasePage，宁可少放一次也不能放错。 */
+  function releasePage() {
+    if (pageClaimed && SESSION) SESSION.release(SESSION_KIND);
+    pageClaimed = false;
+  }
 
   // 战斗日志收集器（2026-09-09）：始终写入 window.__battleLog 环形缓冲（取证券），
   // 玩家在控制台敲 copy(__battleLog.join('\n')) 可一次性捞出全部战斗日志。
@@ -66,6 +76,7 @@
   let active = false;
   let timer = null;         // 兜底 settle 定时器
   let petId = null;         // 本次会话绑定的宠物 cloudId
+  let sessionAreaId = null; // 本次会话绑的地图 id（服务器会话中断后自愈重建要用，见 recoverSession）
   let totalFights = 0;      // 服务器战报累计场数（展示用）
   let onChange = null;      // 战报到账通知（上层刷新界面）
 
@@ -218,6 +229,7 @@
     if (SESSION && !SESSION.is(SESSION_KIND)) { releasePage(); return { error: 'BUSY', holder: SESSION.holder() }; }
 
     petId = pet.cloudId;
+    sessionAreaId = area.id;
     totalFights = 0;
     active = true;
     if (window.UI) window.UI.updateStatus('fighting', 0);
@@ -245,6 +257,7 @@
     const claim = claimPage();
     if (!claim.ok) return { ok: false, error: claim.reason || 'BUSY' };
     petId = session.pet_id;
+    sessionAreaId = session.area_id;
     totalFights = 0;
     active = true;
     if (window.UI) window.UI.updateStatus('fighting', 0);
@@ -269,6 +282,7 @@
     clearTimeout(timer); timer = null;
     stopShow();
     petId = null;
+    sessionAreaId = null;
     releasePage();
     if (ending) return ending;
     ending = (async function () {
@@ -284,13 +298,17 @@
   }
   function shutdown() { return endSession(true); }  // 停机 / 让位：结算 + 服务器停会话
   function handoff() { return endSession(false); }  // 换图交棒：结算，会话交给下一次 start
-  // 会话已不在服务器侧（NO_ACTIVE_SESSION）：只做本地清理，不再发任何请求
-  function stopLocal() {
+  /* 会话已不在服务器侧（自愈失败等）：只做本地清理，不再发任何请求。
+   * ⚠️ 所有"停下来"都必须留日志（2026-09-13 修）：以前这里是静默停机，
+   * 玩家只看到按钮变回「开始自动战斗」、控制台干干净净 —— 事后完全没法排查（用户实测）。 */
+  function stopLocal(reason) {
     active = false;
     clearTimeout(timer); timer = null;
     stopShow();
     petId = null;
+    sessionAreaId = null;
     releasePage();
+    if (reason) blog('[战斗·停机] ' + reason);
     if (window.UI) window.UI.updateStatus('stopped', totalFights);
   }
 
@@ -359,7 +377,18 @@
    * 冷却必须有（2026-09-08 血泪）：剧本空 + settle 失败 + 无冷却 = 每帧轰炸服务器
    * （控制台 500 刷屏的来源）。冷却 30s = 正常结算节奏，真账由服务器惰性记账，晚结算不亏。 */
   function handleSettleError(r) {
-    if (r.error === 'NO_ACTIVE_SESSION') { stopLocal(); return r; }
+    /* ⚠️ 2026-09-13 修（用户实测："点开始挂机后有时过几分钟就自己停了，控制台什么都没有"）：
+     * 服务器说"你没有在跑的挂机会话"（会话被别处停掉 / 服务端状态被改掉 / 两个页面抢同一个会话）
+     * 时，旧代码直接本地停机、不留任何原因 —— 玩家点开始挂机就是"我要一直挂着"，
+     * 服务器侧会话没了**不是玩家的意图**，不该就这么停。
+     * 现在先自愈：拿当前地图 + 当前出战宠把会话重建起来继续挂；只有重建也失败才停，并且说清原因。 */
+    if (r.error === 'NO_ACTIVE_SESSION') { recoverSession(); return r; }
+    /* 会话绑的那只宠在存档里没了（被合成/涅槃吃掉/卖掉）→ 这只只能停，
+     * 但必须让玩家知道"为什么停"，不能像以前那样无声无息。 */
+    if (r.error === 'PET_NOT_FOUND') {
+      failStop('⚠️ 挂机的宠物已不在存档里（可能被合成/出售），挂机已停止。');
+      return r;
+    }
     /* ⚠️ 时间基必须与比较方一致（2026-09-10 修）：判冷却的地方用的是
      * requestAnimationFrame 的时间戳（= performance.now()），这里原本写 Date.now()
      * （纪元年毫秒，约 1.7e12，恒大于 performance.now() 的 1e5 量级）
@@ -368,6 +397,86 @@
     nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS;
     if (window.UI && window.UI.addLog) window.UI.addLog('⚠️ 挂机暂时没有更新，正在继续运行…');
     return r;
+  }
+
+  /* ---------- 停机 + 自愈（2026-09-13） ----------
+   * 原则：**只有玩家主动操作才该让挂机停下来**。非玩家原因（会话丢了、网络抖了）
+   * 一律先自愈；自愈不了才停，且必须把原因说给玩家听（日志 + 控制台 __battleLog）。 */
+  function failStop(msg) {
+    if (window.UI && window.UI.addLog) window.UI.addLog(msg);
+    stopLocal(msg);
+  }
+  let recovering = false;
+  let recoverCount = 0;
+  let recoverWindowAt = 0;
+  const RECOVER_MAX = 3;            // 一个窗口内最多自愈几次
+  const RECOVER_WINDOW_MS = 600000; // 10 分钟（防"刚建好又被停"的死循环轰炸服务器）
+  async function recoverSession() {
+    if (!active || recovering) return;
+    const t = performance.now();
+    if (t - recoverWindowAt > RECOVER_WINDOW_MS) { recoverWindowAt = t; recoverCount = 0; }
+    if (recoverCount >= RECOVER_MAX) {
+      failStop('⚠️ 挂机会话反复中断，已停止。请重新点「开始自动战斗」。');
+      return;
+    }
+    const pet = Pet.getActivePet();
+    const B = window.Battle;
+    const areaId = sessionAreaId || (B && B.getCurrentArea && B.getCurrentArea() ? B.getCurrentArea().id : null);
+    if (!pet || !pet.cloudId || !areaId) {
+      failStop('⚠️ 挂机会话已中断，且当前地图/宠物不可用，挂机已停止。请重新点「开始自动战斗」。');
+      return;
+    }
+    recovering = true;
+    recoverCount++;
+    blog('[战斗·自愈] 服务器会话已中断，正在自动重建（第' + recoverCount + '次）');
+    try {
+      const r = await callFn({ action: 'start', areaId: areaId, petId: pet.cloudId });
+      if (r.error) {
+        failStop('⚠️ 挂机会话已中断，自动恢复失败（' + r.error + '）。请重新点「开始自动战斗」。');
+        return;
+      }
+      if (!active) return;                       // 重建期间玩家自己点了停止 → 别复活
+      petId = pet.cloudId;
+      sessionAreaId = areaId;
+      nextScriptTryAt = 0;
+      if (window.UI && window.UI.addLog) window.UI.addLog('🔁 挂机会话中断，已自动恢复，继续挂机');
+      if (window.UI && window.UI.updateStatus) window.UI.updateStatus('fighting', totalFights);
+      schedule();
+      settleNow().catch(function () { /* 忽略 */ });
+    } finally {
+      recovering = false;
+    }
+  }
+
+  /* ---------- 改动宠物前，先把挂机账结清（2026-09-13） ----------
+   * 背景（用户实测"进化成功后等级突然变回去"）：托管挂机期间本地 pet.level/exp 是**演出预演值**
+   * —— 回放基线把它设成"窗前真值"，再随每场击杀往上走；而服务器早把整段窗口的账写进库了
+   * （云端领先本地最多一个窗口）。玩家在这段时间做进化/合成/涅槃时，门槛判定读到的是预演值，
+   * 操作完成后下一段回放基线 / 真账校准又把等级写回服务器那份 → 玩家看到等级"跳回去"。
+   * 解法（第一原则：同一份数据只能有一个写入者）：
+   *   ① 挂机中先 shutdown()：把最后一段账结清（服务器停会话），本地等级/经验被真账校准；
+   *   ② 再执行改动（门槛判定、写库都以真账为准）；
+   *   ③ 原来是挂着机的 → 自动重新挂上（同图同宠），玩家不用手动点。
+   * fn 失败也照样重挂，不把玩家晾在停机状态。 */
+  async function duringPetEdit(fn) {
+    const wasActive = active;
+    const area = (window.Battle && window.Battle.getCurrentArea) ? window.Battle.getCurrentArea() : null;
+    const pet = Pet.getActivePet();
+    if (wasActive) {
+      if (window.UI && window.UI.addLog) window.UI.addLog('⏸ 改宠物前先把挂机账结清（稍后自动继续挂）');
+      await shutdown();
+    }
+    try {
+      return await fn();
+    } finally {
+      if (wasActive && !active && pet && pet.cloudId && area) {
+        let r = null;
+        try { r = await start(area, pet); } catch (e) { r = { error: 'EXCEPTION' }; }
+        if (r && r.error && window.UI && window.UI.addLog) {
+          window.UI.addLog('⚠️ 挂机未能自动继续（' + r.error + '），请手动点「开始自动战斗」。');
+        }
+      }
+    }
   }
   function activePetChanged() {
     const pet = Pet.getActivePet();
@@ -384,12 +493,17 @@
     if (sc && sc.events && sc.events.length) {
       if (sameScript) {
         blog('[战斗·剧本] 同一段录像重发，忽略（id=' + sc.id + '）');
+        /* ⚠️ 同一段录像重发 = 服务器在说"这段还有效，先别来问"（退避 2 秒，覆盖剧本窗）。
+         * 以前这里把冷却清零 → 本地剧本已播完、下一帧又去 settle，每帧一次请求
+         * 打到 EF 上门（60+ 次/秒），纯浪费还可能被限流。 */
+        nextScriptTryAt = performance.now() + 2000;
       } else if (script && scriptIdx < script.events.length && showEnemy) {
         pendingScript = sc;
+        nextScriptTryAt = 0;
       } else {
         installScript(sc);
+        nextScriptTryAt = 0;
       }
-      nextScriptTryAt = 0;
     } else {
       nextScriptTryAt = performance.now() + SCRIPT_RETRY_MS; // 冷却，防每帧重试打爆服务器
       blog('[战斗·剧本] 服务器未返回剧本，' + SCRIPT_RETRY_MS / 1000 + 's 后重试');
@@ -450,7 +564,7 @@
         : ((window.Battle && window.Battle.pickScaledEnemy) ? window.Battle.pickScaledEnemy() : null);
       if (window.UI && window.UI.addLog && foe) {
         const xpText = row && row.exp != null ? `：经验 +${row.exp}` : '';
-        window.UI.addLog(`️ 击败 ${foe.name} Lv.${foe.level || 1}${xpText}`);
+        window.UI.addLog(`️ 击败 ${foe.name} Lv.${foe.level || 1}${xpText}`, 'battle');
       }
       const serverReward = row && Object.prototype.hasOwnProperty.call(row, 'reward') ? row.reward : null;
       if (serverReward) {
@@ -471,7 +585,7 @@
       }
     }
     if (list.length > n && window.UI && window.UI.addLog) {
-      window.UI.addLog(`⏸ 后台期间还有 ${list.length - n} 场收益已入账（不逐条展示）`);
+      window.UI.addLog(`⏸ 后台期间还有 ${list.length - n} 场收益已入账（不逐条展示）`, 'battle');
     }
     if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
   }
@@ -505,9 +619,9 @@
     if (r.level != null && !(opts && opts.skipExpLevel)) {
       const wasLevel = pet.level || 1;
       if (r.level > wasLevel) {
-        if (window.UI && window.UI.addLog) window.UI.addLog(` ${pet.name} 升级 Lv.${r.level}！`);
+        if (window.UI && window.UI.addLog) window.UI.addLog(` ${pet.name} 升级 Lv.${r.level}！`, 'battle');
       } else if (r.level < wasLevel) {
-        if (window.UI && window.UI.addLog) window.UI.addLog(`️ 经验校准 Lv.${wasLevel} → Lv.${r.level}（以服务器真账为准）`);
+        if (window.UI && window.UI.addLog) window.UI.addLog(`️ 经验校准 Lv.${wasLevel} → Lv.${r.level}（以服务器真账为准）`, 'battle');
       }
       pet.level = r.level;
       if (r.level < maxLevel && r.expLeft != null) pet.exp = r.expLeft;
@@ -594,7 +708,7 @@
     waitingHealAt = performance.now();
     gauge.pet = 0; gauge.enemy = 0;
     if (UI && UI.updateAction) UI.updateAction(0, 0);
-    if (UI && UI.addLog) UI.addLog(' 血量不足 30%，回血后再战…');
+    if (UI && UI.addLog) UI.addLog(' 血量不足 30%，回血后再战…', 'battle');
     if (UI && UI.updateStatus) UI.updateStatus('recovering', totalFights);
     dropPendingHits();
     showEnemy = null;
@@ -807,7 +921,7 @@
       }
       if (UI && UI.animateVictory) UI.animateVictory();
     } else if (UI && UI.addLog) {
-      UI.addLog(' 战败…');
+      UI.addLog(' 战败…', 'battle');
     }
     showEnemy = null;
     scriptIdx++;
@@ -905,7 +1019,7 @@
       // 超时兜底：正常几秒就回满；卡在异常状态（脏值/属性变大）时不许永久卡住画面
       if (showHp >= maxHp || (now - waitingHealAt) > HEAL_WAIT_MAX_MS) {
         waitingHeal = false;
-        if (UI.addLog) UI.addLog(' 恢复完毕，遭遇新的野怪！');
+        if (UI.addLog) UI.addLog(' 恢复完毕，遭遇新的野怪！', 'battle');
         if (UI.updateStatus) UI.updateStatus('fighting', totalFights);
         const ef = document.getElementById('enemy-fighter');
         if (ef) ef.style.display = '';
@@ -1087,7 +1201,7 @@
       window.Quest.reportType('boss', 1, { areaId: area ? area.id : null });
     }
     if (window.UI && window.UI.addLog) {
-      window.UI.addLog(` 击败 ${f.enemyName} Lv.${f.enemyLevel}：经验 +${f.exp}`);
+      window.UI.addLog(` 击败 ${f.enemyName} Lv.${f.enemyLevel}：经验 +${f.exp}`, 'battle');
     }
     // 新战报的 reward 已由服务器决定；页面只负责入包和展示。
     // 兼容旧版战报（没有 reward 字段）时才走旧掉落逻辑。
@@ -1214,6 +1328,9 @@
     start, resumeActive, settleNow, getDebugState,
     shutdown, // 停机 / 让位：结算最后一段账 + 服务器停会话
     handoff,  // 换图交棒：结算最后一段账，会话交给下一次 start（不发 stop）
+    // 改动宠物（进化/合成/涅槃）专用：先结清挂机真账 → 执行 → 自动重新挂上。
+    // 见文件内 duringPetEdit 的注释（防"照预演等级判门槛 → 之后等级被真账写回去"）。
+    duringPetEdit,
     isActive: function () { return active; },
     enabled: ENABLED,
     getTotalFights: function () { return totalFights; },

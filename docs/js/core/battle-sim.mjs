@@ -735,7 +735,12 @@ function simulateSessionScript(input) {
       if (gapLeft > 0) break;
     }
   }
-  return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs };
+  /* consumedMs：本次真正"吃掉"了多久的会话时间。
+   * 三种提前结束的可能：跑满了 events 上限（200 场）、敌人池为空、最后一个时间片被一场战斗跨过。
+   * ⚠️ 服务器靠它推进结算游标（见 battle-settle/index.ts）：没吃掉的秒数要留在账上，
+   * 否则"客户端很久没来结算"的那段时间会被游标一步跨过 = 永久作废（2026-09-13 挂机掉时间修复）。
+   * ⚠️ 本函数在前后端各有一份副本，必须逐字一致（vtest_sim_sync 守）。 */
+  return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs, consumedMs: Math.max(0, (Number(seconds) || 0) * 1000 - Math.max(0, msLeft)) };
 }
 
 export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff };

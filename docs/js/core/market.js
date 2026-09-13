@@ -132,6 +132,15 @@
   /* ---------- 假卖家（流浪商人）挂单 ----------
    * 由 market_bot.js 定时生成/补货；假单只存前端内存，不落库、不占玩家账号。
    * 购买时：扣买家材料（走云端原子扣）→ 装备直接入买家背包 → 按正常流程写买家存档。 */
+  /* 清空全部假单（2026-09-13：服务端总开关关闭时调用）
+   * 「关掉机器人」= 市场上不再有流浪商人的货，也不再有自动收购。
+   * ⚠️ 只清内存里的假单，真实玩家的挂单一个都不动（它们落在库里，不归这里管）。 */
+  function clearBotListings() {
+    botListings.length = 0;
+    botPetListings.length = 0;
+    botMaterialListings.length = 0;
+    botEggListings.length = 0;
+  }
   function addBotListing(l) {
     botListings.unshift(l);
   }
@@ -412,7 +421,7 @@
     getEggListings, getMyListedEggs, isMyEggListed, listEgg, buyEgg, cancelEgg,
     getMaterialListings, getRealMaterialListings, getMyListedMaterials, isMyMaterialListed, getMaterialListing,
     listMaterial, buyMaterial, cancelMaterial, buyAsBotMaterial,
-    addBotListing, buyBotItem, addBotPetListing, buyBotPet, buyAsBot, buyAsBotAny,
+    addBotListing, buyBotItem, addBotPetListing, buyBotPet, buyAsBot, buyAsBotAny, clearBotListings,
     getBotMaterialListings, addBotMaterialListing, buyBotMaterial,
     getBotEggListings, addBotEggListing, buyBotEgg
   };

@@ -148,9 +148,13 @@
       const rows = g.fields.map(f => {
         let val = getByPath(f.path);
         if (!Number.isFinite(val)) val = Number.isFinite(f._default) ? f._default : (Number.isFinite(f.default) ? f.default : f.min);
+        // 机器人开关：服务器设过就以服务器为准 —— 面板显示的和实际生效的必须一致
+        const serverTag = (f.path === 'marketBot.enabled' && window.ServerConfig && window.ServerConfig.isServerControlled())
+          ? ' · 服务器' : '';
+        if (f.path === 'marketBot.enabled' && window.ServerConfig) val = window.ServerConfig.isBotEnabled();
         if (f.bool) {
           return '<div class="dev-row" data-path="' + f.path + '">' +
-            '<div class="dev-row-head"><span class="dev-label">' + f.label + '</span>' +
+            '<div class="dev-row-head"><span class="dev-label">' + f.label + serverTag + '</span>' +
               '<label class="dev-switch"><input type="checkbox" data-path="' + f.path + '"' + (val ? ' checked' : '') + '><span class="dev-switch-track"></span></label></div>' +
             '<button class="dev-reset-one btn-mini ghost" data-path="' + f.path + '" title="复原">↺</button>' +
           '</div>';
@@ -194,7 +198,31 @@
       inp.addEventListener('change', () => { if (UI.renderAll) UI.renderAll(); });
     });
     body.querySelectorAll('.dev-switch input[data-path]').forEach(cb => {
-      cb.addEventListener('change', () => { setByPath(cb.dataset.path, cb.checked); });
+      cb.addEventListener('change', async () => {
+        const path = cb.dataset.path;
+        /* 市场机器人开关：写服务器（全员生效、刷新不丢）。
+         * 旧行为只改本机内存 —— 别人电脑上的机器人照跑，刷新还复原，等于没关（2026-09-13 修）。
+         * 其余布尔项仍只改本机内存（调试用，故意不落服务器）。 */
+        if (path === 'marketBot.enabled' && window.ServerConfig) {
+          const want = cb.checked;
+          cb.disabled = true;
+          let res = null;
+          try { res = await window.ServerConfig.setBotEnabled(want); }
+          catch (e) { res = { ok: false, error: String((e && e.message) || e) }; }
+          cb.disabled = false;
+          if (!res || res.ok === false) {
+            cb.checked = !want;            // 写入失败就把开关弹回去，别让面板和服务器说的不一样
+            const msg = '机器人开关写入失败：' + ((res && res.error) || '未知错误');
+            if (UI.showToast) UI.showToast(msg); else alert(msg);
+            return;
+          }
+          setByPath(path, want);
+          if (UI.showToast) UI.showToast(want ? '市场机器人已开启（已同步到服务器）' : '市场机器人已关闭（已同步到服务器，全员生效）');
+          if (UI.renderAll) UI.renderAll();
+          return;
+        }
+        setByPath(path, cb.checked);
+      });
     });
     body.querySelectorAll('.dev-range[data-special="monsterMult"]').forEach(inp => {
       inp.addEventListener('input', () => {
@@ -228,7 +256,13 @@
     if (cloudSave) cloudSave.onclick = async () => {
       if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可保存云端配置');
       const S = window.Supabase;
-      const r = S && S.getClient ? await S.getClient().rpc('admin_save_config', { p_config: Config }) : { error: { message: '未连接 Supabase' } };
+      /* ⚠️ 这里存的是「整份 Config 快照」，admin_save_config 会把 jsonb 整个替换掉。
+       * 机器人总开关（server-config.js 写的 bot 键）不在 Config 里 —— 不手动带上，
+       * 一按「保存云端配置」开关就被冲掉，回到本地默认（2026-09-13）。 */
+      const payload = Object.assign({}, Config);
+      const cur = window.ServerConfig && window.ServerConfig.get ? window.ServerConfig.get() : null;
+      if (cur && cur.bot) payload.bot = cur.bot;
+      const r = S && S.getClient ? await S.getClient().rpc('admin_save_config', { p_config: payload }) : { error: { message: '未连接 Supabase' } };
       UI.showToast && UI.showToast(r.error ? '保存失败' : '已保存', r.error ? r.error.message : '新结算将使用云端配置');
     };
     const cloudLoad = $('dev-cloud-load');
@@ -564,6 +598,13 @@
   async function savePet(p) {
     const S = window.Supabase;
     if (!S || !S.savePet) return;
+    /* ⚠️ 托管挂机期间本地 level/exp 是**演出预演值**（服务器真账领先最多一个窗口），
+     * 这时写云端 = 用落后值覆盖真账（经验/等级倒退）。开发面板是"直接改数值"的工具，
+     * 更该走真账 —— 让开发者先停挂机，别把服务器算好的账改坏（2026-09-13）。 */
+    if (window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive()) {
+      if (UI.showToast) UI.showToast('⚠️ 挂机中不能改宠物', '先停止挂机再改，否则会被服务器真账覆盖');
+      return;
+    }
     // 已建档的宠走 update（savePet 是无条件 INSERT，会复制出重复宠——2026-09-08 血泪）
     if (p.cloudId && S.updatePet) {
       const { error } = await S.updatePet(p.cloudId, {

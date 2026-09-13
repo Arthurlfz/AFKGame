@@ -69,5 +69,19 @@ function el() { return { setAttribute() {}, style: { setProperty() {} }, classLi
   }
   A(hitsOk, 'E1. 每场都带出手刀数（我方/敌方：' + hitInfo.join('、') + '）');
 
+  /* ---------- F. consumedMs：本次真正"吃掉"的会话时间（2026-09-13） ----------
+   * 服务器靠它推进结算游标：没吃掉的秒数必须留在账上，否则客户端被浏览器冻结 / 电脑休眠
+   * 那段时间会被游标一步跨过 = 永久作废（用户实测"挂了一整夜几乎没收益"的根因之一）。 */
+  A(typeof r1.consumedMs === 'number' && r1.consumedMs > 0,
+    'F1. 返回 consumedMs（本次吃掉 ' + r1.consumedMs + 'ms）');
+  A(r1.consumedMs >= 30000, 'F2. 30 秒窗口被完整吃掉（' + r1.consumedMs + 'ms ≥ 30000，游标不会漏掉时间）');
+  const rLong = sim.simulateSessionScript(Object.assign(input(777), { seconds: 4 * 3600 }));
+  A(rLong.consumedMs > 0 && rLong.consumedMs <= 4 * 3600 * 1000,
+    'F3. 4 小时窗口不会吃超请求时长（' + rLong.consumedMs + 'ms）');
+  A(rLong.events.length === 200,
+    'F4. 超长窗口撞上模拟器 200 场上限（' + rLong.events.length + ' 场）→ 剩余秒数留给下次继续补');
+  const rZero = sim.simulateSessionScript(Object.assign(input(777), { seconds: 0 }));
+  A(rZero.consumedMs === 0 && rZero.events.length === 0, 'F5. 零秒窗口不吃时间（consumedMs=0）');
+
   console.log('\nALL SCRIPT SIM TESTS PASSED');
 })().catch(e => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

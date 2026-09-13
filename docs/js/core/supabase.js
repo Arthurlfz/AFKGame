@@ -669,6 +669,28 @@
     return profileCache;
   }
 
+  /* ---------- 服务端全局配置（game_config_overrides 单例表 id=true） ----------
+   * 读：表级 RLS 允许 authenticated select —— 普通玩家也读得到，用来同步「机器人总开关」这类
+   *     全员生效的开关。⚠️ 只消费白名单键（bot.*）；**别往这张表放敏感配置**（玩家可读整行）。
+   * 写：只走 admin_save_config RPC，服务端校验管理员邮箱，前端改不动。
+   * 与 battle-settle（服务端）读的是同一张表，口径一致。 */
+  async function loadServerConfig() {
+    try {
+      const { data, error } = await client.from('game_config_overrides')
+        .select('config').eq('id', true).maybeSingle();
+      if (error) return null;                 // 读不到 = 没配过，调用方沿用本地默认值
+      return (data && data.config) || null;
+    } catch (e) { return null; }
+  }
+  async function saveServerConfig(p_config) {
+    try {
+      // jsonb 参数传对象，不要 JSON.stringify（PostgREST 会当成字符串塞进去）
+      const { data, error } = await client.rpc('admin_save_config', { p_config: p_config || {} });
+      if (error) return { ok: false, error: error.message };
+      return data && typeof data === 'object' ? data : { ok: true };
+    } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  }
+
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
@@ -684,6 +706,7 @@
     listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
     fetchQuestProgress, saveQuestProgress, completeQuest, fetchQuestClaims,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
-    loadMyProfile, setMyNickname, getMyProfile
+    loadMyProfile, setMyNickname, getMyProfile,
+    loadServerConfig, saveServerConfig
   };
 })();

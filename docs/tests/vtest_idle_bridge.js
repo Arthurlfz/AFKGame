@@ -13,7 +13,7 @@
  *   I. 网络失败 → 返回 error 不崩
  *   J. 无 active 会话 → 安静退场不再重试
  * ============================================================ */
-const fs = require('fs'), vm = require('vm');
+const fs = require('fs'), vm = require('vm'), path = require('path');
 const VTF=require('./vtest_files');
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 
@@ -147,11 +147,25 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   A(r3.error === 'NETWORK', 'I1. 网络失败返回 error 而非抛异常');
   A(C('IdleBridge.isActive()') === true, 'I2. 网络失败后仍保持挂机（下个周期继续试）');
 
-  /* ---------- J. 会话没了 → 安静退场 ---------- */
+  /* ---------- J. 会话没了 → 自愈重建（2026-09-13 改：以前是"静默停机"） ----------
+   * 用户实测："点开始挂机后有时过几分钟就自己停了，控制台什么都没有"。
+   * 旧行为：服务器说无会话 → 立刻本地停机、零日志。玩家点开始挂机就是"我要一直挂着"，
+   * 服务器侧会话丢了不是玩家的意图 → 应该先用当前地图+宠重建会话继续挂。 */
   const realResp = settleResp;
+  const startCallsBefore = calls.filter(c => c.action === 'start').length;
   settleResp = { ok: false, error: 'NO_ACTIVE_SESSION' };
   await C('IdleBridge.settleNow()');
-  A(C('IdleBridge.isActive()') === false, 'J1. 服务器无会话 → 停止不再重试');
+  A(C('IdleBridge.isActive()') === true, 'J1. 服务器无会话时不再静默停机（挂机仍在跑）');
+  settleResp = realResp;   // 服务器恢复正常：自愈要把挂机接回去
+  await S(150);
+  A(C('IdleBridge.isActive()') === true, 'J2. 自愈后挂机继续跑（不需要玩家手动重开）');
+  A(calls.filter(c => c.action === 'start').length > startCallsBefore,
+    'J3. 自愈向服务器重建了会话（补发 start）');
+
+  /* J4. 反复中断到上限 → 明确停机（防"建好又被停"的死循环轰服务器） */
+  settleResp = { ok: false, error: 'NO_ACTIVE_SESSION' };
+  for (let i = 0; i < 8; i++) { await C('IdleBridge.settleNow()'); await S(40); }
+  A(C('IdleBridge.isActive()') === false, 'J4. 会话反复中断达上限 → 停机（不再无限重试）');
   settleResp = realResp;
 
   /* ---------- K. 服务器录像安装 + 回放基线 + 幂等判重（回放版核心） ---------- */
@@ -181,7 +195,9 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   // M. settle 冷却的时间基准必须与比较方（rAF 时间戳 = performance.now）一致。
   //    旧代码写 Date.now()（1.7e12 量级）永远大于 performance.now() → 一次 settle 失败后
   //    剧本刷新彻底停摆，只能等 120 秒兜底结算 → 症状是"挂机卡死一两分钟又自己好了"。
-  A(/handleSettleError[\s\S]{0,700}performance\.now\(\) \+ SCRIPT_RETRY_MS/.test(SRC),
+  // 窗口放宽到 2500 字符：2026-09-13 起 handleSettleError 里加了自愈分支与说明注释，
+  // 断言的语义没变（"冷却那行必须用 performance.now"），只是离函数头更远了。
+  A(/handleSettleError[\s\S]{0,2500}performance\.now\(\) \+ SCRIPT_RETRY_MS/.test(SRC),
     'M1. settle 冷却用 performance.now（与 rAF 时间戳同基准，防冷却永不到期→挂机卡死）');
   A(SRC.indexOf('Date.now() + SCRIPT_RETRY_MS') < 0, 'M2. 不再有混用 Date.now() 写冷却的写法');
 
@@ -214,6 +230,77 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   A(dbg2.showEnemy === '腐噜兽', 'O5. 怪没被换剧本抹掉（仍在场）');
 
   C('IdleBridge.shutdown()');
+
+  /* ---------- P. duringPetEdit：改宠物前先结清真账，改完自动重挂（2026-09-13） ----------
+   * 用户实测"进化成功后等级突然变回去"的根因：托管期间本地 pet.level 是**演出预演值**
+   * （回放基线 + 每场击杀往上加），服务器真账领先最多一个窗口；进化/合成/涅槃拿这个预演值
+   * 判门槛、甚至写回云端，随后又被真账校准 → 玩家看到等级跳回去。
+   * 现在这些操作统一先 shutdown()（结账 → 本地被真账校准）→ 执行 → 自动重新挂上。 */
+  await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
+  await S(80);
+  const beforeP = calls.length;
+  const pr = await C('IdleBridge.duringPetEdit(async () => { globalThis.__petEditRan = true; return { ok: true, tag: "edited" }; })');
+  A(pr && pr.ok === true && pr.tag === 'edited', 'P1. duringPetEdit 原样返回被包裹函数的结果');
+  A(C('globalThis.__petEditRan') === true, 'P2. 被包裹的"改宠物"逻辑确实执行了');
+  A(C('IdleBridge.isActive()') === true, 'P3. 改完宠物后挂机自动继续（不用玩家手动点开始）');
+  const pCalls = calls.slice(beforeP);
+  A(pCalls.some(c => c.action === 'stop'), 'P4. 执行前先把服务器会话停掉（最后一段账已结清）');
+  A(pCalls.filter(c => c.action === 'start').length >= 1, 'P5. 执行后重新 start 会话（同图同宠接回去）');
+  C('IdleBridge.shutdown()');
+
+  /* ---------- Q. 静态守值：不许再有"无理由的静默停机" ---------- */
+  A(/NO_ACTIVE_SESSION'\)\s*\{\s*recoverSession\(\)/.test(SRC), 'Q1. NO_ACTIVE_SESSION 走自愈（不再静默停机）');
+  A(SRC.indexOf('stopLocal()') < 0, 'Q2. 停机一律带原因（不再出现无参 stopLocal() 静默停机）');
+  A(/window\.IdleBridge\s*=\s*\{[\s\S]{0,400}duringPetEdit/.test(SRC), 'Q3. duringPetEdit 已对外暴露（供进化/合成/涅槃调用）');
+
+  /* ---------- R. 静态守值：挂机时间不再凭空消失（服务端，2026-09-13） ---------- */
+  const EF = fs.readFileSync('../../supabase/functions/battle-settle/index.ts', 'utf8');
+  const CORE = fs.readFileSync('../../supabase/functions/_shared/settle-core.mjs', 'utf8');
+  A(EF.indexOf('MAX_CATCHUP_SECONDS') >= 0 && EF.indexOf('GRACE_SETTLE_SECONDS') < 0,
+    'R1. 补账上限不再是 120 秒（浏览器冻结 / 电脑休眠时不丢挂机时间）');
+  A(EF.indexOf('p_cursor: cursorIso') >= 0 && /cursorIso = new Date\(fromMs \+ \(Number\(plan\.result\.coveredMs\)/.test(EF),
+    'R2. 结算游标 = 上次游标 + 本次真正算掉的时间（不是 now，不会跨过没算的时间）');
+  A(CORE.indexOf('coveredMs') >= 0, 'R3. settle-core 上报 coveredMs（没算完的秒数留在账上，下次继续补）');
+
+  /* ---------- S. "托管期间客户端不许写宠物等级/经验"的静态守值（2026-09-13） ----------
+   * 背景：托管挂机期间本地 level/exp 是**演出预演值**（云端真账领先最多一个窗口），
+   * 任何一处"顺手把本地值写回云端"都会改坏真账：经验/等级倒退，随后被真账校准 → 玩家看到等级跳回去。
+   * 规则：写 level/exp 的入口**必须**有闸（托管期间不写）或走 IdleBridge.duringPetEdit。
+   * 这条测试的作用 = 以后谁新加一个写入入口，这里当场红，逼他先想清楚用哪道闸。 */
+  const jsRoot = path.join(__dirname, '..', 'js');
+  const walkJs = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+    const p = path.join(dir, e.name);
+    return e.isDirectory() ? walkJs(p) : (e.name.endsWith('.js') ? [p] : []);
+  });
+  const ALL_FILES = walkJs(jsRoot);
+  const srcOf = n => (ALL_FILES.find(p => path.basename(p) === n) ? fs.readFileSync(ALL_FILES.find(p => path.basename(p) === n), 'utf8') : '');
+  // 名单：每个入口旁边写清"闸在哪"，不许只写文件名了事（S5~S7 会抽查闸是否真的存在）
+  const ALLOW = {
+    'main.js': 'flushPetProgress 内有 serverManaged() 闸',
+    'ui-dev.js': 'savePet 内有 IdleBridge.isActive() 闸',
+    'pet_merge.js': '涅槃/合成走 IdleBridge.duringPetEdit 包裹',
+    'pet_evolve.js': '进化走 IdleBridge.duringPetEdit 包裹',
+    'tutorial_mode.js': '引导顶等级走 IdleBridge.duringPetEdit 包裹'
+  };
+  // 判定：**在 updatePet(...) 的实参里**出现 level:/exp:（只认"这次调用真的在写等级/经验"，
+  // 不认文件里别处的 level: —— 否则 setCloudPets 那种只补 traits 的调用会被误伤）
+  const writesLevelExp = src => {
+    const re = /updatePet\(([\s\S]{0,400}?)\)/g;
+    let m;
+    while ((m = re.exec(src))) { if (/\b(level|exp)\s*:/.test(m[1])) return true; }
+    return false;
+  };
+  const suspects = [];
+  for (const p of ALL_FILES) {
+    if (writesLevelExp(fs.readFileSync(p, 'utf8'))) suspects.push(path.basename(p));
+  }
+  const unguarded = suspects.filter(n => !ALLOW[n]);
+  A(unguarded.length === 0,
+    'S1. 客户端写 pets.level/exp 的入口全在"有闸名单"里（漏网：' + (unguarded.join('、') || '无') + '；在册：' + suspects.filter(n => ALLOW[n]).join('、') + '）');
+  A(/serverManaged\(\)/.test(srcOf('main.js')), 'S2. main.js 的等级写入确有"托管期间不写"的闸（flushPetProgress）');
+  A(/IdleBridge\.isActive/.test(srcOf('ui-dev.js')), 'S3. 开发面板的等级写入确有托管闸');
+  A(/duringPetEdit/.test(srcOf('pet_evolve.js')) && /duringPetEdit/.test(srcOf('pet_merge.js')) && /duringPetEdit/.test(srcOf('tutorial_mode.js')),
+    'S4. 进化/合成/涅槃/引导顶等级 都走 IdleBridge.duringPetEdit（先结清真账再改宠物）');
 
   console.log('\nALL IDLE BRIDGE TESTS PASSED');process.exit(0);
 })().catch(e => { console.error('FAIL: 未捕获异常 ' + (e && e.stack || e)); process.exit(1) });

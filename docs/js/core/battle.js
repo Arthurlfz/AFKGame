@@ -50,6 +50,7 @@
   let corruptionStacks = 0;      // 毒沼蛙：敌人腐蚀层数
 
   /* ---------- 开始 / 停止 ---------- */
+  let pageClaimed = false;  // 本模块是否持有战斗页占用权（只交还自己那一份，见 stopAutoBattle）
   function claimPage() {
     if (!SESSION) {
       const msg = '⚠️ 战斗页占用权模块未加载（缺 core/battle-session.js），无法开始挂机。';
@@ -58,6 +59,7 @@
     }
     const r = SESSION.claim('wild');
     if (!r.ok) return false; // 战斗页被副本/塔占着：调用方据此提示玩家
+    pageClaimed = true;
     return true;
   }
   // startAutoBattle(callback)：callback({win, fightCount}) 每场结束调用
@@ -70,13 +72,18 @@
     fightCount = 0;
     onFightEnd = callback;
     window.UI.updateStatus('fighting', fightCount);
-    window.UI.addLog(' 开始自动战斗！');
+    window.UI.addLog(' 开始自动战斗！', 'battle');
     beginFight();
     return { ok: true };
   }
   // 手动停止：立即停下，当前血量写回宠物
   function stopAutoBattle() {
-    if (SESSION) SESSION.release('wild'); // 交还战斗页（被抢占时处于他人名下，释放是空操作）
+    /* ⚠️ 只交还【自己确实持有】的那一份（2026-09-13 修）。
+     * 旧写法是无条件 `SESSION.release('wild')`，而 release 只比 kind、不比"这是不是我这轮占的"——
+     * 于是「本地循环早就不在跑了」的迟到调用，能把**刚起来的新占用者**（服务器托管挂机）踢出战斗页。
+     * 世界地图换图那条链正好是 `await handoff()` 之后才调到这里，时序上就能踩到：
+     * 表现为换图后挂机看起来起过又散了、要重新进图再点一次。 */
+    if (pageClaimed && SESSION) { SESSION.release('wild'); pageClaimed = false; }
     if (!autoRunning) return;
     autoRunning = false;
     waitingRecover = false;
@@ -88,7 +95,7 @@
     setTimeout(() => {
       if (state.pet) setCurHp(state.petRef || getActivePet(), state.pet.hp);
     }, 250);
-    window.UI.addLog(' 停止自动战斗');
+    window.UI.addLog(' 停止自动战斗', 'battle');
     window.UI.updateStatus('stopped', fightCount);
   }
   const isRunning = () => autoRunning;
@@ -99,7 +106,7 @@
   function enterRecover(reason) {
     waitingRecover = true;
     window.UI.updateStatus('recovering', fightCount);
-    window.UI.addLog(reason);
+    window.UI.addLog(reason, 'battle');
     clearInterval(recoverTimer);
     recoverTimer = setInterval(() => {
       const pet = getActivePet();
@@ -108,7 +115,7 @@
         clearInterval(recoverTimer);
         recoverTimer = null;
         waitingRecover = false;
-        window.UI.addLog(' 恢复完毕，自动继续挂机！');
+        window.UI.addLog(' 恢复完毕，自动继续挂机！', 'battle');
         beginFight();
       }
     }, 500);
@@ -517,7 +524,7 @@
     fightCount++;
     totalFights++; // 累计战斗场数（跨挂机累计）
     // 胜利不单独播报：每场的「经验 +N」已经代表打赢了；战败是异常事件，必须让玩家看见。
-    if (!win) window.UI.addLog(' 战斗失败……');
+    if (!win) window.UI.addLog(' 战斗失败……', 'battle');
     window.UI.updateStatus('fighting', fightCount);
     if (win && window.UI.animateVictory) window.UI.animateVictory(); // 胜利演出：敌人淡出（表现层）
 
