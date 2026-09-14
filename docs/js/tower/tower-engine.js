@@ -85,6 +85,12 @@
       ? (c.guardianMult || { hp: 3.0, atk: 1.35, def: 1.05 })
       : (c.mobMult || { hp: 0.8, atk: 1.0, def: 0.9 });
     const hp = Math.max(1, Math.round(base.hp * (m.hp || 1) * scale * diff));
+    // 机制属性（2026-09-15 命中/闪避升格）：命中/闪避随怪等级涨（tower-config.mech），与野图同曲线、独立定标
+    const MC = c.mech || {};
+    const hitLv = Number(MC.hitPerLv) || 8, refLv = Number(MC.refLevel) || 55, dExp = Number(MC.dodgeExp) || 1.35;
+    const hit = Math.round(hitLv * level * (isGuardian ? (Number(MC.guardianHitMult) || 1.35) : 1));
+    const dodge = Math.round((isGuardian ? (Number(MC.dodgeGuardian) || 200) : (Number(MC.dodgeMob) || 140))
+      * Math.pow(level / refLv, dExp));
     /* 塔怪技能（2026-09-10）：守卫用 guardianSkills、杂兵用 mobSkills；
      * 按 (层 + 第几只) 取模分配 → 同一层每次进都一样（可复现，便于校准/对账/回放）。
      * 野图怪没有 skill 字段，battle.js 里「没 skill 就不摇随机数」→ 野图行为零变化。 */
@@ -99,7 +105,7 @@
       hp, maxHp: hp,
       atk: Math.max(1, Math.round(base.atk * (m.atk || 1) * scale * diff)),
       def: Math.max(0, Math.round(base.def * (m.def || 1) * scale * diff)),
-      hit: Number(c.guardianHit) || 160,
+      hit, dodge,
       growth: 0,
       skill: skill || undefined,
       _towerFloor: floor,

@@ -151,8 +151,13 @@ async function runTower(affixIds, opts) {
   ok(!!TC.resetCardName && TC.resetCard && TC.resetCard.priceGems > 0 && TC.resetCard.limitPerWeek > 0,
     '重置卡配置齐（名/魔石价/每周硬限购）：' + TC.resetCardName);
   ok(TC.unlock && TC.unlock.hardGate === null && !!TC.unlock.hint, '入口不硬拦、只给提示（hardGate=null）');
-  ok(TC.baseStats.hp > 0 && TC.baseStats.atk > 0 && TC.baseStats.def > 0 && TC.guardianHit > 90,
-    '基准数值与守卫命中已配置（守卫命中 ' + TC.guardianHit + ' 高于野怪 90）');
+  /* 2026-09-15：塔怪命中/闪避改随怪等级走（tower-config.mech），旧写死 guardianHit 退役 */
+  const TM = TC.mech || {};
+  const gHit = Math.round((TM.hitPerLv || 8) * 60 * (TM.guardianHitMult || 1));
+  ok(TC.baseStats.hp > 0 && TC.baseStats.atk > 0 && TC.baseStats.def > 0 && gHit > 90,
+    '基准数值与塔怪机制属性已配置（守卫命中 ' + gHit + ' = hitPerLv×等级×守卫倍率，随层数涨，高于野怪 90）');
+  ok((TM.dodgeMob || 0) > 0 && (TM.dodgeGuardian || 0) > 0,
+    '塔怪也有闪避（杂兵 ' + TM.dodgeMob + ' / 守卫 ' + TM.dodgeGuardian + '，按 (等级/refLevel)^dodgeExp 成长）');
   const guardians = TC.guardians || [];
   let cov = true;
   for (let f = 1; f <= TC.floors; f++) if (!guardians.some(g => f >= g.from && f <= g.to)) cov = false;
@@ -165,16 +170,18 @@ async function runTower(affixIds, opts) {
   const lv1 = ctx.TowerEngine.floorLevelOf(1), lv30 = ctx.TowerEngine.floorLevelOf(30);
   // 2026-09-10 用户要求：怪 60 级起步、每通关一层就提升（后期内容不该出现小号怪）
   ok(lv1 === 60 && lv30 === 120, '怪等级第 1 层 Lv60、第 30 层 Lv120（' + lv1 + '→' + lv30 + '）');
-  let mono = true, prevHp = 0, prevDiff = 0;
+  let mono = true, prevHp = 0, prevDiff = 0, prevHit = 0;
   for (let f = 1; f <= TC.floors; f++) {
     const e = ctx.TowerEngine.floorEnemyStats(f, null);
     const d = ctx.TowerEngine.floorDifficultyOf(f);
     if (d <= prevDiff) mono = false;
     if (e.hp <= prevHp) mono = false;
     prevDiff = d; prevHp = e.hp;
-    if (!(e.hit === TC.guardianHit)) mono = false;
+    // 2026-09-15：塔怪命中/闪避随层数涨（旧 guardianHit 写死值退役）→ 改守「每层都更强」
+    if (!(e.hit > prevHit)) mono = false;
+    prevHit = e.hit;
   }
-  ok(mono, '层难度与怪血全程严格递增（含强档层阶梯，绝不倒退），守卫命中一致');
+  ok(mono, '层难度与怪血全程严格递增（含强档层阶梯，绝不倒退），怪命中随层数递增');
   // 后段必须明显陡峭：要覆盖「中档普通宠 → 满配神级涅槃5」的差距（实测第 30 层一层总血 = 第 20 层的 4.3 倍）
   const hpRatio = ctx.TowerEngine.floorTotalHp(30, null) / ctx.TowerEngine.floorTotalHp(20, null);
   ok(hpRatio > 3.5, '后段陡峭：第 30 层一层总血是第 20 层的 ' + hpRatio.toFixed(2) + ' 倍（覆盖满配/中档差距）');

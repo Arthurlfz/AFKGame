@@ -40,8 +40,8 @@ function mulberry32(seed) {
 /* ---------- 守关 Boss（2026-09-05 拍板·随机版） ----------
  * 每场 1/1600 随机（期望 1600 场 ≈ 图10 挂机 2 小时），连续 2400 场未出必出（保底），
  * 出后 200 场内不再出（冷却）。跨结算段累计：fightOffset = 会话总场数（全局 fightNo），
- * bossState.lastBossFight = 上次实际出 Boss 的全局场次（服务器 session.last_boss_fight）。
- * 独立随机流（seed 盐化）→ 不污染战斗伤害随机序列。
+ * bossState.lastBossFight = 上次实际出 Boss 的全局场次（服务器 session.last_boss_fight / 前端 localStorage）。
+ * 独立随机流（seed 盐化）→ 不污染战斗伤害随机序列，旧 seed 的胜负/经验测试不漂移。
  * Boss = 该图怪池 level 最高的怪，等级=图段上限，血×5、攻×1.5，名字前缀「霸主·」。 */
 const BOSS_CHANCE = 1 / 1600;
 const BOSS_PITY = 2400;
@@ -126,6 +126,15 @@ function getBaseSpeed(pet, config) {
   const fallback = config.pet.speeds[base];
   return typeof fallback === 'number' && fallback > 0 ? fallback : 40;
 }
+// 命中/闪避的「品种倍率」（2026-09-15，与 pet.js getMechCoeff 同源）：
+// 乘在 config.pet.mechCoeff 的全局系数上，让不同定位的宠在后期走出不同的命中/闪避曲线。
+// 神级宠 resolveLineId 已把名字映射回根源基宠 → 继承本线倍率，不额外 ×1.5。
+function getMechCoeff(pet, config) {
+  const lineId = resolveLineId(pet && (pet.name || pet.lineId), config) || (pet && (pet.lineId || pet.name));
+  const st = ((config.pet && config.pet.starters) || []).find(s => s.name === lineId);
+  const m = (st && st.mech) || null;
+  return { hit: (m && m.hit) || 1, dodge: (m && m.dodge) || 1 };
+}
 function getStatCoeff(pet, config) {
   // 神级宠：成长系数 = 普通宠 ×1.5（手册 2.6），优先于 starters 查找
   const god = godDefOf(pet, config);
@@ -147,19 +156,23 @@ function getEquipBonuses(pet, config) {
     const affixes = flattenAffixes(eq.affixes || {});
     const own = {};
     for (const [type, value] of Object.entries(stats)) own[type] = value;
+    // 词缀统一规则（2026-09-15，与 equipment.js getEquipBonuses 同源）：fixed=true → 固定值；
+    // fixed=false（T1 百分比）→ pct 通道（atk/hp/def/hit/dodge/spd 乘全属性）
     for (const aff of affixes) {
-      if (['dropQty', 'dropRare', 'matDrop'].includes(aff.type)) resources[aff.type] *= 1 + (aff.value || 0) / 100;
-      else if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
-      else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-      else if (['hit', 'dodge', 'spd', 'pen'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-      else if (['dmgBonus', 'dr'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-      else own[aff.type] = (own[aff.type] || 0) + (stats[aff.type] || 0) * (aff.value || 0) / 100;
+      const t = aff.type, v = aff.value || 0;
+      if (['dropQty', 'dropRare', 'matDrop'].includes(t)) resources[t] *= 1 + v / 100;
+      else if (['atk', 'hp', 'def', 'hit', 'dodge', 'spd'].includes(t)) {
+        if (aff.fixed) own[t] = (own[t] || 0) + v;
+        else pct[t] = (pct[t] || 0) + v / 100;
+      }
+      else if (t === 'pen') own[t] = (own[t] || 0) + v;
+      else if (['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr'].includes(t)) own[t] = (own[t] || 0) + v;
+      else own[t] = (own[t] || 0) + v;
     }
+    // 魂铸词缀（2026-09-15 与 equipment.js 同源）：攻/血/防/命中/闪避/速度走 pct（乘全属性）
     if (eq.soulAffix) {
       const aff = eq.soulAffix;
-      if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
-      else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-      else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+      if (['atk', 'hp', 'def', 'hit', 'dodge', 'spd'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
       else own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
     }
     for (const [type, value] of Object.entries(own)) flat[type] = (flat[type] || 0) + value;
@@ -284,22 +297,25 @@ function petStats(pet, config) {
     blDodge = (bl.params.dodge || 0) * 100;
   }
   const g = Number(pet.growth) || 0, lv = Number(pet.level) || 1, C = getStatCoeff(pet, config);
-  const coreHp = pet.baseHp + Math.round(lv * C.hp);
-  const coreAtk = pet.baseAtk + Math.round(lv * C.atk);
-  const coreDef = pet.baseDef + Math.round(lv * C.def);
   const totalHp = pet.baseHp + Math.round(lv * g * C.hp);
   const totalAtk = pet.baseAtk + Math.round(lv * g * C.atk);
   const totalDef = pet.baseDef + Math.round(lv * g * C.def);
   const baseSpd = pet.baseSpd != null ? pet.baseSpd : getBaseSpeed(pet, config);
+  // 机制属性成长（2026-09-15 命中/闪避升格，与 pet.js getStats 逐行同源；config.pet.mechCoeff）
+  const MC = (config.pet && config.pet.mechCoeff) || { hitLv: 1, hitGrowth: 0.05, dodgeLv: 0.35, dodgeGrowth: 0.02 };
+  const MM = getMechCoeff(pet, config);   // 品种倍率（与 pet.js 同源）
+  const hitCore = baseHit + Math.round(lv * MC.hitLv * MM.hit) + Math.round(lv * g * MC.hitGrowth * MM.hit);
+  const dodgeCore = baseDodge + Math.round(lv * MC.dodgeLv * MM.dodge) + Math.round(lv * g * MC.dodgeGrowth * MM.dodge);
   return {
-    atk: Math.round(coreAtk * (1 + (pct.atk || 0)) + (totalAtk - coreAtk) + (flat.atk || 0)),
-    hp: Math.round(coreHp * (1 + (pct.hp || 0)) + (totalHp - coreHp) + (flat.hp || 0)),
-    def: Math.round(coreDef * (1 + (pct.def || 0)) + (totalDef - coreDef) + (flat.def || 0)),
-    spd: baseSpd + (flat.spd || 0),
+    // T1 百分比词缀乘全属性（底座+成长增量；2026-09-15 改判，配套涅槃分段阻尼）
+    atk: Math.round(totalAtk * (1 + (pct.atk || 0)) + (flat.atk || 0)),
+    hp: Math.round(totalHp * (1 + (pct.hp || 0)) + (flat.hp || 0)),
+    def: Math.round(totalDef * (1 + (pct.def || 0)) + (flat.def || 0)),
+    spd: Math.round((baseSpd + (flat.spd || 0)) * (1 + (pct.spd || 0))),
     critRate: baseCrit + (flat.crit || 0) / 100 + blCrit,
     critDamage: baseCritDmg + (flat.critDamage || 0) / 100,
-    hit: baseHit + (flat.hit || 0) + blHit,
-    dodge: baseDodge + (flat.dodge || 0) + blDodge,
+    hit: Math.round(hitCore * (1 + (pct.hit || 0))) + (flat.hit || 0) + blHit,
+    dodge: Math.round(dodgeCore * (1 + (pct.dodge || 0))) + (flat.dodge || 0) + blDodge,
     lifesteal: baseLs + (flat.lifesteal || 0) / 100,
     pen: (flat.pen || 0),
     dmgBonus: (flat.dmgBonus || 0),
@@ -323,7 +339,12 @@ function calcDamage(att, defStats, config, rnd) {
   const rate = (att.critRate == null) ? config.battle.critRate : att.critRate;
   const mult = (att.critDamage == null) ? config.battle.critMultiplier : att.critDamage;
   const isCrit = rnd() < rate;
-  const effDef = Math.max(0, defStats.def - Math.max(0, att.pen || 0));
+  /* 穿透（2026-09-15 改百分比破甲）：点数制在 dmg = atk²/(atk+def) 下结构性无效
+   * （削固定值的相对收益 ∝ 1/(atk+def)，而 atk+def 随层数暴涨 → 拉满 480 点也只 +0.1 层）。
+   * 改成「无视 X% 防御」= 有效防御 ×（1 − X%），越打高防怪越强，符合"克制高防"定位。
+   * 上限 80%：留一成底，避免"完全无视防御"破坏攻防递减对抗的设计。 */
+  const penPct = Math.min(80, Math.max(0, att.pen || 0));
+  const effDef = Math.max(0, Math.round(defStats.def * (1 - penPct / 100)));
   // 攻防递减对抗（2026-09-09，与 battle.js calcDamage 同源，见 docs/战斗公式重设计_v1.md）：
   // 防御与攻击力相等时挡掉一半，永远挡不完 → dmg = atk × atk / (atk + effDef)
   let dmg = Math.max(1, Math.round(att.atk * att.atk / (att.atk + effDef)));
@@ -362,14 +383,19 @@ function simulateFight(input) {
   const hp = Math.round(base.hp * ratio * tm * diff * (isBoss ? 5 : 1));
   const def = Math.round(base.def * ratio * tm * diff);
   const atk = Math.round(base.atk * ratio * tm * diff * (isBoss ? 1.5 : 1));
+  // 怪物机制属性（2026-09-15 命中/闪避升格）：怪也有命中/闪避，跟怪等级走（config.battle.enemyMech，
+  // 与 battle.js applyEnemyDefaults 同源）。塔怪由 mobEnemyStats 显式给值，不走这里。
+  const EM = B.enemyMech || {};
+  const emType = enemy.enemyType || 'normal';
   const E = {
     name: (isBoss ? '霸主·' : '') + enemy.name, icon: enemy.icon, level: enemyLevel,
     hp, maxHp: hp, atk, def,
     spd: enemy.spd, // 与前端一致：enemy-data 必配 spd；缺省则 NaN（前端同样行为）
     critRate: enemy.critRate != null ? enemy.critRate : B.critRate,
     critDamage: enemy.critDamage != null ? enemy.critDamage : B.critMultiplier,
-    hit: enemy.hit != null ? enemy.hit : 90,
-    dodge: enemy.dodge != null ? enemy.dodge : (enemy.enemyType === 'mutant' ? 12 : enemy.enemyType === 'evolved' ? 8 : 5),
+    hit: enemy.hit != null ? enemy.hit : Math.round((EM.hitPerLv || 8) * enemyLevel),
+    dodge: enemy.dodge != null ? enemy.dodge
+      : Math.round((((EM.dodgeAtRef || {})[emType]) || 140) * Math.pow(enemyLevel / (EM.refLevel || 55), EM.dodgeExp || 1.35)),
     lifesteal: enemy.lifesteal != null ? enemy.lifesteal : 0,
     pen: enemy.pen != null ? enemy.pen : 0,
     dmgBonus: enemy.dmgBonus != null ? enemy.dmgBonus : 0,
@@ -640,10 +666,10 @@ function simulateSession(input) {
  * simulateSessionScript —— 带时间轴的会话模拟（演出剧本版）
  * 与 simulateSession 完全同结构同 rng 消耗序（同 seed → 同结果），
  * 但输出的是"演出剧本"：每场的开始/结束时刻、起止血量、胜负、经验、完整敌人数据。
- * 2026-09-09 架构改版：**这是运行时唯一在跑的会话模拟**——服务器预结算
- * 接下来一段挂机并把"已入账的录像"下发，客户端纯回放，不再本地模拟。
- * ⚠️ 本函数必须与 docs/js/core/battle-sim.mjs 的同名函数逐字同步
- *（vtest_sim_sync.js 守护）；改这里必须同步前端副本，反之亦然。
+ * 2026-09-09 架构改版：**运行时只有服务器副本在跑**（客户端纯回放，
+ * 见 idle-bridge.js）——本文件保留为参考/测试副本。
+ * ⚠️ 必须与 supabase/functions/_shared/battle-sim.mjs 同名函数逐字同步
+ *（vtest_sim_sync.js 守护）；改这里必须同步服务器副本，反之亦然。
  * ============================================================ */
 function simulateSessionScript(input) {
   const { pet, areaId, seconds, seed, config, enemyList, curHp, fightOffset, bossState } = input;
@@ -743,4 +769,4 @@ function simulateSessionScript(input) {
   return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs, consumedMs: Math.max(0, (Number(seconds) || 0) * 1000 - Math.max(0, msLeft)) };
 }
 
-export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, skillOf, getEquipBonuses, getBloodline, getAwakenState, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff };
+export { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff, getMechCoeff };

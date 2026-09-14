@@ -1,12 +1,12 @@
 // 由 supabase/gen_equip_gen.js 自动生成（勿手改）—— 与 docs/js/equipment/equipment.js 同源
-// 生成时间：2026-09-11T12:10:27.843Z
+// 生成时间：2026-09-14T17:54:15.696Z
 /* 服务端装备生成：与前端同一份逻辑，靠构建期抽取而非手抄。
  * 用法：const gen = makeEquipGen(config.equipment, rnd);   // rnd: () => [0,1)
  *       const eq = gen.generateEquipment(null, areaTier, 0, ilvl, countBonus);
  *       // 参数与前端 generateEquipment(rarity, areaTier, materialTier, ilvl, countBonus) 完全一致
  *       // （rarity / materialTier 已被内部忽略，仅为兼容旧调用签名） */
 const SLOTS = ["武器","戒指","项链","头盔","护甲","盾牌","靴子","腰带","斗篷","饰品","护符","徽章"];
-const SLOT_INFO = {"武器":{"names":["短剑","战斧","长弓","法杖"],"bases":[{"type":"atk","label":"攻击","value":30}]},"戒指":{"names":["铁戒","骨戒"],"bases":[{"type":"atk","label":"攻击","value":15},{"type":"crit","label":"暴击率","value":2}]},"项链":{"names":["狼牙项链","灵魂项链"],"bases":[{"type":"atk","label":"攻击","value":15},{"type":"critDamage","label":"暴击伤害","value":8}]},"头盔":{"names":["铁盔","骨盔"],"bases":[{"type":"def","label":"防御","value":15}]},"护甲":{"names":["锁甲","胸甲"],"bases":[{"type":"hp","label":"生命","value":80},{"type":"def","label":"防御","value":8}]},"盾牌":{"names":["圆盾","塔盾"],"bases":[{"type":"def","label":"防御","value":15},{"type":"dodge","label":"闪避","value":5}]},"靴子":{"names":["战靴","影靴"],"bases":[{"type":"spd","label":"速度","value":8}]},"腰带":{"names":["重腰带","猎手腰带"],"bases":[{"type":"hp","label":"生命","value":60},{"type":"spd","label":"速度","value":5}]},"斗篷":{"names":["黑斗篷","影纱"],"bases":[{"type":"dodge","label":"闪避","value":10},{"type":"hp","label":"生命","value":50}]},"饰品":{"names":["徽记坠饰","战斗饰品"],"bases":[{"type":"atk","label":"攻击","value":12},{"type":"hit","label":"命中","value":5}]},"护符":{"names":["生命护符","吸血护符"],"bases":[{"type":"lifesteal","label":"吸血","value":4}]},"徽章":{"names":["铁徽章","王者徽章"],"bases":[{"type":"crit","label":"暴击率","value":3},{"type":"critDamage","label":"暴击伤害","value":10}]}};
+const SLOT_INFO = {"武器":{"names":["短剑","战斧","长弓","法杖"],"bases":[{"type":"atk","label":"攻击","value":30}]},"戒指":{"names":["铁戒","骨戒"],"bases":[{"type":"atk","label":"攻击","value":15},{"type":"crit","label":"暴击率","value":2}]},"项链":{"names":["狼牙项链","灵魂项链"],"bases":[{"type":"atk","label":"攻击","value":15},{"type":"critDamage","label":"暴击伤害","value":8}]},"头盔":{"names":["铁盔","骨盔"],"bases":[{"type":"def","label":"防御","value":15}]},"护甲":{"names":["锁甲","胸甲"],"bases":[{"type":"hp","label":"生命","value":80},{"type":"def","label":"防御","value":8}]},"盾牌":{"names":["圆盾","塔盾"],"bases":[{"type":"def","label":"防御","value":15},{"type":"dodge","label":"闪避","value":5}]},"靴子":{"names":["战靴","影靴"],"bases":[{"type":"spd","label":"速度","value":8}]},"腰带":{"names":["重腰带","猎手腰带"],"bases":[{"type":"hp","label":"生命","value":60},{"type":"spd","label":"速度","value":5}]},"斗篷":{"names":["黑斗篷","影纱"],"bases":[{"type":"dodge","label":"闪避","value":10},{"type":"hp","label":"生命","value":50}]},"饰品":{"names":["徽记坠饰","战斗饰品"],"bases":[{"type":"atk","label":"攻击","value":12},{"type":"hit","label":"命中","value":5}]},"护符":{"names":["生命护符","庇护护符"],"bases":[{"type":"hp","label":"生命","value":60},{"type":"crit","label":"暴击率","value":2}]},"徽章":{"names":["铁徽章","王者徽章"],"bases":[{"type":"crit","label":"暴击率","value":3},{"type":"critDamage","label":"暴击伤害","value":10}]}};
 const LABELS = {"atk":"攻击","hp":"生命","def":"防御","spd":"速度","crit":"暴击率","critDamage":"暴击伤害","hit":"命中","dodge":"闪避","lifesteal":"吸血","pen":"穿透","dmgBonus":"伤害加成","dr":"受伤减免"};
 const AFFIX_POOL = [{"type":"atk","label":"攻击","category":"prefix","weight":100},{"type":"hp","label":"生命","category":"prefix","weight":100},{"type":"def","label":"防御","category":"prefix","weight":100},{"type":"lifesteal","label":"吸血","category":"prefix","weight":60},{"type":"spd","label":"速度","category":"suffix","weight":60},{"type":"crit","label":"暴击率","category":"suffix","weight":55},{"type":"critDamage","label":"暴击伤害","category":"suffix","weight":45},{"type":"hit","label":"命中","category":"suffix","weight":50},{"type":"dodge","label":"闪避","category":"suffix","weight":40},{"type":"pen","label":"穿透","category":"suffix","weight":45},{"type":"dmgBonus","label":"伤害加成","category":"suffix","weight":45},{"type":"dr","label":"受伤减免","category":"suffix","weight":40},{"type":"dropQty","label":"掉落数量","category":"suffix","weight":15},{"type":"dropRare","label":"掉落稀有度","category":"suffix","weight":12},{"type":"matDrop","label":"材料掉率","category":"suffix","weight":10}];
 
@@ -30,6 +30,11 @@ export function makeEquipGen(cfg, rnd) {
   let uid = 1;
   const AFFIX_TIER_TABLES = {
     spd: () => Config.equipment.speedAffixTiers,
+    atk: () => Config.equipment.atkTiers,
+    hp: () => Config.equipment.hpTiers,
+    def: () => Config.equipment.defTiers,
+    hit: () => Config.equipment.hitTiers,
+    dodge: () => Config.equipment.dodgeTiers,
     lifesteal: () => Config.equipment.lifestealAffixTiers,
     crit: () => Config.equipment.critAffixTiers,
     critDamage: () => Config.equipment.critDamageAffixTiers,
@@ -53,10 +58,24 @@ export function makeEquipGen(cfg, rnd) {
       return Util.pickWeighted(items);
     }
   
+  function affixFixedOf(type, tier) {
+      // 「百分比点数」量纲：全档都按百分比结算（显示带 %），不参与 T1/T2 分野。
+      // pen 于 2026-09-15 并入（改百分比破甲，点数制结构性无效）。
+      const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'pen'];
+      return POINT_TYPES.includes(type) ? false : tier !== 1;
+    }
+  
   function rollAffixTier(ilvl) {
       const lv = ilvl == null ? 100 : Number(ilvl);
       const gates = (Config.equipment.affixIlvlGates || {});
-      const weights = (Config.equipment.affixTierWeights) || { 4: 60, 5: 40 };
+      // T1 概率按装备等级分段上调（2026-09-15）：取「满足的最高段」权重；没有分段表时退回整表
+      const segs = Config.equipment.affixTierWeightsByIlvl;
+      let weights = (Config.equipment.affixTierWeights) || { 4: 60, 5: 40 };
+      if (Array.isArray(segs) && segs.length) {
+        let seg = null;
+        for (const s of segs) if (lv >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
+        if (seg && seg.weights) weights = seg.weights;
+      }
       // 池子 = 门槛已达标的 tier（ilvl 10 → 只有 T4/T5；ilvl 80 → T1~T5 全在池里）
       const entries = Object.entries(gates)
         .filter(([, g]) => lv >= Number(g))
@@ -145,11 +164,11 @@ export function makeEquipGen(cfg, rnd) {
         })).filter(a => a.weight > 0));
         if (!aff) break;
         pool.splice(pool.indexOf(aff), 1);
-        // 每条词缀独立 roll T 阶：门槛达标的 tier 进池按权重抽（ilvl 70+ 才可能有 T1，且只占 5%）
+        // 每条词缀独立 roll T 阶：门槛达标的 tier 进池按权重抽（T1 概率按 ilvl 分段上调，见 config）
         const tier = rollAffixTier(ilvl);
         const tiers = affixTiersFor(aff.type);
         const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
-        const fixed = ['hit', 'dodge', 'spd', 'pen'].includes(aff.type);
+        const fixed = affixFixedOf(aff.type, tier);
         affixes[aff.category].push({ type: aff.type, label: aff.label, tier, value: Util.randInt(T.min, T.max), fixed });
       }
       const eq = {

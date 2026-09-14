@@ -26,7 +26,10 @@ async function makeEq() {
   const id = 'eq-' + (++seq);
   C(`(function(){const eq={id:${seq},name:'测试甲${seq}',slot:'护甲',areaTier:6,materialTier:3,tier:3,ilvl:60,
     rarity:{id:'gold',label:'金色',color:'#c9a86a'},base:{type:'hp',label:'生命',value:80},baseStats:{hp:80},
-    affixes:{prefix:[{type:'atk',label:'攻击',tier:3,value:11}],suffix:[{type:'spd',label:'速度',tier:2,value:9},{type:'crit',label:'暴击率',tier:3,value:4}]},
+    // 2026-09-15 词缀统一规则：T2~T5 = 固定值(fixed:true)、T1 = 百分比(fixed:false)；
+    // 暴击率等「百分比点数」量纲恒 false。旧数据没这个字段时由 normalizeAffixes 回填 —— 夹具必须显式带上，
+    // 否则「回滚后词缀与回滚前一致」这条断言会被回填差异打翻。
+    affixes:{prefix:[{type:'atk',label:'攻击',tier:3,value:11,fixed:true}],suffix:[{type:'spd',label:'速度',tier:2,value:9,fixed:true},{type:'crit',label:'暴击率',tier:3,value:4,fixed:false}]},
     cloudId:'${id}',locked:false};Equipment.addToInventory(eq);globalThis.__eq=eq;return true})()`);
   ctx.itemsTable.push({ id, user_id: C('session.user.id'), name: '测试甲', slot: '护甲', base_stat: { type: 'hp', label: '生命', value: 80 }, affixes: { prefix: [], suffix: [] }, tier: 3, rarity: 'gold', locked: false, identified: true });
   return id;

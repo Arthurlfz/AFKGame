@@ -33,7 +33,7 @@
     武器: ['短剑', '战斧', '长弓', '法杖'], 戒指: ['铁戒', '骨戒'], 项链: ['狼牙项链', '灵魂项链'],
     头盔: ['铁盔', '骨盔'], 护甲: ['锁甲', '胸甲'], 盾牌: ['圆盾', '塔盾'],
     靴子: ['战靴', '影靴'], 腰带: ['重腰带', '猎手腰带'], 斗篷: ['黑斗篷', '影纱'],
-    饰品: ['徽记坠饰', '战斗饰品'], 护符: ['生命护符', '吸血护符'], 徽章: ['铁徽章', '王者徽章']
+    饰品: ['徽记坠饰', '战斗饰品'], 护符: ['生命护符', '庇护护符'], 徽章: ['铁徽章', '王者徽章']
   };
   const SLOT_INFO = Object.fromEntries(SLOTS.map(slot => [slot, {
     names: NAMES[slot] || [slot],
@@ -63,6 +63,16 @@
     const a = AFFIX_POOL.find(x => x.type === type);
     return a ? a.category : 'prefix';
   }
+  /* 词缀统一规则（2026-09-15 用户拍板）：T1 = 百分比（fixed=false）、T2~T5 = 固定值（fixed=true）。
+   * 例外：pen 量纲是「无视X点防御」全档固定值；crit/critDamage/lifesteal/dmgBonus/dr 本身就是
+   * 「百分比点数」量纲（fixed=false 仅表示"显示带 %"），不参与 T1/T2 分野。
+   * 生成（generateEquipment）与打造（equipment_craft.js）共用这一个判定，杜绝两套口径。 */
+  function affixFixedOf(type, tier) {
+    // 「百分比点数」量纲：全档都按百分比结算（显示带 %），不参与 T1/T2 分野。
+    // pen 于 2026-09-15 并入（改百分比破甲，点数制结构性无效）。
+    const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'pen'];
+    return POINT_TYPES.includes(type) ? false : tier !== 1;
+  }
 
   /* ---------- 词缀容器兼容层 ----------
    * 新结构：eq.affixes = { prefix: [Affix], suffix: [Affix] }（前缀最多 3、后缀最多 3、总共最多 6）
@@ -72,7 +82,13 @@
   // 任意形态 → 标准嵌套 {prefix,suffix}（旧扁平数组按类型归类；清洗 null/缺 type 的脏词缀）
   function normalizeAffixes(raw) {
     if (!raw) return { prefix: [], suffix: [] };
-    const clean = a => (a && a.type ? { ...a } : null);
+    // 旧数据没有 fixed 标记 → 按统一规则回填（T1=%/其余固定；点数量纲恒 false），防止老词缀被当成百分比乘全属性
+    const clean = a => {
+      if (!a || !a.type) return null;
+      const c = { ...a };
+      if (c.fixed == null && AFFIX_POOL.some(x => x.type === c.type)) c.fixed = affixFixedOf(c.type, c.tier);
+      return c;
+    };
     if (Array.isArray(raw)) {
       const out = { prefix: [], suffix: [] };
       for (const a of raw) { const c = clean(a); if (c) out[affixCategory(c.type)].push(c); }
@@ -123,7 +139,14 @@
   function rollAffixTier(ilvl) {
     const lv = ilvl == null ? 100 : Number(ilvl);
     const gates = (Config.equipment.affixIlvlGates || {});
-    const weights = (Config.equipment.affixTierWeights) || { 4: 60, 5: 40 };
+    // T1 概率按装备等级分段上调（2026-09-15）：取「满足的最高段」权重；没有分段表时退回整表
+    const segs = Config.equipment.affixTierWeightsByIlvl;
+    let weights = (Config.equipment.affixTierWeights) || { 4: 60, 5: 40 };
+    if (Array.isArray(segs) && segs.length) {
+      let seg = null;
+      for (const s of segs) if (lv >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
+      if (seg && seg.weights) weights = seg.weights;
+    }
     // 池子 = 门槛已达标的 tier（ilvl 10 → 只有 T4/T5；ilvl 80 → T1~T5 全在池里）
     const entries = Object.entries(gates)
       .filter(([, g]) => lv >= Number(g))
@@ -148,6 +171,11 @@
   // 生成（generateEquipment）、roll 区间展示（affixRange）共用这一张分派表，杜绝两套口径。
   const AFFIX_TIER_TABLES = {
     spd: () => Config.equipment.speedAffixTiers,
+    atk: () => Config.equipment.atkTiers,
+    hp: () => Config.equipment.hpTiers,
+    def: () => Config.equipment.defTiers,
+    hit: () => Config.equipment.hitTiers,
+    dodge: () => Config.equipment.dodgeTiers,
     lifesteal: () => Config.equipment.lifestealAffixTiers,
     crit: () => Config.equipment.critAffixTiers,
     critDamage: () => Config.equipment.critDamageAffixTiers,
@@ -238,11 +266,11 @@
       })).filter(a => a.weight > 0));
       if (!aff) break;
       pool.splice(pool.indexOf(aff), 1);
-      // 每条词缀独立 roll T 阶：门槛达标的 tier 进池按权重抽（ilvl 70+ 才可能有 T1，且只占 5%）
+      // 每条词缀独立 roll T 阶：门槛达标的 tier 进池按权重抽（T1 概率按 ilvl 分段上调，见 config）
       const tier = rollAffixTier(ilvl);
       const tiers = affixTiersFor(aff.type);
       const T = tiers.find(t => t.tier === tier) || tiers[tiers.length - 1];
-      const fixed = ['hit', 'dodge', 'spd', 'pen'].includes(aff.type);
+      const fixed = affixFixedOf(aff.type, tier);
       affixes[aff.category].push({ type: aff.type, label: aff.label, tier, value: Util.randInt(T.min, T.max), fixed });
     }
     const eq = {
@@ -352,23 +380,28 @@
       const affixes = flattenAffixes(eq.affixes);
       const own = {};
       for (const [type, value] of Object.entries(stats)) own[type] = value;
-      for (const aff of affixes) {
-        if (['dropQty', 'dropRare', 'matDrop'].includes(aff.type)) resources[aff.type] *= 1 + (aff.value || 0) / 100;
-        else if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
-        // 机制百分比词缀（暴击/暴伤/吸血）：直接加「百分比点数」（如 +6% → flat.lifesteal += 6，getStats 再 /100 转小数）
-        else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-        // 固定值词缀（命中/闪避/速度/穿透）：直接加数值
-        else if (['hit', 'dodge', 'spd', 'pen'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-        // 独立结算词缀（最终伤害+X% / 受伤减免X%）：加百分比点数，battle.js 结算时使用
-        else if (['dmgBonus', 'dr'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-        else own[aff.type] = (own[aff.type] || 0) + (stats[aff.type] || 0) * (aff.value || 0) / 100;
-      }
+      /* 词缀统一规则（2026-09-15）：fixed=true → 固定值进 own；fixed=false（T1 百分比）→ 百分比点数
+       * 进 pct（atk/hp/def/hit/dodge/spd 共用「乘全属性」通道；暴击/暴伤/吸血/伤加/减伤是
+       * 「百分比点数」量纲，仍进 own 由 getStats ÷100）。 */
+      const applyAffix = (aff) => {
+        const t = aff.type, v = aff.value || 0;
+        if (['dropQty', 'dropRare', 'matDrop'].includes(t)) resources[t] *= 1 + v / 100;
+        else if (['atk', 'hp', 'def', 'hit', 'dodge', 'spd'].includes(t)) {
+          if (aff.fixed) own[t] = (own[t] || 0) + v;
+          else pct[t] = (pct[t] || 0) + v / 100;
+        }
+        else if (t === 'pen') own[t] = (own[t] || 0) + v;
+        else if (['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr'].includes(t)) own[t] = (own[t] || 0) + v;
+        else own[t] = (own[t] || 0) + v;
+      };
+      for (const aff of affixes) applyAffix(aff);
       // 魂铸词缀（独立于 affixes：不会被重铸/剥离/神圣石影响，永久保留；type 走词缀坐标系 critRate→crit）
+      /* 魂铸词缀（2026-09-15 与统一规则对齐）：魂铸是「传承」的顶级工艺，量纲本就是百分比点数，
+       * 所以攻/血/防/命中/闪避/速度一律进 pct（乘全属性，强度 ≈ 一条 T1 词缀）；
+       * 旧写法把命中/闪避/速度当固定点数结算，与同档的攻血防不一致（同源不同命）。 */
       if (eq.soulAffix) {
         const aff = eq.soulAffix;
-        if (['atk', 'hp', 'def'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
-        else if (['crit', 'critDamage', 'lifesteal'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
-        else if (['hit', 'dodge', 'spd'].includes(aff.type)) own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
+        if (['atk', 'hp', 'def', 'hit', 'dodge', 'spd'].includes(aff.type)) pct[aff.type] += (aff.value || 0) / 100;
         else own[aff.type] = (own[aff.type] || 0) + (aff.value || 0);
       }
       for (const [type, value] of Object.entries(own)) flat[type] = (flat[type] || 0) + value;
@@ -378,11 +411,14 @@
   }
 
   /* ---------- 展示文案 ---------- */
-  // 词缀展示统一入口：命中/闪避/速度为固定值词缀，不显示 %；攻击/生命/防御词缀按成长相关百分比显示，其余机制/资源词缀按配置显示。
-  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd', 'pen']);
+  // 词缀展示统一入口（2026-09-15 词缀统一规则）：% 与否由词缀自身的 fixed 标记决定
+  // （T1 百分比 / T2~T5 固定值），不再按属性类型硬编码 —— 生成端怎么定，展示端就怎么显。
   const PERCENT_AFFIX_TYPES = new Set(['atk', 'hp', 'def', 'crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'dropQty', 'dropRare', 'matDrop']);
+  function isPercentAffix(a) {
+    return !!a && !a.fixed && PERCENT_AFFIX_TYPES.has(a.type);
+  }
   function formatAffix(a) {
-    return `${a.label} +${a.value}${FIXED_AFFIX_TYPES.has(a.type) ? '' : PERCENT_AFFIX_TYPES.has(a.type) ? '%' : ''}`;
+    return `${a.label} +${a.value}${isPercentAffix(a) ? '%' : ''}`;
   }
 
   /* ---------- roll 区间（2026-08-30 用户拍板，参考流放之路的装备显示） ----------
@@ -403,7 +439,7 @@
   function formatAffixHtml(a, cls) {
     const label = String((a && a.label) || '?');
     const val = (a && a.value) || 0;
-    const pct = a && FIXED_AFFIX_TYPES.has(a.type) ? '' : PERCENT_AFFIX_TYPES.has(a.type) ? '%' : '';
+    const pct = isPercentAffix(a) ? '%' : '';
     const range = affixRange(a);
     // 区间不带 %（POE 风格）：值已经标了 +8%，区间写 (6~8) 更清爽
     const rangeHtml = range ? ` <span class="tip-range">(${range.min}~${range.max})</span>` : '';
@@ -446,7 +482,7 @@
     pickRarity, generateEquipment, rollAffixTier, rollAffixCount, ilvlOf, syncRarity, scoreOf, getInventory, addToInventory, removeFromInventory, replaceInventory,
     // 生成链的内部纯函数：导出只为让 supabase/gen_equip_gen.js 能 toString() 出源码
     // 生成服务端副本（构建期抽取，不手抄 —— 手抄必漂移）
-    affixTiersFor, rollBaseHit, levelOfAreaTier, rarityIdFromCount,
+    affixTiersFor, rollBaseHit, levelOfAreaTier, rarityIdFromCount, affixFixedOf, isPercentAffix,
     equipItem, unequip, getEquipBonuses, describeItem, formatAffix, formatAffixHtml, affixRange, rarityOf, baseOf
   };
 })();

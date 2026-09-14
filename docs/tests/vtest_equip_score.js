@@ -53,15 +53,18 @@ await C(`(async()=>{
 })()`);
 await S(250);
 
-/* ---------- 1. 评分分层：金 > 蓝 > 白，T1 > T5 ---------- */
-const avg = (rarity) => C(`(function(){
-  const R=Config.equipment.rarities.find(r=>r.id==='${rarity}');let s=0;
-  for(let i=0;i<300;i++){const eq=Equipment.generateEquipment(R,4,3);eq.slot='武器';s+=Equipment.scoreOf(eq);}
+/* ---------- 1. 评分分层：装备等级越高（词缀越多）评分越高；T1 > T5 ----------
+ * ⚠️ 2026-09-11 起词缀条数【只由装备等级决定】，颜色是条数的结果（1 白 / 2 蓝 / 3+ 金）。
+ * 旧断言按「稀有度」造装备且没传 ilvl → 三种颜色实际都只出 1~2 条词缀，分数自然一样（31/31/33），
+ * 于是这条守值一直红着 —— 它是断言过时，不是评分坏了。改成按 ilvl 造（这条才是真实掉落逻辑）。 */
+const avgAtIlvl = (ilvl) => C(`(function(){
+  const R=Config.equipment.rarities[2];let s=0;
+  for(let i=0;i<300;i++){const eq=Equipment.generateEquipment(R,4,3,${ilvl});eq.slot='武器';s+=Equipment.scoreOf(eq);}
   return Math.round(s/300);
 })()`);
-const sw = avg('white'), sb = avg('blue'), sg = avg('gold');
-console.log(`  平均评分（图4/T3底材/武器）：白 ${sw} < 蓝 ${sb} < 金 ${sg}`);
-A(sw < sb && sb < sg, '评分能区分稀有度（金 > 蓝 > 白）');
+const sw = avgAtIlvl(10), sb = avgAtIlvl(25), sg = avgAtIlvl(60);
+console.log(`  平均评分（图4/武器，按装备等级）：ilvl10 ${sw} < ilvl25 ${sb} < ilvl60 ${sg}`);
+A(sw < sb && sb < sg, '评分随装备等级/词缀条数递增（1~2 条 < 2~3 条 < 4~5 条）');
 
 const t1Score = C(`(function(){
   const eq=Equipment.generateEquipment(Config.equipment.rarities[0],4,3);

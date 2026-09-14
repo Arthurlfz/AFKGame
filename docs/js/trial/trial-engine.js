@@ -59,6 +59,11 @@
     const base = c.baseStats || { hp: 4400, atk: 720, def: 320 };
     const g = (route && route.guardian) || {};
     const hp = Math.round(base.hp * scale * diff);
+    // 机制属性（2026-09-15 命中/闪避升格）：随怪等级涨（trial-config.mech）
+    const MC = c.mech || {};
+    const hit = Math.round((Number(MC.hitPerLv) || 3.5) * level);
+    const dodge = Math.round((Number(MC.dodgeAtRef) || 200)
+      * Math.pow(level / (Number(MC.refLevel) || 60), Number(MC.dodgeExp) || 1.35));
     return {
       id: `trial-${(route && route.id) || 'x'}-${floor}`,
       name: g.name || '试炼之影',
@@ -68,7 +73,7 @@
       hp, maxHp: hp,
       atk: Math.round(base.atk * scale * diff),
       def: Math.round(base.def * scale * diff),
-      hit: Number(c.guardianHit) || 90, // 守关者命中（默认野怪 90 会被高闪避玩家砍半）
+      hit, dodge,
       growth: 0,
       _trialFloor: floor
     };

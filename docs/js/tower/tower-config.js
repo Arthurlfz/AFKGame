@@ -110,7 +110,10 @@
        *   它 4 刀就能打死一只普通 Lv60 宠）。代价见校准记录：裸装玩家第 1 层就过不去，
        *   中档 10 层、涅槃5 21 层 → 15/20/25/30 档位变成少数人的东西（用户知情并选择）。 */
       difficultyStart: 0.5,
-      difficultyPerFloor: 0.124,
+      /* 2026-09-15 第五轮（命中/闪避升格 + 词缀统一规则后重校，sim_tower_balance.js 实测）：
+       *   新装备 T1% 乘全属性 → 毕业战力上抬，旧 per=0.124 被推到 中档 16 / 涅槃5 27 层；
+       *   per 0.124 → **0.21** 后梯子与旧锚点对齐：低档 0 / 中档 11 / 涅1 15 / 涅3 20 / 涅5 21（通关率 0%，30 层仍是长线）。 */
+      difficultyPerFloor: 0.21,
       eliteEvery: 5,
       eliteMult: 1.05
     },
@@ -119,9 +122,15 @@
      *    「单只更软」来维持总伤害不变，见校准记录）。 */
     baseStats: { hp: 48960, atk: 6210, def: 3060 },
 
-    /* 守卫命中：高于野怪默认 90 —— 满配玩家闪避 ~50+，90 会被砍半，
-     * 塔的守卫要能打到人（战斗才有压力）。 */
-    guardianHit: 160,
+    /* 塔怪机制属性（2026-09-15 命中/闪避升格）：塔怪也有命中/闪避，跟怪等级（Lv60→120）一起涨。
+     *   命中 = hitPerLv × 怪等级 ×（守卫 ? guardianHitMult : 1）
+     *   闪避 = (守卫 ? dodgeGuardian : dodgeMob) × (怪等级 / refLevel)^dodgeExp
+     * （旧 guardianHit:160 写死值退役：它不随层数涨，正是「命中/闪避没有成长对手」结构问题的怪侧根源。
+     *   改动塔曲线/机制参数任意一项都必须重跑 docs/tests/sim_tower_balance.js。） */
+    mech: {
+      hitPerLv: 8, guardianHitMult: 1.35,
+      dodgeMob: 125, dodgeGuardian: 200, refLevel: 60, dodgeExp: 1.6
+    },
     /* 楼层之间的停顿（毫秒）：给日志/血条一点喘息 */
     floorDelayMs: 700,
 

@@ -423,7 +423,7 @@
         '</div>' +
       '</div>' +
       '<div class="dev-row">' +
-        '<div class="dev-row-head"><span class="dev-label">加成长（可负，封顶 ' + (Config.nirvana.maxGrowth || 100) + '）</span></div>' +
+        '<div class="dev-row-head"><span class="dev-label">加成长（可负，无上限）</span></div>' +
         '<div class="dev-inline">' +
           '<input class="dev-input" id="res-pet-gr" type="number" step="0.1" value="5" style="width:90px">' +
           '<button class="btn-mini primary" id="res-pet-gr-go">加</button>' +
@@ -561,9 +561,9 @@
     const grGo = $('res-pet-gr-go');
     if (grGo) grGo.onclick = async () => {
       const p = needPet(); if (!p) return;
-      const max = Config.nirvana.maxGrowth || 100;
+      // 2026-09-15：成长无上限（阻尼制）→ 开发面板不再钳 100
       const d = parseFloat($('res-pet-gr') && $('res-pet-gr').value) || 0;
-      p.growth = Math.max(0, Math.min(max, (p.growth || 0) + d));
+      p.growth = Math.max(0, (p.growth || 0) + d);
       if (window.Pet && window.Pet.getStats) p.curHp = window.Pet.getStats(p).hp;
       await savePet(p);
       if (UI.renderAll) UI.renderAll();

@@ -184,13 +184,24 @@
       if (cdEl.textContent !== txt) flashStat('pet-critdmg');
       cdEl.textContent = txt;
     }
-    // 命中/闪避为固定数值（非百分比），直接显示数值；吸血为百分比
+    // 命中/闪避：显示数值；悬停给出「对同级怪的实际命中率」（2026-09-15 命中/闪避升格配套，
+    // 治"这两个数字看不出好坏"——公式 hit/(hit+dodge)，效果取决于对手，所以必须给换算）
+    const mechTip = (key, selfIsAtk) => {
+      const EM = (Config.battle && Config.battle.enemyMech) || {};
+      const lv = Number(pet.level) || 1;
+      const mk = t => Math.round((((EM.dodgeAtRef || {})[t]) || 125) * Math.pow(lv / (EM.refLevel || 60), EM.dodgeExp || 1.6));
+      const eh = Math.round((EM.hitPerLv || 8) * lv);
+      const rate = (a, d) => a + d > 0 ? Math.round(Math.max(5, Math.min(95, a / (a + d) * 100))) : 5;
+      if (key === 'hit') return `命中 ${Math.round(s.hit)}：对同级普通怪 ≈${rate(s.hit, mk('normal'))}%，变异怪更低；命中不够，刀会被躲掉`;
+      return `闪避 ${Math.round(s.dodge)}：同级普通怪打你 ≈${rate(eh, s.dodge)}%（越深图的怪命中越高）`;
+    };
     ['hit', 'dodge'].forEach(key => {
       const el = $('pet-' + key);
       if (!el) return;
       const txt = String(Math.round(s[key]));
       if (el.textContent !== txt) flashStat('pet-' + key);
       el.textContent = txt;
+      if (typeof el.setAttribute === 'function') el.title = mechTip(key);
     });
     const lsEl = $('pet-ls');
     if (lsEl) {

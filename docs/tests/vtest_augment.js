@@ -18,9 +18,8 @@ const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
 // 2026-09-04 吸血移入前缀池（equipment.js AFFIX_POOL 同口径），新增三类纯数值词缀归后缀
 const PREFIX_TYPES=['atk','hp','def','lifesteal'], SUFFIX_TYPES=['spd','crit','critDamage','pen','dmgBonus','dr'];
-// 从 VM 上下文取一次 T 阶数值区间表，供 Node 侧做区间断言（Node 侧无 Config）
-const TIERS=JSON.parse(C('JSON.stringify(Config.equipment.affixTiers)'));
-const tierRange=t=>TIERS.find(x=>x.tier===t);
+// 区间断言走「按属性分派」的真实表（2026-09-15 起每个属性有自己的 T 阶表，不再共用 affixTiers）
+const tierRange=(t,type)=>JSON.parse(C(`JSON.stringify(Equipment.affixRange({type:${JSON.stringify(type||'atk')},tier:${t}}))`));
 const countP=C=>C('eq.affixes.prefix.length'), countS=C=>C('eq.affixes.suffix.length'), countAll=C=>(C('eq.affixes.prefix.length')+C('eq.affixes.suffix.length'));
 (async()=>{
 await S(300);await C('Game.onLogin("aug@test.com","123456")');await S(300);
@@ -60,8 +59,9 @@ for(let i=0;i<5;i++){
   A(!usedTypes.has(n.type),`第 ${i+1} 次新增词缀类型不重复（${n.type}）`);
   usedTypes.add(n.type);
   A(n.tier>=1&&n.tier<=5,`第 ${i+1} 次 T 阶合法（T${n.tier}）`);
-  const T=tierRange(n.tier);
-  A(n.value>=T.min&&n.value<=T.max,`第 ${i+1} 次数值落在该 T 阶区间`);
+  // 区间断言在 VM 内做（每个属性有自己的 T 阶表，走 Equipment.affixRange 单一口径）
+  A(C(`(function(){const T=Equipment.affixRange({type:${JSON.stringify(n.type)},tier:${n.tier}});return !!T && ${n.value}>=T.min && ${n.value}<=T.max})()`),
+    `第 ${i+1} 次数值落在 ${n.type} T${n.tier} 的区间`);
   total=np+ns;
 }
 C('Math.random=globalThis.__rand');

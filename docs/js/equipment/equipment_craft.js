@@ -34,20 +34,12 @@
     return () => { eq.lockPrefix = p; eq.lockSuffix = s; };
   }
 
-  // 词缀数值表分派（2026-09-04 独立定标）：与 equipment.js 的 affixTiersFor 同一套映射，杜绝两套口径
-  const AFFIX_TIER_TABLES = {
-    spd: () => Config.equipment.speedAffixTiers,
-    lifesteal: () => Config.equipment.lifestealAffixTiers,
-    crit: () => Config.equipment.critAffixTiers,
-    critDamage: () => Config.equipment.critDamageAffixTiers,
-    pen: () => Config.equipment.penAffixTiers,
-    dmgBonus: () => Config.equipment.dmgBonusAffixTiers,
-    dr: () => Config.equipment.drAffixTiers
-  };
+  /* 词缀数值表分派：直接复用 equipment.js 的 affixTiersFor（2026-09-15 修）。
+   * 旧写法在打造页抄了一份映射表 —— 2026-09-15 新增 atk/hp/def/hit/dodge 独立表后这份副本没跟上，
+   * 于是「打造」与「掉落」用着不同的数值表（第二份事实源 = 本项目头号病因）。 */
   const tierOf = (t, type) => {
-    const get = type && AFFIX_TIER_TABLES[type];
-    const tiers = (get ? get() : null) || Config.equipment.affixTiers;
-    return tiers.find(x => x.tier === t);
+    const tiers = (window.Equipment && window.Equipment.affixTiersFor(type)) || Config.equipment.affixTiers;
+    return (tiers || []).find(x => x.tier === t);
   };
   // 词缀 T 阶的颜色（T1 最好 → 暗金，T5 最差 → 灰；低饱和金属系）
   const TIER_COLORS = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f', 4: '#7f9fc4', 5: '#6c7684' };
@@ -161,7 +153,7 @@
           used.add(aff.type);
           const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq));
           const T = tierOf(tier, aff.type);
-          chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) });
+          chosen.push({ type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max), fixed: window.Equipment.affixFixedOf(aff.type, tier) });
         }
         return chosen;
       };
@@ -174,7 +166,7 @@
           const aff = pick(pool);
           const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq));
           const T = tierOf(tier, aff.type);
-          const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
+          const one = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max), fixed: window.Equipment.affixFixedOf(aff.type, tier) };
           if (bucket === 'prefix') prefix = [one]; else suffix = [one];
         }
       }
@@ -205,11 +197,11 @@
   }
 
   // 词缀展示：如「攻击 +12%（T4）」，带 T 阶颜色
-  // 命中/闪避/速度/穿透为固定值词缀（fixed），不显示 %，其余（atk/hp/def/crit/critDamage/lifesteal/dmgBonus/dr/dropQty/dropRare/matDrop）为百分比
-  const FIXED_AFFIX_TYPES = new Set(['hit', 'dodge', 'spd', 'pen']);
+  // 2026-09-15 词缀统一规则：% 与否由词缀自身的 fixed 标记决定（T1=%、T2~T5 固定值），
+  // 走 Equipment.isPercentAffix 单一判定，不再按属性类型硬编码。
   function affixText(aff) {
     const color = TIER_COLORS[aff.tier] || '#9a9a9a';
-    const suffix = FIXED_AFFIX_TYPES.has(aff.type) ? '' : '%';
+    const suffix = window.Equipment.isPercentAffix(aff) ? '%' : '';
     return `<span style="color:${color}">${aff.label} +${aff.value}${suffix}（T${aff.tier}）</span>`;
   }
 
@@ -274,7 +266,7 @@
       const aff = pick(pool);
       const tier = window.Equipment.rollAffixTier(window.Equipment.ilvlOf(eq)); // T 阶只由装备等级解锁（2026-09-11）
       const T = tierOf(tier, aff.type);
-      const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max) };
+      const added = { type: aff.type, label: aff.label, tier, value: randInt(T.min, T.max), fixed: window.Equipment.affixFixedOf(aff.type, tier) };
       eq.affixes[target] = [...eq.affixes[target], added];
       syncRarity(eq); // 词缀+1 → 颜色按条数同步（如白→蓝→金）
       return {

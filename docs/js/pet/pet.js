@@ -215,6 +215,15 @@
     const st = (Config.pet.starters || []).find(s => s.name === lineId);
     return (st && st.statCoeff) || Config.pet.statCoeff || { hp: 5, atk: 2, def: 1 };
   }
+  /* 命中/闪避的「品种倍率」（2026-09-15）：乘在 Config.pet.mechCoeff 的全局系数上，
+   * 让「极速闪避的兔子」与「重甲的瘟熊」在后期真的走出两条曲线（否则 8 宠完全同曲线，定位差异被抹平）。
+   * 神级宠 statNameOf 已把名字映射回根源基宠 → 直接继承本线倍率，不额外 ×1.5。 */
+  function getMechCoeff(pet) {
+    const lineId = statNameOf(pet);
+    const st = (Config.pet.starters || []).find(s => s.name === lineId);
+    const m = (st && st.mech) || null;
+    return { hit: (m && m.hit) || 1, dodge: (m && m.dodge) || 1 };
+  }
   function baseStats(pet) {
     const g = pet.growth, lv = pet.level, C = getStatCoeff(pet);
     return {
@@ -331,7 +340,7 @@
     }
   }
   // statParts：把裸属性拆成「底座 core（基础值+等级系数）」+「成长增量 growth」两段，
-  // pct（装备/特质百分比）只作用于 core，成长增量不放大（2026-09-01 拍板口径）
+  // 2026-09-15 改判：pct（T1 百分比词缀）作用于【total = 底座+成长增量】（见 getStats；配套涅槃分段阻尼）
   function statParts(pet) {
     const g = pet.growth, lv = pet.level, C = getStatCoeff(pet);
     const coreHp = pet.baseHp + Math.round(lv * C.hp);
@@ -367,17 +376,23 @@
       blHit = (bl.params.hit || 0) * 100;
       blDodge = (bl.params.dodge || 0) * 100;
     }
-    // 装备/特质 % 只作用于"底座"（基础值 + 等级系数），成长增量不放大（2026-09-01 口径）
+    // 装备/特质 % 乘【全部属性】（底座+成长增量；2026-09-15 改判旧口径，配套涅槃分段阻尼，见宪法 H-11）
     const sp = statParts(pet);
+    // 机制属性成长（2026-09-15 命中/闪避升格）：与攻/防同构，跟等级与成长值走（config.pet.mechCoeff）
+    const MC = Config.pet.mechCoeff || { hitLv: 1, hitGrowth: 0.05, dodgeLv: 0.35, dodgeGrowth: 0.02 };
+    const MM = getMechCoeff(pet);   // 品种倍率（兔子闪避涨得快、瘟熊几乎不涨）
+    const lvN = Number(pet.level) || 1, gN = Number(pet.growth) || 0;
+    const hitCore = baseHit + Math.round(lvN * MC.hitLv * MM.hit) + Math.round(lvN * gN * MC.hitGrowth * MM.hit);
+    const dodgeCore = baseDodge + Math.round(lvN * MC.dodgeLv * MM.dodge) + Math.round(lvN * gN * MC.dodgeGrowth * MM.dodge);
     return {
-      atk: Math.round(sp.core.atk * (1 + (pct.atk || 0)) + sp.growth.atk + (flat.atk || 0)),
-      hp: Math.round(sp.core.hp * (1 + (pct.hp || 0)) + sp.growth.hp + (flat.hp || 0)),
-      def: Math.round(sp.core.def * (1 + (pct.def || 0)) + sp.growth.def + (flat.def || 0)),
-      spd: base.spd + (flat.spd || 0),
+      atk: Math.round(sp.total.atk * (1 + (pct.atk || 0)) + (flat.atk || 0)),
+      hp: Math.round(sp.total.hp * (1 + (pct.hp || 0)) + (flat.hp || 0)),
+      def: Math.round(sp.total.def * (1 + (pct.def || 0)) + (flat.def || 0)),
+      spd: Math.round((base.spd + (flat.spd || 0)) * (1 + (pct.spd || 0))),
       critRate: baseCrit + (flat.crit || 0) / 100 + blCrit,
       critDamage: baseCritDmg + (flat.critDamage || 0) / 100,
-      hit: baseHit + (flat.hit || 0) + blHit,
-      dodge: baseDodge + (flat.dodge || 0) + blDodge,
+      hit: Math.round(hitCore * (1 + (pct.hit || 0))) + (flat.hit || 0) + blHit,
+      dodge: Math.round(dodgeCore * (1 + (pct.dodge || 0))) + (flat.dodge || 0) + blDodge,
       lifesteal: baseLs + (flat.lifesteal || 0) / 100,
       // 三个新词缀字段（穿透固定值 / 伤害加成% / 受伤减免%）：battle.calcDamage 结算用
       pen: (flat.pen || 0),

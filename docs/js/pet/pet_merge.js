@@ -77,22 +77,29 @@
   }
 
   /* ---------- 涅槃成长计算（纯函数，nirvana 与 UI 预览共用） ---------- */
-  // calcNirvanaGrowth(main, sub) → { growth, subRatioPenalty, capApplied }
+  // calcNirvanaGrowth(main, sub) → { growth, subRatioPenalty, capApplied, damped }
   // bonusMult：凝魂晶石加成倍率（1 = 不投入）；预览与实际走同一函数，不会算歪
   function calcNirvanaGrowth(main, sub, bonusMult) {
     const M = NV();
     const minLv = M.minLevel || 60;
     /* 2026-09-06（手册 2.7）：吸收 50%【不衰减】——
      * 删掉旧的「副宠成长下限打折」与「60 成长分水岭减半」两重衰减，
-     * 节奏改由涅磐兽消耗（5 只）控制。只保留副宠等级加成（练得高当肥料更值钱，不属于衰减）。 */
+     * 节奏改由涅磐兽消耗（5 只）控制。只保留副宠等级加成（练得高当肥料更值钱，不属于衰减）。
+     * 2026-09-15 新增【分段阻尼】（宪法 H-11 ③④，与「装备 T1% 乘全属性」绑定落地）：
+     *   主宠当前成长越高，本次【新吸收量】越打折（config.nirvana.damping，多段叠乘）。
+     *   ⭐ 成长仍无上限（旧 maxGrowth=100 硬停一并退役）；阻尼阈值键控在【主宠当前成长】
+     *   （宠物状态）上——本项目有 P2P 交易，按账号键控会被买宠绕过。 */
     const lvBonus = 1 + Math.max(0, (sub.level || 0) - minLv) * (M.levelBonus || 0); // 等级加成倍数
-    // 成长软上限：主宠成长已达 maxGrowth 则不再涨（仅重置等级）
-    const maxGrowth = M.maxGrowth || 100;
     let absorb = (sub.growth || 0) * (M.absorbRatio || 0.5) * lvBonus * (bonusMult || 1);
-    if ((main.growth || 0) >= maxGrowth) absorb = 0;
-    const growth = Math.round(((main.growth || 0) + absorb) * 10) / 10;
-    // 字段保留（UI/旧调用在读），恒为 false：不再有衰减
-    return { growth, absorb: Math.round(absorb * 10) / 10, subRatioPenalty: false, capApplied: false };
+    const mainGrowth = main.growth || 0;
+    let damped = false;
+    for (const d of (M.damping || [])) {
+      if (mainGrowth > (Number(d.at) || 0)) { absorb *= Number(d.mult) || 1; damped = true; }
+    }
+    absorb = Math.round(absorb * 10) / 10;
+    const growth = Math.round((mainGrowth + absorb) * 10) / 10;
+    // subRatioPenalty / capApplied 字段保留（UI/旧调用在读）：capApplied 现在表达"触发了阻尼"
+    return { growth, absorb, subRatioPenalty: false, capApplied: damped, damped };
   }
 
   /* ---------- 合成成长计算（纯函数，synthesize 与 UI 预览共用） ----------

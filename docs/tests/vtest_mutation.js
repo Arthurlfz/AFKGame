@@ -119,14 +119,22 @@ r=await C('Merge.nirvana('+C('globalThis.__cf')+','+C('globalThis.__csub')+')');
 // 旧规则：60 分水岭吸收减半（70）；新规则不衰减 → 吸收 = 40×0.5 = 20 → 80
 A(r&&r.ok===true&&r.newGrowth===80,'涅槃 60 分水岭不再减半（无衰减）：60 + 40×0.5 = 80');
 
-/* ============ 8. 涅槃：成长软上限 100 → 不再涨，仅重置等级 ============ */
+/* ============ 8. 涅槃：成长无上限 + 分段阻尼（2026-09-15 拍板，旧"软上限 100"退役） ============ */
 await mkPet('血狐','🦊',100,'xf');
 await mkPet('骨狼','🐺',8,'xsub');
 await C('(function(){const q=Pet.getPets().find(p=>p.id===globalThis.__xf);q.isGodPet=true;Pet.addPet(q)})()');
 r=await C('Merge.nirvana('+C('globalThis.__xf')+','+C('globalThis.__xsub')+')');
 const xmain=C('Pet.getPets().find(p=>p.id==='+C('globalThis.__xf')+')');
-A(r&&r.ok===true&&xmain.growth===100,'涅槃达软上限 100：成长不再涨');
-A(xmain.level===1,'软上限涅槃仍重置等级为 1');
+A(r&&r.ok===true&&xmain.growth>100,`涅槃：成长无上限（100 → ${xmain.growth}，旧的 100 硬停已退役）`);
+A(xmain.level===1,'涅槃仍重置等级为 1');
+// 分段阻尼：主宠成长越高，本次新吸收越打折（键控在宠物成长上，不键控在账号上）
+{
+  const raw = C('(function(){return Merge.calcNirvanaGrowth({growth:20,level:60},{growth:100,level:60})})()');
+  const hi = C('(function(){return Merge.calcNirvanaGrowth({growth:250,level:60},{growth:100,level:60})})()');
+  const mult = C('(function(){const d=Config.nirvana.damping||[];let m=1;for(const x of d) if(250>Number(x.at||0)) m*=Number(x.mult||1);return m})()');
+  A(raw.damped===false && Math.abs(raw.absorb-50)<0.2, `低成长不衰减：吸收 ${raw.absorb}（副宠 100 × 50%）`);
+  A(hi.damped===true && Math.abs(hi.absorb-50*mult)<0.5, `高成长分段阻尼：吸收 ${hi.absorb}（无阻尼 50 × ${mult.toFixed(3)}）`);
+}
 
 /* ============ 9. 普通宠（非神级宠）涅槃被拒（2026-09-06 手册 2.7） ============ */
 await mkPet('毒沼蛙','🐸',10,'mf2');

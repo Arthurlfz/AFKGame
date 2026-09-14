@@ -24,14 +24,14 @@ window.Config = {
      */
     starters: [
       // ⚠️ 不配 emoji icon（2026-09-10 移除占位头像）：头像/立绘一律由 PetSprites 按名字解析真实素材
-      { name: '腐噜兽', growth: 5, baseHp: 110, baseAtk: 22, baseDef: 11, statCoeff: { hp: 4.9, atk: 2.38, def: 1.02 } }, // 均衡（spd 80）
-      { name: '血狐',   growth: 5, baseHp: 85,  baseAtk: 30, baseDef: 8,  statCoeff: { hp: 3.22, atk: 2.22, def: 0.92 } }, // 暴击爆发（最脆，spd 96）
-      { name: '瘟熊',   growth: 5, baseHp: 160, baseAtk: 18, baseDef: 18, statCoeff: { hp: 5.7, atk: 2.42, def: 1.12 } }, // 坦克（最慢最肉，spd 70）
-      { name: '疫毛兽', growth: 5, baseHp: 95,  baseAtk: 26, baseDef: 9,  statCoeff: { hp: 4, atk: 2.28, def: 0.96 } },   // 敏捷输出（spd 92）
-      { name: '骨狼',   growth: 5, baseHp: 105, baseAtk: 25, baseDef: 10, statCoeff: { hp: 4.3, atk: 2.24, def: 0.99 } }, // 攻击均衡（spd 88）
-      { name: '毒沼蛙', growth: 5, baseHp: 130, baseAtk: 20, baseDef: 14, statCoeff: { hp: 5.2, atk: 2.36, def: 1.08 } }, // 耐久坦克（spd 75）
-      { name: '尸犬',   growth: 5, baseHp: 120, baseAtk: 21, baseDef: 13, statCoeff: { hp: 4.6, atk: 2.25, def: 1.05 } }, // 均衡偏坦（spd 84）
-      { name: '幽影兔', growth: 5, baseHp: 70,  baseAtk: 24, baseDef: 7,  statCoeff: { hp: 3.35, atk: 2.34, def: 0.90 } }  // 极速闪避（最快，spd 100）
+      { name: '腐噜兽', growth: 5, baseHp: 110, baseAtk: 22, baseDef: 11, statCoeff: { hp: 4.9, atk: 2.38, def: 1.02 }, mech: { hit: 1.0, dodge: 1.0 } },   // 均衡（spd 80）
+      { name: '血狐',   growth: 5, baseHp: 85,  baseAtk: 30, baseDef: 8,  statCoeff: { hp: 3.22, atk: 2.22, def: 0.92 }, mech: { hit: 1.1, dodge: 0.9 } },  // 暴击爆发（最脆，spd 96）
+      { name: '瘟熊',   growth: 5, baseHp: 160, baseAtk: 18, baseDef: 18, statCoeff: { hp: 5.7, atk: 2.42, def: 1.12 }, mech: { hit: 1.1, dodge: 0.6 } },   // 坦克（最慢最肉，spd 70）：重甲不靠躲
+      { name: '疫毛兽', growth: 5, baseHp: 95,  baseAtk: 26, baseDef: 9,  statCoeff: { hp: 4, atk: 2.28, def: 0.96 }, mech: { hit: 1.0, dodge: 1.2 } },     // 敏捷输出（spd 92）
+      { name: '骨狼',   growth: 5, baseHp: 105, baseAtk: 25, baseDef: 10, statCoeff: { hp: 4.3, atk: 2.24, def: 0.99 }, mech: { hit: 1.05, dodge: 1.0 } },  // 攻击均衡（spd 88）
+      { name: '毒沼蛙', growth: 5, baseHp: 130, baseAtk: 20, baseDef: 14, statCoeff: { hp: 5.2, atk: 2.36, def: 1.08 }, mech: { hit: 1.0, dodge: 1.15 } },  // 耐久坦克（spd 75）
+      { name: '尸犬',   growth: 5, baseHp: 120, baseAtk: 21, baseDef: 13, statCoeff: { hp: 4.6, atk: 2.25, def: 1.05 }, mech: { hit: 1.0, dodge: 1.0 } },   // 均衡偏坦（spd 84）
+      { name: '幽影兔', growth: 5, baseHp: 70,  baseAtk: 24, baseDef: 7,  statCoeff: { hp: 3.35, atk: 2.34, def: 0.90 }, mech: { hit: 0.9, dodge: 1.45 } }  // 极速闪避（最快，spd 100）
     ],
     // 旧莱姆只作为历史存档/孵化兼容基准，不再作为新玩家默认初始宠物
     legacyBase: { name: '莱姆', growth: 5, hp: 100, atk: 20, def: 10, spd: 40 },
@@ -40,6 +40,16 @@ window.Config = {
     // 系数集中在此；以后新宠物只需写 3 个基础值（baseHp/baseAtk/baseDef）
     // 注意：速度不走此公式 —— 速度 = 宠物基础速度（speeds 表）+ 装备加成，成长值/等级不参与
     statCoeff: { hp: 5, atk: 2, def: 1 },
+    /* 机制属性成长系数（2026-09-15 命中/闪避升格：与攻/防同构，跟等级与成长值走）：
+     *   命中 = (定位档 hit + 等级×hitLv×品种倍率 + 等级×成长×hitGrowth×品种倍率) × (1 + 装备命中%) + 装备固定命中
+     *   闪避同理。定标铁律：成长增量在成长 100 时 ≈ 底座的 2~4 倍（防淹没、保词缀有效）。
+     * ⭐ 品种倍率写在各 starter 的 mech:{hit,dodge}（乘在下面全局系数上），不写 = 1.0。
+     *   —— 与 statCoeff 一样是「定位差异化」的落点：兔子闪避涨得快、瘟熊几乎不涨（重甲不靠躲）。
+     *   ⚠️ 幅度刻意收窄（0.6~1.45）：v2.1 曾把机制属性拉开过大，破坏了「8 宠净推进拉平」，
+     *      改这些值后必须重跑一次净推进（野图场数）校准确认没有谁独大。
+     *   神级宠继承本线倍率、不额外 ×1.5（命中/闪避是比例属性，再乘会失控）。
+     * 怪物侧对应表见 battle.enemyMech（两端同源：battle.js / battle-sim.mjs）。 */
+    mechCoeff: { hitLv: 1.0, hitGrowth: 0.05, dodgeLv: 0.35, dodgeGrowth: 0.02 },
     // 单宠刷怪定位：强项越突出，其他输出乘区越收敛；定位与暴击参数在宠物页公开展示。
     petProfiles: {
       // v2.2：机制属性回到「原始定位档」—— v2.1 动过这些值（如兔子闪避 20、熊暴击 12）会破坏
@@ -444,6 +454,16 @@ window.Config = {
     enemies: [],
     // 暴击率 / 暴击伤害倍率
     critRate: 0.1, critMultiplier: 1.5,
+    /* 怪物机制属性（2026-09-15 命中/闪避升格配套）：怪也有命中/闪避，跟怪等级走。
+     *   怪命中 = hitPerLv × 怪等级
+     *   怪闪避 = dodgeAtRef[type] × (怪等级 / refLevel)^dodgeExp
+     * 闪避曲线用指数（dodgeExp>1）：前期贴地（新手命中率 ≥90%）、后期抬头（深图命中不够=打不过）。
+     * 两端同源：battle.js applyEnemyDefaults 与 battle-sim.mjs 敌人构造处逐行一致；
+     * 塔用 tower-config 自己的 mech 段（同公式、独立定标）。 */
+    enemyMech: {
+      hitPerLv: 8, refLevel: 60, dodgeExp: 1.6,
+      dodgeAtRef: { normal: 125, evolved: 225, mutant: 325 }
+    },
     // 血量低于最大值的这个比例时自动停止挂机（0.3 = 30%）
     stopHpRatio: 0.3,
     // 场与场之间的间隔（毫秒）
@@ -954,28 +974,56 @@ window.Config = {
   /* ================= 装备 ================= */
   equipment: {
     // 每个部位的 1 档基底固定值；生成时再乘 baseTierMultipliers（图 1~6）与 materialTierMultipliers（底材 T1~T5）。
+    // ⚠️ 2026-09-15 拍板：护符基底不再出吸血（吸血变纯词缀去摇，护符白送吸血占整套 63% 的怪相根除）。
     baseValues: {
       武器: { atk: 30 }, 戒指: { atk: 15, crit: 2 }, 项链: { atk: 15, critDamage: 8 },
       头盔: { def: 15 }, 护甲: { hp: 80, def: 8 }, 盾牌: { def: 15, dodge: 5 },
       靴子: { spd: 8 }, 腰带: { hp: 60, spd: 5 }, 斗篷: { dodge: 10, hp: 50 },
-      饰品: { atk: 12, hit: 5 }, 护符: { lifesteal: 4 }, 徽章: { crit: 3, critDamage: 10 }
+      饰品: { atk: 12, hit: 5 }, 护符: { hp: 60, crit: 2 }, 徽章: { crit: 3, critDamage: 10 }
     },
     // 每图档位基底倍数：10 张图平滑递增（步进 0.25，图10=3.25）
     // 2026-09-06 地图精简 17→10：原 11-17 档（3.5~5.0）随图删除
     baseTierMultipliers: [1, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25],
     materialTierMultipliers: { 1: 1.5, 2: 1.3, 3: 1, 4: 0.8, 5: 0.6 },
-    speedAffixTiers: [
-      { tier: 1, min: 12, max: 16 }, { tier: 2, min: 9, max: 11 }, { tier: 3, min: 6, max: 8 },
+    /* ---------- 词缀统一规则（2026-09-15 用户拍板：全属性适用）----------
+     * ⭐ T1 = 百分比词缀；T2~T5 = 固定值词缀。玩家侧唯一读法：「带 % 的就是顶级词缀」。
+     * 攻/血/防/命中/闪避/速度 的 T1 百分比乘【全部属性】（底座+成长增量，2026-09-01 旧口径改判，
+     *   配套涅槃分段阻尼 + %总预算收紧，见 nirvana.damping 与宪法 H-11）。
+     * pen（穿透）暂保持固定值全档（百分比破甲另行立项）；crit/critDamage/lifesteal/dmgBonus/dr
+     *   本身就是「百分比点数」量纲，不受此规则影响。 */
+    speedAffixTiers: [      // 速度：T1 给 %（乘全速），T2~T5 固定值
+      { tier: 1, min: 6, max: 9 }, { tier: 2, min: 9, max: 11 }, { tier: 3, min: 6, max: 8 },
       { tier: 4, min: 3, max: 5 }, { tier: 5, min: 1, max: 2 }
     ],
-    affixTiers: [
+    atkTiers: [             // 攻击：T1 %乘全攻；T2~T5 固定值（前期实感、后期过渡品）
+      { tier: 1, min: 15, max: 20 }, { tier: 2, min: 25, max: 40 }, { tier: 3, min: 12, max: 20 },
+      { tier: 4, min: 6, max: 10 }, { tier: 5, min: 2, max: 5 }
+    ],
+    hpTiers: [
+      { tier: 1, min: 12, max: 18 }, { tier: 2, min: 150, max: 240 }, { tier: 3, min: 70, max: 120 },
+      { tier: 4, min: 30, max: 60 }, { tier: 5, min: 10, max: 25 }
+    ],
+    defTiers: [
+      { tier: 1, min: 12, max: 18 }, { tier: 2, min: 12, max: 20 }, { tier: 3, min: 6, max: 10 },
+      { tier: 4, min: 3, max: 5 }, { tier: 5, min: 1, max: 2 }
+    ],
+    hitTiers: [             // 命中：体格有界（成长增量刻意压小），固定值全程有效
+      { tier: 1, min: 5, max: 8 }, { tier: 2, min: 18, max: 26 }, { tier: 3, min: 10, max: 16 },
+      { tier: 4, min: 5, max: 9 }, { tier: 5, min: 2, max: 4 }
+    ],
+    dodgeTiers: [
+      { tier: 1, min: 5, max: 8 }, { tier: 2, min: 18, max: 26 }, { tier: 3, min: 10, max: 16 },
+      { tier: 4, min: 5, max: 9 }, { tier: 5, min: 2, max: 4 }
+    ],
+    affixTiers: [           // 兜底表（未单独定标的属性走这张）
       { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 4 },
       { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
     ],
     /* ---------- 词缀独立数值表（2026-09-04 拍板） ----------
      * 痛点：以前暴伤和吸血共用 affixTiers（6~8），但暴伤从 150% 起跳、吸血从 0 起跳，
      * 同一张表导致"暴伤+8"是废条、"吸血+8"是神条 —— 数字小不代表收益小，量纲必须各自定标。
-     * 原则：总量守恒（各属性 T1 期望战力打平），%只乘底座不乘成长值。
+     * 原则：总量守恒（各属性 T1 期望战力打平）。
+     * ⚠️ 2026-09-15 起旧原则「%只乘底座不乘成长值」已改判：T1 百分比乘全属性（见上方词缀统一规则）。
      * 每张表 tier 1~5，T1 最强；未列出的属性继续走 affixTiers。
      */
     lifestealAffixTiers: [   // 吸血%（移入前缀池后定标）：T1 4% 一击回 4% 伤害，可感知
@@ -990,13 +1038,16 @@ window.Config = {
       { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 3 },
       { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
     ],
-    penAffixTiers: [         // 穿透（固定值，无视X点防御）：对照怪物防御区间校准（高图怪 def 数百，T1 破防有感）
-      { tier: 1, min: 30, max: 40 }, { tier: 2, min: 20, max: 28 }, { tier: 3, min: 12, max: 18 },
-      { tier: 4, min: 6, max: 10 }, { tier: 5, min: 2, max: 5 }
-    ],
-    dmgBonusAffixTiers: [    // 最终伤害+X%：万金油进攻词缀
-      { tier: 1, min: 6, max: 8 }, { tier: 2, min: 4, max: 5 }, { tier: 3, min: 3, max: 3 },
+    /* 穿透（2026-09-15 改百分比破甲）：无视 X% 防御（有效防御 ×(1−X%)，结算钳 0~80%）。
+     * 旧的点数制（无视 X 点防御）在伤害公式 atk²/(atk+def) 下结构性无效 —— 拉满 480 点实测只 +0.1 层。
+     * 与暴击/吸血同属「百分比点数」量纲：全档按百分比结算，显示带 %。 */
+    penAffixTiers: [
+      { tier: 1, min: 8, max: 12 }, { tier: 2, min: 5, max: 7 }, { tier: 3, min: 3, max: 4 },
       { tier: 4, min: 2, max: 2 }, { tier: 5, min: 1, max: 1 }
+    ],
+    dmgBonusAffixTiers: [    // 最终伤害+X%：万金油进攻词缀（2026-09-15 上调：拉满值很香但供给太少，套里常只有 3%）
+      { tier: 1, min: 10, max: 14 }, { tier: 2, min: 6, max: 8 }, { tier: 3, min: 4, max: 5 },
+      { tier: 4, min: 2, max: 3 }, { tier: 5, min: 1, max: 1 }
     ],
     drAffixTiers: [          // 受伤减免X%（受击侧乘 (1-dr)，clamp 最低承伤 10%）：坦克流核心
       { tier: 1, min: 4, max: 5 }, { tier: 2, min: 3, max: 3 }, { tier: 3, min: 2, max: 2 },
@@ -1046,8 +1097,18 @@ window.Config = {
      * 词缀与底材共用这两张表；稀有度（颜色）不参与 T 阶判定，颜色 = 词缀条数的结果。
      * 装备 ilvl = 掉落它的怪等级（塔怪 Lv60→120：10 层前 T1 不入池，10 层后 T1 进池 5%）。
      * 打造(重铸/增缀)沿用装备出生时的 ilvl，不会因换图刷高而解锁。 */
-    affixIlvlGates: { 1: 70, 2: 60, 3: 25, 4: 1, 5: 1 },
+    affixIlvlGates: { 1: 55, 2: 45, 3: 25, 4: 1, 5: 1 },
     affixTierWeights: { 1: 5, 2: 15, 3: 30, 4: 25, 5: 25 },
+    /* T1 概率按装备等级上调（2026-09-15 配套「T1 = 百分比词缀」）：
+     * 词缀统一规则后 T2~T5 固定值后期必然被成长值淹 → 若 T1 恒为 5%，后期满地死签。
+     * 分段表：达到 minIlvl 后该段权重生效（取「满足的最高段」）。
+     * 验收：图10（ilvl 55~67）每小时 T1 产出可感知；塔高层（怪 Lv90+）T1 更常见。 */
+    affixTierWeightsByIlvl: [
+      { minIlvl: 90, weights: { 1: 18, 2: 22, 3: 60 } },
+      { minIlvl: 55, weights: { 1: 15, 2: 19, 3: 66 } },
+      { minIlvl: 45, weights: { 1: 6, 2: 16, 3: 40, 4: 19, 5: 19 } },
+      { minIlvl: 1,  weights: { 1: 5, 2: 15, 3: 30, 4: 25, 5: 25 } }
+    ],
     // 词缀总条数（含基础词缀 1 条）也由装备等级决定 —— 颜色只是条数的结果（1 白/2 蓝/3+ 金）：
     // 70+ 必金（4~5 条）、60+ 必金（3~4 条）、25~59 蓝~金（2~3 条）、前期白/蓝（1~2 条）。
     affixCountByIlvl: [
@@ -1105,7 +1166,12 @@ window.Config = {
      */
     score: {
       stat: { atk: 1, hp: 0.2, def: 1, spd: 1.5, hit: 1, dodge: 1, crit: 2, critDamage: 0.5, lifesteal: 3, pen: 1 },
-      pct:  { atk: 5, hp: 5, def: 5, dmgBonus: 6, dr: 8 },
+      /* 2026-09-15 词缀统一规则配套：T1 百分比词缀（fixed=false）走 pct 通道。
+       * ⚠️ 命中/闪避/速度的百分比此前【没登记】，会被当成固定值按 stat 权重计分
+       *   → 一条 T1「命中+6%」(6 分) 反而低于 T2 固定「命中+26」(26 分) ⇒ 排序/一键分解可能吃掉 T1 好装备（资产风险）。
+       *   权重按「该百分比实际带来的面板增益」定标：命中/闪避/速度百分比乘的是数百量级的属性，
+       *   T1 约 +5~8% ≈ 20~45 点面板，取 10 让它的分数（50~80）与 T1 攻%（75~100）同档、且高于固定值档。 */
+      pct:  { atk: 5, hp: 5, def: 5, hit: 10, dodge: 10, spd: 10, dmgBonus: 6, dr: 8 },
       resource: { dropQty: 8, dropRare: 6, matDrop: 6 }
     },
     // 稀有度（颜色）由词缀总条数唯一决定：1 条=白 / 2 条=蓝 / 3 条及以上=金。
@@ -1608,6 +1674,17 @@ window.Config = {
     levelBonus: 0.01,       // 副宠等级加成：吸收 × (1 + (副宠等级-门槛)×levelBonus)，仅 add 型生效
     // 可选加成：额外投入凝魂晶石，本次吸收 ×(1 + absorbBonus)。仅 add 型道具可用（替换型语义冲突）。
     crystalBonus: { material: '凝魂晶石', amount: 10, absorbBonus: 0.3, onlyType: 'add' },
+    /* 分段阻尼（2026-09-15 拍板，宪法 H-11 ③④）：主宠当前成长越高，本次涅槃【新吸收的成长】越打折。
+     *   成长仍无上限（游戏出发点），只是越来越慢 —— 这是「装备 T1% 乘全属性」的配套刹车：
+     *   用户担心的「基础×等级×成长×装备% 指数爆炸」，其燃料是成长获取速度，刹车装在这里。
+     * ⭐ 红线：阈值键控在【主宠当前成长值】（宠物状态）上，不许键控在玩家/账号上 ——
+     *   本作有 P2P 交易宠物，按账号算额度会被「买一只高成长宠」整条绕过。
+     * 键值语义：主宠成长 > at 时，本次吸收量 × mult（多段叠乘）。 */
+    damping: [
+      { at: 100, mult: 0.7 },
+      { at: 150, mult: 0.65 },
+      { at: 200, mult: 0.45 }
+    ],
     resetLevel: true        // 涅槃后主宠等级重置为 1（重新练级）；神级宠成长无软上限，可无限叠
   },
 

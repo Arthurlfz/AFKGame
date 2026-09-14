@@ -91,7 +91,8 @@ A(mutantZero === 0, '变异宠保底至少 1 条特质');
   const C3 = ctx.Pet.getStatCoeff(p3);
   const core = p3.baseDef + Math.round(p3.level * C3.def);
   const growthInc = Math.round(p3.level * p3.growth * C3.def) - Math.round(p3.level * C3.def);
-  A(Math.abs(s3.def - Math.round(core * 1.08 + growthInc)) <= 1, '铁壁 T2 → 防御 +8%（作用于底座，成长增量不放大）');
+  // 2026-09-15 改判口径：装备/特质 % 乘【全部属性】（底座+成长增量）
+  A(Math.abs(s3.def - Math.round((core + growthInc) * 1.08)) <= 1, '铁壁 T2 → 防御 +8%（乘全属性：底座+成长增量）');
 }
 
 /* ================= 3. 觉醒特质（2026-09-10 v2：觉醒石永久觉醒，与等级无关） ================= */

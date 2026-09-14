@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-11T12:10:27.903Z
+// 生成时间：2026-09-14T17:54:15.747Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -13,6 +13,10 @@ const serverConfig = {
           "hp": 4.9,
           "atk": 2.38,
           "def": 1.02
+        },
+        "mech": {
+          "hit": 1,
+          "dodge": 1
         }
       },
       {
@@ -25,6 +29,10 @@ const serverConfig = {
           "hp": 3.22,
           "atk": 2.22,
           "def": 0.92
+        },
+        "mech": {
+          "hit": 1.1,
+          "dodge": 0.9
         }
       },
       {
@@ -37,6 +45,10 @@ const serverConfig = {
           "hp": 5.7,
           "atk": 2.42,
           "def": 1.12
+        },
+        "mech": {
+          "hit": 1.1,
+          "dodge": 0.6
         }
       },
       {
@@ -49,6 +61,10 @@ const serverConfig = {
           "hp": 4,
           "atk": 2.28,
           "def": 0.96
+        },
+        "mech": {
+          "hit": 1,
+          "dodge": 1.2
         }
       },
       {
@@ -61,6 +77,10 @@ const serverConfig = {
           "hp": 4.3,
           "atk": 2.24,
           "def": 0.99
+        },
+        "mech": {
+          "hit": 1.05,
+          "dodge": 1
         }
       },
       {
@@ -73,6 +93,10 @@ const serverConfig = {
           "hp": 5.2,
           "atk": 2.36,
           "def": 1.08
+        },
+        "mech": {
+          "hit": 1,
+          "dodge": 1.15
         }
       },
       {
@@ -85,6 +109,10 @@ const serverConfig = {
           "hp": 4.6,
           "atk": 2.25,
           "def": 1.05
+        },
+        "mech": {
+          "hit": 1,
+          "dodge": 1
         }
       },
       {
@@ -97,6 +125,10 @@ const serverConfig = {
           "hp": 3.35,
           "atk": 2.34,
           "def": 0.9
+        },
+        "mech": {
+          "hit": 0.9,
+          "dodge": 1.45
         }
       }
     ],
@@ -1162,7 +1194,8 @@ const serverConfig = {
         "hit": 5
       },
       "护符": {
-        "lifesteal": 4
+        "hp": 60,
+        "crit": 2
       },
       "徽章": {
         "crit": 3,
@@ -1191,8 +1224,8 @@ const serverConfig = {
     "speedAffixTiers": [
       {
         "tier": 1,
-        "min": 12,
-        "max": 16
+        "min": 6,
+        "max": 9
       },
       {
         "tier": 2,
@@ -1213,6 +1246,141 @@ const serverConfig = {
         "tier": 5,
         "min": 1,
         "max": 2
+      }
+    ],
+    "atkTiers": [
+      {
+        "tier": 1,
+        "min": 15,
+        "max": 20
+      },
+      {
+        "tier": 2,
+        "min": 25,
+        "max": 40
+      },
+      {
+        "tier": 3,
+        "min": 12,
+        "max": 20
+      },
+      {
+        "tier": 4,
+        "min": 6,
+        "max": 10
+      },
+      {
+        "tier": 5,
+        "min": 2,
+        "max": 5
+      }
+    ],
+    "hpTiers": [
+      {
+        "tier": 1,
+        "min": 12,
+        "max": 18
+      },
+      {
+        "tier": 2,
+        "min": 150,
+        "max": 240
+      },
+      {
+        "tier": 3,
+        "min": 70,
+        "max": 120
+      },
+      {
+        "tier": 4,
+        "min": 30,
+        "max": 60
+      },
+      {
+        "tier": 5,
+        "min": 10,
+        "max": 25
+      }
+    ],
+    "defTiers": [
+      {
+        "tier": 1,
+        "min": 12,
+        "max": 18
+      },
+      {
+        "tier": 2,
+        "min": 12,
+        "max": 20
+      },
+      {
+        "tier": 3,
+        "min": 6,
+        "max": 10
+      },
+      {
+        "tier": 4,
+        "min": 3,
+        "max": 5
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 2
+      }
+    ],
+    "hitTiers": [
+      {
+        "tier": 1,
+        "min": 5,
+        "max": 8
+      },
+      {
+        "tier": 2,
+        "min": 18,
+        "max": 26
+      },
+      {
+        "tier": 3,
+        "min": 10,
+        "max": 16
+      },
+      {
+        "tier": 4,
+        "min": 5,
+        "max": 9
+      },
+      {
+        "tier": 5,
+        "min": 2,
+        "max": 4
+      }
+    ],
+    "dodgeTiers": [
+      {
+        "tier": 1,
+        "min": 5,
+        "max": 8
+      },
+      {
+        "tier": 2,
+        "min": 18,
+        "max": 26
+      },
+      {
+        "tier": 3,
+        "min": 10,
+        "max": 16
+      },
+      {
+        "tier": 4,
+        "min": 5,
+        "max": 9
+      },
+      {
+        "tier": 5,
+        "min": 2,
+        "max": 4
       }
     ],
     "affixTiers": [
@@ -1326,50 +1494,50 @@ const serverConfig = {
     "penAffixTiers": [
       {
         "tier": 1,
-        "min": 30,
-        "max": 40
+        "min": 8,
+        "max": 12
       },
       {
         "tier": 2,
-        "min": 20,
-        "max": 28
-      },
-      {
-        "tier": 3,
-        "min": 12,
-        "max": 18
-      },
-      {
-        "tier": 4,
-        "min": 6,
-        "max": 10
-      },
-      {
-        "tier": 5,
-        "min": 2,
-        "max": 5
-      }
-    ],
-    "dmgBonusAffixTiers": [
-      {
-        "tier": 1,
-        "min": 6,
-        "max": 8
-      },
-      {
-        "tier": 2,
-        "min": 4,
-        "max": 5
+        "min": 5,
+        "max": 7
       },
       {
         "tier": 3,
         "min": 3,
-        "max": 3
+        "max": 4
       },
       {
         "tier": 4,
         "min": 2,
         "max": 2
+      },
+      {
+        "tier": 5,
+        "min": 1,
+        "max": 1
+      }
+    ],
+    "dmgBonusAffixTiers": [
+      {
+        "tier": 1,
+        "min": 10,
+        "max": 14
+      },
+      {
+        "tier": 2,
+        "min": 6,
+        "max": 8
+      },
+      {
+        "tier": 3,
+        "min": 4,
+        "max": 5
+      },
+      {
+        "tier": 4,
+        "min": 2,
+        "max": 3
       },
       {
         "tier": 5,
@@ -1498,12 +1666,50 @@ const serverConfig = {
       "5": 25
     },
     "affixIlvlGates": {
-      "1": 70,
-      "2": 60,
+      "1": 55,
+      "2": 45,
       "3": 25,
       "4": 1,
       "5": 1
     },
+    "affixTierWeightsByIlvl": [
+      {
+        "minIlvl": 90,
+        "weights": {
+          "1": 18,
+          "2": 22,
+          "3": 60
+        }
+      },
+      {
+        "minIlvl": 55,
+        "weights": {
+          "1": 15,
+          "2": 19,
+          "3": 66
+        }
+      },
+      {
+        "minIlvl": 45,
+        "weights": {
+          "1": 6,
+          "2": 16,
+          "3": 40,
+          "4": 19,
+          "5": 19
+        }
+      },
+      {
+        "minIlvl": 1,
+        "weights": {
+          "1": 5,
+          "2": 15,
+          "3": 30,
+          "4": 25,
+          "5": 25
+        }
+      }
+    ],
     "affixCountByIlvl": [
       {
         "minIlvl": 70,
@@ -1679,6 +1885,9 @@ const serverConfig = {
         "atk": 5,
         "hp": 5,
         "def": 5,
+        "hit": 10,
+        "dodge": 10,
+        "spd": 10,
         "dmgBonus": 6,
         "dr": 8
       },

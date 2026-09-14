@@ -29,8 +29,10 @@ const qBefore=C('Materials.getQuantity(Config.craft.holy.name)');
 A(qBefore===2,'神圣石初始 2 颗');
 // 先把每条词缀数值压到各自 T 阶最小值，并把 Math.random 钉到 0.999 → randInt 必取最大值
 // 这样 new = max，old = min，保证「数值确实变化」且「落在 T 阶范围」
-// 独立数值表分派（与 equipment.js affixTiersFor 同口径）：spd/lifesteal/crit 等各自有专属表
-C('var __T=(t,type)=>({spd:Config.equipment.speedAffixTiers,lifesteal:Config.equipment.lifestealAffixTiers,crit:Config.equipment.critAffixTiers,critDamage:Config.equipment.critDamageAffixTiers,pen:Config.equipment.penAffixTiers,dmgBonus:Config.equipment.dmgBonusAffixTiers,dr:Config.equipment.drAffixTiers}[type]||Config.equipment.affixTiers).find(x=>x.tier===t)');
+/* 数值表分派：走 Equipment.affixRange 单一口径（2026-09-15）。
+ * 旧写法在这里抄了一份映射表 —— 新增 atk/hp/def/hit/dodge 独立表后这份副本没跟上，
+ * 于是「装备上随机抽到攻击/命中/闪避词缀」时断言会红（表现成时红时绿的 flaky）。 */
+C('var __T=(t,type)=>Equipment.affixRange({type:type,tier:t})');
 C('heq.affixes.prefix.concat(heq.affixes.suffix).forEach(a=>{a.value=__T(a.tier,a.type).min})');
 C('globalThis.__rand=Math.random; Math.random=()=>0.999');   // 在 context 内控制随机
 const oldJson=C('JSON.stringify(Equipment.flattenAffixes(heq.affixes).map(a=>({type:a.type,tier:a.tier,value:a.value})))');

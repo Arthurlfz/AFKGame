@@ -56,7 +56,8 @@
     return note('战斗全自动进行，出手快慢由速度决定，命中、暴击、吸血各自独立结算。')
       + rules([
         `出手：进度条满 100 打一次，每 100 毫秒累加 速度 ÷ ${scale}。速度 ${fast} 约 ${secOf(fast)} 秒出手一次，速度 ${slow} 约 ${secOf(slow)} 秒一次`,
-        '命中：命中率 = 命中 ÷（命中 + 闪避），最低 5%，最高 95%',
+        '命中：每一刀先判命中，命中率 = 命中 ÷（命中 + 闪避），最低 5%，最高 95%；没打中就是白砍（伤害 0），怪照样打你',
+        '⭐ 命中与闪避都会成长：宠物的命中/闪避随等级与成长值上涨（每只宠涨速不同），怪物也有自己的命中/闪避并随地图深度、塔层提升',
         '伤害：伤害 = 攻击 × 攻击 ÷（攻击 + 有效防御），有效防御 = 防御 − 穿透；防御与攻击相等时挡掉一半，防御再高也挡不完',
         '暴击：按暴击率触发，触发后伤害 × 暴击伤害倍率',
         '吸血：命中后按 伤害 × 吸血率 回血，回血不超过生命上限',
@@ -194,14 +195,19 @@
       const sum = vals.reduce((a, b) => a + b, 0);
       return sum ? Math.round((Number(w[1] || 0) / sum) * 100) : 0;
     };
-    // 词缀 T 阶概率（按稀有度权重现读）
-    const affW = E.affixTierWeights || {};
-    const affT1Pct = (r) => {
-      const w = affW[r] || {};
-      const vals = Object.values(w).map(Number);
-      const sum = vals.reduce((a, b) => a + b, 0);
+    /* 词缀 T 阶概率：2026-09-15 起 T 阶只由【装备等级】决定（不再按稀有度加权），
+     * 且 T1 概率按装备等级分段上调（后期必须刷得到百分比词缀，否则满地死签）。
+     * 这里按「图档对应的装备等级」取分段权重现算，避免百科写死一个过时数字。 */
+    const segs = E.affixTierWeightsByIlvl || [];
+    const t1PctAtIlvl = (ilvl) => {
+      let seg = null;
+      for (const s of segs) if (ilvl >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
+      const w = (seg && seg.weights) || E.affixTierWeights || {};
+      const sum = Object.values(w).map(Number).reduce((a, b) => a + b, 0);
       return sum ? Math.round((Number(w[1] || 0) / sum) * 100) : 0;
     };
+    const ilvlOfTier = (t) => (C.areaLevels || [])[t - 1] || 1;
+    const affT1Pct = () => t1PctAtIlvl(ilvlOfTier(10));
     const rarityRows = rarities.map(r => [
       escapeHtml(r.label),
       r.affixMin === r.affixMax ? `${r.affixMin} 条` : `${r.affixMin} 到 ${r.affixMax} 条`
@@ -241,9 +247,9 @@
       // 等级判定（T 阶门槛）
       + note(`【等级判定（T 阶门槛）】词缀与底材的 T 阶共用同一套装备等级门槛：${gateLine}（T1 需物品等级 ≥ 55，即图 10）。门槛以下的 T 阶不会被 roll 出来，抽到高档也会降到当前等级允许的最高 T。`)
       + rules([
-        `词缀 T 阶按装备稀有度加权抽取：白装只能 T4~T5、蓝装 T3~T4、金装 T1 仅 ${affT1Pct('gold')}%。`,
-        `底材 T 阶按图档权重抽取，门槛与词缀相同，但同门槛下出现概率不同：图 10 底材 T1 约 ${matT1Pct(10)}%，词缀 T1 在金装上仅 ${affT1Pct('gold')}%，白 / 蓝装根本抽不到 T1~T3。`,
-        '结论：高图装备常能见到底材 T1，词缀 T1 却极难出现，这是刻意设计的「求而不得」落差。'
+        `T 阶只由【装备等级】决定，与颜色无关；T1 概率按装备等级分段上调：图 10（装备等级 ≈${ilvlOfTier(10)}）约 ${affT1Pct()}%，塔高层（装备等级 ≥90）约 ${t1PctAtIlvl(90)}%。`,
+        `底材 T 阶与词缀 T 阶同一套门槛与权重：图 10 底材 T1 约 ${matT1Pct(10)}%、词缀 T1 约 ${affT1Pct()}%，两者接近；后期刷得到 T1，但仍是少数（刻意保留「求而不得」）。`,
+        '⭐ 词缀统一规则：T1 = 百分比词缀（带 %），T2~T5 = 固定值词缀。看到「攻击 +15%」就是 T1 顶级词缀；「攻击 +25」是固定值，前期顶用、后期被成长值越落越远。'
       ])
       // 颜色 / 品质分类
       + note('【品质颜色】由词缀条数唯一决定，与等级、底材无关：')
@@ -254,9 +260,10 @@
       // 属性公式
       + note('最终属性怎么算：')
       + rules([
-        '攻击 / 生命 / 防御 = 宠物裸属性 ×（1 + 百分比词缀总和）+ 装备底材固定值',
-        '暴击 / 暴击伤害 / 吸血 / 命中 / 闪避 / 速度 = 宠物底子 + 装备底材 + 词缀',
-        '穿透 = 无视 X 点防御（只削防御不成负数）；伤害加成 = 最终伤害 +X%；受伤减免 = 受到伤害 -X%（最低承伤 10%）'
+        '攻击 / 生命 / 防御 =（基础值 + 等级×成长值×成长系数 + 等级×系数）×（1 + T1 百分比词缀）+ 固定值词缀；百分比词缀乘的是全部属性，宠物越强加得越多',
+        '命中 / 闪避 =（定位基础值 + 等级×系数×品种倍率 + 等级×成长值×系数×品种倍率）×（1 + T1 百分比词缀）+ 固定值词缀；**每只宠的品种倍率不同**（幽影兔闪避涨得快、瘟熊几乎不涨）',
+        '暴击 / 暴击伤害 / 吸血 = 宠物底子 + 装备底材 + 词缀点数；速度 = 基础速度 + 词缀',
+        '穿透 = 无视 X% 防御（有效防御被打折，上限 80%；越打高防怪越赚）；伤害加成 = 最终伤害 +X%；受伤减免 = 受到伤害 -X%（最低承伤 10%）'
       ])
       // 打造石头
       + note('打造消耗对应的石头，直接改变装备的词缀：')
@@ -274,6 +281,7 @@
   function buildPet() {
     const P = Config.pet;
     const coeff = P.statCoeff || {};
+    const mc = P.mechCoeff || { hitLv: 1, hitGrowth: 0.05, dodgeLv: 0.35, dodgeGrowth: 0.02 };
     const names = (P.starters || []).map(s => s.name);
     const profOf = n => (P.petProfiles && P.petProfiles[n]) || P.defaultPetProfile || {};
     const rows1 = (P.starters || []).map(s => {
@@ -318,7 +326,10 @@
         `生命 = 基础生命 + 等级 × 成长值 × ${coeff.hp}`,
         `攻击 = 基础攻击 + 等级 × 成长值 × ${coeff.atk}`,
         `防御 = 基础防御 + 等级 × 成长值 × ${coeff.def}`,
-        '速度 = 该宠固定基础速度 + 装备加成，等级与成长值不影响速度',
+        `速度 = 该宠固定基础速度 + 装备加成，等级与成长值不影响速度`,
+        `命中 = 定位基础值 + 等级 × ${mc.hitLv} × 品种倍率 + 等级 × 成长值 × ${mc.hitGrowth} × 品种倍率（再乘 T1 命中% 词缀）`,
+        `闪避 = 定位基础值 + 等级 × ${mc.dodgeLv} × 品种倍率 + 等级 × 成长值 × ${mc.dodgeGrowth} × 品种倍率（再乘 T1 闪避% 词缀）`,
+        '⭐ 品种倍率：幽影兔闪避涨得最快（1.45 倍）、瘟熊几乎不涨（0.6 倍，重甲不靠躲）；宠物越练，命中和闪避也跟着水涨船高',
         `等级上限 ${P.maxLevel} 级`
       ])
       + note(`5 阶进化：共 ${EV.maxEvolveTimes} 次进化（初始 → 终阶），素材与成长提升由「当前阶」决定：`)
@@ -345,6 +356,10 @@
     const synthItems = Config.itemsOf ? Config.itemsOf('synth') : [];
     const nirItems = Config.itemsOf ? Config.itemsOf('nirvana') : [];
     const cb = NI.crystalBonus || {};
+    // 分段阻尼（2026-09-15）：主宠成长越高，本次新吸收越少；从 config 现读，不写死
+    const dampLine = (NI.damping || [])
+      .map(d => `成长 >${Number(d.at)} 时 ×${Number(d.mult)}`)
+      .join('、');
     const godMin = (SY.god && SY.god.minGrowth) || G.minGrowth || 0;
     const godLv = G.baseLevelRequire || SY.minLevel || 60;
     const matList = gated.map(s => `${escapeHtml(s.label)}：${escapeHtml(s.material)} ×${s.amount}${s.extra ? ' + ' + escapeHtml(s.extra.name) + ' ×' + s.extra.amount : ''}`);
@@ -363,7 +378,8 @@
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>️ 涅槃', 'Lv.' + (NI.minLevel || 0) + '（主宠与副宠都要到）',
         nirItems.length ? '可选消耗 ' + nirItems.map(i => escapeHtml(i.name)).join(' / ') + ' ×1' : '无（不再消耗涅磐兽）',
         `主宠成长 += 副宠成长 × 吸收比例（${nirItems.map(i => escapeHtml(i.name) + '：' + escapeHtml(i.effect || '')).join('；')}）；副宠消失，主宠等级重置为 1`,
-        `${NI.requireGodPet !== false ? '只有神级宠能涅槃；' : ''}可反复涅槃叠加成长${cb.amount ? `；额外投入 ${escapeHtml(cb.material)} ×${cb.amount} 可让本次吸收 ×${(1 + (cb.absorbBonus || 0)).toFixed(1)}` : ''}；穿着装备的宠物不能涅槃`],
+        `${NI.requireGodPet !== false ? '只有神级宠能涅槃；' : ''}成长没有上限，可反复涅槃叠加${cb.amount ? `；额外投入 ${escapeHtml(cb.material)} ×${cb.amount} 可让本次吸收 ×${(1 + (cb.absorbBonus || 0)).toFixed(1)}` : ''}；穿着装备的宠物不能涅槃` +
+        (dampLine ? `；⚠️ 分段阻尼：主宠成长越高，每次新吸收越少（${dampLine}）` : '')],
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>️ 合成', 'Lv.' + (SY.minLevel || 0) + '（两只都要到）',
         ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1) + ' + 合成道具 ×1',
         `新宠成长 = 主宠成长 + 副宠成长 × ${SY.baseBoostRatio} ×（1 + 等级加成 + 道具加成）+ 随机 +${rb[0]} 到 +${rb[1]}，成长只涨不跌；${pct(mu.chance || 0)} 概率出「·异变」宠`,

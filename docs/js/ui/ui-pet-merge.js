@@ -75,7 +75,7 @@
       const matAmt2 = 1;
       const haveMat2 = pill2 && Materials.getQuantity ? Materials.getQuantity(pill2.name) : 0;
       mb.innerHTML = '<div class="es-tip"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.086 18.412A2 2 0 0112.67 19H5v-7.672a2 2 0 01.586-1.414L11.75 3.75a6 6 0 118.49 8.49z"/><path d="M16 8 2 22"/><path d="M17.488 15H9"/></svg> 涅槃是什么</div>';
-      sb.innerHTML = '<div class="es-tip"><b>只有神级宠才能涅槃</b>（手册 2.7）。主宠吸收副宠 50% 的成长值（不衰减），等级重置回 <b>Lv.1</b>，继续叠成长。</div>';
+      sb.innerHTML = '<div class="es-tip"><b>只有神级宠才能涅槃</b>（手册 2.7）。主宠吸收副宠 50% 的成长值，等级重置回 <b>Lv.1</b>，继续叠成长；<b>成长无上限</b>，但主宠成长越高，每次新吸收越少（分段阻尼）。</div>';
       pb.innerHTML = '<div class="es-tip">条件：主宠必须是<b>神级宠</b>且 Lv.<b>' + (M.minLevel || 60) + '</b> 以上、未穿装备、不在出售；可选消耗 <b>' + matName2 + ' ×1</b>（吸收 ×1.2，当前持有 ' + haveMat2 + '）。<br>神级宠：两只<b>终阶</b>宠 + 成长 ≥ ' + ((Config.pet.godPets && Config.pet.godPets.minGrowth) || 60) + ' 在<b>合成</b>里搏出（30% 概率，持涅槃丹必出）。<br>符合条件后，在左侧选中主宠，这里会展开完整流程。</div>';
       cb.innerHTML = '';
       if (arrow) arrow.innerHTML = '';
@@ -189,7 +189,7 @@
     if (useCrystal && !cryOk) footWarns.push(`<span class="warn">${CB.material}不足：需要 ${CB.amount} 颗，当前持有 ${cryHave}</span>`);
     pb.innerHTML = `
       <div class="preview-bar">
-        <div class="pv"><div class="k">吸收成长</div><div class="v">+${absorb.toFixed(1)}<small>副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${bonusMult > 1 ? ' ×' + bonusMult : ''} · 不衰减</small></div></div>
+        <div class="pv"><div class="k">吸收成长</div><div class="v">+${absorb.toFixed(1)}<small>副宠 ${sub.growth.toFixed(1)} × ${Math.round((M.absorbRatio || 0.5) * 100)}%${bonusMult > 1 ? ' ×' + bonusMult : ''}${(calcBoost && calcBoost.damped) ? ' · 高成长阻尼' : ''}</small></div></div>
         <div class="pv"><div class="k">涅槃后成长</div><div class="v">${finalGrowth.toFixed(1)}<small>主宠 ${main.growth.toFixed(1)} → ${finalGrowth.toFixed(1)}</small></div></div>
         <div class="pv"><div class="k">等级</div><div class="v">Lv.${main.level} → ${M.resetLevel ? 'Lv.1' : '不变'}<small>${M.resetLevel ? '重置 · 经验清零' : ''}</small></div></div>
         <div class="pv"><div class="k">涅槃丹</div><div class="v"><label><input type="checkbox" id="nir-pill-check" ${useNirvanaPill ? 'checked' : ''} ${pillOk ? '' : 'disabled'}> ×${pillMult}（持有 ${pillHave}）</label></div></div>
@@ -237,7 +237,7 @@
     const minG = (Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
     const hintPill = Config.itemOf ? Config.itemOf(M.defaultItem || 'nir_pill') : null;
     const hintPillName = hintPill ? hintPill.name : '涅槃丹';
-    if (el && M.minLevel) el.innerHTML = `涅槃：<b>只有神级宠</b>能涅槃。主宠吸副宠 <b>${Math.round((M.absorbRatio || 0.5) * 100)}%</b> 成长（不衰减）+ 重置等级。条件：神级宠 Lv.<b>${M.minLevel}</b>；可选消耗 <b>${hintPillName} ×1</b>（吸收 ×${hintPill && hintPill.boostMult ? hintPill.boostMult : 1.2}）。神级宠 = 两只终阶宠（成长 ≥ ${minG}）合成，概率看合成道具。`;
+    if (el && M.minLevel) el.innerHTML = `涅槃：<b>只有神级宠</b>能涅槃。主宠吸副宠 <b>${Math.round((M.absorbRatio || 0.5) * 100)}%</b> 成长 + 重置等级；成长无上限，但主宠成长越高，每次新吸收越少（<b>分段阻尼</b>）。条件：神级宠 Lv.<b>${M.minLevel}</b>；可选消耗 <b>${hintPillName} ×1</b>（吸收 ×${hintPill && hintPill.boostMult ? hintPill.boostMult : 1.2}）。神级宠 = 两只终阶宠（成长 ≥ ${minG}）合成，概率看合成道具。`;
   }
 
 

@@ -74,19 +74,20 @@ for(const kind of ['white','blue','gold']){
 }
 // 5) POE 式 roll 区间（affixRange / formatAffixHtml，2026-08-30 用户拍板）
 {
+  // 2026-09-15 词缀统一规则：T1 = 百分比（攻/血/防 15~20、命中/闪避 5~8、速度 6~9），T2~T5 = 固定值
   const r1 = C('JSON.stringify(Equipment.affixRange({type:"atk",tier:1}))');
-  A(r1 === '{"min":6,"max":8}', `攻击 T1 区间 (6~8)（${r1}）`);
+  A(r1 === '{"min":15,"max":20}', `攻击 T1 区间（百分比 15~20）（${r1}）`);
   const r2 = C('JSON.stringify(Equipment.affixRange({type:"spd",tier:1}))');
-  A(r2 === '{"min":12,"max":16}', `速度 T1 走 speedAffixTiers：区间 (12~16)（${r2}）`);
+  A(r2 === '{"min":6,"max":9}', `速度 T1 走 speedAffixTiers：区间（百分比 6~9）（${r2}）`);
   const r3 = C('JSON.stringify(Equipment.affixRange({type:"atk",tier:5}))');
-  A(r3 === '{"min":1,"max":1}', `攻击 T5 区间 (1~1)（${r3}）`);
+  A(r3 === '{"min":2,"max":5}', `攻击 T5 区间（固定值 2~5）（${r3}）`);
   A(C('Equipment.affixRange({type:"hit",tier:5,base:true})') === null, '基础词缀（base:true）无区间概念 → null');
-  const h1 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:8,tier:1})');
-  A(h1.indexOf('(6~8)') >= 0 && h1.indexOf('#f2b632') >= 0, 'T1 词缀：显示区间 (6~8) 且金色高亮');
-  const h2 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:4,tier:3})');
-  A(h2.indexOf('(3~4)') >= 0 && h2.indexOf('#f2b632') >= 0, 'T3 满 roll（=区间 max）也金色高亮');
-  const h3 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:3,tier:3})');
-  A(h3.indexOf('(3~4)') >= 0 && h3.indexOf('#f2b632') < 0, 'T3 低 roll 不高亮（正常色）');
+  const h1 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:20,tier:1,fixed:false})');
+  A(h1.indexOf('(15~20)') >= 0 && h1.indexOf('#f2b632') >= 0, 'T1 百分比词缀：显示区间 (15~20) 且金色高亮');
+  const h2 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:20,tier:3,fixed:true})');
+  A(h2.indexOf('(12~20)') >= 0 && h2.indexOf('#f2b632') >= 0, 'T3 满 roll（固定值=区间 max）也金色高亮');
+  const h3 = C('Equipment.formatAffixHtml({label:"攻击",type:"atk",value:13,tier:3,fixed:true})');
+  A(h3.indexOf('(12~20)') >= 0 && h3.indexOf('#f2b632') < 0, 'T3 低 roll 不高亮（正常色）');
   // 生成的金装：每条真实词缀都能给出区间（高亮逻辑能跑通不崩）
   const goldsRangeOk = C(`(function(){
     const eq=Equipment.generateEquipment(Config.equipment.rarities.find(x=>x.id==="gold"),6,3);
@@ -106,11 +107,11 @@ for(const kind of ['white','blue','gold']){
     const arr=C(`Config.equipment.${k}`);
     A(Array.isArray(arr)&&arr.length>=5,`config.equipment.${k} 存在且至少 5 档`);
   }
-  // 5b) affixRange 走独立表
+  // 5b) affixRange 走独立表（2026-09-15：穿透改百分比破甲 → T1 8~12%；伤害加成供给上调 → T1 10~14%）
   const rp=C('JSON.stringify(Equipment.affixRange({type:"pen",tier:1}))');
-  A(rp==='{"min":30,"max":40}',`穿透 T1 区间 (30~40)（${rp}）`);
+  A(rp==='{"min":8,"max":12}',`穿透 T1 区间（百分比破甲 8~12%）（${rp}）`);
   const rd=C('JSON.stringify(Equipment.affixRange({type:"dmgBonus",tier:1}))');
-  A(rd==='{"min":6,"max":8}',`伤害加成 T1 区间 (6~8)（${rd}）`);
+  A(rd==='{"min":10,"max":14}',`伤害加成 T1 区间 (10~14)（${rd}）`);
   const rl=C('JSON.stringify(Equipment.affixRange({type:"lifesteal",tier:1}))');
   A(rl==='{"min":3,"max":4}',`吸血 T1 走独立表 (3~4)（${rl}）`);
   // 5c) battle.calcDamage：穿透/伤害加成/受伤减免结算（种子化不方便，用确定性字段断言）
@@ -121,25 +122,25 @@ for(const kind of ['white','blue','gold']){
     Math.random=()=>0.2;
     // 递减对抗基线（2026-09-09）：atk 100 def 30 → 100²/(100+30) = 77
     const base=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:0});
-    // 穿透 20：def 50 - 20 = 30 → 77（与基线同）
+    // 穿透（2026-09-15 改百分比破甲）：pen 20% → def 50 × 0.8 = 40 → 100²/(100+40) = 71
     const pen=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:20,dmgBonus:0,lifesteal:0},{def:50,dodge:0,dr:0});
     // 伤害加成 50%：77 → 115
     const bonus=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:50,lifesteal:0},{def:30,dodge:0,dr:0});
     // 受伤减免 50%：70 → 35；clamp：减伤 95 → 最低承伤 10%（70 → 7）
     const dr=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:50});
     const drClamp=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:95});
-    // 穿透不成负防御：def 10 pen 50 → effDef 0 → 伤害 100
-    const penFloor=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:50,dmgBonus:0,lifesteal:0},{def:10,dodge:0,dr:0});
+    // 穿透上限 80%（百分比制不会出现负防御）：pen 99 → clamp 80% → def 10 × 0.2 = 2 → 100²/102 = 98
+    const penFloor=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:99,dmgBonus:0,lifesteal:0},{def:10,dodge:0,dr:0});
     Math.random=ORIG; // 恢复真实随机
     return JSON.stringify({base:base.damage,pen:pen.damage,bonus:bonus.damage,dr:dr.damage,drClamp:drClamp.damage,penFloor:penFloor.damage});
   })()`);
   const cdv=JSON.parse(cd);
   A(cdv.base===77,`递减对抗基线 100²/(100+30)=77（${cdv.base}）`);
-  A(cdv.pen===77,`穿透 20 抵消 def 50→30：77（${cdv.pen}）`);
+  A(cdv.pen===71,`穿透 20% 破甲：def 50→40，伤害 71（${cdv.pen}）`);
   A(cdv.bonus===115,`伤害加成 50%：77→115（${cdv.bonus}）`);
   A(cdv.dr===38,`受伤减免 50%：77→38（${cdv.dr}）`);
   A(cdv.drClamp===7,`减伤 clamp 最低承伤 10%：77→7（${cdv.drClamp}）`);
-  A(cdv.penFloor===100,`穿透不成负防御：effDef 0 → 100（${cdv.penFloor}）`);
+  A(cdv.penFloor===98,`穿透钳在 80% 上限：def 10→2，伤害 98（${cdv.penFloor}）`);
   // 5d) getStats 透传：给宠物穿带三词缀的装备，面板字段齐
   const st=C(`(function(){
     // 构造最小宠物（getStats 是纯函数，不依赖登录态）：等级给足让属性>0

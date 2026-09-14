@@ -34,7 +34,7 @@ const Eq = vm.runInContext('window.Equipment', ctx);
 
 // 生成装备所需的函数全集（按依赖顺序：被调用的在前定义无所谓，函数声明会提升）
 const FUNCS = [
-  'affixCategory', 'affixCount', 'pickRarity',
+  'affixCategory', 'affixCount', 'pickRarity', 'affixFixedOf',
   'rollAffixTier', 'rollAffixCount', 'affixTiersFor', 'rollBaseHit', 'levelOfAreaTier',
   'rarityIdFromCount', 'syncRarity', 'generateEquipment'
 ];

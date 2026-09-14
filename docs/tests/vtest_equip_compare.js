@@ -59,7 +59,8 @@ const S = ms => new Promise(r => setTimeout(r, ms));
   mkItem(902, 50);
   mkItem(903, 30);
   // 一件带 hp% 百分比词缀的（验证百分比词缀也走 getStats 换算，不是简单加减）
-  mkItem(904, 30, { type: 'hp', label: '生命', tier: 3, value: 10 });
+  // 2026-09-15 词缀统一规则：fixed:false 才是百分比词缀（T1），这里显式造一条百分比生命词缀
+  mkItem(904, 30, { type: 'hp', label: '生命', tier: 1, value: 10, fixed: false });
 
   // 对比功能由 buildEquipCompare 渲染（现放右侧详情面板 .eq-detail-compare，不再批量建 equip-tip 浮层）
   const cmp = name => C(`(function(){const pet=Pet.getActivePet();const eq=Equipment.getInventory().find(e=>e.name==='${name}');return UI.buildEquipCompare(pet,eq)})()`);
@@ -72,11 +73,11 @@ const S = ms => new Promise(r => setTimeout(r, ms));
 
   A(same.indexOf('属性无变化') >= 0, '与身上完全相同的装备提示「属性无变化」');
 
-  // 百分比词缀：+10% 生命，应按宠物"底座"（core = 基础值+等级系数）换算；成长增量不放大（2026-09-01 口径）
+  // 百分比词缀：+10% 生命。2026-09-15 改判口径：T1 百分比乘【全部属性】（底座+成长增量）
   const pctHpDelta = Number(grab(pctItem, '生命') || 0);
-  const coreHp = C(`Pet.statParts(Pet.getPets().find(p=>p.id===globalThis.__p)).core.hp`);
-  const expectHp = Math.round(coreHp * 1.1) - coreHp;
-  A(pctHpDelta === expectHp, `百分比词缀按底座换算：生命 +${pctHpDelta}（期望 +${expectHp} = 底座 ${coreHp} × 10%，成长增量不放大，而非固定 +10）`);
+  const totalHp = C(`Pet.statParts(Pet.getPets().find(p=>p.id===globalThis.__p)).total.hp`);
+  const expectHp = Math.round(totalHp * 1.1) - totalHp;
+  A(pctHpDelta === expectHp, `百分比词缀乘全属性（2026-09-15 口径）：生命 +${pctHpDelta}（期望 +${expectHp} = 总血 ${totalHp} × 10%，而非固定 +10）`);
 
   A([strong, same, pctItem].every(h => h.indexOf('评分') < 0), '对比里不展示评分（评分只用于排序/清理）');
 

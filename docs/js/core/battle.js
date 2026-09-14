@@ -134,14 +134,16 @@
     return { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
   }
   function applyEnemyDefaults(enemy) {
-    // 敌人机制属性：命中/闪避均为固定数值（命中率 = 命中 ÷ (命中 + 闪避)）。
-    // 闪避按怪物类型给基础值（normal 5 / evolved 8 / mutant 12），让战斗有闪避博弈；命中保持 90。
+    // 敌人机制属性（2026-09-15 命中/闪避升格）：怪也有命中/闪避，跟怪等级走（config.battle.enemyMech，
+    // 与 battle-sim.mjs 敌人构造同源）。命中率 = 命中 ÷ (命中 + 闪避)，clamp 5%~95% 不变。
     if (enemy.critRate == null) enemy.critRate = Config.battle.critRate;
     if (enemy.critDamage == null) enemy.critDamage = Config.battle.critMultiplier;
-    if (enemy.hit == null) enemy.hit = 90;
+    const EM = Config.battle.enemyMech || {};
+    const emLv = Number(enemy.level) || 1;
+    const et = enemy.enemyType || 'normal';
+    if (enemy.hit == null) enemy.hit = Math.round((EM.hitPerLv || 8) * emLv);
     if (enemy.dodge == null) {
-      const et = enemy.enemyType || 'normal';
-      enemy.dodge = et === 'mutant' ? 12 : et === 'evolved' ? 8 : 5;
+      enemy.dodge = Math.round((((EM.dodgeAtRef || {})[et]) || 140) * Math.pow(emLv / (EM.refLevel || 55), EM.dodgeExp || 1.35));
     }
     if (enemy.lifesteal == null) enemy.lifesteal = 0;
     // 敌人侧三新词缀兜底：怪物没配就是 0，calcDamage 行为与旧版一致
@@ -472,7 +474,9 @@
     const mult = (att.critDamage == null) ? Config.battle.critMultiplier : att.critDamage;
     const isCrit = Math.random() < rate;
     // 穿透：只削防御，不把防御削成负数（负防御会放大伤害，穿透不该有这个收益）
-    const effDef = Math.max(0, def - Math.max(0, att.pen || 0));
+    // 穿透（2026-09-15 改百分比破甲，与 battle-sim.mjs calcDamage 同源）：有效防御 ×（1 − X%），上限 80%
+    const penPct = Math.min(80, Math.max(0, att.pen || 0));
+    const effDef = Math.max(0, Math.round(def * (1 - penPct / 100)));
     // 攻防递减对抗（2026-09-09）：防御与攻击相等时挡掉一半，永远挡不完
     let dmg = Math.max(1, Math.round(atk * atk / (atk + effDef)));
     if (isCrit) dmg = Math.floor(dmg * mult);
