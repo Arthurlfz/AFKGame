@@ -420,6 +420,10 @@
   async function identifyEquip(eq, card) {
     const have = window.Materials && window.Materials.getQuantity ? window.Materials.getQuantity('鉴定石') : 0;
     if (!have || have <= 0) { addLog('没有鉴定石，无法鉴定（去挂机捡鉴定石）'); return; }
+    /* 扫光演出必须在【点下去那一刻】就开始（2026-09-15 修）：
+     * 原先它写在两次 await（扣鉴定石 + 同步云端）之后 —— 这 ~0.7 秒里屏幕完全空白，
+     * 玩家以为没点上就会反复点（重复扣石头）。提到前面后，等待过程本身就是演出。 */
+    const s = document.createElement('div'); s.className = 'bc-scan'; card.appendChild(s);
     const r = await window.Materials.spend('鉴定石', 1);
     if (!r || !r.ok) { addLog('鉴定失败：' + ((r && r.error) || '鉴定石不足')); return; }
     eq.identified = true;
@@ -437,7 +441,6 @@
         return;
       }
     }
-    const s = document.createElement('div'); s.className = 'bc-scan'; card.appendChild(s);
     // 揭晓演出（2026-09-14）：只有金装走完整那套（卡片流光 + 词缀逐条亮起）。
     // 白/蓝装鉴定太频繁，每次都演一遍会烦 —— 它们只保留背包格上的扫光。
     const rar = rarityOf(eq);
