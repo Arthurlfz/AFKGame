@@ -274,7 +274,7 @@
         idBtn.className = 'btn-sm id';
         idBtn.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 鉴定';
         idBtn.title = '消耗 1 鉴定石揭晓词缀';
-        idBtn.onclick = (e) => { e.stopPropagation(); identifyEq(eq); };
+        idBtn.onclick = (e) => { e.stopPropagation(); identifyEq(eq, idBtn); };
         actions.appendChild(idBtn);
       }
       const lockBtn = document.createElement('button');
@@ -512,7 +512,7 @@
             '<button class="btn-sm id" id="eq-unid-btn"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 鉴定（消耗 1 鉴定石）</button>' +
           '</div>';
         const idBtn = craftEl.querySelector('#eq-unid-btn');
-        if (idBtn) idBtn.onclick = () => identifyEq(eq);
+        if (idBtn) idBtn.onclick = () => identifyEq(eq, idBtn);
       }
       return;
     }
@@ -521,10 +521,16 @@
   function renderEqDetail(eq) { renderEqDetailInto($('eq-detail'), eq); } // 侧边栏装备页
   function renderBagEqDetail(eq) { renderEqDetailInto($('bag-eq-detail'), eq); } // 背包窗口装备子页
   /* ---------- 鉴定：消耗 1 鉴定石揭晓未鉴定装备（与背包 tab 的 identifyEquip 同规则） ---------- */
-  async function identifyEq(eq) {
+  async function identifyEq(eq, btn) {
     if (!eq || eq.identified !== false) return;
     const have = window.Materials && window.Materials.getQuantity ? window.Materials.getQuantity('鉴定石') : 0;
     if (!have || have <= 0) { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.34-4.34"/></svg> 没有鉴定石', '去挂机捡鉴定石'); return; }
+    /* 反馈（2026-09-15）：扣鉴定石 + 同步云端 = 2 趟往返（约 0.7 秒），原先这段时间按钮毫无变化，
+     * 玩家以为没点上会反复点（重复扣石头）。用 runWithLoading 包住【整个鉴定流程】——
+     * 不能只包扣石那一步，否则后面同步云端那段又没反馈了。
+     * ⚠️ `btn || {}`：runWithLoading 遇到"按钮不存在/已禁用"会直接 early return 什么都不做，
+     *    那样鉴定会被静默跳过；传个空对象当占位，保证"没有按钮时照样鉴定，只是没有 loading 态"。 */
+    return UI.runWithLoading(btn || {}, '鉴定中…', async () => {
     const r = await window.Materials.spend('鉴定石', 1);
     if (!r || !r.ok) { showToast('❌ 鉴定失败', (r && r.error) || '鉴定石不足'); return; }
     eq.identified = true;
@@ -545,6 +551,7 @@
     showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> 鉴定完成', eq.name);
     UI.renderAll();
     if (activeEqId === eq.id) renderBagEqDetail(eq);
+    });   // ← 对应上面 return UI.runWithLoading(btn, '鉴定中…', async () => {
   }
   function hideEqDetail() {
     const hostEl = $('eq-detail');

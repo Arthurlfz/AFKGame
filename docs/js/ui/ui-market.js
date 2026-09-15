@@ -732,7 +732,7 @@
         else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
         return;
       }
-      const res = l.isBot ? await Market.buyBotEgg(l.id) : await Market.buyEgg(l.id);
+      const res = await UI.runWithLoading(btn, '购买中…', () => l.isBot ? Market.buyBotEgg(l.id) : Market.buyEgg(l.id)) || { error: '请稍候再试' };
       if (res.error) showToast('❌ 购买失败', res.error);
       else { showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 购买成功', `获得 ${window.Drop.makeEggName(l.egg_type)}，去「宠物 → 宠物蛋」孵化`); UI.renderAll(); }
     };
@@ -772,7 +772,7 @@
         return;
       }
       if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买'); return; }
-      const res = l.isBot ? await Market.buyBotMaterial(l.id) : await Market.buyMaterial(l.id);
+      const res = await UI.runWithLoading(btn, '购买中…', () => l.isBot ? Market.buyBotMaterial(l.id) : Market.buyMaterial(l.id)) || { error: '请稍候再试' };
       if (res.error) { showToast('❌ 购买失败', res.error); return; }
       // 真实单：云端已把货写进 materials，本地同步（加货 / 扣收款材料）；AI 假单内部已处理
       if (!l.isBot) {
