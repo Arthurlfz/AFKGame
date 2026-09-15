@@ -104,19 +104,60 @@ async function handle(req: Request): Promise<Response> {
 
   const now = new Date().toISOString(); // 服务器权威时间
 
-  // ---------- start / pause / resume / stop：状态机直接走 RPC ----------
-  if (action !== 'settle') {
+  // ---------- pause / resume / stop：状态机直接走 RPC ----------
+  if (action === 'pause' || action === 'resume' || action === 'stop') {
     const { data, error } = await supabase.rpc('battle_session', {
       p_action: action,
-      p_area_id: body.areaId || null,
-      p_pet_id: body.petId || null,
+      p_area_id: null,
+      p_pet_id: null,
       p_now: now
     });
     if (error) return json({ ok: false, error: 'RPC_FAILED', detail: error.message }, 500);
     return json({ ok: true, ...data });
   }
 
+  /* ---------- start（2026-09-15 减往返）：一条请求干完三件事 ----------
+   *   ① 先把【旧会话】的账结清。换图/换宠时旧会话还在跑，客户端这次不再单独发一次 settle，
+   *      所以这一步是它的替代品 —— 而且放在服务器侧做，客户端就只付一次网络往返。
+   *      （旧代码里客户端要串三趟：结旧账 → start → 要首段剧本，点一次挂机等 2~3 秒。）
+   *   ② 再停旧建新。`battle_session('start')` 只把旧会话置 stopped、**不结账**，
+   *      所以①必须排在它前面，否则旧会话尾巴上的账会永久丢掉。
+   *   ③ 最后把【新会话的第一段剧本】一起返回 —— 客户端拿到就能直接开演，省掉第 3 趟。
+   * ⚠️ 退路：①②③ 任何一步没成功，都必须让客户端还能自己再 settle 一次（返回 ok:true 但不带 script），
+   *    老版本前端 / 网络抖动都不会因此卡死。 */
+  if (action === 'start') {
+    await settleQuiet(supabase, uid, runtimeConfig, now);          // ① 结旧账
+    const { data, error } = await supabase.rpc('battle_session', {
+      p_action: 'start',
+      p_area_id: body.areaId || null,
+      p_pet_id: body.petId || null,
+      p_now: now
+    });
+    if (error) return json({ ok: false, error: 'RPC_FAILED', detail: error.message }, 500);
+    if (data && (data as any).ok === false) return json({ ok: false, ...(data as any) });
+    const first = await settleQuiet(supabase, uid, runtimeConfig, now); // ③ 新会话首段录像
+    if (!first) return json({ ok: true, ...((data as any) || {}) });
+    return json({ ok: true, ...((data as any) || {}), ...first });
+  }
+
   // ---------- settle：核心结算 ----------
+  return doSettle(supabase, uid, runtimeConfig, now);
+}
+
+/* 结一次账并返回响应体（会话不存在/出错一律返回 null，调用方据此退回老路）。
+ * 用 clone().json() 而不是改 doSettle 的返回类型：结算流水线一行都不动，风险最小。 */
+async function settleQuiet(supabase: any, uid: string, runtimeConfig: any, now: string): Promise<any | null> {
+  try {
+    const res = await doSettle(supabase, uid, runtimeConfig, now);
+    const body = await res.clone().json();
+    return body && body.ok ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+/* 核心结算流水线（原封不动从 handle 里搬出来，只把 uid / runtimeConfig / now 变成入参）。 */
+async function doSettle(supabase: any, uid: string, runtimeConfig: any, now: string): Promise<Response> {
   // 1) 找当前 active 会话（本人，未停止）
   const { data: session, error: sessErr } = await supabase
     .from('idle_sessions')
@@ -322,4 +363,4 @@ async function handle(req: Request): Promise<Response> {
     totalFights: settleRes?.total_fights ?? session.total_fights + plan.result.totalFights,
     totalExp: settleRes?.total_exp ?? session.total_exp + plan.result.totalExp
   });
-}
+} // doSettle 结束（原 handle 内的结算段落，上方 handle 已在 start 分支后闭合）

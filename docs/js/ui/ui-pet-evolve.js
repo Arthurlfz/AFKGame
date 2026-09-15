@@ -219,14 +219,16 @@
       renderEvolvePreview(pet, i, matName, have);
     };
     cb.innerHTML = `<button class="confirm-btn" id="evolve-ok"${canEvolve ? '': 'disabled'}>确认进化</button>`;
-    cb.querySelector('#evolve-ok').onclick = async () => {
+    /* 进化要串 2~3 次服务器往返（扣进化素材 → 改宠物），约 0.7~1 秒。加反馈，别让玩家干等。 */
+    const evoBtn = cb.querySelector('#evolve-ok');
+    evoBtn.onclick = async () => {
       if (!canEvolve) {
         showToast('无法进化', !lvOk ? '等级不够': '材料不足');
         return;
       }
       const origName = pet.name;
       const origGrowth = pet.growth;
-      const res = await Evolve.evolve(pet.id, i, evolvePreview.boost, evolvePreview.boostItemId);
+      const res = await UI.runWithLoading(evoBtn, '进化中…', () => Evolve.evolve(pet.id, i, evolvePreview.boost, evolvePreview.boostItemId)) || { error: '请稍候再试' };
       if (res.error) { showToast('进化失败', res.error); return; }
       const changed = res.keepForm ? '（形态不变）': '';
       const itemText = res.boostItem ? `（消耗 ${res.boostItem.name}）` : '';
@@ -272,8 +274,9 @@
     cb.innerHTML = `<button class="confirm-btn" id="god-cul-go"${(!item || have < 1 || full || outOfTurn) ? ' disabled' : ''}>确认培育</button>`;
     const sel = document.getElementById('god-cul-item');
     if (sel) sel.onchange = () => { godCulItemId = sel.value; renderGodCultivate(main); };
-    document.getElementById('god-cul-go').onclick = async () => {
-      const res = await Merge.cultivate(main.id, godCulItemId);
+    const godCulBtn = document.getElementById('god-cul-go');
+    godCulBtn.onclick = async () => {
+      const res = await UI.runWithLoading(godCulBtn, '培育中…', () => Merge.cultivate(main.id, godCulItemId)) || { error: '请稍候再试' };
       if (res.error) { addLog(`培育失败：${res.error}`); showToast('培育失败', res.error); return; }
       addLog(`培育成功！${res.pet.name} 成长 +${res.add.toFixed(1)}（消耗 ${res.itemName}；本轮还剩 ${res.left}/${maxCul} 次）`);
       showToast('培育成功！', `${res.pet.name} 成长 +${res.add.toFixed(1)}（剩 ${res.left} 次）`);

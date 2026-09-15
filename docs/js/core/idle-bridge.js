@@ -208,6 +208,11 @@
    * gaugeRaf = requestAnimationFrame(...) 会覆盖句柄，第一个循环取消不掉
    * → 两条 rAF 同时推进行动条、重复结算。 */
   let starting = false;
+  /* 服务器能力标记（2026-09-15 减往返）：新版本 battle-settle 的 start 会把「新会话的第一段录像」
+   * 一起返回（r.script 有值）。**服务器还没换新版时必须退回老路** —— 否则交棒不再结账，
+   * 而旧版 start 又只停不结账，换图时"客户端落后于窗口"那一小段账会丢。
+   * 所以快路走不走，以服务器【实际返回过剧本】为准，前后端不必同时上线。 */
+  let serverStartReturnsScript = false;
   async function start(area, pet) {
     if (!ENABLED) return { error: 'DISABLED' };
     if (active || starting) return { ok: !!active };
@@ -234,9 +239,18 @@
     active = true;
     if (window.UI) window.UI.updateStatus('fighting', 0);
     startShow();
-    // 首段剧本 = 一次 settle：服务器预结算接下来 30 秒并当场入账，客户端拿到的是
-    // 已入账的录像（回放即真账）。点击 → 开打的等待 = 一次 Edge Function 往返。
-    settleNow().catch(function () { /* 忽略 */ });
+    /* 首段剧本（2026-09-15 减一趟往返）：服务器在 start 的响应里已经把「新会话的第一段录像」
+     * 一起带回来了 —— 点「开始挂机」到首怪出现的等待 = 【一次】往返。
+     * 旧写法要 start + settle 两次；换图时还要再加一次"结旧账"，共三趟，这就是"不能马上挂"。
+     * 响应里没有剧本（老版本 EF / 那一段结算失败）→ 退回老路自己 settle 一次，行为不变。 */
+    serverStartReturnsScript = !!(r.script && r.script.events && r.script.events.length);
+    if (serverStartReturnsScript) {
+      blog('[战斗·开局] start 已带回首段剧本（' + r.script.events.length + ' 场），省掉一次结算往返');
+      applyAuthoritative(r);              // 真账入本地（经验/等级/血量）
+      presentSettle(r, r.script, false);  // 装剧本 → 演出立刻开打
+    } else {
+      settleNow().catch(function () { /* 忽略 */ });
+    }
     schedule();
     return { ok: true };
   }
@@ -297,7 +311,30 @@
     return ending;
   }
   function shutdown() { return endSession(true); }  // 停机 / 让位：结算 + 服务器停会话
-  function handoff() { return endSession(false); }  // 换图交棒：结算，会话交给下一次 start
+  /* 换图交棒（2026-09-15 减一趟往返）：**只拆本地演出，不等结算、不发任何请求**。
+   * 旧写法是 `await endSession(false)`，也就是「先等一次完整 EF 往返把账结掉，再让出画面」——
+   * 而玩家点「开始挂机」时还要再等 start + 首段剧本两次往返，于是点一次挂机要串三趟
+   *（结旧账 → 开新会话 → 要第一段录像），表现就是"换图点挂机不能马上挂"。
+   * 现在这笔账交给【紧接着的那一次 start】在服务器侧用同一条请求结清
+   *（battle-settle 的 start 分支：先结旧会话 → 再停旧建新 → 顺带把新会话首段录像一起返回）。
+   * ⚠️ 为什么可以不等：服务器是「先记账后放片」—— 画面这一段录像对应的 30 秒**早已入账并写库**
+   *（battle_settle 的 p_cursor 直接跳到剧本窗尾），所以此刻旧会话并不欠账。
+   * ⚠️ 与旧写法的行为差异只有一处：旧代码在"客户端落后于窗口"（切后台被冻结很久）时
+   * 顺手补了一次账；现在这一次补账由服务器 start 里的"先结旧会话"承担，账一样不会丢。 */
+  function handoff() {
+    /* ⚠️ 服务器还是旧版（start 不带剧本，serverStartReturnsScript=false）→ 退回
+     * 「先结账再交棒」的老路：行为与部署前逐字一致，前后端不必同时上线。 */
+    if (!serverStartReturnsScript) return endSession(false);
+    if (!active) { releasePage(); return Promise.resolve(); }
+    active = false;
+    clearTimeout(timer); timer = null;
+    stopShow();
+    petId = null;
+    sessionAreaId = null;
+    releasePage();
+    blog('[战斗·交棒] 已让出画面（不等结算）｜旧账由下一次 start 在服务器侧结清');
+    return Promise.resolve();
+  }
   /* 会话已不在服务器侧（自愈失败等）：只做本地清理，不再发任何请求。
    * ⚠️ 所有"停下来"都必须留日志（2026-09-13 修）：以前这里是静默停机，
    * 玩家只看到按钮变回「开始自动战斗」、控制台干干净净 —— 事后完全没法排查（用户实测）。 */
@@ -674,6 +711,7 @@
     scaled.raw = enemyData;   // 自检重挂用未缩放的原始数据（否则会被二次缩放）
     scaled.level = lv;
     dropPendingHits();        // 换怪：上一只在飞的刀一律作废
+    cancelHideEnemy();        // 新怪上台 → 上一场那次"延迟收起"作废（别把这只新怪藏了）
     showEnemy = scaled;
     showEnemyMountedAt = performance.now();
     // 本场演出配额（刀数来自剧本，模拟器统计的真实出手次数）。
@@ -703,6 +741,33 @@
     return true;
   }
 
+  /* ---------- 敌人容器的"收起"时机（2026-09-15 修「一刀秒杀看不到伤害」） ----------
+   * 伤害飘字是 appendChild 到 #enemy-icon 里的，而 #enemy-icon 就在 #enemy-fighter 里。
+   * 于是"一场结束就 display:none"会把刚飘出来的数字一起藏掉 —— 最要命的是【斩杀那一刀】：
+   * 代码顺序是「飘字 → 判定刀数用完 → 立刻结算本场 → 立刻隐藏」，全在同一个同步块里，
+   * 浏览器一次中间状态都没画过，玩家永远看不到决定胜负的那一下。
+   * 平时多刀砍不死时看不出来（前面的刀都看得见），一旦能一刀秒杀，那唯一的一刀就全没了。
+   * 现在改成【延迟收起】：等飘字播完（fs-float 0.8s）再收；期间只要下一只怪已经挂上台，
+   * 这次收起就自动作废。 */
+  const ENEMY_HIDE_MS = 950;
+  let enemyHideTimer = null;
+  function cancelHideEnemy() {
+    clearTimeout(enemyHideTimer);
+    enemyHideTimer = null;
+  }
+  function hideEnemySoon(ms) {
+    cancelHideEnemy();
+    enemyHideTimer = setTimeout(function () {
+      enemyHideTimer = null;
+      // 已经在演下一只了（或进了回血等待）→ 谁都别碰这只容器
+      if (showEnemy || waitingHeal) return;
+      try {
+        const ef = document.getElementById('enemy-fighter');
+        if (ef) ef.style.display = 'none';
+      } catch (e) { /* DOM 缺失（测试环境）不影响状态机 */ }
+    }, ms);
+  }
+
   function enterHealWait(UI) {
     waitingHeal = true;
     waitingHealAt = performance.now();
@@ -712,8 +777,7 @@
     if (UI && UI.updateStatus) UI.updateStatus('recovering', totalFights);
     dropPendingHits();
     showEnemy = null;
-    const ef = document.getElementById('enemy-fighter');
-    if (ef) ef.style.display = 'none';
+    hideEnemySoon(ENEMY_HIDE_MS);   // 别立刻收：败方/斩杀那一刀的飘字还挂在里面
   }
 
   // 宠物可演出的主动技能（终形态名 + 等级达标）；变异剥后缀继承本体
@@ -932,8 +996,8 @@
     freezeUntil.enemy = now;
     const stop2 = ((window.Config.battle || {}).stopHpRatio) || 0.3;
     const needHeal = (!f.win || showHp <= maxHp * stop2);
-    const ef = document.getElementById('enemy-fighter');
-    if (ef) ef.style.display = 'none';
+    // ⚠️ 不要在这里立刻 display:none：斩杀那一刀的飘字刚刚才生成（见 hideEnemySoon 的注释）
+    hideEnemySoon(ENEMY_HIDE_MS);
     if (needHeal) enterHealWait(UI);
   }
 

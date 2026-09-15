@@ -179,9 +179,12 @@
     if (itemSel) {
       itemSel.onchange = () => { synthItemId = itemSel.value; renderSynthPreview(main, matName, matAmt, haveMat, mutPct); };
     }
-    cb.querySelector('#synth-ok').onclick = async () => {
+    /* ⚠️ 合成要串 4~6 次服务器往返（扣材料/道具 → 查条件 → 存新宠 → 删两只素材宠），约 1~2 秒。
+     * 这段时间必须给反馈，否则玩家以为没点着 → 反复点（重复扣材料，这个坑踩过）。 */
+    const synthBtn = cb.querySelector('#synth-ok');
+    synthBtn.onclick = async () => {
       if (!matOk || !itemOk) { showToast('无法合成', synthItemId ? '材料或道具不足' : '材料不足'); return; }
-      const res = await Merge.synthesize(main.id, sub.id, synthItemId);
+      const res = await UI.runWithLoading(synthBtn, '合成中…', () => Merge.synthesize(main.id, sub.id, synthItemId)) || { error: '请稍候再试' };
       if (res.error) { showToast('合成失败', res.error); return; }
       if (res.isGod) {
         // 神级宠降世（手册 2.6）：金色特殊提示

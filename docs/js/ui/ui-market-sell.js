@@ -335,7 +335,7 @@
     btn.onclick = mine ? async () => {
       const listing = Market.getPetListing(pet.cloudId);
       if (!listing) return;
-      const res = await Market.cancelPet(listing.listingId);
+      const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelPet(listing.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${pet.name} 已下架`); UI.renderAll(); }
     } : () => openSellModal('pet', pet);
@@ -365,7 +365,7 @@
     btn.onclick = mine ? async () => {
       const listing = Market.getItemListing(eq.cloudId);
       if (!listing) return;
-      const res = await Market.cancelItem(listing.listingId);
+      const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelItem(listing.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${eq.name} 已下架`); UI.renderAll(); }
     } : () => openSellModal('item', eq);
@@ -390,7 +390,7 @@
     btn.onclick = mine ? async () => {
       const my = Market.getMyListedEggs ? Market.getMyListedEggs().find(x => x.eggType === baseName) : null;
       if (!my) return;
-      const res = await Market.cancelEgg(my.listingId);
+      const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelEgg(my.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${window.Drop.makeEggName(baseName)} 已下架`); UI.renderAll(); }
     } : () => openSellModal('egg', baseName);
@@ -414,7 +414,7 @@
       <div class="mk-card-foot"><button class="mk-btn ${listed ? 'recall' : 'buy'}">${listed ? '取回' : '上架'}</button></div>`;
     const btn = div.querySelector('.mk-btn');
     btn.onclick = listed ? async () => {
-      const res = await Market.cancelMaterial(listed.listingId);
+      const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelMaterial(listed.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${entry.name} ×${listed.goodQty || 0} 已回到背包`); UI.renderAll(); }
     } : () => openSellModal('material', entry);

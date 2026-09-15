@@ -1677,8 +1677,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   35%  { opacity:1; }
   100% { opacity:0; transform:translateX(24%); }
 }
-/* 敌人被击败：淡出 + 下沉消散（下一场 resetBattle 时移除还原） */
-#tab-battle .fighter-enemy .stage-avatar.defeated {
+/* 敌人被击败：淡出 + 下沉消散（下一场 resetBattle 时移除还原）
+ * ⚠️ 动画挂在【立绘 img】上，不是挂在 .stage-avatar 容器上（2026-09-15 修）：
+ *   伤害飘字是 appendChild 到 .stage-avatar 里的 —— 容器一 opacity:0，斩杀那一刀的数字
+ *   会跟着尸体一起淡掉（能一刀秒杀时那是唯一的一刀，等于完全看不到伤害）。 */
+#tab-battle .fighter-enemy .stage-avatar.defeated img {
   animation:defeated .55s ease-in forwards;
 }
 @keyframes defeated {

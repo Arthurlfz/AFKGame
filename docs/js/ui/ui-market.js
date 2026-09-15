@@ -630,7 +630,8 @@
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
-        const res = await Market.cancelItem(l.id);
+        // 取回 = 撤销挂单 + 一次全量刷新，两趟往返（~0.7s）；按钮必须给反馈，别让玩家以为没点上
+        const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelItem(l.id)) || { error: '请稍候再试' };
         if (res.error) { showToast('❌ 取回失败', res.error); return; }
         showToast('↩️ 已取回', `${l.item_name} 已下架`);
         UI.renderAll();
@@ -690,7 +691,7 @@
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
-        const res = await Market.cancelPet(l.id);
+        const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelPet(l.id)) || { error: '请稍候再试' };
         if (res.error) { showToast('❌ 取回失败', res.error); return; }
         showToast('↩️ 已取回', `${l.pet_name} 已下架`);
         UI.renderAll();
@@ -726,7 +727,7 @@
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
-        const res = await Market.cancelEgg(l.id);
+        const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelEgg(l.id)) || { error: '请稍候再试' };
         if (res.error) showToast('❌ 取回失败', res.error);
         else { showToast('↩️ 已取回', `${window.Drop.makeEggName(l.egg_type)} 已下架`); UI.renderAll(); }
         return;
@@ -764,7 +765,7 @@
     const btn = div.querySelector('.mk-btn');
     btn.onclick = async () => {
       if (mine) {
-        const res = await Market.cancelMaterial(l.id);
+        const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelMaterial(l.id)) || { error: '请稍候再试' };
         if (res.error) { showToast('❌ 取回失败', res.error); return; }
         showToast('↩️ 已取回', `${l.good_name} ×${goodQty} 已回到背包`);
         UI.renderAll();

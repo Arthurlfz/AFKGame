@@ -218,9 +218,13 @@
     if (cryCheck) {
       cryCheck.onchange = () => { useCrystal = cryCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
     }
-    cb.querySelector('#merge-ok').onclick = async () => {
+    /* ⚠️ 涅槃要串 3~5 次服务器往返（查条件 → 逐项扣材料 → 改主宠 → 删副宠），实测 1~2 秒。
+     * 以前这段时间按钮不置灰也不改字 = 玩家以为没点着，会反复点（重复扣材料）。
+     * 统一走 UI.runWithLoading（打造/购买用的同一套）：点下立刻换文案 + 禁用，结束恢复。 */
+    const nirBtn = cb.querySelector('#merge-ok');
+    nirBtn.onclick = async () => {
       if (!canMerge) { showToast('无法涅槃', '道具或材料不足'); return; }
-      const res = await Merge.nirvana(main.id, sub.id, useCrystal, useNirvanaPill, useLock ? lockTraitId : null);
+      const res = await UI.runWithLoading(nirBtn, '涅槃中…', () => Merge.nirvana(main.id, sub.id, useCrystal, useNirvanaPill, useLock ? lockTraitId : null)) || { error: '请稍候再试' };
       if (res.error) { showToast('涅槃失败', res.error); return; }
       addLog(`涅槃成功！${res.main.name} 成长 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}，等级重置为 Lv.${res.main.level}，转生 ${res.main.rebornCount} 次；本轮培育次数已重置（0/10）`);
       showToast('涅槃成功！', `${res.main.name} 成长值 ${res.oldGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}`);

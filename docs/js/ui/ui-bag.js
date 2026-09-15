@@ -540,8 +540,10 @@
     if (hatchBtn) {
       hatchBtn.disabled = !UI.isLoggedIn();
       hatchBtn.innerHTML = UI.isLoggedIn() ? '孵化' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 登录后孵化';
+      /* ⚠️ 孵化要串 4 次服务器往返（建新宠 = insert + 装备槽更新，再扣蛋 = 先读后写），约 1.3 秒。
+       * 以前只有成功时才弹 toast，等待期间按钮完全没变化 = 玩家以为没点着，反复点会建出多只宠。 */
       hatchBtn.onclick = async () => {
-        const res = await hatchEgg(baseName);
+        const res = await UI.runWithLoading(hatchBtn, '孵化中…', () => hatchEgg(baseName));
         if (!res) return;
         if (res.error) { showToast('❌ 无法孵化', res.error); return; }
         showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 孵化成功！', escapeHtml(res.baby.name));

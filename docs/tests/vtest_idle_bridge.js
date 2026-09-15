@@ -25,6 +25,8 @@ function el() {
 /* ---------- 可配置的 EF 桩 ----------
  * 2026-09-09 回放版：settle 响应带 script（服务器已入账的录像），客户端不再本地模拟。 */
 let settleResp = { fights: 3, exp: 90, endHp: 500, petMaxHp: 800, level: 2, expLeft: 40, ok: true };
+// start 的响应可配置（2026-09-15 减往返）：默认不带剧本 = 老版本 EF 的行为（客户端退回自己 settle 一次）
+let startResp = null;
 let failNext = false;
 const calls = [];
 const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
@@ -45,7 +47,7 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
     const body = JSON.parse(opt.body);
     calls.push(body);
     if (failNext) { failNext = false; throw new Error('boom'); }
-    if (body.action === 'start') return mkRes({ ok: true, session_id: 'sess-1', status: 'active' });
+    if (body.action === 'start') return mkRes(startResp || { ok: true, session_id: 'sess-1', status: 'active' });
     if (body.action === 'stop') return mkRes({ ok: true, status: 'stopped' });
     if (body.action === 'settle') return mkRes(settleResp);
     return mkRes({ ok: false, error: 'BAD_ACTION' });
@@ -188,7 +190,47 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   await C('IdleBridge.settleNow()');
   A(C('globalThis.__dropCalls') === 20, 'L1. 补账按 detail 行数计，展示上限 20 场（50 场只补 20，防止一次性刷垮日志）');
 
-  C('IdleBridge.shutdown()'); // K/L 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
+  /* ---------- M. 减往返（2026-09-15）：start 直接带回首段录像 → 不再多发一次 settle ----------
+   * 背景：点一次挂机原本要跟服务器串三趟（结旧账 → start → 要首段剧本），实测 2~3 秒才开打。
+   * 现在服务器在 start 响应里就把新会话的第一段录像一起返回（见 battle-settle 的 start 分支）。 */
+  C('IdleBridge.shutdown()');
+  await S(120);                                            // 等收尾的 settle+stop 落地、占用权交还
+  const settlesBefore = calls.filter(c => c.action === 'settle').length;
+  const scriptM = { type: 'fight', t0: 0, t1: 6000, win: true, enemy: { name: '腐噜兽', level: 3 }, enemyLevel: 3, enemyName: '腐噜兽', exp: 30, hpStart: 400, hpLeft: 380, petHits: 2, enemyHits: 1, petDmg: [10, 10] };
+  startResp = {
+    ok: true, session_id: 'sess-M', status: 'active',
+    fights: 0, exp: 0, endHp: 500, petMaxHp: 800, level: 5, expLeft: 10,
+    elapsedSec: 0, totalFights: 0, detail: [],
+    script: { id: 'w-M', events: [scriptM], endHp: 500, petMaxHp: 800, totalExp: 30, level: 5, expLeft: 10, levelBefore: 5, expBefore: 10 }
+  };
+  const rM = await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
+  A(rM.ok === true, 'M1. start 成功');
+  A(calls.filter(c => c.action === 'settle').length === settlesBefore,
+    'M2. start 已带剧本 → 不再多发一次 settle（少一趟往返，这就是"点挂机要等 2~3 秒"的第 3 趟）');
+  A(C('IdleBridge.getScriptId()') === 'w-M', 'M3. 首段剧本被立刻装上（点击即开演，不用等第二次往返）');
+  A(C('IdleBridge.isActive()') === true, 'M4. 挂机已进入运行态');
+
+  /* ---------- N. handoff（换图交棒）只拆本地、不发任何请求 ---------- */
+  const beforeH = calls.length;
+  await C('IdleBridge.handoff()');
+  A(calls.length === beforeH, 'N1. handoff 不发任何请求（旧账由服务器下一次 start 结清 —— 省掉"结旧账"那一趟）');
+  A(C('IdleBridge.isActive()') === false, 'N2. handoff 后本地演出已收场');
+  A(C('BattleSession.isIdle()') === true, 'N3. handoff 后战斗页占用权已交还（新挂机才抢得到）');
+
+  /* ---------- O0/O1. 服务器还是旧版（start 不带剧本）→ 交棒必须退回"先结账"老路 ----------
+   * 这是快路的**安全阀**：客户端不假设服务器已升级，以"start 实际有没有带回剧本"为准。
+   * 没这道闸，旧版服务器下交棒不再结账、而旧 start 又只停不结账 → 换图会丢旧会话尾巴。 */
+  startResp = null; // 模拟旧版 EF；后面的段落也依赖它为空（走"自己 settle 一次"的老路）
+  const rO = await C('IdleBridge.start({id:"a1"}, Pet.getActivePet())');
+  A(rO.ok === true, 'O0. 旧版服务器下 start 仍成功（客户端退回老路）');
+  await S(80); // 等 start 内部 fire-and-forget 的那次 settle 落地
+  const beforeH2 = calls.length;
+  await C('IdleBridge.handoff()');
+  await S(60);
+  A(calls.length > beforeH2, 'O1. 旧版服务器下 handoff 仍发结账请求（不丢旧会话尾巴）');
+  A(C('IdleBridge.isActive()') === false, 'O2. 交棒后本地演出已收场');
+
+  C('IdleBridge.shutdown()'); // M/N/O 段重新 start 过：不停掉 rAF 桩会让 node 进程永不退出
 
   /* ---------- M~O. 野外战斗"卡住/怪消失"三处修复的回归（2026-09-10） ---------- */
   const SRC = fs.readFileSync('../js/core/idle-bridge.js', 'utf8');
@@ -301,6 +343,21 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   A(/IdleBridge\.isActive/.test(srcOf('ui-dev.js')), 'S3. 开发面板的等级写入确有托管闸');
   A(/duringPetEdit/.test(srcOf('pet_evolve.js')) && /duringPetEdit/.test(srcOf('pet_merge.js')) && /duringPetEdit/.test(srcOf('tutorial_mode.js')),
     'S4. 进化/合成/涅槃/引导顶等级 都走 IdleBridge.duringPetEdit（先结清真账再改宠物）');
+
+  /* ---------- T. 静态守值：斩杀那一刀的伤害飘字不许被"同帧隐藏敌人"吃掉（2026-09-15） ----------
+   * 事故：伤害飘字是 appendChild 到 #enemy-icon 里的，而 #enemy-icon 就在 #enemy-fighter 里。
+   * 本场结算时若【同一个同步块里】立刻 display:none，刚生成的数字浏览器一次都没画过 ——
+   * 一刀秒杀时那是唯一的一刀，玩家等于完全看不到伤害（多刀时只是最后一刀看不见，不易察觉）。
+   * 规则：① 收敌人容器必须延迟到飘字播完；② 击败淡出动画不许挂在会被飘字继承的容器上。 */
+  A(/showEnemy = null;[\s\S]{0,160}?hideEnemySoon\(/.test(SRC),
+    'T1. 回血等待那条路走延迟收起（不再立刻隐藏敌人容器）');
+  A(/const needHeal[\s\S]{0,220}?hideEnemySoon\(/.test(SRC),
+    'T2. 本场收尾那条路走延迟收起（斩杀刀的飘字还在容器里）');
+  const HIDE_MS = Number((SRC.match(/ENEMY_HIDE_MS\s*=\s*(\d+)/) || [])[1] || 0);
+  A(HIDE_MS >= 800, 'T3. 收起延迟 ≥ 飘字时长 0.8s（当前 ' + HIDE_MS + 'ms）');
+  const CSS = fs.readFileSync(path.join(__dirname, '..', 'css', 'game.css'), 'utf8');
+  A(/#tab-battle \.fighter-enemy \.stage-avatar\.defeated img\s*\{/.test(CSS),
+    'T4. 击败淡出挂在立绘 img 上（挂容器上会把刀伤飘字一起淡掉）');
 
   console.log('\nALL IDLE BRIDGE TESTS PASSED');process.exit(0);
 })().catch(e => { console.error('FAIL: 未捕获异常 ' + (e && e.stack || e)); process.exit(1) });
