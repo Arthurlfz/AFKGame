@@ -681,25 +681,19 @@
       const spentList = [];
       // ① 收集类先扣材料：扣失败说明没货，此时【奖励一份未发、服务端也未占位】，回滚完全安全
       if (q.type === 'collect' || q.type === 'collect_loop') {
-        // matList：每种都要扣 need 个；中途失败把已扣的补回来
-        if (q.type === 'collect' && Array.isArray(q.matList)) {
-          for (const name of q.matList) {
-            const sp = await Materials.spend(name, q.need);
-            if (!sp.ok) {
-              for (const [n, amt] of spentList) Materials.gain(n, amt);
-              unmarkFinished(q);
-              return { error: sp.error || '材料不足' };
-            }
-            spentList.push([name, q.need]);
-          }
-        } else {
-          const spent = await Materials.spend(q.matName, q.need);
-          if (!spent.ok) {
-            unmarkFinished(q);
-            return { error: spent.error || '材料扣减失败' };
-          }
-          spentList.push([q.matName, q.need]);
+        // matList：每种都要扣 need 个
+        const matList = (q.type === 'collect' && Array.isArray(q.matList))
+          ? q.matList
+          : [q.matName];
+        /* 2026-09-15：一次请求【原子】扣完（原先逐个扣、中途失败把已扣的 gain 回来）。
+         * 服务端要么全扣要么全不扣，所以这里只需要把清单记进 spentList ——
+         * spentList 仍然有用：它是给【后面步骤】（服务端占位/发奖）失败时整体退回用的。 */
+        const sp = await Materials.spendMany(matList.map(n => ({ name: n, amount: q.need })));
+        if (!sp.ok) {
+          unmarkFinished(q);
+          return { error: sp.error || '材料不足' };
         }
+        for (const n of matList) spentList.push([n, q.need]);
       }
       /* ② 服务端权威的领取记录（2026-09-12 新增，堵「改本地 completed 无限重领」）：
        * 本地 quest_progress 客户端可改 → 清掉 completed 刷新一下就能再领一次。

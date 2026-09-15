@@ -103,6 +103,62 @@
     return { ok: true };
   }
 
+  /* ---------- 多材料【原子】扣减（2026-09-15） ---------- */
+  /* 一次请求扣完好几种材料 —— 走服务端 spend_materials(jsonb)：
+   * 服务端在一个事务里逐项扣，**任一项不足就整体回滚**（前面已扣的自动退回）。
+   * 为什么要它：
+   *   ① 往返 N 趟 → 1 趟（涅槃/合成/进化/收集任务原本要扣 2~N 种）；
+   *   ② 干掉了"扣一半再退回"的中间态 —— 原来靠客户端逐级 Materials.gain 补偿，
+   *      补偿期间是真会出现"材料被吞了再吐回来"的可见状态。
+   * 服务端还会**把同名材料合并成一笔**（分两笔扣时第一笔会把余额吃到不够第二笔），
+   * 所以调用方不用再自己合并同名项（pet_evolve.js 里那套合并逻辑现在可以留着不管，服务端兜了）。
+   * items: [{ name, amount }, ...]；返回 { ok, error? }，语义与 spend 一致。
+   * 空清单 / 全是 0 → 直接 { ok:true }，**不发请求**（涅槃可以一分钱不花）。 */
+  async function spendMany(items) {
+    const list = (items || []).filter(it => it && it.name && it.amount > 0);
+    if (!list.length) return { ok: true };
+    const need = {};
+    for (const it of list) need[it.name] = (need[it.name] || 0) + it.amount;
+    for (const n of Object.keys(need)) {
+      if ((local[n] || 0) < need[n]) return { ok: false, error: `${n} 不足` };
+    }
+    // 同 spend：先把还没上报的掉落补上去，否则云端余额里还没有这批，直接扣会误报「余额不足」
+    await flushMaterials();
+    const user = await Supabase.getCurrentUser();
+    if (!user) return { ok: false, error: '请先登录' };
+    let res;
+    try {
+      // ⚠️ jsonb 参数直接传数组，别 JSON.stringify（PostgREST 只认表级权限那条坑）
+      res = await Supabase.getClient().rpc('spend_materials', {
+        p_items: list.map(it => ({ name: it.name, amount: it.amount }))
+      });
+    } catch (e) { res = { data: null, error: e }; }
+    const error = res && res.error;
+    /* 旧库没有这个函数（迁移没跑）→ 退回单体版逐个扣：慢一点、可能留下中间态，但功能不能直接崩。
+     * ⚠️ 只对「函数不存在」这一类错降级；扣款失败（余额不足）绝不能降级重试，那是重复扣款。 */
+    if (error && /PGRST202|Could not find the function|function .* does not exist/i.test(String(error.message || '') + String(error.code || ''))) {
+      for (const it of list) {
+        const one = await spend(it.name, it.amount);
+        if (!one.ok) return one;
+      }
+      return { ok: true };
+    }
+    if (error) {
+      const msg = String(error.message || '');
+      if (msg.indexOf('INSUFFICIENT_MATERIAL') >= 0) {
+        const who = msg.split('INSUFFICIENT_MATERIAL:')[1];
+        return { ok: false, error: who ? `${who} 不足（云端）` : '材料不足（云端）' };
+      }
+      return { ok: false, error: msg || '材料扣减失败' };
+    }
+    if (res && res.data === false) return { ok: false, error: '材料不足（云端）' };
+    for (const n of Object.keys(need)) {
+      local[n] -= need[n];
+      if (local[n] <= 0) delete local[n];
+    }
+    return { ok: true };
+  }
+
   /* ---------- 本地 / 云端拆分（性能优化：本地先行 → 异步同步 → 失败回滚用） ---------- */
   // 纯本地累加（不回写云端；界面立即生效，云同步单独调 cloudGain）
   function gainLocal(name, amount) {
@@ -184,7 +240,7 @@
 
   /* ---------- 对外 API ---------- */
   window.Materials = {
-    gain, spend, gainLocal, spendLocal, cloudGain, cloudSpend, flushMaterials, clearAll,
+    gain, spend, spendMany, gainLocal, spendLocal, cloudGain, cloudSpend, flushMaterials, clearAll,
     getQuantity, setCloudMaterials, getLocal, loadCloudMaterials
   };
 })();

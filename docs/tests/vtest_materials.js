@@ -49,5 +49,52 @@ const withPending = C('JSON.stringify(Materials.getLocal())');
 C(`Materials.setCloudMaterials([{ name: '鉴定石', quantity: 5 }])`);
 A(C('JSON.stringify(Materials.getLocal())') === withPending, '刷新快照后未上报的掉落仍在（不会被误杀）');
 
-console.log(failures ? 'MATERIALS TESTS FAILED: ' + failures : 'ALL MATERIALS TESTS PASSED');
-process.exit(failures ? 1 : 0);
+/* ---- ⑤ spendMany：一次请求【原子】扣完多种材料（2026-09-15 减往返） ----
+ * 守两件事：① N 种材料只发 1 次 RPC（不是 N 次）；② 服务端说不足时【本地一分都不扣】。 */
+(async () => {
+  const setLocal = o => C(`Materials.setCloudMaterials(${JSON.stringify(Object.entries(o).map(([name, quantity]) => ({ name, quantity })))})`);
+  const q = n => C(`Materials.getQuantity(${JSON.stringify(n)})`);
+  const rpcN = fn => C('rpcCalls').filter(x => x === fn).length;
+  const cloudRows = rows => { ctx.materialsTable.length = 0; for (const [name, quantity] of rows) ctx.materialsTable.push({ id: 'm-' + name, user_id: 'u-many', name, quantity }); };
+  ctx.session = { user: { id: 'u-many' } };
+
+  /* ⑤-1 两样都够 → 一次 RPC，两样各扣各的 */
+  cloudRows([['甲石', 5], ['乙石', 2]]); setLocal({ '甲石': 5, '乙石': 2 });
+  let before = rpcN('spend_materials');
+  let r = await C(`Materials.spendMany([{ name: '甲石', amount: 2 }, { name: '乙石', amount: 1 }])`);
+  A(r.ok === true, '⑤ 两样都够 → 扣减成功');
+  A(q('甲石') === 3 && q('乙石') === 1, '⑤ 本地各扣各的额度（甲 5→3 / 乙 2→1）');
+  A(rpcN('spend_materials') - before === 1, '⑤ ⭐两个材料只发 1 次 RPC：' + (rpcN('spend_materials') - before));
+  A(rpcN('spend_material') === 0, '⑤ 没有退回单体版逐个扣（spend_material 一次都没调）');
+
+  /* ⑤-2 服务端说不足 → 本地一分都不扣（原子性的客户端那一半） */
+  cloudRows([['甲石', 5], ['乙石', 1]]); setLocal({ '甲石': 5, '乙石': 5 }); // 本地以为够、云端其实不够
+  r = await C(`Materials.spendMany([{ name: '甲石', amount: 2 }, { name: '乙石', amount: 3 }])`);
+  A(r.ok === false && String(r.error).indexOf('乙石') >= 0, '⑤ 中途不足 → 失败并点出是哪一种：' + JSON.stringify(r));
+  A(q('甲石') === 5, '⑤ ⭐原子性：失败时本地甲石原样不动（没被扣成 3）');
+  A(q('乙石') === 5, '⑤ 失败时不扣任何一样');
+
+  /* ⑤-3 同名两项：客户端也要合并后再校验（2+2=4 > 3 → 本地就该拦下，不必打服务器） */
+  cloudRows([['甲石', 3]]); setLocal({ '甲石': 3 });
+  before = rpcN('spend_materials');
+  r = await C(`Materials.spendMany([{ name: '甲石', amount: 2 }, { name: '甲石', amount: 2 }])`);
+  A(r.ok === false, '⑤ 同名两项按合计校验（2+2=4 > 余额 3 → 不足）');
+  A(rpcN('spend_materials') - before === 0, '⑤ 本地就不够时一次请求都不发');
+
+  /* ⑤-4 空清单 / 数量 0 → 成功且不发请求（涅槃可以一分钱不花） */
+  before = rpcN('spend_materials');
+  A((await C(`Materials.spendMany([])`)).ok === true, '⑤ 空清单直接成功');
+  A((await C(`Materials.spendMany([{ name: '甲石', amount: 0 }])`)).ok === true, '⑤ 数量 0 的项被忽略，仍算成功');
+  A(rpcN('spend_materials') - before === 0, '⑤ 空清单不发任何请求');
+
+  /* ⑤-5 未登录 → 不扣、提示先登录 */
+  ctx.session = null;
+  setLocal({ '甲石': 5 });
+  r = await C(`Materials.spendMany([{ name: '甲石', amount: 1 }])`);
+  A(r.ok === false && /登录/.test(r.error || ''), '⑤ 未登录 → 拒绝并提示登录：' + JSON.stringify(r));
+  A(q('甲石') === 5, '⑤ 未登录那次没动本地账');
+  ctx.session = { user: { id: 'u-many' } };
+
+  console.log(failures ? 'MATERIALS TESTS FAILED: ' + failures : 'ALL MATERIALS TESTS PASSED');
+  process.exit(failures ? 1 : 0);
+})();

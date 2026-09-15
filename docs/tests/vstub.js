@@ -28,6 +28,12 @@ if(t==='pet_egg')return{select:()=>tq(petEggTable,{}),insert:row=>({select:()=>(
 if(t==='quest_progress'){if(!globalThis.questTable)globalThis.questTable=[];const qp=globalThis.questTable;const uid=session?session.user.id:'anon';return{select:()=>tq(qp,{user_id:uid}),upsert:(row)=>({then:(res)=>{const i=qp.findIndex(x=>x.user_id===row.user_id);if(i>=0)qp[i]=Object.assign({},qp[i],row);else qp.push(Object.assign({},row));res({data:null,error:null})}})}};
 return{select:()=>tq([],{})};},
 rpc:async(fn,args)=>{rpcCalls.push(fn);if(fn==='add_material'){const uid=session?session.user.id:'anon';const r=materialsTable.find(x=>x.user_id===uid&&x.name===args.p_name);if(r)r.quantity+=args.p_amount;else materialsTable.push({id:'m'+(++uidSeq),user_id:uid,name:args.p_name,quantity:args.p_amount});return{data:null,error:null}}if(fn==='spend_material'){const uid=session?session.user.id:'anon';const r=materialsTable.find(x=>x.user_id===uid&&x.name===args.p_name&&x.quantity>=args.p_amount);if(!r)return{data:false,error:null};r.quantity-=args.p_amount;return{data:true,error:null}}
+// spend_materials（2026-09-15 多材料原子扣，对应 supabase/migrate_spend_materials.sql）：
+// 语义必须与线上 SQL 一致 —— 同名相加、任一项不足则【整体失败且一分不扣】。
+if(fn==='spend_materials'){const uid=session?session.user.id:'anon';const list=Array.isArray(args.p_items)?args.p_items:[];const need={};for(const it of list){const n=it&&it.name,a=Number(it&&it.amount)||0;if(!n||a<=0)return{data:false,error:null};need[n]=(need[n]||0)+a}
+for(const n of Object.keys(need)){const r=materialsTable.find(x=>x.user_id===uid&&x.name===n);if(!r||r.quantity<need[n])return{data:null,error:{message:'INSUFFICIENT_MATERIAL:'+n,code:'P0001'}}}
+for(const n of Object.keys(need)){materialsTable.find(x=>x.user_id===uid&&x.name===n).quantity-=need[n]}
+return{data:true,error:null}}
 // ---- 魔石钱包 / 商店（与 migrate_shop.sql 的四个函数语义一致）----
 const W=(uid)=>{let w=(typeof walletsTable!=='undefined'?walletsTable:[]).find(x=>x.user_id===uid);if(!w){w={user_id:uid,gems:0,total_recharged:0};walletsTable.push(w)}return w};
 if(fn==='get_my_wallet'){if(!session)return{data:[],error:null};const w=W(session.user.id);return{data:[{gems:w.gems,total_recharged:w.total_recharged}],error:null}}

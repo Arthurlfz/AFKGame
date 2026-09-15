@@ -165,28 +165,18 @@
       return { error: `${boostItem.name}不足` };
     }
 
-    // ---- 执行：先扣素材（云端原子扣，成功才继续） ----
+    // ---- 执行：一次请求把素材【原子】扣掉（成功才继续） ----
     // extra 与主素材同名 → 合并成一笔扣（分开扣会“先扣的吃掉余额”导致第二笔失败）
     const sameNameExtra = !!(rm.extra && rm.extra.name === materialName);
     const mainTotal = rm.amount + (sameNameExtra ? rm.extra.amount : 0);
-    const spent = await Materials.spend(materialName, mainTotal);
+    /* 2026-09-15 改原子扣：素材 + 异名额外素材 + 进化道具（原 2~3 趟）现在一趟扣完，
+     * 服务端任一项不足就整体回滚 ⇒ 下面那条"后一笔失败把前几笔 gain 回去"的补偿链删掉了
+     * （同名合并服务端也会做，这里保留 sameNameExtra/mainTotal 只给下面云端失败时的退回用）。 */
+    const evoSpends = [{ name: materialName, amount: rm.amount }];
+    if (rm.extra) evoSpends.push({ name: rm.extra.name, amount: rm.extra.amount });
+    if (boostItem) evoSpends.push({ name: boostItem.name, amount: 1 });
+    const spent = await Materials.spendMany(evoSpends);
     if (!spent.ok) return { error: spent.error || '素材扣减失败' };
-    // 异名额外素材：扣失败则把主素材退回去，不让玩家白亏
-    if (rm.extra && !sameNameExtra) {
-      const ex = await Materials.spend(rm.extra.name, rm.extra.amount);
-      if (!ex.ok) {
-        await Materials.gain(materialName, mainTotal);
-        return { error: ex.error || '素材扣减失败' };
-      }
-    }
-    if (boostItem) {
-      const itemSpent = await Materials.spend(boostItem.name, 1);
-      if (!itemSpent.ok) {
-        await Materials.gain(materialName, mainTotal);
-        if (rm.extra && !sameNameExtra) await Materials.gain(rm.extra.name, rm.extra.amount);
-        return { error: itemSpent.error || `${boostItem.name}扣减失败` };
-      }
-    }
 
     // ---- 计算结果；先不改本地，等云端更新成功后再提交 ----
     const oldGrowth = pet.growth;

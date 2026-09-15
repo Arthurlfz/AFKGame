@@ -228,25 +228,15 @@
       if (Materials.getQuantity(lockItem.name) < 1) return { error: '锁魂玉不足（指定特质需要 1 颗）' };
     }
 
-    if (useCrystal && bonusMult > 1) {
-      const cs = await Materials.spend(CB.material, CB.amount);
-      if (!cs.ok) return { error: cs.error || '材料扣减失败' };
-    }
-    if (nirPill) {
-      const ps = await Materials.spend(nirPill.name, 1);
-      if (!ps.ok) {
-        if (useCrystal && bonusMult > 1) Materials.gain(CB.material, CB.amount);
-        return { error: ps.error || `${nirPill.name}扣减失败` };
-      }
-    }
-    if (lockTraitId && lockItem) {
-      const ls = await Materials.spend(lockItem.name, 1);
-      if (!ls.ok) {
-        if (useCrystal && bonusMult > 1) Materials.gain(CB.material, CB.amount);
-        if (nirPill) Materials.gain(nirPill.name, 1);
-        return { error: ls.error || '锁魂玉扣减失败' };
-      }
-    }
+    /* 三样消耗【一次请求原子扣】（2026-09-15）：凝魂晶石 / 涅槃丹 / 锁魂玉（各 0~1 份）。
+     * 原先逐样扣、后一样失败再把前面已扣的 gain 回来 —— 2~3 趟往返，且退回期间玩家能看到
+     * "材料被吞了又吐回来"。现在服务端一个事务：要么一起扣掉，要么一样都不扣。 */
+    const nirSpends = [];
+    if (useCrystal && bonusMult > 1) nirSpends.push({ name: CB.material, amount: CB.amount });
+    if (nirPill) nirSpends.push({ name: nirPill.name, amount: 1 });
+    if (lockTraitId && lockItem) nirSpends.push({ name: lockItem.name, amount: 1 });
+    const nirPaid = await Materials.spendMany(nirSpends);
+    if (!nirPaid.ok) return { error: nirPaid.error || '材料扣减失败' };
 
     /* ---- 整单失败时把主宠和道具都还原（2026-09-11 修）----
      * 涅槃要串「扣道具 → 更新主宠 → 删副宠」三步，任一步失败都必须回到起点：
@@ -373,18 +363,19 @@
       return { error: `需要 ${S.material.amount} 颗${S.material.name}，去挂机刷材料吧` };
     }
 
-    const spent = await Materials.spend(S.material.name, S.material.amount);
-    if (!spent.ok) return { error: spent.error || '材料扣减失败' };
-
-    // 选中合成道具校验+消耗（第二版手册 2.2：道具化）
-    // 校验失败必须【退回已扣的合成之石】：道具不足/类别不对时玩家不该白亏基础材料
+    // 选中合成道具校验（第二版手册 2.2：道具化）
+    /* ⚠️ 校验挪到【扣款之前】（2026-09-15）：道具类别错/不够时根本不该动材料。
+     * 原先的写法是"先把合成之石扣了、道具不合规再 gain 退回"，为此写了 3 处补偿。
+     * 现在「合成之石 + 道具」一次性原子扣：要么两样一起扣掉，要么一样都不扣。 */
     const synthItem = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
     if (synthItem) {
-      if (synthItem.category !== 'synth') { Materials.gain(S.material.name, S.material.amount); return { error: '所选道具不是合成道具' }; }
-      if (Materials.getQuantity(synthItem.name) < 1) { Materials.gain(S.material.name, S.material.amount); return { error: synthItem.name + '不足' }; }
-      const is = await Materials.spend(synthItem.name, 1);
-      if (!is.ok) { Materials.gain(S.material.name, S.material.amount); return { error: is.error || '道具扣减失败' }; }
+      if (synthItem.category !== 'synth') return { error: '所选道具不是合成道具' };
+      if (Materials.getQuantity(synthItem.name) < 1) return { error: synthItem.name + '不足' };
     }
+    const synthSpends = [{ name: S.material.name, amount: S.material.amount }];
+    if (synthItem) synthSpends.push({ name: synthItem.name, amount: 1 });
+    const spent = await Materials.spendMany(synthSpends);
+    if (!spent.ok) return { error: spent.error || '材料扣减失败' };
 
     // 神级宠判定（第二版手册 2.2：道具化）：终阶 + 成长达标 + 等级达标 → 概率由选中道具 godChance 决定
     const gi = godSynthInfo(main, sub, itemId);
