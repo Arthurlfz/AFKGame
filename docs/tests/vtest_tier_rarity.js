@@ -33,13 +33,13 @@ console.log('  ilvl80', JSON.stringify(s80), '｜65', JSON.stringify(s65), '｜4
 A(!s80[0] && !s10[1] && !s10[2] && !s10[3], '门槛外不可能：ilvl 80 之外不出 T1；ilvl 10 只有 T4/T5');
 A(s80[1] > 0, 'ilvl 80 能出 T1（「可以出现」—— 顶级词缀不是锁死的）');
 const t1pct = (s80[1] || 0) / 20000 * 100;
-/* 2026-09-15：T1 概率改按装备等级分段上调（词缀统一规则后 T1=% 必须刷得到）→
- * ilvl 80 命中 minIlvl 55 段（权重 15/19/66）≈15%，不再是全档 5%。 */
-A(t1pct >= 12 && t1pct <= 18, `ilvl 80 的 T1 概率 ≈ 15%（实际 ${t1pct.toFixed(2)}%，权重 15/100，分段表 55+）`);
+/* 2026-09-15：T1 概率按装备等级分段上调（T1 只在塔里刷得到）→
+ * ilvl 80 命中 minIlvl 70 段（权重 15/19/66）≈15%，不再是全档 5%。 */
+A(t1pct >= 12 && t1pct <= 18, `塔（ilvl 80）的 T1 概率 ≈ 15%（实际 ${t1pct.toFixed(2)}%，权重 15/100，分段表 70+）`);
 A((s80[1] || 0) < (s80[3] || 0), 'T1 比 T3 稀有（权重递增，高档词缀求而不得）');
-/* T1 门槛从 70 降到 55（图10 ilvl 55~67 必须刷得到 T1）→ 改用 ilvl 40 验「T1/T2 不进池」 */
-A(!!s40[3] && !s40[2] && !s40[1], 'ilvl 40：T3 进池、T1/T2 不进池（T1 门槛 55 / T2 门槛 45）');
-A(!!s65[2] && !!s65[1], 'ilvl 65：T1/T2 都进池（55+ 段权重 15/19/66）');
+A(!!s40[3] && !s40[2] && !s40[1], 'ilvl 40：T3 进池、T1/T2 不进池（门槛 T1 70 / T2 60）');
+/* ⭐ 用户拍板：T1 门槛保持 70 —— 图 10（ilvl 55~60）**不出 T1**，T1 是塔的专属产出 */
+A(!s65[1] && !!s65[2], 'ilvl 65（图 10 档）：T2 进池、T1 不进池（T1 门槛 70 = 塔专属）');
 
 /* ---------- 2. 实际生成的装备守规矩（条数→颜色 / 每条独立 roll / 底材同池） ---------- */
 const scan = lv => C(`(function(){
@@ -56,10 +56,9 @@ A(g80.color === 'gold' && g80.count >= 4 && g80.count <= 5, `ilvl 80：4~5 条 �
  * 权重 30:25:25 → 单次抽样出 T4/T5 完全正常，断言却在要求必然 T3，于是三天两头红。
  * 真要守的不变量是「T1/T2 进不来」（门槛 60/70 未达标），用分布验证才不会误判。 */
 const dist55 = C(`(function(){const c={};for(let i=0;i<300;i++){const t=Equipment.generateEquipment(null,10,0,55).materialTier;c[t]=(c[t]||0)+1;}return c;})()`);
-/* 2026-09-15：T1 门槛 70→55，图10（ilvl 55）必须能出 T1/T2 —— 词缀统一规则后 T1 才是百分比，
- * 若后期野图刷不到 T1 就是满地死签。 */
-A((dist55[1] || 0) > 0, `野图图 10（ilvl 55）能出 T1（分布 ${JSON.stringify(dist55)}）—— 后期死签防线`);
-A((dist55[1] || 0) < (dist55[3] || 0), '图 10 的 T1 仍比 T3 稀有（T1 是头奖，不是常态）');
+/* ⭐ 用户拍板（2026-09-15）：T1 门槛保持 70 —— 图 10（ilvl 55）**不出 T1**，
+ * 顶级词缀是塔的专属产出；野图保留 T2/T3（其中机制类词缀仍是百分比点数，输出有价值）。 */
+A(!dist55[1] && !dist55[2], `图 10（ilvl 55）不出 T1/T2（分布 ${JSON.stringify(dist55)}）—— T1 是塔专属产出`);
 A((dist55[3] || 0) > 0, 'T3 能出现（门槛没被误伤）');
 A(g10.count >= 1 && g10.count <= 2 && (g10.color === 'white' || g10.color === 'blue'),
   `ilvl 10：1~2 条 → 白/蓝（实际 ${g10.count} 条 ${g10.color}）`);
@@ -72,9 +71,9 @@ A((craftSrc.match(/rollAffixTier\(window\.Equipment\.ilvlOf\(eq\)\)/g) || []).le
 A(craftSrc.indexOf('rollAffixTier(eq.rarity.id') < 0, '旧签名（按稀有度抽 T 阶）已清干净');
 
 /* ---------- 4. 配置表在位 ---------- */
-/* 2026-09-15：T1 门槛 70→55（图10 ilvl 55~67 必须刷得到 T1，否则后期满地死签） */
-A(C(`Config.equipment.affixIlvlGates[1]`) === 55 && C(`Config.equipment.affixIlvlGates[2]`) === 45,
-  'ilvl 门槛：T1=55 / T2=45（2026-09-15 拍板值）');
+/* 2026-09-15 用户拍板：T1 门槛保持 70（图 10 不出 T1，T1 是塔专属产出） */
+A(C(`Config.equipment.affixIlvlGates[1]`) === 70 && C(`Config.equipment.affixIlvlGates[2]`) === 60,
+  'ilvl 门槛：T1=70（塔专属）/ T2=60（2026-09-15 拍板值）');
 A((C(`(Config.equipment.affixTierWeightsByIlvl||[]).length`) || 0) >= 3,
   'T1 概率分段表在位（按装备等级上调，后期死签防线）');
 A(C(`(Config.equipment.affixCountByIlvl||[]).length`) === 4, 'affixCountByIlvl 四档区间表在位');

@@ -118,12 +118,16 @@ const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } c
     tiers1.push(d.eq.materialTier);
   }
   A(tiers1.every(t => t >= 4), 'D3. 图1 ilvl=6 底材全被门槛压到 T4/T5（实际：' + [...new Set(tiers1)].sort().join('/') + '）');
-  let sawT1 = false;
+  /* ⚠️ 2026-09-15 修正断言（这条以前是长期存量红）：底材 T 阶与词缀 T 阶共用同一套装备等级门槛，
+   * 而 T1 门槛是 70（T1 是塔的专属产出）→ 图 10（ilvl 55~60）**出不了 T1 底材**，最高 T3。
+   * 旧断言要求「图 10 能出 T1 底材」，与门槛表天然矛盾，所以它一直红着。 */
+  let bestT = 9;   // 数字越小越强
   for (let i = 0; i < 30; i++) {
     const d = await C(`(async () => await Drop.rollReward(${JSON.stringify({ name: '霸主·瘟熊·异变', level: 60, isBoss: true })}, ${JSON.stringify(area10)}, { boss: true, enemyLevel: 60, dry: true }))()`);
-    if (d.type === 'boss' && d.eq.materialTier === 1) sawT1 = true;
+    if (d.type === 'boss' && d.eq) bestT = Math.min(bestT, d.eq.materialTier);
   }
-  A(sawT1, 'D4. 图10 ilvl=60 能出 T1 底材（门槛放行）');
+  // ilvl=60 恰好达 T2 门槛（60）→ 底材最高 T2；T1（门槛 70）在图 10 出不了
+  A(bestT >= 2, `D4. 图10 ilvl=60 底材最高只到 T${bestT}（T1 要装备等级 70，图 10 出不了；T1 是塔专属产出）`);
 
   /* ===== E. quest.js：Boss 首通（沙箱） ===== */
   const qctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, navigator: {}, location: { href: 'http://x' }, localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, document: { getElementById: () => el(), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [], addEventListener() {} } };
