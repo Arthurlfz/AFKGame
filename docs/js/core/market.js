@@ -251,7 +251,13 @@
     const { data, error } = await Supabase.cancelPetListing(listingId);
     if (error) return { error: error.message };
     if (data === false) return { error: '取回失败：挂单不存在或已售出' };
-    await refresh();
+    /* 减往返（2026-09-15）：原来这里是 `await refresh()` —— 撤单成功后再整套重拉 9 个查询，
+     * 于是点一次「取回」要付两趟往返（约 0.7 秒）。而本文件下面的 buy() 早就是
+     * 「本地移除该挂单，等轮询兜底」；取回是同一件事的逆操作，照同一套做即可：
+     * 本地把它从【在售列表】和【我的上架】两处同时摘掉，真账由 main.js 的 5 秒市场轮询兜底
+     * （万一漏掉一行，最多 5 秒后自愈）。⇒ 取回从两趟变一趟。 */
+    listings = listings.filter(x => x.id !== listingId);
+    myListedPets = myListedPets.filter(x => x.listingId !== listingId);
     return { ok: true };
   }
 
@@ -282,7 +288,9 @@
     const { data, error } = await Supabase.cancelEquipListing(listingId);
     if (error) return { error: error.message };
     if (data === false) return { error: '取回失败：挂单不存在或已售出' };
-    await refresh();
+    // 减往返：同 cancelPet —— 本地摘掉即可，不再整套 refresh()（两趟变一趟）
+    itemListings = itemListings.filter(x => x.id !== listingId);
+    myListedItems = myListedItems.filter(x => x.listingId !== listingId);
     return { ok: true };
   }
   /* 假买家在交易记录里的显示身份 —— 取当次会话随机生成的 persona 昵称。
@@ -341,7 +349,9 @@
     const { data, error } = await Supabase.cancelEggListing(listingId);
     if (error) return { error: error.message };
     if (data !== 'ok') return { error: '取回失败：挂单不存在或已售出' };
-    await refresh();
+    // 减往返：同 cancelPet —— 本地摘掉即可，不再整套 refresh()（两趟变一趟）
+    eggListings = eggListings.filter(x => x.id !== listingId);
+    myListedEggs = myListedEggs.filter(x => x.listingId !== listingId);
     return { ok: true };
   }
 
@@ -372,7 +382,9 @@
     const { data, error } = await Supabase.cancelMaterialListing(listingId);
     if (error) return { error: error.message };
     if (data !== 'ok') return { error: '取回失败：挂单不存在或已售出' };
-    await refresh();
+    // 减往返：同 cancelPet —— 本地摘掉即可，不再整套 refresh()（两趟变一趟）
+    materialListings = materialListings.filter(x => x.id !== listingId);
+    myListedMaterials = myListedMaterials.filter(x => x.listingId !== listingId);
     return { ok: true };
   }
   // 假买家收购玩家材料挂单
