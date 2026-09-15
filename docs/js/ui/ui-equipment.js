@@ -281,10 +281,14 @@
       lockBtn.className = 'btn-sm lock' + (eq.locked ? ' on' : '');
       lockBtn.innerHTML = eq.locked ? '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
       lockBtn.title = eq.locked ? '已锁定（分解跳过）' : '锁定（防分解）';
-      lockBtn.onclick = async (e) => {
+      /* 锁定/解锁：toggleLock 内部是「本地先翻转 → 云端同步」（1 趟，~340ms），
+       * 但界面要等 await 完才 renderAll —— 这段时间按钮毫无变化。给个即时反馈。 */
+      lockBtn.onclick = (e) => {
         e.stopPropagation();
-        await Salvage.toggleLock(eq);
-        UI.renderAll();
+        UI.runWithLoading(lockBtn, '…', async () => {
+          await Salvage.toggleLock(eq);
+          UI.renderAll();
+        });
       };
       actions.appendChild(lockBtn);
       card.appendChild(actions);

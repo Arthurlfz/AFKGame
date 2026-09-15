@@ -506,11 +506,12 @@
       closeEquipDetail();
     };
     const lockBtn = modal.querySelector('[data-lock]');
-    if (lockBtn) lockBtn.onclick = async () => {
+    // 同装备页：锁定要等一次云端同步，期间给即时反馈（否则点了解锁看不出有没有生效）
+    if (lockBtn) lockBtn.onclick = () => UI.runWithLoading(lockBtn, '…', async () => {
       await Salvage.toggleLock(eq);
       closeEquipDetail();
       UI.renderAll();
-    };
+    });
     modal.classList.add('open');
   }
   function closeEquipDetail() {
