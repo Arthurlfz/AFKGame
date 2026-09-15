@@ -229,7 +229,15 @@
     if (error) return { error: error.message };
     // 立即本地标记已上架（不依赖 refresh 异步拉回，避免锁定判定空窗）
     if (data && data.id) myListedPets.push({ listingId: data.id, petId: data.pet_id || pet.cloudId, materialType, materialQty });
-    await refresh();
+    /* 减往返第二刀（2026-09-15）：上架成功后不再【等你重拉整套 9 个查询】。
+     * 为什么不能像 cancel* 那样直接删掉：取回是「把已知的一行摘掉」，本地能做；
+     * 上架是「多出一行」，而这行在「全部在售」列表里要带卖家昵称等字段 ——
+     * 那是服务端 join 出来的，本地拼不出来。
+     * 所以改成【不等待】的 refresh：你立刻能接着操作，那张总表几百毫秒后自己补上
+     *（自己的挂单已经 push 进 myListed* →「我的上架」是立刻可见的，不必等服务端）。
+     * 并发安全：main.js 的 5 秒轮询本来就会与它并发跑 refresh()（既有事实）；
+     * 两边拉的都是同一份服务端状态，后写者胜且数据一致。 */
+    refresh().catch(function () { /* 后台补拉失败无妨：下一次轮询兜底 */ });
     // 任务进度上报：所有 type=list 的任务 +1（上架宠物/装备都算）
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
     return { ok: true, data };
@@ -268,7 +276,15 @@
     const { data, error } = await Supabase.listItem(eq, materialType, materialQty);
     if (error) return { error: error.message };
     if (data && data.id) myListedItems.push({ listingId: data.id, itemId: data.item_id || eq.cloudId, materialType, materialQty });
-    await refresh();
+    /* 减往返第二刀（2026-09-15）：上架成功后不再【等你重拉整套 9 个查询】。
+     * 为什么不能像 cancel* 那样直接删掉：取回是「把已知的一行摘掉」，本地能做；
+     * 上架是「多出一行」，而这行在「全部在售」列表里要带卖家昵称等字段 ——
+     * 那是服务端 join 出来的，本地拼不出来。
+     * 所以改成【不等待】的 refresh：你立刻能接着操作，那张总表几百毫秒后自己补上
+     *（自己的挂单已经 push 进 myListed* →「我的上架」是立刻可见的，不必等服务端）。
+     * 并发安全：main.js 的 5 秒轮询本来就会与它并发跑 refresh()（既有事实）；
+     * 两边拉的都是同一份服务端状态，后写者胜且数据一致。 */
+    refresh().catch(function () { /* 后台补拉失败无妨：下一次轮询兜底 */ });
     // 任务进度上报：所有 type=list 的任务 +1（上架宠物/装备都算）
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
     return { ok: true, data };
@@ -334,7 +350,15 @@
     const { data, error } = await Supabase.listEgg(eggType, materialType, materialQty);
     if (error) return { error: error.message };
     if (data && data.id) myListedEggs.push({ listingId: data.id, eggType });
-    await refresh();
+    /* 减往返第二刀（2026-09-15）：上架成功后不再【等你重拉整套 9 个查询】。
+     * 为什么不能像 cancel* 那样直接删掉：取回是「把已知的一行摘掉」，本地能做；
+     * 上架是「多出一行」，而这行在「全部在售」列表里要带卖家昵称等字段 ——
+     * 那是服务端 join 出来的，本地拼不出来。
+     * 所以改成【不等待】的 refresh：你立刻能接着操作，那张总表几百毫秒后自己补上
+     *（自己的挂单已经 push 进 myListed* →「我的上架」是立刻可见的，不必等服务端）。
+     * 并发安全：main.js 的 5 秒轮询本来就会与它并发跑 refresh()（既有事实）；
+     * 两边拉的都是同一份服务端状态，后写者胜且数据一致。 */
+    refresh().catch(function () { /* 后台补拉失败无妨：下一次轮询兜底 */ });
     return { ok: true, data };
   }
   async function buyEgg(listingId) {
@@ -364,7 +388,15 @@
     if (data && data.id) {
       myListedMaterials.push({ listingId: data.id, goodName: data.good_name || goodName, goodQty: data.good_qty || goodQty });
     }
-    await refresh();
+    /* 减往返第二刀（2026-09-15）：上架成功后不再【等你重拉整套 9 个查询】。
+     * 为什么不能像 cancel* 那样直接删掉：取回是「把已知的一行摘掉」，本地能做；
+     * 上架是「多出一行」，而这行在「全部在售」列表里要带卖家昵称等字段 ——
+     * 那是服务端 join 出来的，本地拼不出来。
+     * 所以改成【不等待】的 refresh：你立刻能接着操作，那张总表几百毫秒后自己补上
+     *（自己的挂单已经 push 进 myListed* →「我的上架」是立刻可见的，不必等服务端）。
+     * 并发安全：main.js 的 5 秒轮询本来就会与它并发跑 refresh()（既有事实）；
+     * 两边拉的都是同一份服务端状态，后写者胜且数据一致。 */
+    refresh().catch(function () { /* 后台补拉失败无妨：下一次轮询兜底 */ });
     // 任务进度上报：所有 type=list 的任务 +1（上架材料也算）
     if (window.Quest && window.Quest.reportType) window.Quest.reportType('list', 1);
     return { ok: true, data };
