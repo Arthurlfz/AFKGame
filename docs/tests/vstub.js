@@ -34,6 +34,9 @@ if(fn==='spend_materials'){const uid=session?session.user.id:'anon';const list=A
 for(const n of Object.keys(need)){const r=materialsTable.find(x=>x.user_id===uid&&x.name===n);if(!r||r.quantity<need[n])return{data:null,error:{message:'INSUFFICIENT_MATERIAL:'+n,code:'P0001'}}}
 for(const n of Object.keys(need)){materialsTable.find(x=>x.user_id===uid&&x.name===n).quantity-=need[n]}
 return{data:true,error:null}}
+// hatch_egg（2026-09-15 挑蛋+打标记合成一趟）：语义必须与 supabase/migrate_hatch_egg.sql 一致
+// —— 挑第一颗匹配的「未孵化」蛋、标记已孵化、返回它的 id；没有则 null。
+if(fn==='hatch_egg'){const uid=session?session.user.id:'anon';const rows=(typeof petEggTable!=='undefined'?petEggTable:[]).filter(r=>r.owner_id===uid&&r.status==='未孵化'&&(args.p_base_name==='宠物蛋'?(r.egg_type==null||r.egg_type==='宠物蛋'):r.egg_type===args.p_base_name));if(!rows.length)return{data:null,error:null};const e=rows[0];e.status='已孵化';e.pet_id=args.p_pet_id;return{data:e.id,error:null}}
 // ---- 魔石钱包 / 商店（与 migrate_shop.sql 的四个函数语义一致）----
 const W=(uid)=>{let w=(typeof walletsTable!=='undefined'?walletsTable:[]).find(x=>x.user_id===uid);if(!w){w={user_id:uid,gems:0,total_recharged:0};walletsTable.push(w)}return w};
 if(fn==='get_my_wallet'){if(!session)return{data:[],error:null};const w=W(session.user.id);return{data:[{gems:w.gems,total_recharged:w.total_recharged}],error:null}}

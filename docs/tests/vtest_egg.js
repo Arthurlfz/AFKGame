@@ -57,6 +57,9 @@ const eggs2=JSON.parse(C('JSON.stringify(Drop.getEggs())'));
 A(eggs2['骨狼']===1,'孵化后骨狼蛋 2 → 1');
 A(eggs2['血狐']===1,'孵化不影响血狐蛋');
 A(JSON.parse(C('JSON.stringify(petEggTable.filter(r=>r.status==="已孵化").length)'))===1,'云端标记 1 颗已孵化');
+/* 2026-09-15 减往返：孵化从「SELECT 挑蛋 + UPDATE 打标记」两趟 HTTP 合成一个 RPC（hatch_egg）。
+ * 这行守它不被改回两步走；桩的实现见 vstub.js（语义与 migrate_hatch_egg.sql 对齐）。 */
+A(C('rpcCalls').filter(x=>x==='hatch_egg').length>=1,'孵化只走 hatch_egg 一个 RPC（挑蛋+打标记一趟完成）');
 
 // —— 旧数据兼容：egg_type 为 null 的蛋（加品种列之前掉的）也要能孵化掉，否则刷新后会"复活" ——
 C(`petEggTable.push({id:'e4',owner_id:'user-a',egg_type:null,status:'未孵化'})`);

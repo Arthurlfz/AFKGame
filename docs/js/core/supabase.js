@@ -418,24 +418,20 @@
   }
 
   // 孵化：消耗一颗指定品种的「未孵化」蛋，标记「已孵化」并关联新宠物。
+  /* 2026-09-15 减一趟往返：原先「SELECT 挑一颗未孵化蛋 → UPDATE 打标记」两趟 HTTP，
+   * 现在合成服务端函数 `hatch_egg`（挑蛋 + 打标记在同一个事务里，两个标签页同时孵化也
+   * 不会把两颗名字挂到同一颗蛋上、把 pet_id 覆盖掉）。见 supabase/migrate_hatch_egg.sql。
+   * 旧数据兼容（加 egg_type 列之前掉的蛋，egg_type 为 null，被归到通用品种「宠物蛋」）
+   * 已经挪进 SQL —— 那个"退一步用 is(egg_type,null) 去找，否则蛋永远孵不掉、刷新后又复活"
+   * 的坑仍然成立，只是现在写在函数里。
+   * 返回：成功 { data: { id } }；该品种没有可孵化的蛋 { data:null, error }。 */
   async function consumeEgg(baseName, petId) {
     const user = await getCurrentUser();
     if (!user) return { data: null, error: new Error('请先登录') };
-    // 旧数据兼容：加 egg_type 列之前掉的蛋，egg_type 是 null。
-    // loadEggCount 把它们归到通用品种「宠物蛋」显示，所以孵「宠物蛋」时
-    // eq(egg_type,'宠物蛋') 必然查不到 → 必须退一步用 is(egg_type, null) 去找，
-    // 否则这颗蛋永远孵不掉：本地扣了、云端没标记 → 刷新后蛋又"复活"。
-    const wantLegacy = (baseName === '宠物蛋');
-    let q = client.from('pet_egg').select('id').eq('owner_id', user.id).eq('status', '未孵化');
-    q = wantLegacy ? q.is('egg_type', null) : q.eq('egg_type', baseName);
-    const { data, error } = await q
-      .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    const { data, error } = await client.rpc('hatch_egg', { p_base_name: baseName, p_pet_id: petId });
     if (error) return { data: null, error };
     if (!data) return { data: null, error: new Error('云端没有可孵化的该品种宠物蛋') };
-    return client.from('pet_egg')
-      .update({ status: '已孵化', pet_id: petId })
-      .eq('id', data.id)
-      .select().single();
+    return { data: { id: data }, error: null };
   }
   // 云端未孵化蛋（登录时恢复；云端为权威）。返回 { eggMap, total }
   // eggMap = { '血狐': 2 }；无品种的旧数据归入「宠物蛋」（能正常孵化，见 consumeEgg 的回退查找）。
