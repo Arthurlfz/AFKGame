@@ -177,7 +177,16 @@ async function doSettle(supabase: any, uid: string, runtimeConfig: any, now: str
   //      玩家看到的每场战斗/每个数字 = 服务器已入账的数字（实时结算，无校准无漂移）。
   //    - 游标按「真正算掉的时间」推进（见 cursorIso）：补账窗一次最多跑 200 场，
   //      没算完的秒数留在游标后面，下次继续补 —— 客户端不在线也不丢挂机时间。
-  const SCRIPT_WINDOW_SECONDS = 30; // 剧本窗时长（客户端回放时长 = 服务器的记账步长）
+  /* 剧本窗时长（客户端回放时长 = 服务器的记账步长）。
+   * 2026-09-15：30 → 60。改之前查过两件事：
+   *   ① 客户端【不读】script.until、也不假设窗口长度（全仓只有本文件用到 SCRIPT_WINDOW_SECONDS，
+   *      客户端侧 grep `until` 只命中 freezeUntil/buyPausedUntil 这类无关变量）⇒ 加长窗口对客户端透明；
+   *   ② 客户端兜底结算 SAFETY_SETTLE_MS = 120 秒 > 这一窗 60 秒，不会出现"剧本演完了还没兜底"。
+   * 收益：挂机中每次 settle 覆盖 60 秒 ⇒ 后台请求数、pets 行写入各减半；
+   *      客户端手上囤的录像从 30 秒变 60 秒，**网络抖一下能多撑 30 秒不卡画面**。
+   * 代价：服务器记账领先画面最多 60 秒（本来就是 30 秒，性质不变）；
+   *      写入审计日志的 p_detail 仍截断 100 场（发奖归集在截断【之前】完成，不受影响）。 */
+  const SCRIPT_WINDOW_SECONDS = 60;
   const PENDING_GRACE_MS = 2000;    // 剧本到期宽容（客户端回放节奏有毫秒级抖动）
   const pending: any = (session as any).pending_script || null;
   const nowMs = Date.now();
