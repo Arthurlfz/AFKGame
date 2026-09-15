@@ -318,7 +318,9 @@ function petStats(pet, config) {
     hit: Math.round(hitCore * (1 + (pct.hit || 0))) + (flat.hit || 0) + blHit,
     dodge: Math.round(dodgeCore * (1 + (pct.dodge || 0))) + (flat.dodge || 0) + blDodge,
     lifesteal: baseLs + (flat.lifesteal || 0) / 100,
+    // 穿透双通道（2026-09-15，与 pet.js 同源）：pen = 点数（T2~T5 常数）；penPct = 百分比（T1）
     pen: (flat.pen || 0),
+    penPct: (pct.pen || 0) * 100,
     dmgBonus: (flat.dmgBonus || 0),
     dr: (flat.dr || 0),
     growth: Number(pet.growth) || 0
@@ -340,12 +342,12 @@ function calcDamage(att, defStats, config, rnd) {
   const rate = (att.critRate == null) ? config.battle.critRate : att.critRate;
   const mult = (att.critDamage == null) ? config.battle.critMultiplier : att.critDamage;
   const isCrit = rnd() < rate;
-  /* 穿透（2026-09-15 改百分比破甲）：点数制在 dmg = atk²/(atk+def) 下结构性无效
-   * （削固定值的相对收益 ∝ 1/(atk+def)，而 atk+def 随层数暴涨 → 拉满 480 点也只 +0.1 层）。
-   * 改成「无视 X% 防御」= 有效防御 ×（1 − X%），越打高防怪越强，符合"克制高防"定位。
-   * 上限 80%：留一成底，避免"完全无视防御"破坏攻防递减对抗的设计。 */
-  const penPct = Math.min(80, Math.max(0, att.pen || 0));
-  const effDef = Math.max(0, Math.round(defStats.def * (1 - penPct / 100)));
+  /* 穿透（2026-09-15 二次修正）：先扣点数（T2~T5 的常数档），再按百分比打折（T1 的乘法档）。
+   *  · 点数制在 dmg = atk²/(atk+def) 下天然低效（拉满 480 点只 +0.1 层）→ 只留给低档做"常数"形态；
+   *  · 百分比档越打高防怪越强（塔 20 层守卫拉满 +167% 伤害），是顶级词缀该有的样子；上限 80% 留一成底。 */
+  const penPts = Math.max(0, att.pen || 0);
+  const penPct = Math.min(80, Math.max(0, att.penPct || 0));
+  const effDef = Math.max(0, Math.round(Math.max(0, defStats.def - penPts) * (1 - penPct / 100)));
   // 攻防递减对抗（2026-09-09，与 battle.js calcDamage 同源，见 docs/战斗公式重设计_v1.md）：
   // 防御与攻击力相等时挡掉一半，永远挡不完 → dmg = atk × atk / (atk + effDef)
   let dmg = Math.max(1, Math.round(att.atk * att.atk / (att.atk + effDef)));
@@ -409,7 +411,8 @@ function simulateFight(input) {
     hp: Number(input.curHp) || stats.hp, maxHp: stats.hp,
     atk: stats.atk, def: stats.def, spd: stats.spd,
     critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge,
-    lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0
+    lifesteal: stats.lifesteal, pen: stats.pen || 0, penPct: stats.penPct || 0,
+    dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0
   };
   // 主动技能（skillOf 档位缩放）——名字查得到 = 曾到过终形态，永久激活（涅槃后 Lv1 也能放）
   const skillDef = skillOf(pet, config);

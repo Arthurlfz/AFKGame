@@ -1,5 +1,5 @@
 // 由 supabase/gen_equip_gen.js 自动生成（勿手改）—— 与 docs/js/equipment/equipment.js 同源
-// 生成时间：2026-09-15T05:39:14.195Z
+// 生成时间：2026-09-15T05:44:40.511Z
 /* 服务端装备生成：与前端同一份逻辑，靠构建期抽取而非手抄。
  * 用法：const gen = makeEquipGen(config.equipment, rnd);   // rnd: () => [0,1)
  *       const eq = gen.generateEquipment(null, areaTier, 0, ilvl, countBonus);
@@ -59,9 +59,10 @@ export function makeEquipGen(cfg, rnd) {
     }
   
   function affixFixedOf(type, tier) {
-      // 「百分比点数」量纲：全档都按百分比结算（显示带 %），不参与 T1/T2 分野。
-      // pen 于 2026-09-15 并入（改百分比破甲，点数制结构性无效）。
-      const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'pen'];
+      /* 「加点型」量纲（暴击率/暴击伤害/吸血/伤害加成/受伤减免）：效果就是「加 X 个百分点」，
+       * 属于常数加点（不是"乘你现在的值"），所以全档 fixed=false 只表示"显示带 %"，不走 T1/T2 分野。
+       * 其余属性（攻/血/防/命中/闪避/速度/穿透）严格执行：T1 = 百分比、T2~T5 = 固定值。 */
+      const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr'];
       return POINT_TYPES.includes(type) ? false : tier !== 1;
     }
   

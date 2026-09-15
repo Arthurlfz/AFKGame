@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-15T05:39:14.148Z
+// 生成时间：2026-09-15T05:44:40.564Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1499,23 +1499,23 @@ const serverConfig = {
       },
       {
         "tier": 2,
-        "min": 5,
-        "max": 7
+        "min": 50,
+        "max": 70
       },
       {
         "tier": 3,
-        "min": 3,
-        "max": 4
+        "min": 25,
+        "max": 40
       },
       {
         "tier": 4,
-        "min": 2,
-        "max": 2
+        "min": 12,
+        "max": 20
       },
       {
         "tier": 5,
-        "min": 1,
-        "max": 1
+        "min": 5,
+        "max": 10
       }
     ],
     "dmgBonusAffixTiers": [

@@ -122,21 +122,24 @@ for(const kind of ['white','blue','gold']){
     Math.random=()=>0.2;
     // 递减对抗基线（2026-09-09）：atk 100 def 30 → 100²/(100+30) = 77
     const base=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:0});
-    // 穿透（2026-09-15 改百分比破甲）：pen 20% → def 50 × 0.8 = 40 → 100²/(100+40) = 71
+    // 穿透双档（2026-09-15）：T2~T5 常数档 = 无视 20 点 → def 50-20 = 30 → 77
     const pen=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:20,dmgBonus:0,lifesteal:0},{def:50,dodge:0,dr:0});
+    // T1 百分比档 = 无视 20% → def 50 × 0.8 = 40 → 100²/(100+40) = 71
+    const penPct=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,penPct:20,dmgBonus:0,lifesteal:0},{def:50,dodge:0,dr:0});
     // 伤害加成 50%：77 → 115
     const bonus=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:50,lifesteal:0},{def:30,dodge:0,dr:0});
     // 受伤减免 50%：70 → 35；clamp：减伤 95 → 最低承伤 10%（70 → 7）
     const dr=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:50});
     const drClamp=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,dmgBonus:0,lifesteal:0},{def:30,dodge:0,dr:95});
-    // 穿透上限 80%（百分比制不会出现负防御）：pen 99 → clamp 80% → def 10 × 0.2 = 2 → 100²/102 = 98
-    const penFloor=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:99,dmgBonus:0,lifesteal:0},{def:10,dodge:0,dr:0});
+    // 百分比档上限 80%（不会出现负防御）：penPct 99 → clamp 80% → def 10 × 0.2 = 2 → 100²/102 = 98
+    const penFloor=B.calcDamage({atk:100,hit:999,dodge:0,critRate:0,critDamage:1,pen:0,penPct:99,dmgBonus:0,lifesteal:0},{def:10,dodge:0,dr:0});
     Math.random=ORIG; // 恢复真实随机
-    return JSON.stringify({base:base.damage,pen:pen.damage,bonus:bonus.damage,dr:dr.damage,drClamp:drClamp.damage,penFloor:penFloor.damage});
+    return JSON.stringify({base:base.damage,pen:pen.damage,penPct:penPct.damage,bonus:bonus.damage,dr:dr.damage,drClamp:drClamp.damage,penFloor:penFloor.damage});
   })()`);
   const cdv=JSON.parse(cd);
   A(cdv.base===77,`递减对抗基线 100²/(100+30)=77（${cdv.base}）`);
-  A(cdv.pen===71,`穿透 20% 破甲：def 50→40，伤害 71（${cdv.pen}）`);
+  A(cdv.pen===77,`穿透常数档 20 点：def 50→30，伤害 77（${cdv.pen}）`);
+  A(cdv.penPct===71,`穿透百分比档（T1）20%：def 50→40，伤害 71（${cdv.penPct}）`);
   A(cdv.bonus===115,`伤害加成 50%：77→115（${cdv.bonus}）`);
   A(cdv.dr===38,`受伤减免 50%：77→38（${cdv.dr}）`);
   A(cdv.drClamp===7,`减伤 clamp 最低承伤 10%：77→7（${cdv.drClamp}）`);

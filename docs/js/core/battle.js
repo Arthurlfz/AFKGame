@@ -131,7 +131,7 @@
    * initCombatSkills = 主动技/血统被动初始化。字段与旧版 beginFight 逐项一致。 */
   function snapshotPet(pet) {
     const stats = getStats(pet);
-    return { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
+    return { name: pet.name, level: pet.level || 1, hp: getCurHp(pet), maxHp: stats.hp, atk: stats.atk, def: stats.def, spd: stats.spd, critRate: stats.critRate, critDamage: stats.critDamage, hit: stats.hit, dodge: stats.dodge, lifesteal: stats.lifesteal, pen: stats.pen || 0, penPct: stats.penPct || 0, dmgBonus: stats.dmgBonus || 0, dr: stats.dr || 0 };
   }
   function applyEnemyDefaults(enemy) {
     // 敌人机制属性（2026-09-15 命中/闪避升格）：怪也有命中/闪避，跟怪等级走（config.battle.enemyMech，
@@ -474,9 +474,10 @@
     const mult = (att.critDamage == null) ? Config.battle.critMultiplier : att.critDamage;
     const isCrit = Math.random() < rate;
     // 穿透：只削防御，不把防御削成负数（负防御会放大伤害，穿透不该有这个收益）
-    // 穿透（2026-09-15 改百分比破甲，与 battle-sim.mjs calcDamage 同源）：有效防御 ×（1 − X%），上限 80%
-    const penPct = Math.min(80, Math.max(0, att.pen || 0));
-    const effDef = Math.max(0, Math.round(def * (1 - penPct / 100)));
+    // 穿透（2026-09-15，与 battle-sim.mjs calcDamage 同源）：先扣点数（T2~T5 常数档）再按百分比打折（T1），上限 80%
+    const penPts = Math.max(0, att.pen || 0);
+    const penPct = Math.min(80, Math.max(0, att.penPct || 0));
+    const effDef = Math.max(0, Math.round(Math.max(0, def - penPts) * (1 - penPct / 100)));
     // 攻防递减对抗（2026-09-09）：防御与攻击相等时挡掉一半，永远挡不完
     let dmg = Math.max(1, Math.round(atk * atk / (atk + effDef)));
     if (isCrit) dmg = Math.floor(dmg * mult);

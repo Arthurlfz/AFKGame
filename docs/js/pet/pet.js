@@ -394,8 +394,9 @@
       hit: Math.round(hitCore * (1 + (pct.hit || 0))) + (flat.hit || 0) + blHit,
       dodge: Math.round(dodgeCore * (1 + (pct.dodge || 0))) + (flat.dodge || 0) + blDodge,
       lifesteal: baseLs + (flat.lifesteal || 0) / 100,
-      // 三个新词缀字段（穿透固定值 / 伤害加成% / 受伤减免%）：battle.calcDamage 结算用
+      // 穿透双通道（2026-09-15）：pen = T2~T5 的「无视 X 点防御」（常数）；penPct = T1 的「无视 X% 防御」
       pen: (flat.pen || 0),
+      penPct: (pct.pen || 0) * 100,
       dmgBonus: (flat.dmgBonus || 0),
       dr: (flat.dr || 0),
       growth: pet.growth || 0
@@ -424,6 +425,7 @@
     if (Math.round((s.lifesteal - bLs) * 100)) parts.push('吸血+' + Math.round((s.lifesteal - bLs) * 100) + '%');
     // 三个新词缀属性：穿透为固定值，伤害加成/受伤减免为百分比点数
     if (Math.round(s.pen || 0)) parts.push('穿透+' + Math.round(s.pen));
+    if (s.penPct) parts.push('破甲+' + Math.round(s.penPct) + '%');
     if (Math.round(s.dmgBonus || 0)) parts.push('伤害+' + Math.round(s.dmgBonus) + '%');
     if (Math.round(s.dr || 0)) parts.push('减伤+' + Math.round(s.dr) + '%');
     return parts.length ? parts.join(' ') : '无';

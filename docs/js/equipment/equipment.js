@@ -68,9 +68,10 @@
    * 「百分比点数」量纲（fixed=false 仅表示"显示带 %"），不参与 T1/T2 分野。
    * 生成（generateEquipment）与打造（equipment_craft.js）共用这一个判定，杜绝两套口径。 */
   function affixFixedOf(type, tier) {
-    // 「百分比点数」量纲：全档都按百分比结算（显示带 %），不参与 T1/T2 分野。
-    // pen 于 2026-09-15 并入（改百分比破甲，点数制结构性无效）。
-    const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr', 'pen'];
+    /* 「加点型」量纲（暴击率/暴击伤害/吸血/伤害加成/受伤减免）：效果就是「加 X 个百分点」，
+     * 属于常数加点（不是"乘你现在的值"），所以全档 fixed=false 只表示"显示带 %"，不走 T1/T2 分野。
+     * 其余属性（攻/血/防/命中/闪避/速度/穿透）严格执行：T1 = 百分比、T2~T5 = 固定值。 */
+    const POINT_TYPES = ['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr'];
     return POINT_TYPES.includes(type) ? false : tier !== 1;
   }
 
@@ -390,7 +391,8 @@
           if (aff.fixed) own[t] = (own[t] || 0) + v;
           else pct[t] = (pct[t] || 0) + v / 100;
         }
-        else if (t === 'pen') own[t] = (own[t] || 0) + v;
+        // 穿透双通道：T1 百分比（pct.pen，乘算）/ T2~T5 点数（own.pen，常数），见 config.penAffixTiers
+        else if (t === 'pen') { if (aff.fixed) own.pen = (own.pen || 0) + v; else pct.pen = (pct.pen || 0) + v / 100; }
         else if (['crit', 'critDamage', 'lifesteal', 'dmgBonus', 'dr'].includes(t)) own[t] = (own[t] || 0) + v;
         else own[t] = (own[t] || 0) + v;
       };
