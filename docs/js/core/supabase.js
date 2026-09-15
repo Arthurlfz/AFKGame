@@ -168,9 +168,20 @@
       }
     }
     if (!res.error && res.data && res.data.id) {
-      try {
-        await client.from('pets').update({ equipment: petEquipmentToCloud(pet) }).eq('id', res.data.id);
-      } catch (e) { /* 旧库无 equipment 列：忽略，宠物本体已保存 */ }
+      /* 减往返第三刀（2026-09-15）：**空装备槽不再多发一次 UPDATE**。
+       * 装备槽之所以分两步走，是为了兼容"旧库没有 equipment 列"（见上），这一步不能删。
+       * 但它对**新建的宠物**（孵化 / 合成的宝宝 / 市场买来的宠）是纯空写 ——
+       * 这些宠身上本来就没有装备，而该列默认值就是 '{}'。
+       * 判据取"有没有至少一个真装备引用（带 cloudId）"：无 cloudId 的本地装备本来就写 ''、
+       * 刷新后一样不恢复（见 petEquipmentToCloud 注释），所以跳过与写入结果等价。
+       * ⇒ 建档从两趟变一趟（孵化是最高频的建档入口）。 */
+      const eqCloud = petEquipmentToCloud(pet);
+      const hasRealEquip = Object.keys(eqCloud).some(k => eqCloud[k]);
+      if (hasRealEquip) {
+        try {
+          await client.from('pets').update({ equipment: eqCloud }).eq('id', res.data.id);
+        } catch (e) { /* 旧库无 equipment 列：忽略，宠物本体已保存 */ }
+      }
     }
     return res;
   }
