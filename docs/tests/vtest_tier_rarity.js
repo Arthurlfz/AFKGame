@@ -37,9 +37,9 @@ const t1pct = (s80[1] || 0) / 20000 * 100;
  * ilvl 80 命中 minIlvl 70 段（权重 15/19/66）≈15%，不再是全档 5%。 */
 A(t1pct >= 12 && t1pct <= 18, `塔（ilvl 80）的 T1 概率 ≈ 15%（实际 ${t1pct.toFixed(2)}%，权重 15/100，分段表 70+）`);
 A((s80[1] || 0) < (s80[3] || 0), 'T1 比 T3 稀有（权重递增，高档词缀求而不得）');
-A(!!s40[3] && !s40[2] && !s40[1], 'ilvl 40：T3 进池、T1/T2 不进池（门槛 T1 70 / T2 60）');
-/* ⭐ 用户拍板：T1 门槛保持 70 —— 图 10（ilvl 55~60）**不出 T1**，T1 是塔的专属产出 */
-A(!s65[1] && !!s65[2], 'ilvl 65（图 10 档）：T2 进池、T1 不进池（T1 门槛 70 = 塔专属）');
+A(!!s40[3] && !s40[2] && !s40[1], 'ilvl 40：T3 进池、T1/T2 不进池（门槛 T1/T2 = 70）');
+/* ⭐ 用户拍板（2026-09-15）：T1 与 T2 都是塔专属（门槛都 70）→ 图 10（ilvl 55~60）最高只出 T3 */
+A(!s65[1] && !s65[2] && !!s65[3], 'ilvl 65（图 10 档）：只出 T3 及以下（T1/T2 要装备等级 70 = 塔专属）');
 
 /* ---------- 2. 实际生成的装备守规矩（条数→颜色 / 每条独立 roll / 底材同池） ---------- */
 const scan = lv => C(`(function(){
@@ -71,9 +71,9 @@ A((craftSrc.match(/rollAffixTier\(window\.Equipment\.ilvlOf\(eq\)\)/g) || []).le
 A(craftSrc.indexOf('rollAffixTier(eq.rarity.id') < 0, '旧签名（按稀有度抽 T 阶）已清干净');
 
 /* ---------- 4. 配置表在位 ---------- */
-/* 2026-09-15 用户拍板：T1 门槛保持 70（图 10 不出 T1，T1 是塔专属产出） */
-A(C(`Config.equipment.affixIlvlGates[1]`) === 70 && C(`Config.equipment.affixIlvlGates[2]`) === 60,
-  'ilvl 门槛：T1=70（塔专属）/ T2=60（2026-09-15 拍板值）');
+/* 2026-09-15 用户拍板：T1 与 T2 都是塔专属（门槛都 70）→ 普通地图最高只出 T3 */
+A(C(`Config.equipment.affixIlvlGates[1]`) === 70 && C(`Config.equipment.affixIlvlGates[2]`) === 70,
+  'ilvl 门槛：T1=70 / T2=70（都是塔专属产出，2026-09-15 拍板值）');
 A((C(`(Config.equipment.affixTierWeightsByIlvl||[]).length`) || 0) >= 3,
   'T1 概率分段表在位（按装备等级上调，后期死签防线）');
 A(C(`(Config.equipment.affixCountByIlvl||[]).length`) === 4, 'affixCountByIlvl 四档区间表在位');

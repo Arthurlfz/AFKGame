@@ -199,13 +199,15 @@
      * 且 T1 概率按装备等级分段上调（后期必须刷得到百分比词缀，否则满地死签）。
      * 这里按「图档对应的装备等级」取分段权重现算，避免百科写死一个过时数字。 */
     const segs = E.affixTierWeightsByIlvl || [];
-    const t1PctAtIlvl = (ilvl) => {
+    const tierPctAtIlvl = (ilvl, tier) => {
       let seg = null;
       for (const s of segs) if (ilvl >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
       const w = (seg && seg.weights) || E.affixTierWeights || {};
       const sum = Object.values(w).map(Number).reduce((a, b) => a + b, 0);
-      return sum ? Math.round((Number(w[1] || 0) / sum) * 100) : 0;
+      return sum ? Math.round((Number(w[tier] || 0) / sum) * 100) : 0;
     };
+    const t1PctAtIlvl = (ilvl) => tierPctAtIlvl(ilvl, 1);
+    const t2PctAtIlvl = (ilvl) => tierPctAtIlvl(ilvl, 2);
     const ilvlOfTier = (t) => (C.areaLevels || [])[t - 1] || 1;
     const rarityRows = rarities.map(r => [
       escapeHtml(r.label),
@@ -246,9 +248,9 @@
       // 等级判定（T 阶门槛）
       + note(`【等级判定（T 阶门槛）】词缀与底材的 T 阶共用同一套装备等级门槛：${gateLine}。门槛以下的 T 阶不会被 roll 出来，抽到高档也会降到当前等级允许的最高 T。`)
       + rules([
-        `T 阶只由【装备等级】决定，与颜色无关。⭐ T1 需要装备等级 ≥ ${gates[1] || 70}，也就是【通天塔的怪（Lv70 起，约第 10 层）才出】；地图可掉落区间最高到图 10，装备等级 ${ilvlOfTier(10)}，所以【普通地图不掉 T1】。`,
-        `塔里 T1 概率约 ${t1PctAtIlvl(70)}%（高层 ≥90 级约 ${t1PctAtIlvl(90)}%）：塔是后期主要玩法，顶级词缀就放在那里作为专属产出。`,
-        `底材 T 阶门槛相同：图 10 底材 T1 约 ${matT1Pct(10)}%（底材按图档权重，不受词缀 T1 门槛那条限制）。`,
+        `T 阶只由【装备等级】决定，与颜色无关。⭐ T1 与 T2 都需要装备等级 ≥ ${gates[1] || 70}，也就是【通天塔的怪（Lv70 起，约第 6 层）才出】；普通地图装备等级最高到图 10 的 ${ilvlOfTier(10)}，所以【普通地图最高只出 T3】。`,
+        `塔里高档词缀概率约 T1 ${t1PctAtIlvl(70)}% / T2 ${t2PctAtIlvl(70)}%（高层 ≥90 级约 ${t1PctAtIlvl(90)}% / ${t2PctAtIlvl(90)}%）：塔是后期主要玩法，高档词缀就放在那里作为专属产出。`,
+        `底材 T 阶同门槛：图 10 底材最高 T3（T1/T2 底材同样要装备等级 70 以上）。`,
         '⭐ 词缀统一规则：T1 = 百分比词缀（带 %），T2~T5 = 固定值词缀。看到「攻击 +15%」就是 T1 顶级词缀（塔产）；「攻击 +25」是固定值，前期顶用、后期被成长值越落越远。'
       ])
       // 颜色 / 品质分类

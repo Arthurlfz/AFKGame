@@ -1,5 +1,5 @@
 // 由 supabase/gen_equip_gen.js 自动生成（勿手改）—— 与 docs/js/equipment/equipment.js 同源
-// 生成时间：2026-09-14T17:54:15.696Z
+// 生成时间：2026-09-15T05:39:14.195Z
 /* 服务端装备生成：与前端同一份逻辑，靠构建期抽取而非手抄。
  * 用法：const gen = makeEquipGen(config.equipment, rnd);   // rnd: () => [0,1)
  *       const eq = gen.generateEquipment(null, areaTier, 0, ilvl, countBonus);

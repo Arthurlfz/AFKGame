@@ -126,8 +126,8 @@ const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } c
     const d = await C(`(async () => await Drop.rollReward(${JSON.stringify({ name: '霸主·瘟熊·异变', level: 60, isBoss: true })}, ${JSON.stringify(area10)}, { boss: true, enemyLevel: 60, dry: true }))()`);
     if (d.type === 'boss' && d.eq) bestT = Math.min(bestT, d.eq.materialTier);
   }
-  // ilvl=60 恰好达 T2 门槛（60）→ 底材最高 T2；T1（门槛 70）在图 10 出不了
-  A(bestT >= 2, `D4. 图10 ilvl=60 底材最高只到 T${bestT}（T1 要装备等级 70，图 10 出不了；T1 是塔专属产出）`);
+  // 2026-09-15 用户拍板：T1/T2 门槛都是 70（塔专属）→ 图 10 底材最高只到 T3
+  A(bestT >= 3, `D4. 图10 ilvl=60 底材最高只到 T${bestT}（T1/T2 要装备等级 70，图 10 出不了；高档是塔专属产出）`);
 
   /* ===== E. quest.js：Boss 首通（沙箱） ===== */
   const qctx = { console, setTimeout, clearTimeout, setInterval, clearInterval, navigator: {}, location: { href: 'http://x' }, localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, document: { getElementById: () => el(), createElement: () => el(), querySelector: () => el(), querySelectorAll: () => [], addEventListener() {} } };

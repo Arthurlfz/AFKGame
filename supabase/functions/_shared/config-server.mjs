@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-15T04:52:02.184Z
+// 生成时间：2026-09-15T05:39:14.148Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1667,7 +1667,7 @@ const serverConfig = {
     },
     "affixIlvlGates": {
       "1": 70,
-      "2": 60,
+      "2": 70,
       "3": 25,
       "4": 1,
       "5": 1
