@@ -4,13 +4,17 @@
  * 管理员看玩家反馈的地方。反馈表只开 insert（玩家写不读），
  * 这里是唯一的读取路径 —— 走 admin_list_feedback RPC（服务端校验管理员邮箱）。
  *
+ * 🔴 **开发者面板的注册契约（2026-09-17 踩过坑，别再犯）**：
+ *   `render()` 无参数、必须【同步】返回 HTML 字符串；`bind()` 必须提供
+ *   （ui-dev.js 里 `binders[activeTab]()` 是无条件调的）。
+ *   异步数据一律「render 出壳 → bind 里查 DOM 再填」。详见 ui-dev-ops.js 顶部注释。
+ *
  * 依赖：ui-dev（DevPanel.registerTab）、core/supabase（listFeedback）
  * ============================================================ */
 (function () {
   'use strict';
   const DP = window.DevPanel;
   if (!DP) return;
-  const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -23,7 +27,7 @@
     return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
-  // ctx 是提交时自动带的 JSON（页面 / 浏览器 / 最近报错），折叠显示，别糊一屏
+  // ctx 是提交时自动带的 JSON（页面 / 浏览器 / 最近报错），只显示摘要 + 报错行，别糊一屏
   function ctxLine(ctx) {
     let o = null;
     try { o = JSON.parse(ctx || '{}'); } catch (_) { return esc(ctx || ''); }
@@ -34,25 +38,15 @@
       ? '<div class="fb-err">' + o.errors.map(esc).join('<br>') + '</div>' : '');
   }
 
-  async function render(host) {
-    host.innerHTML = '<div class="dev-hint">正在读取玩家反馈…</div>';
-    if (!window.Supabase || !window.Supabase.listFeedback) {
-      host.innerHTML = '<div class="dev-hint">反馈功能未就绪（Supabase.listFeedback 不存在）</div>';
-      return;
-    }
-    const { data, error } = await window.Supabase.listFeedback(100);
-    if (error) {
-      host.innerHTML = '<div class="dev-hint">读取失败：' + esc(error.message || '')
-        + '<br>（非管理员会被服务端挡下：ERR_NOT_ADMIN）</div>';
-      return;
-    }
-    const rows = data || [];
-    if (!rows.length) {
-      host.innerHTML = '<div class="dev-hint">还没有玩家提交过反馈。</div>';
-      return;
-    }
-    host.innerHTML =
-      '<div class="dev-hint">共 ' + rows.length + ' 条（最新在前）</div>'
+  /* ---------- render：同步出壳 ---------- */
+  function render() {
+    return '<div class="ops-head">玩家反馈<span class="hint">最新 100 条，带提交时的页面与报错</span></div>'
+      + '<div id="fb-root"><div class="dev-hint">正在读取…</div></div>';
+  }
+
+  function rowsHtml(rows) {
+    if (!rows.length) return '<div class="dev-hint">还没有玩家提交过反馈。</div>';
+    return '<div class="dev-hint">共 ' + rows.length + ' 条（最新在前）</div>'
       + rows.map(function (r) {
           return '<div class="fb-row">'
             + '<div class="fb-row-head"><b>' + esc(KIND_LABEL[r.kind] || r.kind) + '</b>'
@@ -64,5 +58,26 @@
         }).join('');
   }
 
-  DP.registerTab('fb', { render: render });
+  /* ---------- bind：挂事件 + 异步填数据 ---------- */
+  function bind() {
+    const root = document.getElementById('fb-root');
+    if (!root) return;
+    if (!window.Supabase || !window.Supabase.listFeedback) {
+      root.innerHTML = '<div class="dev-hint">反馈功能未就绪（Supabase.listFeedback 不存在）</div>';
+      return;
+    }
+    window.Supabase.listFeedback(100).then(function (r) {
+      if (!root.isConnected) return;                       // 玩家已经切走这一页了
+      if (r && r.error) {
+        root.innerHTML = '<div class="dev-hint">读取失败：' + esc(r.error.message || '')
+          + '<br>（非管理员会被服务端挡下：ERR_NOT_ADMIN）</div>';
+        return;
+      }
+      root.innerHTML = rowsHtml((r && r.data) || []);
+    }).catch(function (e) {
+      if (root.isConnected) root.innerHTML = '<div class="dev-hint">读取失败：' + esc(e && e.message) + '</div>';
+    });
+  }
+
+  DP.registerTab('fb', { render: render, bind: bind });
 })();

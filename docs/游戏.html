@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="css/fonts-lxgw.css?v=20260917font1">
 <link rel="stylesheet" href="css/design-tokens.css?v=20260917font2">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
-<link rel="stylesheet" href="css/app.css?v=20260917fix1">
+<link rel="stylesheet" href="css/app.css?v=20260917fix4">
 <link rel="stylesheet" href="css/game.css?v=20260916bind3">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260917fix1">
@@ -34,7 +34,7 @@
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
-<link rel="stylesheet" href="css/ui-fixes.css?v=20260917zfix11">
+<link rel="stylesheet" href="css/ui-fixes.css?v=20260917zfix12">
 <!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
 <link rel="stylesheet" href="css/session-guard.css?v=20260910sess1">
 <style id="boot-style">
@@ -54,29 +54,78 @@
 .boot-hills::after { height: 62%; border-radius: 50% 50% 0 0 / 90% 90% 0 0;
   background: linear-gradient(180deg, rgb(24 26 32 / .16), rgb(10 11 14 / .92)); transform: rotate(-2deg) translateY(26%); }
 .boot-inner { position: relative; z-index: 2; text-align: center; transform: translateY(-7%); }
-.boot-logo {
+/* —— 一排排逐行浮现 —— */
+.boot-line { opacity: 0; }
+.boot-line--sub {
   font-family: var(--font-title, "LXGW WenKai"), "STKaiti", serif;
-  font-size: 64px; letter-spacing: .14em; color: #e8dcc0;
+  font-size: 18px; letter-spacing: .5em; margin-left: .5em;
+  color: rgb(216 209 189 / .66);
+  animation: boot-line-in .6s ease-out .05s forwards;
+}
+.boot-line--title { margin-top: 10px; }
+.boot-line--title span {
+  display: inline-block;
+  font-family: var(--font-title, "LXGW WenKai"), "STKaiti", serif;
+  font-size: 72px; letter-spacing: .12em;
+  color: #e8dcc0;
   -webkit-text-stroke: 1px rgb(0 0 0 / .5);
   text-shadow: 0 0 30px rgb(184 155 89 / .38), 0 4px 16px rgb(0 0 0 / .85);
-  animation: boot-fade 1s ease-out both;
+  opacity: 0;
+  animation: boot-char .5s cubic-bezier(.2, .8, .3, 1.15) forwards;
 }
-.boot-sub { margin-top: 12px;
+.boot-line--en {
+  margin-top: 14px;
   font-family: var(--font-num, Bahnschrift), sans-serif;
-  font-size: 13px; letter-spacing: .44em; color: rgb(216 209 189 / .6); }
-.boot-bar { width: 300px; height: 3px; margin: 36px auto 0;
-  border: 1px solid rgb(184 155 89 / .5); border-radius: 3px;
-  overflow: hidden; background: rgb(255 255 255 / .05); }
-.boot-bar i { display: block; height: 100%; width: 0%;
-  background: linear-gradient(90deg, rgb(184 155 89 / .55), #e0c77d);
-  box-shadow: 0 0 12px rgb(224 199 125 / .55);
-  animation: boot-fill 1.15s ease-in-out forwards; }
+  font-size: 14px; letter-spacing: .46em;
+  color: rgb(216 209 189 / .6);
+  animation: boot-line-in .6s ease-out .6s forwards;
+}
+.boot-line--slogan {
+  margin-top: 12px;
+  font-family: var(--font-title, "LXGW WenKai"), "STKaiti", serif;
+  font-size: 15px; letter-spacing: .28em;
+  color: rgb(184 155 89 / .78);
+  animation: boot-line-in .6s ease-out .82s forwards;
+}
+/* —— 一排宠物依次登场（圆形金环墨镜徽章） —— */
+.boot-pets { display: flex; gap: 16px; justify-content: center; margin-top: 34px; }
+.boot-pet {
+  width: 62px; height: 62px; border-radius: 50%;
+  border: 1px solid rgb(184 155 89 / .6);
+  background: rgb(10 11 14 / .85);
+  box-shadow: 0 0 16px rgb(184 155 89 / .2), inset 0 0 14px rgb(0 0 0 / .85);
+  overflow: hidden;
+  opacity: 0;
+  animation: boot-pet-in .55s cubic-bezier(.2, .8, .3, 1.12) forwards;
+}
+.boot-pet img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  filter: saturate(.92) contrast(1.06);
+}
+@keyframes boot-pet-in { from { opacity: 0; transform: translateY(44px) scale(.8); } to { opacity: 1; transform: none; } }
+/* —— 一排排格子进度条（一格一格点亮） —— */
+.boot-bar {
+  display: flex; gap: 3px; justify-content: center;
+  margin: 30px auto 0; height: 4px;
+}
+.boot-bar i {
+  width: 11px; height: 4px; border-radius: 1px;
+  background: rgb(184 155 89 / .16);
+  opacity: 0;
+  animation: boot-cell .34s ease forwards;
+}
 .boot-meta { margin-top: 16px;
   font-family: var(--font-num, Bahnschrift), sans-serif;
   font-size: 12px; letter-spacing: .12em; color: rgb(216 209 189 / .5); }
 #boot-screen.boot-done { opacity: 0; transition: opacity .5s ease; }
-@keyframes boot-fill { 0% { width: 0% } 55% { width: 74% } 100% { width: 100% } }
-@keyframes boot-fade { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes boot-line-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes boot-char { from { opacity: 0; transform: translateY(28px) scale(.72); } to { opacity: 1; transform: none; } }
+@keyframes boot-cell {
+  0% { opacity: 0; }
+  100% { opacity: 1;
+    background: linear-gradient(90deg, rgb(184 155 89 / .6), #e0c77d);
+    box-shadow: 0 0 8px rgb(224 199 125 / .5); }
+}
 </style></head>
 <body>
 <!-- ==================== 启动加载画面（首次进入 / 版本更新时显示；逻辑在 js/ui/ui-boot.js） ==================== -->
@@ -84,9 +133,19 @@
   <div class="boot-bg"></div>
   <div class="boot-hills"></div>
   <div class="boot-inner">
-    <div class="boot-logo">永夜灵市</div>
-    <div class="boot-sub">EVERNIGHT BAZAAR</div>
-    <div class="boot-bar"><i></i></div>
+    <div class="boot-line boot-line--sub">永夜降临 · 百灵归市</div>
+    <div class="boot-line boot-line--title"><span>永</span><span>夜</span><span>灵</span><span>市</span></div>
+    <div class="boot-line boot-line--en">EVERNIGHT BAZAAR</div>
+    <div class="boot-line boot-line--slogan">挂机养灵 · 市集卖货</div>
+    <div class="boot-pets">
+      <div class="boot-pet"><img src="assets/pets/avatars/pack1-bloodfox/幽火狐.png" alt=""></div>
+      <div class="boot-pet"><img src="assets/pets/avatars/pack2-bonewolf/骨刃狼.png" alt=""></div>
+      <div class="boot-pet"><img src="assets/pets/avatars/pack3-shadowrabbit/影刃兔.png" alt=""></div>
+      <div class="boot-pet"><img src="assets/pets/avatars/pack4-plaguebear/瘟神巨熊.png" alt=""></div>
+      <div class="boot-pet"><img src="assets/pets/avatars/pack7-bogfrog/深渊蛙帝.png" alt=""></div>
+      <div class="boot-pet"><img src="assets/pets/avatars/pack9-moyuan/墨渊魔君.png" alt=""></div>
+    </div>
+    <div class="boot-bar" id="boot-bar"></div>
     <div class="boot-meta"><span id="boot-ver"></span></div>
   </div>
 </div>
@@ -112,16 +171,7 @@
   <!-- 片头（Remotion 渲染的 mp4，见 video/ 工程）：只在首次进入时覆盖登录页播一遍，可跳过。
        产物路径 docs/assets/video/opening.mp4；逻辑在 js/ui/ui-intro.js。 -->
     <!-- 登录页 8 基宠展示层（hover 显示名字；小屏隐藏） -->
-  <div class="login-pets" id="login-pets" aria-hidden="true">
-    <div class="pet" style="left:3%;top:10%;--d:.10s;--f:-.4s" data-name="腐噜兽"><img src="assets/pets/pack0-base/monster-00.png" alt="腐噜兽"><span class="pet-name">腐噜兽</span></div>
-    <div class="pet" style="right:3%;top:12%;--d:.30s;--f:-2.1s" data-name="幽影兔"><img src="assets/pets/pack0-base/monster-07.png" alt="幽影兔"><span class="pet-name">幽影兔</span></div>
-    <div class="pet" style="left:6%;top:36%;--d:.18s;--f:-1.6s" data-name="骨狼"><img src="assets/pets/pack0-base/monster-04.png" alt="骨狼"><span class="pet-name">骨狼</span></div>
-    <div class="pet" style="right:6%;top:38%;--d:.42s;--f:-3.2s" data-name="疫毛兽"><img src="assets/pets/pack0-base/monster-03.png" alt="疫毛兽"><span class="pet-name">疫毛兽</span></div>
-    <div class="pet" style="left:3%;top:60%;--d:.26s;--f:-.9s" data-name="瘟熊"><img src="assets/pets/pack0-base/monster-02.png" alt="瘟熊"><span class="pet-name">瘟熊</span></div>
-    <div class="pet" style="right:3%;top:62%;--d:.54s;--f:-2.8s" data-name="血狐"><img src="assets/pets/pack0-base/monster-01.png" alt="血狐"><span class="pet-name">血狐</span></div>
-    <div class="pet" style="left:6%;top:82%;--d:.06s;--f:-1.2s" data-name="尸犬"><img src="assets/pets/pack0-base/monster-06.png" alt="尸犬"><span class="pet-name">尸犬</span></div>
-    <div class="pet" style="right:6%;top:84%;--d:.38s;--f:-2.4s" data-name="毒沼蛙"><img src="assets/pets/pack0-base/monster-05.png" alt="毒沼蛙"><span class="pet-name">毒沼蛙</span></div>
-  </div>
+  
 <div class="login-intro" id="login-intro" hidden>
     <video class="login-intro-video" id="login-intro-video" src="assets/video/opening.mp4"
            muted playsinline preload="auto" aria-label="片头"></video>
@@ -995,7 +1045,7 @@ window.PetSprites = {
 <script src="js/tower/tower-engine.js?v=20260915mech1"></script>
 <script src="js/core/battle-sim.global.js?v=20260915mech6"></script>
 <script src="js/core/idle-bridge.js?v=20260915dmg1"></script>
-<script src="js/ui/ui-boot.js?v=20260917b1"></script>
+<script src="js/ui/ui-boot.js?v=20260917b3"></script>
 <script src="js/ui/ui-common.js?v=20260917p3"></script>
 <script src="js/ui/ui-console.js?v=20260914reveal1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
@@ -1039,8 +1089,8 @@ window.PetSprites = {
 <script src="js/ui/ui-dev.js?v=20260917fix1"></script>
 <!-- 宠物数值总表页（注册到开发者面板，必须排在 ui-dev.js 之后） -->
 <script src="js/ui/ui-dev-pets.js?v=20260916pets1"></script>
-<script src="js/ui/ui-dev-feedback.js?v=20260917fix1"></script>
-<script src="js/ui/ui-dev-ops.js?v=20260917fix1"></script>
+<script src="js/ui/ui-dev-feedback.js?v=20260917fix2"></script>
+<script src="js/ui/ui-dev-ops.js?v=20260917fix2"></script>
 <!-- 片头（Remotion 产物）：放在 main 之前，登录页可见时才有动作 -->
 <script src="js/ui/ui-intro.js?v=20260916intro1"></script>
 <script src="js/main.js?v=20260916mo1"></script>
