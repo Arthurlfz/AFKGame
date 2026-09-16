@@ -192,7 +192,7 @@
       name: name,
       group: info.group || 'misc',
       groupLabel: labelOf(info.group),
-      icon: it ? it.icon : null,
+      icon: (it && it.icon) || (window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[name] : null) || null,
       rarity: it ? it.rarity : null,
       handUse: info.use || '',   // 手写"怎么用"（仅消耗点在代码里的那几条）
       uses: uses(name),

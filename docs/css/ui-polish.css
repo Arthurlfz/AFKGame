@@ -200,12 +200,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* 顶部鉴定卷轴 SVG 尺寸 */
 .bag-idstone .bs-ico svg { width:18px; height:21px; display:block; }
 
-/* 分解台回收区 */
-.salvage-drop { margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:6px;
-  background:rgba(127,174,90,.04); text-align:center; transition:.15s; }
-.salvage-drop.hot { border-color:var(--good); background:rgba(127,174,90,.12); box-shadow:0 0 12px rgba(127,174,90,.25) inset; }
-.salvage-drop .sd-title { font-size:var(--fs-2xs); text-transform:uppercase; letter-spacing:.1em; color:var(--good); }
-.salvage-drop .sd-sub { font-size:10.5px; color:var(--faint); margin-top:3px; line-height:1.4; }
+/* 分解台回收区 —— 2026-09-17 删除：JS 从来没有创建过 .salvage-drop 元素，
+   只有这套样式 + 背包装备卡 dragstart 写了 act:'salvage'。玩家拖起装备却无处可放，
+   是个"看起来能做其实什么都不会发生"的幽灵功能。分解走装备页「一键清理 / 批量分解」。 */
 
 /* 装备详情 modal：词缀区复用全局 .craft-affix-group（前缀绿 / 后缀蓝） */
 /* 层级表 200 档：模态。它在**背包窗口里**弹出（鉴定揭晓 / 看详情），

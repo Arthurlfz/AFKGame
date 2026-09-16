@@ -172,10 +172,19 @@
       const rc = rectOf(el);
       if (!rc || rc.width < 1 || rc.height < 1) {
         if (!warned) { warned = true; console.warn('[onboarding] spotlight target 不可见/缺失:', spec.sel || target); }
+        /* 🔴 2026-09-17：以前这里把【挖洞和气泡一起藏掉】= 引导整块消失。
+         * 玩家点了「去分解」却什么都没出现，引导断死在这一步（n5 的锚点曾指向一个
+         * 页面上不存在的按钮）。锚点写错是迟早会再发生的事，不能让它变成死局：
+         * 降级 = 不挖洞，气泡居中照常显示，文案和「下一步」按钮都还在。 */
         hole.style.display = 'none';
-        float.style.display = 'none';
+        float.style.display = 'flex';
+        float.removeAttribute('data-side');           // 没有目标可指，去掉小箭头
+        float.style.left = '50%';
+        float.style.top = '50%';
+        float.style.transform = 'translate(-50%, -50%)';
         return;
       }
+      float.style.transform = '';
       hole.style.display = 'block';
       float.style.display = 'flex';
       hole.style.left = Math.round(rc.left) + 'px';

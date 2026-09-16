@@ -37,6 +37,9 @@
    * ============================================================ */
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    // 「下一步」卡片 z-index（230）比背包（100）高，ESC 先关最上面那层
+    const nextCard = document.querySelector('.next-step-card');
+    if (nextCard) { nextCard.remove(); return; }
     // 背包开着就关背包
     const bag = $('bag-window');
     const bagOpen = bag && (bag.classList.contains('is-open') || getComputedStyle(bag).display === 'block');
@@ -93,63 +96,18 @@
    * ============================================================ */
 
   /* ============================================================
-   * 5. 设置按钮：弹一个真正的设置面板
+   * 5. 设置面板 —— 2026-09-17 整段删除，理由见下，别再抄回来。
+   *
+   * 这里以前给「设置」按钮 addEventListener 造了一个 #fix-settings-panel，
+   * 而 ui-shell.js:191 早就用 onclick 绑了它自己的设置 Popover ——
+   * 同一个按钮两套处理器 ⇒ 点一次【同时弹出两个设置面板】，内容还互相矛盾。
+   * 更要命的是这个旧面板里的东西全是假的：
+   *   · 「战斗动画速度」下拉没有 change 监听 —— 选 0.5x/2x 画面毫无变化
+   *   · 「自动回城血量阈值 当前 30%」是写死的字符串，既不能改也不读真实配置
+   *   · 「更多设置将在后续版本加入」—— 永远是这句话
+   * 真设置（减少动效 / 登出）在 ui-shell.js 的 showSettingsDialog 里，
+   * 删掉这份重复的假面板 = 一次点开两个、死控件、假数字三个问题一起消失。
    * ============================================================ */
-  function initSettingsPanel() {
-    const settingsBtn = $('btn-settings-sidebar');
-    if (!settingsBtn) return;
-
-    settingsBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      // 检查是否已存在
-      let panel = $('fix-settings-panel');
-      if (panel) { panel.remove(); return; }
-
-      panel = document.createElement('div');
-      panel.id = 'fix-settings-panel';
-      panel.style.cssText = [
-        'position:fixed', 'top:60px', 'right:20px', 'z-index:150',
-        'width:320px', 'background:var(--panel,#1a2223)',
-        'border:1px solid var(--accent,#c9a84c)', 'border-radius:8px',
-        'padding:16px', 'box-shadow:0 8px 30px rgba(0,0,0,.7)'
-      ].join(';');
-
-      panel.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-        '<b style="color:#f2b632;font-size:1.05rem"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/></svg> 设置</b>' +
-        '<button id="fix-settings-close" style="background:none;border:1px solid #555;color:#999;width:28px;height:28px;border-radius:4px;cursor:pointer">×</button>' +
-        '</div>' +
-        '<div style="display:flex;flex-direction:column;gap:10px;font-size:.9rem;color:#ccc">' +
-        '<label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">' +
-        '<span>战斗动画速度</span>' +
-        '<select id="fix-anim-speed" style="background:#111;color:#ccc;border:1px solid #444;border-radius:4px;padding:3px 8px">' +
-        '<option value="1">正常</option><option value="1.5">1.5x 快</option><option value="2">2x 更快</option>' +
-        '<option value="0">0.5x 慢</option></select></label>' +
-        '<label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">' +
-        '<span>自动回城血量阈值</span>' +
-        '<span style="color:#888;font-size:.8rem">当前 30%</span></label>' +
-        '<label style="display:flex;justify-content:space-between;align-items:center;cursor:pointer">' +
-        '<span>聊天面板透明度</span>' +
-        '<span style="color:#888;font-size:.8rem">拖拽聊天面板底部滑块</span></label>' +
-        '<div style="border-top:1px solid #333;margin-top:6px;padding-top:10px;color:#888;font-size:.8rem;line-height:1.6">' +
-        '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg> 更多设置（音效/快捷键/数据管理）将在后续版本加入。<br>' +
-        '当前账号：' + (window.__USER_EMAIL || '已登录') +
-        '</div>' +
-        '</div>';
-
-      document.body.appendChild(panel);
-      $('fix-settings-close').addEventListener('click', () => panel.remove());
-      // 点击外部关闭
-      setTimeout(() => {
-        document.addEventListener('click', function onDocClick(ev) {
-          if (!panel.contains(ev.target) && ev.target !== settingsBtn) {
-            panel.remove();
-            document.removeEventListener('click', onDocClick);
-          }
-        });
-      }, 100);
-    });
-  }
 
   /* ============================================================
    * 6. 教程结束后弹出"下一步做什么"卡片
@@ -196,13 +154,31 @@
       '<button data-action="pet"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 看看宠物养成</button>' +
       '</div>';
 
+    /* 🔴 2026-09-17：这张卡片以前【没有任何关闭方式】—— 没有 ×、没有 ESC、
+     * 点外面也不关，只能从四个选项里挑一个或者刷新页面。现在三条路都给上。 */
+    const closeCard = () => {
+      card.remove();
+      document.removeEventListener('click', onOutsideClick);
+    };
+    function onOutsideClick(ev) { if (!card.contains(ev.target)) closeCard(); }
+
+    const xBtn = document.createElement('button');
+    xBtn.className = 'next-step-close';
+    xBtn.type = 'button';
+    xBtn.setAttribute('aria-label', '关闭');
+    xBtn.textContent = '×';
+    xBtn.addEventListener('click', closeCard);
+    card.appendChild(xBtn);
+
     document.body.appendChild(card);
     localStorage.setItem('__nextStepShown', '1');
+    // 延后一拍再挂「点外面关闭」，否则弹出卡片的那一次点击会立刻把它自己关掉
+    setTimeout(() => document.addEventListener('click', onOutsideClick), 0);
 
-    card.querySelectorAll('button').forEach(btn => {
+    card.querySelectorAll('button[data-action]').forEach(btn => {
       btn.addEventListener('click', function () {
         const action = btn.dataset.action;
-        card.remove();
+        closeCard();
         navigateTo(action);
       });
     });
@@ -250,7 +226,6 @@
   function init() {
     patchBagOpen();
     initCurrencyTooltips();
-    initSettingsPanel();
     initTutorialEndCard();
     initEvolutionCards();
     // 货币 tooltip 延迟再跑一次（等市集内容渲染完）

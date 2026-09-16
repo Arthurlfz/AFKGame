@@ -103,6 +103,25 @@
 /* 英文名跟在中文名后面当副标（小一号、弱化，不抢主标题） */
 .app-topbar .title-en { margin-left: 9px; font-size: var(--fs-2xs, 10px); font-weight: 400; letter-spacing: 3px; color: var(--text-faint); }
 .app-topbar .spacer { flex: 1; }
+/* 顶栏挂机状态（2026-09-17）：挂机是后台行为，以前只有战斗页看得到，
+   玩家逛市集 / 商店 / 百科时完全不知道它还在不在跑（掉线也看不出来）。
+   暗底 + 一个呼吸小圆点，遵循「不加霓虹外发光」的定调。 */
+.idle-chip {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border-radius: 999px;
+  font-size: var(--fs-2xs, 10px); letter-spacing: 1px; white-space: nowrap;
+  color: var(--text-dim); background: var(--inset);
+  border: 1px solid var(--line); cursor: pointer; user-select: none;
+  transition: color .2s, border-color .2s;
+}
+.idle-chip::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; opacity: .5;
+}
+.idle-chip.is-running { color: #7fd18b; border-color: rgb(127 209 139 / .45); }
+.idle-chip.is-running::before { opacity: .9; }
+.idle-chip.is-fighting::before { animation: idle-chip-pulse 1.5s ease-in-out infinite; }
+@keyframes idle-chip-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 /* 右上角快捷按钮组（背包 / 牧场 / 任务 / 消息 / 设置） */
 .top-actions { display: flex; align-items: center; gap: 6px; }
 .top-btn {

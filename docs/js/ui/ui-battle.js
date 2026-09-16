@@ -590,13 +590,31 @@
     showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : (label ? { label: label } : null));
   }
 
-  /* ---------- 挂机状态徽章（battle.js 调用） ---------- */
+  /* ---------- 挂机状态徽章（battle.js 调用） ----------
+   * 两个显示点：① 战斗页内的 #status-badge ② 顶栏 #topbar-idle。
+   * 🔴 2026-09-17 加顶栏那份：挂机是后台行为，以前只有战斗页看得到，
+   *   玩家逛市集 / 商店 / 百科时完全不知道挂机还在不在跑（掉线了也看不出来）。
+   *   顶栏那份点一下回世界地图（战斗页从地图进，不在侧边栏）。 */
   const STATUS_TEXT = { idle: '空闲', fighting: '挂机中', stopped: '已停止', healing: '恢复中', recovering: '回血中' };
+  const STATUS_RUNNING = { fighting: 1, healing: 1, recovering: 1 };
   function updateStatus(type, fightCount) {
     const badge = $('status-badge');
     badge.textContent = STATUS_TEXT[type] || type;
     badge.className = 'status-badge ' + type;
     $('fight-count').textContent = fightCount || 0;
+
+    const chip = $('topbar-idle');
+    if (chip) {
+      chip.textContent = STATUS_TEXT[type] || type;
+      chip.className = 'idle-chip'
+        + (STATUS_RUNNING[type] ? ' is-running' : '')
+        + (type === 'fighting' ? ' is-fighting' : '');
+      chip.title = '挂机状态 · 点击回到世界地图';
+      if (!chip.__bound) {
+        chip.__bound = true;
+        chip.addEventListener('click', () => { if (UI.switchPage) UI.switchPage('worldmap'); });
+      }
+    }
   }
 
   /* ---------- 战斗按钮（main.js 调用，main 决定文案/可用性） ---------- */

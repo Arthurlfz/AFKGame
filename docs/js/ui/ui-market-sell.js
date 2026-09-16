@@ -84,7 +84,7 @@
         ${kind === 'pet'
           ? (avatar ? `<img class="mk-avatar" src="${avatar}">` : '<div class="mk-avatar mk-avatar--item"></div>')
           : kind === 'item'? '<div class="mk-avatar mk-avatar--item"></div>'
-            : kind === 'material'? `<div class="mk-egg-icon">${Market.findMaterial(payload.name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>`
+            : kind === 'material'? `<div class="mk-egg-icon">${(window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[payload.name] : null) || Market.findMaterial(payload.name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>`
               : '<div class="mk-egg-icon"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></div>'}
         <div class="mk-card-info"><div class="mk-name">${escapeHtml(title)}</div><div class="mk-meta">选择收款物并定价</div></div>
       </div>
@@ -325,27 +325,37 @@
     }
   }
 
+  /* 挂单挂了多久 —— 复用市集页那份 ageLabel，不另写一套口径。
+   * 2026-09-17：以前「我的上架」看不到挂单时长（市集页有），
+   * 玩家判断不了自己挂的东西是不是滞销。 */
+  function listedAge(l) {
+    if (!l || !UI.ageLabel) return '';
+    const s = UI.ageLabel(l);
+    return s ? ' · 挂出 ' + s : '';
+  }
+
   /* ---- 上架用宠物卡 ---- */
   function buildSellPetCard(pet) {
     const div = document.createElement('div');
     div.className = 'mk-card';
     if (div.dataset) div.dataset.cloudId = pet.cloudId;
     else div._cloudId = pet.cloudId;
-    const mine = Market.isListed(pet.cloudId);
+    const listing = Market.getPetListing(pet.cloudId);
+    const mine = !!listing;
     const avatar = window.PetSprites && window.PetSprites.avatarOf ? window.PetSprites.avatarOf(pet.name) : null;
     div.innerHTML = `
       <div class="mk-card-top">
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(pet.name)}">` : '<div class="mk-avatar mk-avatar--item="></div>'}
         <div class="mk-card-info">
           <div class="mk-name">${escapeHtml(pet.name)}</div>
-          <div class="mk-meta">成长${pet.growth} · Lv.${pet.level}</div>
+          <div class="mk-meta">成长${pet.growth} · Lv.${pet.level}${listedAge(listing)}</div>
         </div>
       </div>
       <div class="mk-card-foot"><button class="mk-btn ${mine ? 'recall': 'buy'}">${mine ? '取回': '上架'}</button></div>`;
     const btn = div.querySelector('.mk-btn');
     btn.onclick = mine ? async () => {
-      const listing = Market.getPetListing(pet.cloudId);
-      if (!listing) return;
+      // 找不到挂单时不能静默 return（以前点了完全没反应，既不成功也不报错）
+      if (!listing) { showToast('取回失败', '没找到这笔挂单，刷新一下市集再试'); UI.renderAll(); return; }
       const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelPet(listing.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${pet.name} 已下架`); UI.renderAll(); }
@@ -359,7 +369,8 @@
     div.className = 'mk-card';
     if (div.dataset) div.dataset.cloudId = eq.cloudId;
     else div._cloudId = eq.cloudId;
-    const mine = Market.isItemListed(eq.cloudId);
+    const listing = Market.getItemListing(eq.cloudId);
+    const mine = !!listing;
     // 绑定装备不给上架（2026-09-16「任务产出全绑定」）：能穿、能分解，就是不能卖
     const bound = eq.bound === true;
     const r = rarityOf(eq);
@@ -369,7 +380,7 @@
         <div class="mk-avatar mk-avatar--item="></div>
         <div class="mk-card-info">
           <div class="mk-name" style="color:${r.color}">${escapeHtml(eq.name)}</div>
-          <div class="mk-meta">${r.label}装 · T${eq.tier}｜${eq.slot}</div>
+          <div class="mk-meta">${r.label}装 · T${eq.tier}｜${eq.slot}${listedAge(listing)}</div>
         </div>
       </div>
       <div class="mk-affix">${escapeHtml(desc) || '<span style="color:var(--text-faint)">无词缀</span>'}</div>
@@ -380,8 +391,8 @@
     // 绑定装备直接短路：不给点、也不弹定价窗（2026-09-16「任务产出全绑定」）
     if (bound) return div;
     btn.onclick = mine ? async () => {
-      const listing = Market.getItemListing(eq.cloudId);
-      if (!listing) return;
+      // 找不到挂单时不能静默 return（以前点了完全没反应，既不成功也不报错）
+      if (!listing) { showToast('取回失败', '没找到这笔挂单，刷新一下市集再试'); UI.renderAll(); return; }
       const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelItem(listing.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${eq.name} 已下架`); UI.renderAll(); }
@@ -393,20 +404,21 @@
   function buildSellEggCard(baseName, n) {
     const div = document.createElement('div');
     div.className = 'mk-card';
-    const mine = Market.isMyEggListed ? Market.isMyEggListed(baseName) : false;
+    const my = Market.getMyListedEggs ? Market.getMyListedEggs().find(x => x.eggType === baseName) : null;
+    const mine = !!my;
     div.innerHTML = `
       <div class="mk-card-top">
         <div class="mk-egg-icon"></div>
         <div class="mk-card-info">
           <div class="mk-name">${escapeHtml(window.Drop.makeEggName(baseName))}</div>
-          <div class="mk-meta">持有 ×${n}</div>
+          <div class="mk-meta">持有 ×${n}${listedAge(my)}</div>
         </div>
       </div>
       <div class="mk-card-foot"><button class="mk-btn ${mine ? 'recall': 'buy'}">${mine ? '取回': '上架'}</button></div>`;
     const btn = div.querySelector('.mk-btn');
     btn.onclick = mine ? async () => {
-      const my = Market.getMyListedEggs ? Market.getMyListedEggs().find(x => x.eggType === baseName) : null;
-      if (!my) return;
+      // 找不到挂单时不能静默 return（以前点了完全没反应，既不成功也不报错）
+      if (!my) { showToast('取回失败', '没找到这笔挂单，刷新一下市集再试'); UI.renderAll(); return; }
       const res = await UI.runWithLoading(btn, '取回中…', () => Market.cancelEgg(my.listingId)) || { error: '请稍候再试' };
       if (res.error) showToast('取回失败', res.error);
       else { showToast('已取回', `${window.Drop.makeEggName(baseName)} 已下架`); UI.renderAll(); }
@@ -423,7 +435,7 @@
     const free = Number(entry.free != null ? entry.free : entry.qty) || 0;
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">${mat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>
+        <div class="mk-egg-icon">${(window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[mat.name] : null) || mat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>
         <div class="mk-card-info">
           <div class="mk-name">${escapeHtml(entry.name)}</div>
           <div class="mk-meta">可交易 ×${free}${free < entry.qty ? `（另有绑定 ×${entry.qty - free} 不可卖）` : ''}${listed ? ' · 已挂 ×' + (listed.goodQty || 0) : ''}</div>

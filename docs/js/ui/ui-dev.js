@@ -250,7 +250,9 @@
     { id: 'sim',    idx: '4', short: '模拟', title: '模拟器' },
     { id: 'fast',   idx: '5', short: '快进', title: '养成快进' },
     { id: 'player', idx: '6', short: '玩家', title: '玩家管理' },
-    { id: 'stats',  idx: '7', short: '数据', title: '运营数据' }
+    { id: 'stats',  idx: '7', short: '数据', title: '运营数据' },
+    { id: 'fb',     idx: '8', short: '反馈', title: '玩家反馈', ext: true },  // ui-dev-feedback.js
+    { id: 'ops',    idx: '9', short: '看板', title: '内测看板', ext: true }   // ui-dev-ops.js
   ];
   const hasPanel = (id) => {
     const t = TABS.filter(x => x.id === id)[0];

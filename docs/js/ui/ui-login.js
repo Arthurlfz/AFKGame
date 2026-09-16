@@ -28,6 +28,7 @@
 
     function setBusy(busy) {
       btn.disabled = busy;
+      btn.classList.toggle('is-loading', busy);
       btn.textContent = busy ? (mode === 'signup' ? '注册中…' : '登录中…') : (mode === 'signup' ? '注册' : '登录');
     }
     function setErr(msg) { if (err) err.textContent = msg || ''; }

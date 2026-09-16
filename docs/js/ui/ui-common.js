@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
  * ui/ui-common.js —— UI 通用组件与渲染枢纽（不绑定任何具体页面）
  * 职责：
  *  1. 共享底层工具：escapeHtml / $ / showToast / addLog
@@ -168,10 +168,41 @@
     if (!btn || btn.disabled) return;
     const original = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = loadingText;
+    btn.classList.add('is-loading');
+    // ⚠️ querySelector 可能不存在（测试 mock / 非标准宿主），缺了就按纯文字处理。
+    const hasIcon = btn.querySelector && btn.querySelector('img, svg');
+    const canStyle = !!(btn.style && typeof btn.style.setProperty === 'function');
+    let pctEl = null;
+    if (loadingText && !hasIcon) {
+      btn.innerHTML = loadingText;
+      if (btn.appendChild) {
+        try {
+          pctEl = document.createElement('b');
+          pctEl.className = 'ld-pct';
+          pctEl.textContent = '0%';
+          btn.appendChild(pctEl);
+        } catch (e) { pctEl = null; }
+      }
+    }
+    // 金墨进度条：先快后慢推进到 88% 封顶（真实进度未知，请求完成瞬间补满 100% 再恢复）
+    const setP = v => {
+      if (canStyle) btn.style.setProperty('--p', v + '%');
+      if (pctEl) pctEl.textContent = v + '%';
+    };
+    setP(0);
+    let p = 0;
+    const iv = setInterval(() => {
+      p = Math.min(88, p + (p < 30 ? 12 : p < 60 ? 5 : 2.2));
+      setP(Math.round(p));
+    }, 320);
     try { return await task(); }
     finally {
+      clearInterval(iv);
+      setP(100);
+      // 补满 100% 后短暂停留 220ms，让玩家看到「完成」再恢复按钮
+      await new Promise(r => setTimeout(r, 220));
       btn.disabled = false;
+      btn.classList.remove('is-loading');
       btn.innerHTML = original;
     }
   }

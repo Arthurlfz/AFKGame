@@ -91,4 +91,40 @@
   }
 
   UI.checkMarketOfflineSales = check;
+
+  /* ---------- 在线成交提示（2026-09-17） ----------
+   * 离线那笔汇总由上面的 check() 在上线时弹一次；但玩家【正开着游戏】时挂单被买走，
+   * 以前**完全没有提示** —— 材料悄悄进背包，玩家根本不知道自己卖出去了。
+   * 而这游戏主打的就是"打到的东西能卖掉"，卖掉的那一刻必须看得见。
+   * 只读 Market 的内存缓存（数据由 main.js 每 5 秒的市集轮询更新），不发额外请求。 */
+  let liveSeen = null;
+  function checkLive() {
+    if (UI.isLoggedIn && !UI.isLoggedIn()) return;
+    const recs = Market.getTradeRecords ? (Market.getTradeRecords() || []) : [];
+    const sells = recs.filter(r => r.role === 'sell');
+    if (!sells.length) return;
+    let latest = sells[0].created_at;
+    for (const r of sells) if (ts(r.created_at) > ts(latest)) latest = r.created_at;
+    if (liveSeen === null) { liveSeen = latest; return; } // 首次只记水位，别把历史记录当新成交刷屏
+    const fresh = sells.filter(r => ts(r.created_at) > ts(liveSeen));
+    liveSeen = latest;
+    if (!fresh.length) return;
+    for (const r of fresh) {
+      const m = matOf(r.material_type);
+      const who = r.counterparty ? escapeHtml(r.counterparty) : '有人';
+      const line = `${escapeHtml(r.item_name || '物品')} → 到手 <b>${Number(r.net_qty || 0)}</b> ${escapeHtml(m.name)}`;
+      if (UI.showToast) UI.showToast('💰 卖出去了', `${who} 买走了：${line}`);
+      if (UI.consoleLog) UI.consoleLog('loot', `💰 挂单成交：${who} 买走了 ${r.item_name || '物品'}，到手 ${Number(r.net_qty || 0)} ${m.name}`);
+    }
+  }
+  /* 每 15 秒看一次（只读内存，零网络开销；市集数据由 main.js 的 5 秒轮询带着更新）
+   * ⚠️ 两道防御，缺一个就会把测试搞红：
+   *   ① 测试桩（vtest_* 的 vm ctx）里【没有 setInterval】，裸调用直接 ReferenceError
+   *      → 整个 ui 模块炸掉，表现为「进程退出码 1」且没有 FAIL 行（2026-09-10 同款事故）；
+   *   ② node 下定时器会拖住进程不退出 → 要 unref（浏览器里没有这个方法，判一下）。 */
+  if (typeof setInterval === 'function') {
+    const timer = setInterval(() => { try { checkLive(); } catch (e) { /* 提示失败不该影响游戏 */ } }, 15000);
+    if (timer && typeof timer.unref === 'function') timer.unref();
+  }
+  UI.checkMarketSalesLive = checkLive;
 })();

@@ -69,10 +69,10 @@
   --btn-border-hover: #b89b59;
 
   /* 字体与尺寸 */
-  --font-body: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: "LXGW WenKai", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font: var(--font-body);
-  --font-title: "STKaiti", "KaiTi", "FZKai-Z03", "Microsoft YaHei", sans-serif;
-  --font-num: "Consolas", "Cascadia Mono", "Courier New", monospace;
+  --font-title: "LXGW WenKai", "STKaiti", "KaiTi", "FZKai-Z03", "Microsoft YaHei", sans-serif;
+  --font-num: "Bahnschrift", "DIN Alternate", "Consolas", "Cascadia Mono", monospace;
   --font-size: 1rem;
   --font-small: .889rem;
   --fs-2xs: .667rem; /* 12px 角标/标签最小档（2026-09-03 UI 体检新增） */

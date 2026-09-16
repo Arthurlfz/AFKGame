@@ -691,7 +691,7 @@ window.Config = {
        * onclick → UI.renderBagEqDetail → .eq-detail-craft → renderCraftInto），所以直接淬炼身上
        * 那件蓝装即可，不必再发一件白装当打造对象 —— 少发一件、少一步找装备的操作。 */
       { id: 'g4', category: 'tutorial', type: 'craft', need: 1, requires: 'g3', name: '亲手淬炼', guide: { page: 'pet', tab: 'equip', btn: '去淬炼' }, isGuide: true, hint: '在 <b>宠物页 · 装备</b> 栏点身上刚穿的那件装备，右侧用刚领的重铸石重铸 1 次', target: '.bag-subtab[data-bag-subtab="equip"]', npc: '掉落终有尽时。学会亲手锻造，你的战力便不再仰仗天命。' },
-      { id: 'g5', category: 'tutorial', type: 'salvage', need: 1, requires: 'g4', name: '化废为宝', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点 <b>一键分解</b>，把刚领到的那件白装拆掉（白装本无产出，完成这一步会给你一颗宠物蛋）', target: '#btn-salvage', npc: '废品并非无用。拆了回炉成打造石，养成的循环才真正闭合。' },
+      { id: 'g5', category: 'tutorial', type: 'salvage', need: 1, requires: 'g4', name: '化废为宝', guide: { page: 'equip', btn: '去分解' }, isGuide: true, hint: '在打造页点 <b>一键分解</b>，把刚领到的那件白装拆掉（白装本无产出，完成这一步会给你一颗宠物蛋）', target: '#btn-salvage-selected', npc: '废品并非无用。拆了回炉成打造石，养成的循环才真正闭合。' },
       { id: 'g6', category: 'tutorial', type: 'hatch', need: 1, requires: 'g5', name: '孵化新生命', guide: { page: 'pet', tab: 'egg', btn: '去孵化' }, isGuide: true, hint: '在宠物页 <b>宠物蛋</b> 栏孵化刚领到的那颗蛋，得到第二只魂兽', target: '.pet-tab[data-pet-tab="egg"]', npc: '战场不该只容一只孤魂。孵化这颗蛋，让副宠为你并肩而战。' },
       { id: 'g7', category: 'tutorial', type: 'synth', need: 1, requires: 'g6', name: '融合之力', guide: { page: 'pet', tab: 'synth', btn: '去合成' }, isGuide: true, hint: '在宠物页 <b>合成</b> 栏：主宠融合副宠（中阶经验包已发，背包使用后升到 Lv40）', target: '.pet-tab[data-pet-tab="synth"]', npc: '魂兽之间亦有高下。主宠融副宠、继承其特质，向更上一层蜕变。', boostLevel: 40 },
       { id: 'g8', category: 'tutorial', type: 'list', need: 1, requires: 'g7', name: '初入市集', guide: { page: 'market-sell', btn: '去上架' }, isGuide: true, hint: '去 <b>市集</b> 页，把刚领到的那件白装挂上去（1 件即可）', target: '.sb-btn[data-page="market"]', npc: '你亲手锻造之物，可换他人之资。市集之上，强者互通有无。' },
@@ -1667,7 +1667,13 @@ window.Config = {
       windowSec: 60,            // 统计窗口（秒）
       maxPerWindow: 1000,       // 窗口内允许上报的材料总量
       maxPerCall: 5000,         // 单次上报上限（防止单发灌爆）
-      lockSec: 300              // 超限后锁定秒数
+      lockSec: 300,             // 超限后锁定秒数
+      /* ⭐ 2026-09-17 新增：每日上限。
+       * 原来只有 60 秒窗口限流 —— 改改前端就能一天报几十万材料进来，内测期的
+       * 产出/消耗数据会直接废掉。定 20000 的依据：正常玩家挂机 24 小时不休息，
+       * 产出量级在 2000 上下，这里留了 10 倍余量 —— 正常玩法撞不到，撞到的基本是脚本。
+       * ⚠️ 服务端常量在 supabase/migrate_material_daily_cap.sql，改这里必须同步改那边。 */
+      maxPerDay: 20000
     },
     botBuy: {
       minAccountAgeSec: 600,    // 新号保护：创建不足该时长禁止召唤流浪商人
@@ -2017,7 +2023,7 @@ window.Config.drop.quests.push(
    * 改为「处置 + 在图1再击败 5 只怪」：同样教「不用的掉落也有出路 + 继续挂机会滚雪球」，
    * 但几分钟内能完成。Boss 是图首通的长线目标（主线 boss1），不进新手引导。 */
   { id: 'n5', category: 'tutorial', type: 'disposeKill', disposeTypes: ['salvage', 'list'], need: 1, secondNeed: 5, requires: 'n4', area: 'corrupted-forest', name: '处理另一件装备并继续推进', isGuide: true,
-    guide: { page: 'equip', btn: '上架或分解，再回图1刷 5 场' }, target: '#btn-salvage',
+    guide: { page: 'equip', btn: '上架或分解，再回图1刷 5 场' }, target: '#btn-salvage-selected',
     hint: '把没有选的那件装备上架或分解，然后回到第一张地图再击败 5 只怪。不需要的掉落也有出口：分解换打造材料，上架换别人手里的资源。',
     npc: '一件留下来提效，另一件就用来换资源。挂机久了还会遇到守关 Boss，那是这张图的首通目标，不急。' },
   { id: 'n6', category: 'tutorial', type: 'direction', need: 1, requires: 'n5', name: '\u9009\u62e9\u4e0b\u4e00\u6b65\u65b9\u5411', isGuide: true,

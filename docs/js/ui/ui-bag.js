@@ -20,17 +20,97 @@
   const Craft = window.Craft || {};
   const Salvage = window.Salvage || {};
   // 未鉴定装备封印图标（纯 SVG 卷轴 + 问号），流放「???」封印感
-  const SVG_SEALED = `<svg viewBox="0 0 48 56"><rect x="13" y="8" width="22" height="40" rx="2" fill="#26211a" stroke="#7a6a4a"/><rect x="9" y="5" width="30" height="6" rx="3" fill="#6b5a3a"/><rect x="9" y="45" width="30" height="6" rx="3" fill="#6b5a3a"/><text x="24" y="38" text-anchor="middle" font-size="22" font-family="Georgia,serif" fill="#c8a45b">?</text></svg>`;
+  const SVG_SEALED = '<img class="mat-img" src="assets/ui/ic_sealed.png" alt="">';
   // 鉴定卷轴（拿在手上解封）：亮金卷轴 + 眼睛，区别于未鉴定封印卷轴
-  const SVG_IDSTONE = `<svg viewBox="0 0 48 56"><rect x="13" y="8" width="22" height="40" rx="2" fill="#3a2f1c" stroke="#d9b25a"/><rect x="9" y="5" width="30" height="6" rx="3" fill="#caa64e"/><rect x="9" y="45" width="30" height="6" rx="3" fill="#caa64e"/><circle cx="24" cy="30" r="8" fill="none" stroke="#e7d39a" stroke-width="2"/><circle cx="24" cy="30" r="3" fill="#e7d39a"/></svg>`;
+  const SVG_IDSTONE = '<img class="mat-img" src="assets/ui/ic_mat_identify.png" alt="">';
   // 素材名 → emoji 图标（按关键词粗分，流放格子里用）
+  /* 材料专属图标（2026-09-16 暗黑水墨国风全套 ic_mat_*.png）——优先命中，旧 SVG 只作回退 */
+  const MAT_ICONS = {
+    '枯荣种荚': '<img class="mat-img" src="assets/ui/ic_mat_seedpod.png" alt="">',
+    '泣腐之泪': '<img class="mat-img" src="assets/ui/ic_mat_tear.png" alt="">',
+    '白骨残片': '<img class="mat-img" src="assets/ui/ic_mat_bone.png" alt="">',
+    '幽影魂丝': '<img class="mat-img" src="assets/ui/ic_mat_soulthread.png" alt="">',
+    '血潮凝晶': '<img class="mat-img" src="assets/ui/ic_mat_bloodcrystal.png" alt="">',
+    '腐变之心': '<img class="mat-img" src="assets/ui/ic_mat_heart.png" alt="">',
+    '回响之羽': '<img class="mat-img" src="assets/ui/ic_mat_feather.png" alt="">',
+    '腐沼黏液': '<img class="mat-img" src="assets/ui/ic_mat_slime.png" alt="">',
+    '余烬残灰': '<img class="mat-img" src="assets/ui/ic_mat_ash.png" alt="">',
+    '魂渊之尘': '<img class="mat-img" src="assets/ui/ic_mat_dust.png" alt="">',
+    '腐印·暴怒': '<img class="mat-img" src="assets/ui/ic_mat_seal_rage.png" alt="">',
+    '腐印·荆棘': '<img class="mat-img" src="assets/ui/ic_mat_seal_thorn.png" alt="">',
+    '腐印·疾影': '<img class="mat-img" src="assets/ui/ic_mat_seal_swift.png" alt="">',
+    '腐印·蚀甲': '<img class="mat-img" src="assets/ui/ic_mat_seal_corrode.png" alt="">',
+    '腐印·狂乱': '<img class="mat-img" src="assets/ui/ic_mat_seal_frenzy.png" alt="">',
+    '腐印·增殖': '<img class="mat-img" src="assets/ui/ic_mat_seal_proliferate.png" alt="">',
+    '腐印·屠戮': '<img class="mat-img" src="assets/ui/ic_mat_seal_slaughter.png" alt="">',
+    '腐印·渴血': '<img class="mat-img" src="assets/ui/ic_mat_seal_thirst.png" alt="">',
+    '腐印·破阵': '<img class="mat-img" src="assets/ui/ic_mat_seal_break.png" alt="">',
+    '腐印·枯竭': '<img class="mat-img" src="assets/ui/ic_mat_seal_wither.png" alt="">',
+    '腐印·禁疗': '<img class="mat-img" src="assets/ui/ic_mat_seal_noheal.png" alt="">',
+    '腐印·天罚': '<img class="mat-img" src="assets/ui/ic_mat_seal_heavenbolt.png" alt="">',
+    '重铸石': '<img class="mat-img" src="assets/ui/ic_mat_reforge.png" alt="">',
+    '剥离石': '<img class="mat-img" src="assets/ui/ic_mat_strip.png" alt="">',
+    '神圣石': '<img class="mat-img" src="assets/ui/ic_mat_holy.png" alt="">',
+    '增缀石': '<img class="mat-img" src="assets/ui/ic_mat_augment.png" alt="">',
+    '锁定石': '<img class="mat-img" src="assets/ui/ic_mat_lock.png" alt="">',
+    '鉴定石': '<img class="mat-img" src="assets/ui/ic_mat_identify.png" alt="">',
+    '进化素材': '<img class="mat-img" src="assets/ui/ic_mat_evolve.png" alt="">',
+    '精粹进化素材': '<img class="mat-img" src="assets/ui/ic_mat_essence.png" alt="">',
+    '传说进化素材': '<img class="mat-img" src="assets/ui/ic_mat_crown.png" alt="">',
+    '强化丹A': '<img class="mat-img" src="assets/ui/ic_mat_pill_a.png" alt="">',
+    '强化丹B': '<img class="mat-img" src="assets/ui/ic_mat_pill_b.png" alt="">',
+    '天仙玉露': '<img class="mat-img" src="assets/ui/ic_mat_dew.png" alt="">',
+    '琼浆玉露': '<img class="mat-img" src="assets/ui/ic_mat_kettle.png" alt="">',
+    '合成之石': '<img class="mat-img" src="assets/ui/ic_mat_fuse.png" alt="">',
+    '越龙之石': '<img class="mat-img" src="assets/ui/ic_mat_dragon.png" alt="">',
+    '百变魔石': '<img class="mat-img" src="assets/ui/ic_mat_mask.png" alt="">',
+    '至尊神石': '<img class="mat-img" src="assets/ui/ic_mat_supreme.png" alt="">',
+    '涅槃丹': '<img class="mat-img" src="assets/ui/ic_mat_phoenix.png" alt="">',
+    '锁魂玉': '<img class="mat-img" src="assets/ui/ic_mat_souljade.png" alt="">',
+    '觉醒石': '<img class="mat-img" src="assets/ui/ic_mat_awaken.png" alt="">',
+    '通天塔重置卡': '<img class="mat-img" src="assets/ui/ic_mat_tower_ticket.png" alt="">',
+    /* 补漏 5（2026-09-16）：经验屑 / 经验包 / 试炼门票 / 退役凝魂晶石 / 超稀有涅磐兽 */
+    '微光经验屑': '<img class="mat-img" src="assets/ui/ic_extra_expdust.png" alt="">',
+    '终阶经验包': '<img class="mat-img" src="assets/ui/ic_extra_expbox.png" alt="">',
+    '资源试炼门票': '<img class="mat-img" src="assets/ui/ic_extra_trial_ticket.png" alt="">',
+    '凝魂晶石': '<img class="mat-img" src="assets/ui/ic_extra_soulcrystal.png" alt="">',
+    '涅磐兽': '<img class="mat-img" src="assets/ui/ic_extra_phoenix.png" alt="">',
+    /* 宠物蛋 6 种（统一通用蛋图） */
+    '幽影兔蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">',
+    '瘟熊蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">',
+    '血狐蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">',
+    '腐噜兽蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">',
+    '毒沼蛙蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">',
+    '骨狼蛋': '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">'
+  };
+  UI.MAT_ICONS = MAT_ICONS; // 材料词条页复用（mat-wiki / ui-mat-entry）
   const matIcon = name => {
+    if (MAT_ICONS[name]) return MAT_ICONS[name];
     if (/石|丹|核/.test(name)) return '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>';
     if (/兽|魂|晶|珠/.test(name)) return '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>';
     return '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>';
   };
   // 部位 → emoji 图标（背包格与装备 tooltip 共用；挂 UI 供 ui-equipment / ui-market 复用）
-  const EQUIP_ICON = { 武器:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 单手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 双手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️', 长剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 弓:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="22" x2="18" y1="12" y2="12" /><line x1="6" x2="2" y1="12" y2="12" /><line x1="12" x2="12" y1="6" y2="2" /><line x1="12" x2="12" y1="22" y2="18" /></svg>', 法杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 盾:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>', 胸甲:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>', 头盔:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 帽:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 手套:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>', 靴:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 鞋:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 戒指:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 项链:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 护符:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 腰带:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' };
+  const EQUIP_ICON = {
+    武器: '<img class="mat-img" src="assets/ui/ic_equip_weapon.png" alt="">',
+    单手剑: '<img class="mat-img" src="assets/ui/ic_equip_1hsword.png" alt="">',
+    双手剑: '<img class="mat-img" src="assets/ui/ic_equip_2hsword.png" alt="">',
+    长剑: '<img class="mat-img" src="assets/ui/ic_equip_longsword.png" alt="">',
+    弓: '<img class="mat-img" src="assets/ui/ic_equip_bow.png" alt="">',
+    法杖: '<img class="mat-img" src="assets/ui/ic_equip_staff.png" alt="">',
+    杖: '<img class="mat-img" src="assets/ui/ic_equip_rod.png" alt="">',
+    盾: '<img class="mat-img" src="assets/ui/ic_equip_shield.png" alt="">',
+    胸甲: '<img class="mat-img" src="assets/ui/ic_equip_chest.png" alt="">',
+    头盔: '<img class="mat-img" src="assets/ui/ic_equip_helm.png" alt="">',
+    帽: '<img class="mat-img" src="assets/ui/ic_equip_hat.png" alt="">',
+    手套: '<img class="mat-img" src="assets/ui/ic_equip_gloves.png" alt="">',
+    靴: '<img class="mat-img" src="assets/ui/ic_equip_boots.png" alt="">',
+    鞋: '<img class="mat-img" src="assets/ui/ic_equip_shoes.png" alt="">',
+    戒指: '<img class="mat-img" src="assets/ui/ic_equip_ring.png" alt="">',
+    项链: '<img class="mat-img" src="assets/ui/ic_equip_necklace.png" alt="">',
+    护符: '<img class="mat-img" src="assets/ui/ic_equip_amulet.png" alt="">',
+    腰带: '<img class="mat-img" src="assets/ui/ic_equip_belt.png" alt="">'
+  };
   UI.EQUIP_ICON = EQUIP_ICON;
 
   /* 【背包分类口径 · 2026-09-16 定稿】
@@ -119,7 +199,7 @@
       ${eq.soulAffix
         ? '<div class="tip-soul" style="color:#c9a86a">' + (eq.soulAffix.label || '') + (eq.soulAffix.tier ? ' T' + eq.soulAffix.tier : '') + (eq.soulAffix.value != null ? ' +' + eq.soulAffix.value + (['hit','dodge','spd'].includes(eq.soulAffix.type) ? '' : '%') : '') + '</div>'
         : '<div class="tip-empty">无</div>'}
-      <div class="tip-line hint" style="border-bottom:none;margin-top:4px">Ctrl/Alt+点击 分解 · 点开看词缀</div>`;
+      <div class="tip-line hint" style="border-bottom:none;margin-top:4px">Ctrl/Alt+点击 分解（会先问你一次） · 点开看词缀</div>`;
   }
 
   /* ---------- 网格列数（流放式固定格，auto-fill） ----------
@@ -359,8 +439,11 @@
         const rar = (eq.rarity && eq.rarity.id) || 'white';
         const card = document.createElement('div');
         card.className = 'poe-item q-' + rar + (eq.bound ? ' q-bound' : '') + (unid ? ' q-unid' : '') + (identifyMode && unid ? ' bc-idtarget' : '');
-        card.draggable = true;
+        // 2026-09-17：原来 card.draggable = true 并带 act:'salvage' 的 dragstart ——
+        // 但全项目【没有任何 .salvage-drop 落点】（分解台只有 CSS，JS 从不创建它），
+        // 拖起来没有任何地方能放，纯属误导。装备卡现在只作为「鉴定石的落点」。
         if (unid) {
+          card.draggable = false;
           card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('bc-drop'); });
           card.addEventListener('dragleave', () => card.classList.remove('bc-drop'));
           card.addEventListener('drop', e => {
@@ -368,7 +451,6 @@
             if (e.dataTransfer.getData('text/plain') === 'identify') identifyEquip(eq, card);
           });
         }
-        card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: eq.id, act: 'salvage' })); e.dataTransfer.effectAllowed = 'move'; });
         const ico = unid ? SVG_SEALED : '<span class="emoji">' + (EQUIP_ICON[eq.slot] || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>') + '</span>';
         card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>'
           + (eq.bound ? '<div class="bind-mark" title="绑定装备：任务获得，能穿能分解，不能上架">绑</div>' : '')
@@ -422,7 +504,7 @@
         const qty = p.qty;
         const card = document.createElement('div');
         card.className = 'poe-item q-cons' + (p.bound ? ' q-bound' : '');
-        card.innerHTML = '<div class="ico">' + (p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>') + '</div><div class="nm">' + escapeHtml(p.name) + '</div>'
+        card.innerHTML = '<div class="ico">' + (MAT_ICONS[p.name] || p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>') + '</div><div class="nm">' + escapeHtml(p.name) + '</div>'
           + (p.bound ? '<div class="bind-mark" title="绑定道具，不可交易">绑</div>' : '')
           + '<div class="corner">×' + qty + '</div>';
         /* 说明分两种（效果不一样，不能共用一句）：
@@ -432,7 +514,7 @@
         const useDesc = p.action === 'use'
           ? ('使用后 +' + (p.amount || 0).toLocaleString() + ' 经验')
           : ((matInfo[p.name] || {}).use || groupLabel(p.group) || '点开看用途');
-        const tip = '<div class="tip-name">' + (p.icon || '') + ' ' + escapeHtml(p.name) + '</div>'
+        const tip = '<div class="tip-name">' + (MAT_ICONS[p.name] || p.icon || '') + ' ' + escapeHtml(p.name) + '</div>'
           + '<div class="tip-line"><span>' + escapeHtml(useDesc) + '</span><b>×' + qty + '</b></div>'
           + '<div class="tip-line hint">' + (p.action === 'use' ? '点击使用 · ' : '点击看词条 · ') + (p.bound ? '绑定道具，不可交易' : '可交易') + '</div>';
         bindTip(card, tip);
@@ -463,8 +545,8 @@
         const eggName = window.Drop.makeEggName ? window.Drop.makeEggName(baseName) : baseName + '蛋';
         const card = document.createElement('div');
         card.className = 'poe-item q-egg';
-        card.innerHTML = '<div class="ico"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg></div><div class="nm">' + escapeHtml(eggName) + '</div><div class="corner">×' + count + '</div>';
-        const tip = '<div class="tip-name"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> ' + escapeHtml(eggName) + '</div><div class="tip-line"><span>宠物蛋</span><b>×' + count + '</b></div><div class="tip-line hint">点击查看 / 孵化 ' + escapeHtml(baseName) + '，也可在市场交易</div>';
+        card.innerHTML = '<div class="ico"><img class="mat-img" src="assets/ui/ic_egg.png" alt=""></div><div class="nm">' + escapeHtml(eggName) + '</div><div class="corner">×' + count + '</div>';
+        const tip = '<div class="tip-name"><img class="mat-img" src="assets/ui/ic_egg.png" alt=""> ' + escapeHtml(eggName) + '</div><div class="tip-line"><span>宠物蛋</span><b>×' + count + '</b></div><div class="tip-line hint">点击查看 / 孵化 ' + escapeHtml(baseName) + '，也可在市场交易</div>';
         card.onclick = () => { showEggDetail(baseName, count, eggName); };
         bindTip(card, tip);
         bagItems.push(card);
@@ -644,30 +726,64 @@
     }
     modal.classList.add('open');
   }
-  // 拖到分解台 / Ctrl+Alt 点击：单件快分解（复用 Salvage，自动跳过锁定/在售）
-  async function quickSalvage(eq) {
-    if (!Salvage.isSalvageable(eq)) { showToast('不能分解', eq.locked ? '已锁定（详情里解锁）' : '装备在售中'); return; }
-    const res = await Salvage.salvageList([eq]);
-    if (res.error) { showToast('❌ 分解失败', res.error); return; }
-    const parts = Object.entries(res.gains || {}).map(([k, n]) => `${Config.craft[k]?.name || k} ×${n}`);
-    addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 分解：${eq.name}` + (parts.length ? '，得 ' + parts.join('、') : ''));
-    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 分解完成', parts.join('<br>') || '白装无材料产出');
-    UI.renderAll();
+  /* 分解统一出口：先弹确认（看清拆几件、得什么），确认后才真的拆。
+   * 分解是不可逆的，任何入口都不许跳过这一步 —— 2026-09-17 立。 */
+  function askThenSalvage(list, label) {
+    const ICON = '<img class="eic-img" src="assets/ui/ic_shred.png" alt="">';
+    const preview = (Salvage.previewEquips ? Salvage.previewEquips(list) : null) || {};
+    const count = preview.count != null ? preview.count : list.length;
+    const gain = Object.entries(preview.gains || {})
+      .map(([k, n]) => `<div>${(Config.craft[k] && Config.craft[k].name) || k} ×<b>${n}</b></div>`).join('');
+    const r = preview.byRarity || {};
+    const body = `<div class="salvage-count">将分解 <b>${count}</b> 件装备</div>`
+      + `<div class="salvage-detail">白 ${r.white || 0} ｜ 蓝 ${r.blue || 0} ｜ 金 ${r.gold || 0}</div>`
+      + (list.length === 1 ? `<div class="salvage-detail">${escapeHtml(list[0].name)}</div>` : '')
+      + '<div class="salvage-gain">预计获得：</div><div class="salvage-detail">'
+      + (gain || '<span class="hint">无材料产出（白装分解无产出）</span>') + '</div>'
+      + '<div class="salvage-warn">⚠️ 分解不可撤销</div>';
+    const fire = async () => {
+      const res = await Salvage.salvageList(list);
+      if (res.error) { showToast('❌ 分解失败', res.error); return; }
+      const parts = Object.entries(res.gains || {}).map(([k, n]) => `${Config.craft[k]?.name || k} ×${n}`);
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> ${label} ${res.count} 件` + (parts.length ? '，得 ' + parts.join('、') : ''));
+      showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 分解完成', `分解 ${res.count} 件<br>` + (parts.join('<br>') || '白装无材料产出'));
+      UI.renderAll();
+    };
+    if (UI.salvageConfirm) {
+      UI.salvageConfirm({
+        title: ICON + ' ' + label,
+        bodyHtml: body,
+        okLabel: '确认分解',
+        fallbackText: `确认${label} ${count} 件装备？此操作不可撤销。`,
+        onOk: fire
+      });
+    } else fire(); // 面板模块没加载（测试桩）：直接执行，不阻塞
   }
-  // 批量分解：当前背包全部可分解装备（Ctrl+Alt+Enter 或装备页「批量分解」）
-  async function bulkSalvage() {
+  // Ctrl/Alt + 点击：单件快分解（复用 Salvage，自动跳过锁定/在售）
+  function quickSalvage(eq) {
+    if (!Salvage.isSalvageable(eq)) { showToast('不能分解', eq.locked ? '已锁定（详情里解锁）' : '装备在售中'); return; }
+    askThenSalvage([eq], '分解');
+  }
+  // 批量分解：当前背包全部可分解装备（Ctrl/Alt+Enter）
+  function bulkSalvage() {
     const all = getInventory().filter(eq => Salvage.isSalvageable(eq));
     if (!all.length) { showToast('没有可分解装备', '好装备 / 锁定 / 在售都会保留'); return; }
-    const res = await Salvage.salvageList(all);
-    if (res.error) { showToast('❌ 分解失败', res.error); return; }
-    const parts = Object.entries(res.gains || {}).map(([k, n]) => `${Config.craft[k]?.name || k} ×${n}`);
-    addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 批量分解 ${res.count} 件` + (parts.length ? '，得 ' + parts.join('、') : ''));
-    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 批量分解完成', `分解 ${res.count} 件<br>` + (parts.join('<br>') || '白装无材料产出'));
-    UI.renderAll();
+    askThenSalvage(all, '批量分解');
   }
-  // 批量快捷键：Ctrl/Alt + Enter = 分解全部可分解装备
+  /* 批量快捷键：Ctrl/Alt + Enter = 分解全部可分解装备
+   * 🔴 2026-09-17 加两道闸（原来是无条件响应，出过两次事）：
+   *   ① 焦点在输入框里时不响应 —— Ctrl+Enter 是聊天/输入框的「发送」，
+   *      以前按一下会同时"发出消息 + 拆光背包"；
+   *   ② 只有背包窗口开着才响应 —— 在市集、商店页面按到不该有事发生。
+   *   执行前还会走装备页那个分解确认面板（见 askThenSalvage）。 */
   document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.altKey) && e.key === 'Enter') { e.preventDefault(); bulkSalvage(); }
+    if (!(e.ctrlKey || e.altKey) || e.key !== 'Enter') return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const host = document.getElementById('bag-window');
+    if (!host || !host.classList.contains('is-open')) return;
+    e.preventDefault();
+    bulkSalvage();
   });
 
 

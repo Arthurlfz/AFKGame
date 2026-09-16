@@ -27,6 +27,7 @@
   let products = [];
   let orders = [];
   let shopMissing = false; // 表/函数没建 → 提示"未开通"而不是崩
+  let goodsLoaded = false; // 商品是否已拉回来：区分「正在读」和「真的没货」（以前两者都写"暂无商品"）
 
   const cur = () => (Config.shop && Config.shop.currency) || '魔石';
 
@@ -65,6 +66,7 @@
     const p = await Supabase.fetchProducts();
     products = (p.data || []).filter(x => x.kind !== 'recharge'); // 充值档位不进商店列表，走收款码
     shopMissing = shopMissing || !!p.missing;
+    goodsLoaded = true;
     renderShop();
   }
   async function refreshOrders() {
@@ -76,7 +78,7 @@
   function renderGemChip() {
     const chip = $('gem-balance');
     if (chip) {
-      chip.innerHTML = `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> ${wallet.gems} ${cur()}`;
+      chip.innerHTML = `<img class="top-ico" src="assets/ui/nav/ic_top_gem.png" alt=""> ${wallet.gems} ${cur()}`;
       chip.title = `魔石余额 ${wallet.gems} · 累计充值 ${wallet.totalRecharged}`;
     }
     applyVisibility();
@@ -119,7 +121,9 @@
           <button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${(soldOut || poor) ? 'disabled' : ''}>${btnText}</button>
         </div>`;
       }).join('')
-      : '<div class="inv-empty">暂无商品</div>';
+      : (goodsLoaded
+        ? '<div class="inv-empty">暂无商品</div>'
+        : '<div class="inv-empty">正在读取商品…</div>');
 
     const ordersHtml = orders.length
       ? orders.slice(0, 8).map(o => `<div class="shop-order">${escapeHtml(orderTitle(o))} · ${escapeHtml(String(o.created_at || '').slice(0, 10))}</div>`).join('')
@@ -212,6 +216,16 @@
   }
 
   let buying = false; // 购买闸门：spendGems 是一次云端往返，期间连点会重复扣魔石
+  /* 购买中的按钮反馈（2026-09-17）：闸门只挡住了重复扣款，但按钮既不变字也不禁用，
+   * 云端往返这一秒里玩家看到的还是「购买」，会以为没点着然后狂点。 */
+  function setBuyingVisual(sku, on) {
+    document.querySelectorAll('.shop-buy').forEach(b => {
+      if (sku && b.dataset.sku !== sku) return;
+      b.disabled = on;
+      if (on) { b.dataset.oldText = b.dataset.oldText || b.textContent; b.textContent = '购买中…'; }
+      else if (b.dataset.oldText) { b.textContent = b.dataset.oldText; delete b.dataset.oldText; }
+    });
+  }
   async function doBuy(sku) {
     const p = products.find(x => x.sku === sku);
     if (!p || buying) return;
@@ -221,11 +235,13 @@
      * 注释里那句「连点不会重复扣」根本不成立（连点 N 次 = N 单 = 扣 N 份魔石）。 */
     const ref = `${sku}-${Math.floor(Date.now() / 1000)}`;
     buying = true;
+    setBuyingVisual(sku, true);
     const r = await Supabase.spendGems(sku, ref).catch(e => ({ ok: false, message: (e && e.message) || '购买失败' }));
     buying = false;
     if (!r.ok) {
       const msg = r.code === 'insufficient' ? '魔石不足' : r.code === 'limit' ? '已达购买上限' : (r.message || '购买失败');
       showToast('❌ 购买失败', msg);
+      setBuyingVisual(sku, false); // 失败要把按钮从「购买中…」放回来
       return;
     }
     /* 发货落地：服务端已经把东西发出去了，这里只是把本地缓存拉到最新。

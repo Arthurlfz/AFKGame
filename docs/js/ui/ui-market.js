@@ -611,7 +611,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️</div>
+        <div class="mk-avatar mk-avatar--item">${(window.UI && window.UI.EQUIP_ICON ? window.UI.EQUIP_ICON[l.item_slot] : null) || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>'}️</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
           <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -717,7 +717,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        <div class="mk-egg-icon">${l.egg_icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg>'}</div>
+        <div class="mk-egg-icon">${(window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[window.Drop.makeEggName(l.egg_type)] : null) || '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">'}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
           <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -746,7 +746,7 @@
     const mat = Market.findMaterial(l.material_type);
     const deal = dealBadge(l, pool);
     const goodQty = Number(l.good_qty || 1);
-    const goodIcon = l.good_icon || Market.findMaterial(l.good_name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>';
+    const goodIcon = (window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[l.good_name] : null) || l.good_icon || Market.findMaterial(l.good_name).icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>';
     // 真实玩家挂单带 seller_id，AI 假单不带（只有 seller 昵称）→ 用它判定「我的」
     const myId = (UI.getAuthUser && UI.getAuthUser() || {}).id;
     const mine = !l.isBot && !!(l.seller_id && myId && String(l.seller_id) === String(myId));
@@ -974,6 +974,7 @@
 
   /* ---------- 对外 API（市场页） ---------- */
   UI.renderMarket = renderMarket;
+  UI.ageLabel = ageLabel; // 挂单时长：市集页与「我的上架」共用同一份口径，别各写各的
   UI.renderItemMarket = renderItemMarket;
   UI.openBuyConfirm = openBuyConfirm;
   UI.closeBuyPanel = closeBuyPanel;

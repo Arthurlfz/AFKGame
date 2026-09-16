@@ -106,6 +106,25 @@
   font-size: 1.2rem;
   color: var(--accent-hi, #f2b632);
 }
+/* 关闭按钮（2026-09-17）：这张卡片以前没有任何关闭方式，玩家只能刷新页面 */
+.next-step-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 18px;
+  color: var(--text-dim, #999);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.next-step-close:hover {
+  color: var(--accent-hi, #f2b632);
+  border-color: var(--accent, #c9a84c);
+}
 .next-step-card p {
   margin: 0 0 16px;
   color: var(--text-dim, #999);
@@ -297,7 +316,115 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
+/* ---------- 21.4 市集脉动条（2026-09-17）----------
+   在线人数 + 最近成交轮播。以前市集页"毫无动静"，玩家据此判断市场死了。 */
+.market-pulse {
+  display: flex; align-items: center; gap: 14px;
+  margin: 0 0 10px; padding: 7px 12px;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: var(--inset);
+  font-size: var(--fs-2xs, 11px); color: var(--text-dim);
+  overflow: hidden;
+}
+.market-pulse:empty { display: none; }
+.mp-online { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--text-faint); }
+.mp-online b { color: var(--text); }
+.mp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.mp-online.is-live { color: #7fd18b; }
+.mp-online.is-live .mp-dot { background: #7fd18b; animation: mp-pulse 2s ease-in-out infinite; }
+@keyframes mp-pulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+.mp-deal { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .2s ease; }
+.mp-deal.is-out { opacity: 0; }
+.mp-who { color: var(--accent-hi); }
+.mp-item { color: var(--text); }
+.mp-ago { margin-left: 8px; color: var(--text-faint); }
+.mp-idle { color: var(--text-faint); }
+
+/* ---------- 21.3 内测看板 + 玩家反馈列表（2026-09-17） ---------- */
+.ops-head { font-size: 1rem; color: var(--accent-hi); margin: 4px 0 12px; letter-spacing: 1px; }
+.ops-card { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--inset); }
+.ops-title { font-size: .9rem; color: var(--text); margin-bottom: 10px; }
+.ops-title .hint, .ops-card .hint { margin-left: 8px; color: var(--text-faint); font-size: var(--fs-2xs, 11px); font-weight: 400; }
+.ops-row { display: flex; flex-wrap: wrap; gap: 20px; }
+.ops-stat { display: flex; flex-direction: column; gap: 2px; min-width: 84px; }
+.ops-lb { color: var(--text-faint); font-size: var(--fs-2xs, 11px); }
+.ops-v { color: var(--text); font-size: 1.05rem; }
+.ops-sub { color: var(--text-faint); font-size: var(--fs-2xs, 11px); }
+.ops-bar-row { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.ops-bar-lb { flex: 0 0 96px; color: var(--text-dim); font-size: var(--fs-2xs, 11px); }
+.ops-bar-track { flex: 1; height: 8px; background: rgb(255 255 255 / .06); border-radius: 4px; overflow: hidden; }
+.ops-bar-track > i { display: block; height: 100%; background: var(--accent, #c9a84c); opacity: .75; }
+.ops-bar-n { flex: 0 0 52px; text-align: right; color: var(--text-dim); font-size: var(--fs-2xs, 11px); }
+
+.fb-row { padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--inset); }
+.fb-row-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: var(--fs-2xs, 11px); }
+.fb-row-head b { color: var(--accent-hi); }
+.fb-who { color: var(--text-dim); }
+.fb-time { margin-left: auto; color: var(--text-faint); }
+.fb-body { color: var(--text); font-size: .9rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.fb-ctx { margin-top: 6px; color: var(--text-faint); font-size: var(--fs-2xs, 11px); }
+.fb-err { margin-top: 3px; color: var(--danger-hi, #d9705f); font-family: monospace; font-size: 10.5px; }
+
+/* ---------- 21.5 反馈弹窗（2026-09-17） ---------- */
+/* 顶栏「反馈」按钮的图标：与其它顶栏图标（44x44）保持同一尺寸；
+   特异性要压过上面的 `.topbar-btn svg`（1.05em），所以写成 `.topbar-btn svg.fb-ico`。 */
+.topbar-btn svg.fb-ico { width: 44px; height: 44px; flex: none; }
+.fb-kinds { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.fb-kind {
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--inset); color: var(--text-dim);
+  font-size: var(--fs-2xs, 11px); transition: color .15s, border-color .15s;
+}
+.fb-kind:hover { color: var(--text); }
+.fb-kind.is-on { color: var(--accent-hi); border-color: var(--accent); background: rgb(var(--action-gold-rgb) / .1); }
+.fb-text {
+  width: 100%; min-height: 110px; resize: vertical;
+  background: var(--inset); color: var(--text);
+  border: 1px solid var(--line); border-radius: 6px; padding: 10px;
+  font-family: inherit; font-size: .9rem; line-height: 1.6;
+}
+.fb-text:focus { outline: none; border-color: var(--accent); }
+.fb-hint { margin-top: 8px; color: var(--text-faint); font-size: var(--fs-2xs, 11px); line-height: 1.5; }
+
 /* ---------- 22. 内联 SVG 图标（替换 emoji，融入水墨低饱和） ---------- */
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 2px 10px;
+  box-sizing: border-box;
+  line-height: 1;
+}
+.fs-btn:has(.top-ico) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 2px 10px;
+  box-sizing: border-box;
+  line-height: 1;
+}
+.gem-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.worldmap-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fs-btn .top-ico,
+.topbar-btn .top-ico,
+.capital-head .top-ico,
+.gem-chip .top-ico,
+.worldmap-title .top-ico {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  object-fit: contain;
+}
 .fs-btn svg,
 .topbar-btn svg,
 .worldmap-title svg,
@@ -411,4 +538,88 @@ body.rm-anim *::after {
 .wm-marker-icon .mat-img,
 .shop-card-icon .mat-img {
   width: 100%; height: 100%;
+}
+
+/* ===== 2026-09-17 大标题水墨描边（叠加于原有金色光晕；解决浅色背景发虚） ===== */
+.fs-title,
+.fs-title--display,
+.fs-panel__head,
+.app-topbar .title,
+.capital-head .worldmap-title,
+.worldmap-title,
+.pet-page-head .pet-page-title,
+.es-route .es-route-name,
+.loot-banner .lb-t,
+.celebrate .cb-t,
+.celebrate .cb-n,
+.ts-title,
+.ts-badge {
+  -webkit-text-stroke: 1px rgb(0 0 0 / .45);
+}
+
+/* ===== 2026-09-17 按钮手感动效：hover 微浮起 / 点击水墨圈下压 / 主按钮金光扫过 ===== */
+.fs-btn { position: relative; overflow: hidden; }
+.fs-btn::before,
+.fs-btn::after { pointer-events: none; }
+/* 点击水墨圈：从按钮中心扩散 0.32s（overflow 裁边，小按钮不出格） */
+.fs-btn::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: radial-gradient(circle, rgb(0 0 0 / .3), transparent 70%);
+  transform: scale(0); opacity: 0;
+}
+.fs-btn:not(:disabled):active::before { animation: ui-ripple .32s ease-out forwards; }
+@keyframes ui-ripple {
+  0%   { transform: scale(0); opacity: .85; }
+  100% { transform: scale(9); opacity: 0; }
+}
+/* 主按钮 hover 金色光带扫过 0.45s */
+.fs-btn--primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 32%, rgb(255 255 255 / .3) 50%, transparent 68%);
+  transform: translateX(-130%);
+  transition: transform .45s ease;
+}
+.fs-btn--primary:hover:not(:disabled)::after { transform: translateX(130%); }
+/* hover 微浮起 / 按下下压 */
+.fs-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.fs-btn:active:not(:disabled) { transform: translateY(1px) scale(.97); }
+/* 侧边栏按钮按压 */
+.sb-btn:active { transform: scale(.97); }
+
+/* ===== 2026-09-17 请求等待态 v2：按钮内金墨进度条（用户选 C：按钮变身进度） =====
+ * 任何 .is-loading 按钮：背景金墨渐变从左往右推进（JS 用 --p 控制宽度），
+ * 请求完成瞬间补满 100% 再恢复原样；::after 一律关掉防旧光带残留。 */
+.is-loading {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  cursor: wait;
+  opacity: .92;
+}
+.is-loading > * { position: relative; z-index: 2; }
+.is-loading::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--p, 0%);
+  min-width: 0;
+  background: linear-gradient(90deg,
+    rgb(184 155 89 / .12) 0%,
+    rgb(184 155 89 / .28) 55%,
+    rgb(224 199 125 / .38) 100%);
+  border-right: 1px solid rgb(224 199 125 / .45);
+  transition: width .28s ease-out;
+  z-index: 1;
+}
+.is-loading::after { display: none !important; }
+.ld-pct {
+  position: relative;
+  z-index: 3;
+  margin-left: 6px;
+  font-family: var(--font-num, Bahnschrift), sans-serif;
+  font-size: .82em;
+  letter-spacing: .5px;
+  color: var(--accent-hi, #b89b59);
+  font-weight: 700;
 }

@@ -284,7 +284,7 @@
     const id = 'botm-' + (++botUid);
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
-      kind: 'material', good_id: soldMat.id, good_name: soldMat.name, good_qty: 1, good_icon: soldMat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>',
+      kind: 'material', good_id: soldMat.id, good_name: soldMat.name, good_qty: 1, good_icon: (window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[soldMat.name] : null) || soldMat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>',
       material_type: payMat.name, material_qty: payQty,
       created_at: Date.now(), // 缺了会让「最新上架」把它们全甩到最后
     };
@@ -302,7 +302,7 @@
     const id = 'bote-' + (++botUid);
     return {
       id, isBot: true, isLeak: false, seller: ps.nickname, personaId: ps.id,
-      kind: 'egg', egg_type: base.name, egg_icon: base.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg>',
+      kind: 'egg', egg_type: base.name, egg_icon: (window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[base.name] : null) || base.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg>',
       material_type: payMat.name, material_qty: payQty,
       created_at: Date.now(), // 同上：缺了排序会错乱
     };

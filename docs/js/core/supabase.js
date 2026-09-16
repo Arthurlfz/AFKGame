@@ -740,6 +740,39 @@
     } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
   }
 
+  /* ---------- 玩家反馈（2026-09-17）----------
+   * 内测最值钱的是玩家的抱怨。反馈表只开 insert（RLS 保证只能写自己的一行），
+   * 读取一律走 admin_list_feedback（管理员专属），玩家侧没有"我的反馈列表"。 */
+  async function sendFeedback(kind, body, ctx) {
+    const user = await getCurrentUser();
+    if (!user) return { error: '请先登录再提交反馈' };
+    const prof = getMyProfile ? getMyProfile() : null;
+    const { error } = await client.from('feedback')
+      .insert({ email: user.email || null, nickname: (prof && prof.nickname) || null,
+                kind: kind || 'bug', body: String(body || '').slice(0, 2000),
+                ctx: String(ctx || '').slice(0, 1000) });
+    return error ? { error: error.message } : { ok: true };
+  }
+  // 管理员读反馈（非管理员会被服务端 ERR_NOT_ADMIN 挡下）
+  async function listFeedback(limit) {
+    return client.rpc('admin_list_feedback', { p_limit: limit || 50 });
+  }
+
+  /* ---------- 市场脉动（2026-09-17）----------
+   * 一次拿到「在线人数 + 最近成交」。市集页用它做出"这里有活人"的感觉 ——
+   * 挂完单页面毫无动静，是玩家判断"市场死了"的直接依据。
+   * 聚合在服务端做（user_sessions / trade_records 的 RLS 只让读自己那行）。 */
+  async function marketPulse(limit) {
+    const { data, error } = await client.rpc('market_pulse', { p_limit: limit || 8 });
+    if (error) return { error: error.message };
+    return { data: data || {} };
+  }
+
+  // 内测看板（管理员专属；服务端 ERR_NOT_ADMIN 会挡下非管理员）
+  async function opsBoard() {
+    return client.rpc('admin_ops_board');
+  }
+
   /* ---------- 对外 API ---------- */
   window.Supabase = {
     init, getClient, signIn, signUp, signOut, getSession, getCurrentUser,
@@ -756,6 +789,8 @@
     fetchQuestProgress, saveQuestProgress, completeQuest, fetchQuestClaims,
     sendChatMessage, fetchRecentMessages, getMyDisplayName,
     loadMyProfile, setMyNickname, getMyProfile,
-    loadServerConfig, saveServerConfig
+    loadServerConfig, saveServerConfig,
+    sendFeedback, listFeedback,
+    marketPulse, opsBoard
   };
 })();

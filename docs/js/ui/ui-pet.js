@@ -420,7 +420,7 @@
         /* 格子里只放「图标 + 装备名」。
          * 旧写法还塞了一整行 describeItem（部位｜基底｜全部词缀）—— 那行必定被 ellipsis 截成半句话，
          * 既挤又没信息量；详情本来就在右侧面板/悬停里（2026-09-14 用户反馈"左边挺挤的"）。 */
-        item.innerHTML = `<span class="slot-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span></span>`;
+        item.innerHTML = `<span class="slot-icon" aria-hidden="true">${(window.UI && window.UI.EQUIP_ICON ? window.UI.EQUIP_ICON[slot] : null) || eq.icon || '◆'}</span><span class="slot-copy"><span class="slot-name">${escapeHtml(eq.name)}</span></span>`;
         // 单击槽位 → 右侧面板显示穿戴详情（可脱下）；不再挂 hover 浮层（根治遮挡）
         item.onclick = (e) => { e.stopPropagation(); bagActiveEqId = eq.id; if (UI.renderBagEqDetail) UI.renderBagEqDetail(eq); };
         const takeBtn = document.createElement('button');
@@ -524,7 +524,7 @@
       row.className = 'quick-eq q-' + (eq.rarity && eq.rarity.id ? eq.rarity.id : 'white') + (bagActiveEqId === eq.id ? ' selected' : '');
       const name = document.createElement('span');
       name.className = 'qe-name';
-      name.innerHTML = `<span class="qe-icon" aria-hidden="true">${eq.icon || '◆'}</span><span class="qe-copy">${escapeHtml(eq.name)}</span>`;
+      name.innerHTML = `<span class="qe-icon" aria-hidden="true">${(window.UI && window.UI.EQUIP_ICON ? window.UI.EQUIP_ICON[eq.slot] : null) || eq.icon || '◆'}</span><span class="qe-copy">${escapeHtml(eq.name)}</span>`;
       name.style.color = rarityOf(eq).color;
       row.appendChild(name);
       const meta = document.createElement('span');

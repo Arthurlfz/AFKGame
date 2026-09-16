@@ -89,12 +89,35 @@ const matQ = uid => name => {
   assert(psCount === C('Config.marketBot.personas.count'), `AI persona 数量 = 配置（${psCount}）`);
   const nickSet = C('new Set(MarketBot.getPersonas().map(p => p.nickname)).size');
   assert(nickSet === psCount, `昵称不重名（${nickSet}/${psCount}）`);
-  const tierDist = C('MarketBot.getPersonas().reduce((a,p)=>(a[p.tier]=(a[p.tier]||0)+1,a),{})');
-  assert((tierDist['新手'] || 0) >= 4 && (tierDist['中坚'] || 0) >= 4,
-    `等级档分布合理（新手 ${tierDist['新手']||0} / 中坚 ${tierDist['中坚']||0} / 毕业 ${tierDist['毕业']||0}）`);
-  const styleDist = C('MarketBot.getPersonas().reduce((a,p)=>(a[p.playstyle.id]=(a[p.playstyle.id]||0)+1,a),{})');
-  assert((styleDist['dps'] || 0) >= 6 && (styleDist['tank'] || 0) >= 2 && (styleDist['speed'] || 0) >= 1,
-    `流派分布合理（dps ${styleDist['dps']||0} / tank ${styleDist['tank']||0} / speed ${styleDist['speed']||0}）`);
+  /* 分布断言走【多次抽样看比例】，不再看单批 20 个的绝对个数。
+   * 2026-09-17 修：原来写死「新手 ≥4 / dps ≥6」—— persona 是按配置权重随机抽的，
+   * 20 个样本的波动足以让它时红时绿（实测连跑 6 次：新手 5~9、dps 6~16，
+   * 全量并发里还出现过新手 3 直接报红）。这条是周期性污染回归基线的 flaky。
+   * 改法沿用 09-12 修 vtest_tier_rarity 的先例：抽 60 批共 1200 个样本，
+   * 断言实际比例落在配置值 ±6pp 内（各档标准误 ≤1.5pp，≈4σ 以上，误报可忽略）。 */
+  const SAMPLES = 60;
+  const tierSum = { 新手: 0, 中坚: 0, 毕业: 0 };
+  const styleSum = { dps: 0, tank: 0, speed: 0 };
+  for (let i = 0; i < SAMPLES; i++) {
+    C('MarketBot.__test.generatePersonas()');
+    const d = C('MarketBot.getPersonas().reduce((a,p)=>(a[p.tier]=(a[p.tier]||0)+1,a),{})');
+    const s = C('MarketBot.getPersonas().reduce((a,p)=>(a[p.playstyle.id]=(a[p.playstyle.id]||0)+1,a),{})');
+    for (const k in tierSum) tierSum[k] += d[k] || 0;
+    for (const k in styleSum) styleSum[k] += s[k] || 0;
+  }
+  const total = SAMPLES * psCount;
+  const pctOf = n => (n / total * 100);
+  const TOL = 6; // 个百分点
+
+  const cfgTiers = C('Config.marketBot.personas.levelTiers');
+  const tierBad = cfgTiers.filter(t => Math.abs(pctOf(tierSum[t.tier] || 0) - t.pct) > TOL);
+  assert(tierBad.length === 0,
+    `等级档分布贴合配置（新手 ${pctOf(tierSum['新手']).toFixed(1)}% / 中坚 ${pctOf(tierSum['中坚']).toFixed(1)}% / 毕业 ${pctOf(tierSum['毕业']).toFixed(1)}%，配置 40/45/15，容差 ±${TOL}pp）`);
+
+  const cfgStyles = C('Config.marketBot.personas.playstyles');
+  const styleBad = cfgStyles.filter(s => Math.abs(pctOf(styleSum[s.id] || 0) - s.pct) > TOL);
+  assert(styleBad.length === 0,
+    `流派分布贴合配置（dps ${pctOf(styleSum['dps']).toFixed(1)}% / tank ${pctOf(styleSum['tank']).toFixed(1)}% / speed ${pctOf(styleSum['speed']).toFixed(1)}%，配置 55/25/20，容差 ±${TOL}pp）`);
   // 流派口味：dps persona 对 atk 词缀装备的溢价 > 对 hp 词缀装备（需求结构的基础）
   const dpsAff = C('MarketBot.__test.gearAffinity([{type:"atk",tier:1},{type:"crit",tier:1}], MarketBot.getPersonas().find(p=>p.playstyle.id==="dps"))');
   const dpsAffHp = C('MarketBot.__test.gearAffinity([{type:"hp",tier:1}], MarketBot.getPersonas().find(p=>p.playstyle.id==="dps"))');

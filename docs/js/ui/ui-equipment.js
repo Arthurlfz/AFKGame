@@ -174,6 +174,10 @@
       renderInvToolbar();
     };
     btn.onclick = openBatchSalvagePanel;
+    // 「一键清理」= 按评分阈值清理（会保护锁定/在售/比身上好的），入口以前一直没接上，
+    // 玩家只能用「批量分解」或背包里的快捷键 —— 后者当时还没有确认框。
+    const autoBtn = $('btn-salvage-auto');
+    if (autoBtn) autoBtn.onclick = openSalvagePanel;
   }
 
   /* ---------- 背包（穿装备 / 多选批量分解） ---------- */
@@ -311,6 +315,38 @@
     if (scroller && keepScroll) scroller.scrollTop = keepScroll;
   }
 
+  /* ---------- 分解确认面板（唯一实现，全项目共用） ----------
+   * 分解是【不可逆操作】：拆掉就没了，没有撤销。
+   * 2026-09-17 之前这一层根本不存在 —— 背包里的 Ctrl+Enter「全部分解」与
+   * Ctrl/Alt+点「快分解」都是点了直接执行，误触（尤其 Ctrl+Enter 在聊天框还是发送键）
+   * 就是整包装备永久损失。现在四个入口（一键清理 / 批量分解 / 快捷键 / 单件快分解）
+   * 全部走这里，先让玩家看清"要拆几件、能得到什么"再点确认。
+   */
+  function salvageConfirm(opts) {
+    const run = () => { try { return opts.onOk && opts.onOk(); } catch (e) { console.error('[salvage] 执行失败', e); } };
+    const modal = $('salvage-modal');
+    if (!modal || !$('salvage-body')) {
+      // 面板不可用时也不能让玩家无确认就丢装备
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        if (window.confirm(opts.fallbackText || '确认分解？此操作不可撤销。')) run();
+      } else run(); // node / 测试桩：没有 UI 可问，直接执行（测试用）
+      return;
+    }
+    const titleEl = modal.querySelector('.modal-title');
+    if (titleEl && opts.title) titleEl.innerHTML = opts.title;
+    if (opts.bodyHtml != null) $('salvage-body').innerHTML = opts.bodyHtml;
+    if (typeof opts.afterRender === 'function') opts.afterRender();
+    const ok = $('salvage-ok');
+    const cancel = $('salvage-cancel');
+    if (ok) {
+      ok.textContent = opts.okLabel || '确认分解';
+      ok.onclick = () => { closeSalvagePanel(); run(); };
+    }
+    // 「取消」以前压根没绑事件 —— 点了没反应，玩家只能刷新页面
+    if (cancel) cancel.onclick = closeSalvagePanel;
+    modal.style.display = 'flex';
+  }
+
   /* ---------- 一键清理（按评分阈值，确认框 → 执行） ----------
    * 以前「一键分解」= 清空全部可分解装备，好东西也一起没了，玩家根本不敢点。
    * 装备有评分之后改成按分数清理：低于阈值才分解，并且自动保护
@@ -356,18 +392,21 @@
       $('salvage-threshold').oninput = renderPreview;
       renderPreview();
 
-      $('salvage-modal').style.display = 'flex';
-      $('salvage-ok').onclick = async () => {
+      salvageConfirm({
+        title: '<img class="eic-img" src="assets/ui/ic_shred.png" alt=""> 一键清理',
+        okLabel: '确认清理',
+        fallbackText: '确认分解低于 ' + median + ' 分的装备？此操作不可撤销。',
+        onOk: async () => {
         const th = Number($('salvage-threshold').value);
         const res = await Salvage.salvageBelow(Number.isFinite(th) ? th : 0);
-        closeSalvagePanel();
         if (res.error) { showToast('❌ 分解失败', res.error); return; }
         const parts = [`清理了 ${res.count} 件装备（低于 ${res.threshold} 分）`];
         for (const [k, n] of Object.entries(res.gains || {})) parts.push(`${Config.craft[k]?.name || k} ×${n}`);
         addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 一键清理：${parts.join('，')}`);
         showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> 清理完成', parts.join('<br>'));
         UI.renderAll();
-      };
+        }
+      });
     } catch (err) {
       console.error('打开分解面板出错：', err);
       showToast('⚠️ 分解面板出错', (err && err.message) || String(err));
@@ -399,9 +438,11 @@
         ${gainHtml}
       </div>
       <div class="salvage-warn">⚠️ 已锁定装备不会被分解</div>`;
-    $('salvage-modal').style.display = 'flex';
-    $('salvage-ok').onclick = async () => {
-      $('salvage-modal').style.display = 'none';
+    salvageConfirm({
+      title: '<img class="eic-img" src="assets/ui/ic_shred.png" alt=""> 批量分解',
+      okLabel: '确认分解',
+      fallbackText: '确认分解选中的 ' + targets.length + ' 件装备？此操作不可撤销。',
+      onOk: async () => {
       const res = await Salvage.salvageList(targets);
       if (res.error) { showToast('❌ 分解失败', res.error); return; }
       const parts = [`分解了 ${res.count} 件装备`];
@@ -412,7 +453,8 @@
       if (UI.showDialog) UI.showDialog({ icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>', speaker: '分解', text: parts.join('<br>') });
       selectedEqIds.clear();
       UI.renderAll();
-    };
+      }
+    });
   }
 
   /* ---------- 换装属性对比 ----------
@@ -579,4 +621,5 @@
   UI.openSalvagePanel = openSalvagePanel;
   UI.closeSalvagePanel = closeSalvagePanel;
   UI.openBatchSalvagePanel = openBatchSalvagePanel;
+  UI.salvageConfirm = salvageConfirm; // 分解确认的唯一实现：背包快捷键 / 单件快分解也走它
 })();
