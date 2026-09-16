@@ -34,7 +34,7 @@
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
-<link rel="stylesheet" href="css/ui-fixes.css?v=20260917zfix10">
+<link rel="stylesheet" href="css/ui-fixes.css?v=20260917zfix11">
 <!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
 <link rel="stylesheet" href="css/session-guard.css?v=20260910sess1">
 <style id="boot-style">
@@ -111,7 +111,18 @@
 
   <!-- 片头（Remotion 渲染的 mp4，见 video/ 工程）：只在首次进入时覆盖登录页播一遍，可跳过。
        产物路径 docs/assets/video/opening.mp4；逻辑在 js/ui/ui-intro.js。 -->
-  <div class="login-intro" id="login-intro" hidden>
+    <!-- 登录页 8 基宠展示层（hover 显示名字；小屏隐藏） -->
+  <div class="login-pets" id="login-pets" aria-hidden="true">
+    <div class="pet" style="left:3%;top:10%;--d:.10s;--f:-.4s" data-name="腐噜兽"><img src="assets/pets/pack0-base/monster-00.png" alt="腐噜兽"><span class="pet-name">腐噜兽</span></div>
+    <div class="pet" style="right:3%;top:12%;--d:.30s;--f:-2.1s" data-name="幽影兔"><img src="assets/pets/pack0-base/monster-07.png" alt="幽影兔"><span class="pet-name">幽影兔</span></div>
+    <div class="pet" style="left:6%;top:36%;--d:.18s;--f:-1.6s" data-name="骨狼"><img src="assets/pets/pack0-base/monster-04.png" alt="骨狼"><span class="pet-name">骨狼</span></div>
+    <div class="pet" style="right:6%;top:38%;--d:.42s;--f:-3.2s" data-name="疫毛兽"><img src="assets/pets/pack0-base/monster-03.png" alt="疫毛兽"><span class="pet-name">疫毛兽</span></div>
+    <div class="pet" style="left:3%;top:60%;--d:.26s;--f:-.9s" data-name="瘟熊"><img src="assets/pets/pack0-base/monster-02.png" alt="瘟熊"><span class="pet-name">瘟熊</span></div>
+    <div class="pet" style="right:3%;top:62%;--d:.54s;--f:-2.8s" data-name="血狐"><img src="assets/pets/pack0-base/monster-01.png" alt="血狐"><span class="pet-name">血狐</span></div>
+    <div class="pet" style="left:6%;top:82%;--d:.06s;--f:-1.2s" data-name="尸犬"><img src="assets/pets/pack0-base/monster-06.png" alt="尸犬"><span class="pet-name">尸犬</span></div>
+    <div class="pet" style="right:6%;top:84%;--d:.38s;--f:-2.4s" data-name="毒沼蛙"><img src="assets/pets/pack0-base/monster-05.png" alt="毒沼蛙"><span class="pet-name">毒沼蛙</span></div>
+  </div>
+<div class="login-intro" id="login-intro" hidden>
     <video class="login-intro-video" id="login-intro-video" src="assets/video/opening.mp4"
            muted playsinline preload="auto" aria-label="片头"></video>
     <button type="button" class="login-intro-skip" id="login-intro-skip">点击任意处跳过片头 ›</button>
