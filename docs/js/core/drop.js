@@ -134,6 +134,7 @@
         if (!dry) await Materials.gain(am.name, 5); // dry 只抽样，不落库
       }
       if (!dry) {
+        if (bagFullNow()) { warnBagFull(); return { type: 'boss', eq: null, bagFull: true, material: mat, bossItems: [] }; }
         addToInventory(eq);
         totalEquipDrops++;
         if (window.Quest && window.Quest.reportType) window.Quest.reportType('equipDrop', 1);
@@ -183,6 +184,7 @@
       const eq = generateEquipment(null, areaTier, 0, ilvl, rareBonus);
       eq.identified = false;          // 掉落即未鉴定，背包里灰框，鉴定后揭晓
       if (!dry) {
+        if (bagFullNow()) { warnBagFull(); return { type: 'equipment', eq: null, bagFull: true }; }
         addToInventory(eq);
         totalEquipDrops++;
         // 任务进度上报：所有 type=equipDrop 的任务 +1（捡到装备）
@@ -214,6 +216,26 @@
     return { type: 'none' }; // 无掉落
   }
 
+  /* 背包装备位满了吗（2026-09-16 容量上限）。
+   * 满了就不再收新装备 —— 但**不能静默吞掉**：调用方把 bagFull 透出去，界面提示玩家
+   * "背包满了，刚掉的装备没捡到"，否则玩家只会觉得"怎么不掉装备了"。
+   * ⚠️ 托管挂机是服务端发奖，同一道闸在 `battle_settle` RPC 里（那边数的是库里真实件数）。 */
+  const bagFullNow = () => {
+    const U = window.Supabase && window.Supabase.usageOf;
+    const u = U ? U('bag') : null;
+    return !!(u && u.full);
+  };
+  // 满了要说话：不提示的话玩家只会觉得"怎么不掉装备了"。10 秒一次，别刷屏。
+  let lastBagFullLog = 0;
+  const warnBagFull = () => {
+    const now = Date.now();
+    if (now - lastBagFullLog < 10000) return;
+    lastBagFullLog = now;
+    if (window.UI && window.UI.addLog) {
+      window.UI.addLog('⚠️ 背包装备位已满：刚掉的装备没捡到 —— 去分解或上架腾位置，也可以到商店扩建背包');
+    }
+  };
+
   /* ---------- 孵化 ---------- */
   // 未登录不能孵化：返回 { error }；成功返回 { baby, saveError }
   // 孵化出的宠物自动写入 Supabase pets 表（存档失败只提示，不阻塞本地游玩）
@@ -236,6 +258,12 @@
     try {
       const user = await Supabase.getCurrentUser();
       if (!user) return { error: '请先登录账号，才能孵化宠物' };
+      /* 育兽栏上限（2026-09-16）：满了不让孵 —— **蛋不扣**，玩家合成/涅槃掉一只或扩建后再来。
+       * 拦在这里而不是 addPet 里：这里能带着原因返回给玩家，addPet 只是个入组函数。 */
+      const petUsage = window.Supabase && window.Supabase.usageOf ? window.Supabase.usageOf('pet') : null;
+      if (petUsage && petUsage.full) {
+        return { error: `育兽栏已满（${petUsage.used}/${petUsage.cap}）：先合成或涅槃掉一只，或者去商店扩建育兽栏` };
+      }
       eggMap[baseName]--;
       if (eggMap[baseName] <= 0) delete eggMap[baseName];
       const baby = createBaby(baseName); // 按品种定向生成对应基础宠

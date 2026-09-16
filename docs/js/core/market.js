@@ -97,26 +97,28 @@
   const getListedCount = () => myListedPets.length + myListedItems.length + myListedEggs.length + myListedMaterials.length;
   /* 上架额度（2026-09-10 落地）：Config.trade.maxListings 以前只写在配置和百科里，
    * 上架流程完全不校验 → 挂单上限形同虚设。上架前统一问这里。 */
-  /* 玩家权益加成（魔石买的便利类，2026-09-12 落地）
+  /* 账号权益加成（魔石买的便利类，2026-09-12 落地；2026-09-16 从 1 项扩到 3 项）
    * 服务端权威：user_perks 表客户端只有 SELECT，写入只走 spend_gems RPC。
-   * 这里只缓存一份供 listQuota 同步读取（登录时由 refreshPerks 拉一次）。 */
-  let perks = { listingSlots: 0 };
+   * ⚠️ 缓存真源已上移到 `Supabase.refreshPerks()` —— 背包容量 / 育兽栏位也要读同一份数字，
+   *    分两处存必然出现"买了扩建这边生效那边没生效"。这里只保留同名转发，不动调用方；
+   *    **新代码请直接问 Supabase.getPerksCache()**。 */
   async function refreshPerks() {
     try {
-      const p = await Supabase.getMyPerks();
-      perks = { listingSlots: Number((p && p.listing_slots) || 0) };
+      const p = await Supabase.refreshPerks();
+      return { listingSlots: Number((p && p.listing_slots) || 0) };
     } catch (e) {
       // 拉不到就按 0 处理：只是少几单额度，不该打断进游戏
       console.warn('[market] 权益加载失败，按无加成处理：', e && e.message);
-      perks = { listingSlots: 0 };
+      return { listingSlots: 0 };
     }
-    return perks;
   }
-  function getPerks() { return perks; }
+  function getPerks() {
+    return { listingSlots: Number(Supabase.getPerksCache().listing_slots || 0) };
+  }
 
   function listQuota() {
     const base = Number((Config.trade && Config.trade.maxListings) || 5);
-    const max = base + (perks.listingSlots || 0);
+    const max = base + (getPerks().listingSlots || 0);
     const used = getListedCount();
     return { ok: used < max, used, max, left: Math.max(0, max - used) };
   }

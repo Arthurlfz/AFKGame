@@ -154,16 +154,29 @@
   }
 
   /* 商品内容描述。两种 payload：
-   *   materials = { 材料名: 数量 }  → 走 add_material 直发背包
-   *   perks     = { listing_slots: N } → 走 user_perks，改的是市场挂单上限（便利类，不进战力）
-   * ⚠️ 2026-09-12 拍板商店只卖便利不卖数值，所以 materials 类目后续不应再新增。 */
+   *   materials = { 材料名: 数量 } → 走 add_material 直发背包
+   *   perks     = { 权益键: 数量 } → 走 user_perks（便利类，不进战力）：
+   *               listing_slots 挂单额度 / inventory_slots 背包装备位 / pet_slots 育兽栏位
+   * ⚠️ 2026-09-12 拍板商店只卖便利不卖数值，所以 materials 类目后续不应再新增。
+   * 2026-09-16：从"只认挂单额度"改成按权益键查表 —— 以后加便利权益只需动这张表。 */
+  const PERK_LABEL = {
+    listing_slots: '市场挂单上限',
+    inventory_slots: '背包装备位',
+    pet_slots: '育兽栏位'
+  };
   function goodsDesc(payload) {
     const m = payload && payload.materials;
     if (m) return Object.keys(m).map(k => `${k} ×${m[k]}`).join('、');
     const pk = payload && payload.perks;
-    if (pk && pk.listing_slots) {
-      const owned = (Market && Market.getPerks && Market.getPerks().listingSlots) || 0;
-      return `市场挂单上限永久 +${pk.listing_slots}${owned ? `（已拥有 +${owned}）` : ''}`;
+    if (pk) {
+      const cache = (window.Supabase && window.Supabase.getPerksCache) ? window.Supabase.getPerksCache() : {};
+      const parts = Object.keys(PERK_LABEL)
+        .filter(k => Number(pk[k]) > 0)
+        .map(k => {
+          const owned = Number(cache[k] || 0);
+          return `${PERK_LABEL[k]}永久 +${pk[k]}${owned ? `（已拥有 +${owned}）` : ''}`;
+        });
+      if (parts.length) return parts.join('、');
     }
     return '';
   }
@@ -221,7 +234,10 @@
      *                  否则挂单上限还停在旧值，玩家会以为「买了没生效」。 */
     const isPerk = !!(p.payload && p.payload.perks);
     if (p.payload && p.payload.materials) {
-      const { data } = await Supabase.getClient().from('materials').select('name,quantity');
+      /* ⚠️ 必须带 bound_qty：少这一列，setCloudMaterials 会当成"这些材料全不绑定"，
+       * 把本地绑定数整体清零 —— 玩家在商店买一次东西，背包里的「绑定」堆就集体消失。
+       * （2026-09-16 查出来的连带 bug；materials.js 的 loadCloudMaterials 已经带上了。） */
+      const { data } = await Supabase.getClient().from('materials').select('name,quantity,bound_qty');
       if (data) Materials.setCloudMaterials(data);
     }
     if (isPerk && Market && Market.refreshPerks) await Market.refreshPerks();

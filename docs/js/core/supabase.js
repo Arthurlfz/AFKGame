@@ -481,17 +481,59 @@
       return { gems: 0, totalRecharged: 0, error: e && e.message, missing: true };
     }
   }
-  // 我的玩家权益（魔石买的便利类，如市场挂单额度加成）
-  // 与钱包同款服务端权威：user_perks 表只有 SELECT 策略，写入只走 spend_gems。
+  /* 我的玩家权益（魔石买的便利类：挂单额度 / 背包格数 / 育兽栏位）
+   * 服务端权威：user_perks 表只有 SELECT 策略，写入只走 spend_gems。
+   * 2026-09-16：从"只有挂单额度"扩成三项 —— 装备与宠物开始有容量上限，扩建道具走同一套权益。 */
+  const EMPTY_PERKS = { listing_slots: 0, inventory_slots: 0, pet_slots: 0 };
   async function getMyPerks() {
     try {
       const { data, error } = await client.rpc('get_my_perks');
-      if (error) return { listing_slots: 0, error: error.message };
+      if (error) return { ...EMPTY_PERKS, error: error.message };
       const row = (data && data[0]) || null;
-      return { listing_slots: (row && row.listing_slots) || 0, error: null };
+      return {
+        listing_slots: (row && row.listing_slots) || 0,
+        inventory_slots: (row && row.inventory_slots) || 0,
+        pet_slots: (row && row.pet_slots) || 0,
+        error: null
+      };
     } catch (e) {
-      return { listing_slots: 0, error: e && e.message };
+      return { ...EMPTY_PERKS, error: e && e.message };
     }
+  }
+  /* 权益本地缓存（登录时拉一次，界面同步读）。
+   * 放这里而不是各模块各存一份：挂单额度 / 背包容量 / 育兽栏位读的必须是同一份数字，
+   * 否则买了扩建会出现"这边生效、那边没生效"。Market.refreshPerks 现在是它的转发。 */
+  let perksCache = { ...EMPTY_PERKS };
+  async function refreshPerks() {
+    const p = await getMyPerks();
+    perksCache = {
+      listing_slots: Number(p.listing_slots || 0),
+      inventory_slots: Number(p.inventory_slots || 0),
+      pet_slots: Number(p.pet_slots || 0)
+    };
+    return perksCache;
+  }
+  const getPerksCache = () => ({ ...perksCache });
+
+  /* ---------- 容量上限（2026-09-16 用户拍板：装备/宠物设上限，卖扩建道具） ----------
+   * 真源：基础值在 `Config.capacity`，扩建值在 user_perks（服务端权威，登录时拉到 perksCache）。
+   * kind: 'bag'（背包里的装备）| 'pet'（名下宠物）
+   * ⚠️ 装备容量**服务端也有一份**（`battle_settle` 发装备前会数一遍）—— 这里改基础值必须同步改
+   *    那条 RPC，否则前台拦得住、托管挂机拦不住。
+   * 放在这个模块是因为它是 perksCache 的持有者；界面显示与掉落入包都问这一个口，避免各算各的。 */
+  function capacityOf(kind) {
+    const c = ((window.Config && window.Config.capacity) || {})[kind] || {};
+    const bonusKey = kind === 'pet' ? 'pet_slots' : 'inventory_slots';
+    const base = Number(c.base || 0);
+    const bonus = Number(perksCache[bonusKey] || 0);
+    return { base, bonus, cap: base + bonus, step: Number(c.step || 0), maxBuy: Number(c.maxBuy || 0) };
+  }
+  function usageOf(kind) {
+    const used = kind === 'pet'
+      ? ((window.Pet && window.Pet.getPets) ? (window.Pet.getPets() || []).length : 0)
+      : ((window.Equipment && window.Equipment.getInventory) ? (window.Equipment.getInventory() || []).length : 0);
+    const c = capacityOf(kind);
+    return { used, base: c.base, bonus: c.bonus, cap: c.cap, full: used >= c.cap, left: Math.max(0, c.cap - used) };
   }
   // 卡密兑换：返回 'ok:数量' / 'notfound' / 'used' / 'expired' / 'nologin'
   async function redeemCode(code) {
@@ -708,7 +750,7 @@
     listItem, fetchItemMarket, fetchMyListedItemIds, buyItem, cancelEquipListing, botBuyEquip, botBuyPet,
     fetchItemById, loadTradeRecords,
     consumeEgg, loadEggCount, addEgg,
-    getMyWallet, getMyPerks, redeemCode, spendGems, fetchProducts, fetchMyOrders,
+    getMyWallet, getMyPerks, refreshPerks, getPerksCache, capacityOf, usageOf, redeemCode, spendGems, fetchProducts, fetchMyOrders,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
     fetchQuestProgress, saveQuestProgress, completeQuest, fetchQuestClaims,

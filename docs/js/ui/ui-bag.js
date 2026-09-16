@@ -33,11 +33,15 @@
   const EQUIP_ICON = { 武器:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 单手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 双手剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️', 长剑:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m11 19-6-6"/><path d="m5 21-2-2"/><path d="m8 16-4 4"/><path d="M9.5 17.5 20.414 6.586A2 2 0 0021 5.172V3h-2.172a2 2 0 00-1.414.586L6.5 14.5"/></svg>', 弓:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="22" x2="18" y1="12" y2="12" /><line x1="6" x2="2" y1="12" y2="12" /><line x1="12" x2="12" y1="6" y2="2" /><line x1="12" x2="12" y1="22" y2="18" /></svg>', 法杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 杖:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>', 盾:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>', 胸甲:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>', 头盔:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 帽:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>️', 手套:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>', 靴:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 鞋:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></svg>', 戒指:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 项链:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 护符:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3 8 9l4 13 4-13-2.5-6"/><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z"/><path d="M2 9h20"/></svg>', 腰带:'<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' };
   UI.EQUIP_ICON = EQUIP_ICON;
 
-  /* 打造通货（重铸 / 剥离 / 神圣 / 增缀 + 锁定 / 鉴定）2026-09-14 起归到
-   * 「素材」页签的【打造与鉴定】分区 —— 它们和鉴定石本来就是同一类东西，
-   * 以前被拆在「消耗品」里是历史遗留（用户报「背包分类笼统」）。
-   * 分区真源 = Config.materialInfo（唯一一份，UI 不许另写名单）。
-   * 「消耗品」页签现在只放绑定的一次性道具（引导经验包等）。 */
+  /* 【背包分类口径 · 2026-09-16 定稿】
+   * 一级是 5 个页签：全部 / 装备 / 素材 / 消耗品 / 宠物蛋。
+   * 素材与消耗品都走**同一套二级分区真源** `Config.materialInfoGroups`，靠 `kind` 分家：
+   *   kind:'material'（默认）→ 「素材」页签：**攒着按数量扣**的资源（几十几百个：打造石、区域材料、进化素材…）
+   *   kind:'consume'         → 「消耗品」页签：**用一次少一颗**的道具（经验包、涅槃丹、门票…）
+   * 一件东西该去哪边，看玩家怎么用它 —— 想换区只改 materialInfo 里那一行的 group，UI 不用动。
+   * 分区真源仍然只有一份（Config.materialInfo），UI 不许另写名单。
+   * 历史：打造通货（重铸/剥离/神圣/增缀/锁定/鉴定）2026-09-14 从消耗品挪进「素材·打造与鉴定」——
+   * 它们是打造成本、数量大，属于"货币"；那次是用户报「背包分类笼统」的第一轮修正。 */
   // 背包搜索词 / 品质筛选 / 当前 tab（renderAll 高频重建，用 state 保存）
   const RARITY_ORDER = { gold: 0, blue: 1, white: 2 };
   const EQUIP_SLOTS = window.Equipment.SLOTS || [];
@@ -49,7 +53,8 @@
   let bagBaseTier = 'all'; // all / '1'~'5'（底材T阶）
   let bagAffixTier = 'all'; // all / '1'~'5'（最高词缀T阶）
   let bagAffixType = 'all'; // all / 词缀类型（atk/dropQty等）
-  let bagGroup = 'all';  // 素材二级分区：all / Config.materialInfoGroups 的 id
+  let bagGroup = 'all';         // 素材二级分区：all / materialInfoGroups 里 kind!=='consume' 的 id
+  let bagConsumeGroup = 'all';  // 消耗品二级分区：all / materialInfoGroups 里 kind==='consume' 的 id（2026-09-16）
   let identifyMode = false;  // 手持鉴定模式：开启后点未鉴定装备即连续鉴定
 
   // 通用格子 tooltip 浮层（悬停显示完整信息，body 层 fixed 不被裁）
@@ -160,19 +165,59 @@
 
     const equipList = getInventory();
     const localMats = Materials.getLocal ? Materials.getLocal() : {};
-    // 素材分区真源（唯一一份：Config.materialInfo / materialInfoGroups），UI 不另写名单
+    /* 分区真源（唯一一份：Config.materialInfo / materialInfoGroups），UI 不另写名单。
+     * 2026-09-16：这张表分成两半 —— kind==='material' 的进「素材」页签、kind==='consume' 的进「消耗品」页签。
+     * 分界线：**攒着按数量扣**（几十几百）算素材；**用一次少一颗**（手里就几颗）算消耗品。
+     * 两边共用同一个 group 字段 ⇒ 以后想把某件东西换个区，只改它那一行的 group。 */
     const matInfo = Config.materialInfo || {};
-    const matGroups = Config.materialInfoGroups || [];
-    const groupLabel = id => { const g = matGroups.find(x => x.id === id); return g ? g.label : '其他'; };
-    // 引导经验包（2026-09-08）走「消耗品」栏，不在素材里重复出现
-    const EXP_PACK_NAMES = ((Config.tutorialMode && Config.tutorialMode.expPacks) || []).map(p => p.name);
-    const matEntries = Object.entries(localMats).sort((a, b) => a[0].localeCompare(b[0]))
-      .filter(([name]) => !EXP_PACK_NAMES.includes(name))
-      .map(([name, qty]) => ({ name, qty, group: (matInfo[name] || {}).group || 'misc' }));
-    // 「消耗品」= 绑定的一次性道具（引导经验包）；打造石已归「素材 · 打造与鉴定」
-    const consEntries = EXP_PACK_NAMES
-      .map(n => ({ name: n, qty: Materials.getQuantity(n) || 0 }))
-      .filter(x => x.qty > 0);
+    const allGroups = Config.materialInfoGroups || [];
+    const matGroups = allGroups.filter(g => g.kind !== 'consume');   // 素材页签的分区按钮
+    const useGroups = allGroups.filter(g => g.kind === 'consume');   // 消耗品页签的分区按钮
+    const useGroupIds = useGroups.map(g => g.id);                    // 归消耗品的组（这几组不进素材区）
+    const groupLabel = id => { const g = allGroups.find(x => x.id === id); return g ? g.label : '其他'; };
+    /* 经验包一律走「消耗品」栏，不在素材里重复出现。两套来源都要登记，漏一套就会在素材区多显示一份：
+     *   ① 引导经验包（tutorialMode.expPacks）：按关卡把魂兽顶到指定等级
+     *   ② 通用经验包四档（Config.exp.expPacks，2026-09-16）：攒着用，吃了换成经验
+     * 名字登记是唯一判据（它们存在 materials 表里，跟普通材料同表）。 */
+    const EXP_PACK_NAMES = [].concat(
+      ((Config.tutorialMode && Config.tutorialMode.expPacks) || []).map(p => p.name),
+      (Config.expPacks || []).map(p => p.name)   // ⚠️ 顶层 Config.expPacks，不是 Config.exp.expPacks
+    );
+    /* 素材：绑定的和能卖的**拆成两格分开放**（2026-09-16 用户要求）。
+     * 原来一格装总数、靠角标提示，玩家看到「×282」根本不知道自己只能卖 246 个 ——
+     * 分开摆之后「哪堆能卖」一眼就知道，也不用去数角标。
+     * 顺序：同名的先放可交易那格、再放绑定那格（相邻，好对比）。 */
+    const matEntries = [];
+    for (const [name, qty] of Object.entries(localMats).sort((a, b) => a[0].localeCompare(b[0]))) {
+      // ① 经验包（含老号背包里残留的引导包，它们没登记进 materialInfo）② 登记为消耗品的都走下面那一栏
+      if (EXP_PACK_NAMES.includes(name)) continue;
+      const group0 = (matInfo[name] || {}).group || 'misc';
+      if (useGroupIds.includes(group0)) continue;
+      const group = group0;
+      const bq = Materials.getBoundQuantity ? Math.min(Materials.getBoundQuantity(name) || 0, qty) : 0;
+      const freeQty = qty - bq;
+      if (freeQty > 0) matEntries.push({ name, qty: freeQty, group, bound: false });
+      if (bq > 0) matEntries.push({ name, qty: bq, group, bound: true });
+    }
+    /* 消耗品位 = ① 经验包（两套来源的名字）② materialInfo 里归 consume 组的道具（门票 / 涅槃丹 / 觉醒石…）。
+     * 每条带 action：
+     *   'use'  = 背包里点一下当场生效（经验包 → 喂当前出战宠）
+     *   'wiki' = 用法在别的页面（涅槃丹要在涅槃页勾选、门票要在试炼入口花）⇒ 背包只负责告诉玩家
+     *            "这东西干嘛用、去哪用"，点一下打开词条页，**不做假按钮**（点了没反应最伤）。 */
+    const consNames = Array.from(new Set(
+      EXP_PACK_NAMES.concat(Object.keys(matInfo).filter(k => useGroupIds.includes((matInfo[k] || {}).group)))
+    ));
+    const consEntries = consNames.map(n => {
+      const cfg = (Config.expPacks || []).find(x => x.name === n) || null;
+      return {
+        name: n,
+        qty: Materials.getQuantity(n) || 0,
+        group: (matInfo[n] || {}).group || 'use-exp',   // 老号残留的引导包没登记 → 兜到经验组
+        action: cfg ? 'use' : 'wiki',
+        amount: cfg ? (Number(cfg.amount) || 0) : 0,
+        bound: (Materials.getBoundQuantity ? (Materials.getBoundQuantity(n) || 0) : 0) > 0
+      };
+    }).filter(e => e.qty > 0);
     const eggCount = getEggCount();
     const eggEntries = Object.entries(getEggs()).filter(([, c]) => c > 0);
     const totalCount = equipList.length + matEntries.length + consEntries.length + eggCount;
@@ -230,6 +275,21 @@
       left.appendChild(subBar);
     }
 
+    // 消耗品二级分区（2026-09-16 用户报「消耗品没有分类」）：与素材同一套真源，只取 kind==='consume' 的那几组
+    if (bagCat === 'consume') {
+      const subBar = document.createElement('div');
+      subBar.className = 'bag-sub-cats';
+      const subCats = [{ id: 'all', label: '全部消耗品' }].concat(useGroups.map(g => ({ id: g.id, label: g.label })));
+      for (const g of subCats) {
+        const btn = document.createElement('button');
+        btn.className = 'bag-cat' + (bagConsumeGroup === g.id ? ' active' : '');
+        btn.textContent = g.label;
+        btn.onclick = () => { bagConsumeGroup = g.id; renderBag(); };
+        subBar.appendChild(btn);
+      }
+      left.appendChild(subBar);
+    }
+
     // 物品网格区域
     const gridArea = document.createElement('div');
     gridArea.className = 'bag-grid-area';
@@ -242,7 +302,14 @@
     // 底部：统计 + 鉴定石 + 分解台
     const footer = document.createElement('div');
     footer.className = 'bag-footer';
-    footer.innerHTML = '<span>物品：<b>' + totalCount + '</b>（装备' + equipList.length + ' · 素材' + matEntries.length + ' · 消耗' + consEntries.length + ' · 蛋' + eggCount + '）</span>';
+    /* 容量（2026-09-16 用户拍板）：装备位有上限了，底部直接给"用了几格 / 共几格"，
+     * 满了标红 + 一句话告诉玩家去哪解决（商店的扩建道具）。素材/消耗品/蛋暂时不限。 */
+    const bagUse = (window.Supabase && window.Supabase.usageOf) ? window.Supabase.usageOf('bag') : null;
+    const capHtml = bagUse
+      ? '　装备位 <b' + (bagUse.full ? ' style="color:var(--danger-hi)"' : '') + '>' + bagUse.used + '/' + bagUse.cap + '</b>'
+        + (bagUse.full ? '（已满 · 去商店扩建或分解腾位）' : '')
+      : '';
+    footer.innerHTML = '<span>物品：<b>' + totalCount + '</b>（装备' + equipList.length + ' · 素材' + matEntries.length + ' · 消耗' + consEntries.length + ' · 蛋' + eggCount + '）' + capHtml + '</span>';
     left.appendChild(footer);
 
     // 鉴定石开关
@@ -291,7 +358,7 @@
         const unid = eq.identified === false;
         const rar = (eq.rarity && eq.rarity.id) || 'white';
         const card = document.createElement('div');
-        card.className = 'poe-item q-' + rar + (unid ? ' q-unid' : '') + (identifyMode && unid ? ' bc-idtarget' : '');
+        card.className = 'poe-item q-' + rar + (eq.bound ? ' q-bound' : '') + (unid ? ' q-unid' : '') + (identifyMode && unid ? ' bc-idtarget' : '');
         card.draggable = true;
         if (unid) {
           card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('bc-drop'); });
@@ -303,7 +370,9 @@
         }
         card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ id: eq.id, act: 'salvage' })); e.dataTransfer.effectAllowed = 'move'; });
         const ico = unid ? SVG_SEALED : '<span class="emoji">' + (EQUIP_ICON[eq.slot] || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>') + '</span>';
-        card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>' + (unid ? '<div class="qmark">?</div>' : '') + '<div class="unseal-sweep"></div>';
+        card.innerHTML = '<div class="ico">' + ico + '</div><div class="nm">' + escapeHtml(eq.name) + '</div>'
+          + (eq.bound ? '<div class="bind-mark" title="绑定装备：任务获得，能穿能分解，不能上架">绑</div>' : '')
+          + (unid ? '<div class="qmark">?</div>' : '') + '<div class="unseal-sweep"></div>';
         card.onclick = e => {
           if (identifyMode && unid) { identifyEquip(eq, card); return; }
           if (e.ctrlKey || e.altKey) { quickSalvage(eq); return; }
@@ -327,10 +396,14 @@
           ? e.sources.slice(0, 2).map(s => s.where).join(' / ') + (e.sources.length > 2 ? ' 等 ' + e.sources.length + ' 处' : '')
           : '';
         const card = document.createElement('div');
-        card.className = 'poe-item q-mat';
-        card.innerHTML = '<div class="ico">' + matIcon(m.name) + '</div><div class="nm">' + escapeHtml(m.name) + '</div><div class="corner">×' + m.qty + '</div>';
-        const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name) + '</div>'
-          + '<div class="tip-line"><span>' + escapeHtml(groupLabel(m.group)) + '</span><b>×' + m.qty + '</b></div>'
+        // 这一格是"绑定堆"还是"能卖堆"：绑定的描金边 + 左上角「绑」字
+        card.className = 'poe-item q-mat' + (m.bound ? ' q-bound' : '');
+        card.innerHTML = '<div class="ico">' + matIcon(m.name) + '</div><div class="nm">' + escapeHtml(m.name) + '</div>'
+          + (m.bound ? '<div class="bind-mark" title="绑定：任务获得，能自用、能上交，不能交易">绑</div>' : '')
+          + '<div class="corner">×' + m.qty + '</div>';
+        const tip = '<div class="tip-name">' + matIcon(m.name) + ' ' + escapeHtml(m.name)
+          + (m.bound ? '<span class="bind-tag">绑定</span>' : '') + '</div>'
+          + '<div class="tip-line"><span>' + (m.bound ? '任务获得 · 不能卖' : escapeHtml(groupLabel(m.group)) + ' · 可交易') + '</span><b>×' + m.qty + '</b></div>'
           + (useLine ? '<div class="tip-line hint">怎么用：' + escapeHtml(clip(useLine, 72)) + '</div>' : '')
           + (srcLine ? '<div class="tip-line hint">来源：' + escapeHtml(srcLine) + '</div>' : '')
           + '<div class="tip-line hint">点一下看完整词条（用途 ' + (e ? e.uses.length : 0) + ' · 来源 ' + (e ? e.sources.length : 0) + '）</div>';
@@ -341,20 +414,32 @@
       }
     }
 
-    // 消耗品（绑定的一次性道具：引导经验包等）
+    // 消耗品（2026-09-16 分类）：经验包 + 门票 / 涅槃丹 / 觉醒石 这类一次性道具
     if (bagCat === 'all' || bagCat === 'consume') {
-      const packs = consEntries.filter(p => !bagSearch || p.name.toLowerCase().includes(bagSearch));
+      const packs = consEntries.filter(p => (bagCat !== 'consume' || bagConsumeGroup === 'all' || p.group === bagConsumeGroup)
+        && (!bagSearch || p.name.toLowerCase().includes(bagSearch)));
       for (const p of packs) {
         const qty = p.qty;
         const card = document.createElement('div');
-        card.className = 'poe-item q-cons';
-        card.innerHTML = '<div class="ico">' + (p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>') + '</div><div class="nm">' + escapeHtml(p.name) + '</div><div class="corner">×' + qty + '</div>';
+        card.className = 'poe-item q-cons' + (p.bound ? ' q-bound' : '');
+        card.innerHTML = '<div class="ico">' + (p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>') + '</div><div class="nm">' + escapeHtml(p.name) + '</div>'
+          + (p.bound ? '<div class="bind-mark" title="绑定道具，不可交易">绑</div>' : '')
+          + '<div class="corner">×' + qty + '</div>';
+        /* 说明分两种（效果不一样，不能共用一句）：
+         *   经验包 → 「使用后 +N 经验」（点了当场生效）
+         *   其他 → materialInfo.use（一句用途）；没写 use 的退到分区名（如"合成与涅槃"），
+         *          玩家至少知道该去哪个页面找它。 */
+        const useDesc = p.action === 'use'
+          ? ('使用后 +' + (p.amount || 0).toLocaleString() + ' 经验')
+          : ((matInfo[p.name] || {}).use || groupLabel(p.group) || '点开看用途');
         const tip = '<div class="tip-name">' + (p.icon || '') + ' ' + escapeHtml(p.name) + '</div>'
-          + '<div class="tip-line"><span>' + escapeHtml(p.desc || '使用后魂兽直升') + '</span><b>×' + qty + '</b></div>'
-          + '<div class="tip-line hint">点击使用 · 绑定道具，不可交易</div>';
+          + '<div class="tip-line"><span>' + escapeHtml(useDesc) + '</span><b>×' + qty + '</b></div>'
+          + '<div class="tip-line hint">' + (p.action === 'use' ? '点击使用 · ' : '点击看词条 · ') + (p.bound ? '绑定道具，不可交易' : '可交易') + '</div>';
         bindTip(card, tip);
         card.style.cursor = 'pointer';
         card.onclick = async () => {
+          // 用法不在背包里的（涅槃丹 / 门票 / 觉醒石…）→ 打开词条页，别做假按钮
+          if (p.action === 'wiki') { if (UI.openMatEntry) UI.openMatEntry(p.name); else hideBagTip(); return; }
           const T = window.TutorialMode;
           if (!T || !T.useExpPack) return;
           if (card.__busy) return;
@@ -363,7 +448,9 @@
           try { r = await T.useExpPack(p.name); }
           finally { card.__busy = false; }
           if (!r || !r.ok) { if (showToast) showToast('使用失败', (r && r.error) || '未知错误'); return; }
-          if (showToast) showToast('经验包已使用', '魂兽直升 Lv' + r.level + '（教学期门槛，无需刷怪）');
+          if (!showToast) return;
+          if (r.exp > 0) showToast('经验已入账', `${r.petName || '出战魂兽'} +${Number(r.exp).toLocaleString()} 经验` + (r.levelUp ? ` · 升到 Lv.${r.level}` : ''));
+          else showToast('经验包已使用', '魂兽直升 Lv' + r.level + '（教学期门槛，无需刷怪）');
         };
         bagItems.push(card);
       }

@@ -594,6 +594,10 @@
       // 另：自 2026-09-11 起 generateEquipment 已【忽略】rarity / materialTier，颜色由 ilvl 决定，
       // 所以 cfg.rarity 只是给 UI 展示用的，别指望它真能指定颜色。
       const eq = E.generateEquipment(rarity, cfg.areaTier || 1, cfg.materialTier || 3, cfg.ilvl != null ? Number(cfg.ilvl) : undefined);
+      /* 任务送的装备 = 绑定（2026-09-16「任务产出全绑定」）：能穿、能分解，不能上架。
+       * ⚠️ 引导 G8 那件「用来教上架的白装」不走这里 —— 它在 TutorialMode 的 supplyBox 里发放，
+       *    那条链路不打绑定（白装本来就不该绑，否则 G8 无货可上）。 */
+      if (cfg.bound !== false) eq.bound = true;
       E.addToInventory(eq);
       if (I && I.saveItem) {
         // 未登录时 saveItem 返回「未登录」，静默忽略（本地照玩，登录后以云端为准）
@@ -657,6 +661,38 @@
     if (q && q.expReward != null) return Number(q.expReward) || 0;
     return QUEST_EXP_FIXED[q && q.category] || 0;
   }
+  /* ---------- 任务经验发什么（2026-09-16 用户拍板：发经验包） ----------
+   *   'pack'（当前）= 折算成经验包发进背包（**绑定**），可攒着、可换宠吃（练新宠友好）。
+   *   'direct'      = 直接喂当前出战宠（旧行为，留着当开关回退用）。
+   * 为什么能无损折算：任务经验档位全是整百（日常 100 / 新手 300 / 宠物 600 / 主线 1000 / 成就 3000），
+   *   而经验包最小档「微光经验屑」正好 100 点 ⇒ 一分经验都不差（详见 config.js 的 expPacks）。
+   * ⚠️ 别再退回"整包给最小档(1000)"的老思路 —— 那会让日常任务通胀 10 倍。 */
+  const QUEST_EXP_MODE = 'pack';
+  // 经验值 → 经验包清单：从大到小贪心；余数补一个最小档（宁可略多给，也别让玩家觉得经验被吞）
+  function expToPacks(exp) {
+    const packs = (Config.expPacks || []).slice()   // ⚠️ 挂在 Config 顶层，不是 Config.exp.expPacks
+      .filter(p => Number(p.amount) > 0)
+      .sort((a, b) => Number(b.amount) - Number(a.amount));
+    if (!packs.length) return [];
+    let left = Math.max(0, Number(exp) || 0);
+    const out = [];
+    for (const p of packs) {
+      const n = Math.floor(left / Number(p.amount));
+      if (n > 0) { out.push({ name: p.name, count: n }); left -= n * Number(p.amount); }
+    }
+    if (left > 0) {
+      const min = packs[packs.length - 1];
+      const last = out.find(x => x.name === min.name);
+      if (last) last.count += 1; else out.push({ name: min.name, count: 1 });
+    }
+    return out;
+  }
+  /* 这条任务会发什么包（只有 'pack' 模式有值）。
+   * UI 的任务卡预览与 actual 发货**共用这一份**，避免出现"卡片写着经验 +1000、实际发的是包"。 */
+  function expPacksOf(q) {
+    if (QUEST_EXP_MODE !== 'pack') return [];
+    return expToPacks(questExpOf(q));
+  }
 
   async function completeQuest(id) {
     ensureDailyReset();
@@ -718,8 +754,10 @@
          * 断网时 Materials.spend 同样会失败、收集类任务本来也过不去，
          * 所以这个降级换不来多少收益，却能救回弱网下交不了任务的体验。 */
         if (claim && claim.data === 'ALREADY_CLAIMED') {
-          // 材料原样退回：这一趟一份奖励都没发出去，不能白扣
-          for (const [n, amt] of spentList) Materials.gain(n, amt);
+          /* 材料原样退回：这一趟一份奖励都没发出去，不能白扣。
+           * ⚠️ 退回一律记【绑定】：否则「上交 → 被服务端拒 → 退回」就能把绑定材料洗成可交易，
+           * 绑定系统等于白做。（这条只在服务端明确回「已领过」时走到，是防刷分支，误伤面极小。） */
+          for (const [n, amt] of spentList) Materials.gain(n, amt, { bound: true });
           /* ⚠️ 这里【不能】unmarkFinished：服务端说"领过"就是真领过（多半是上一次会话领的，
            * 本地那份状态丢了而已）。保持已交并落盘，面板才会显示"已交"；
            * 撤成未完成 → 玩家看到"可提交" → 再点一次还是同一句报错，死循环。 */
@@ -733,7 +771,18 @@
       const pairs = Object.entries(q.reward || {});
       // 经验奖励（任务奖励的主体）：当前出战宠物，本地即时生效（升级播报由调用方 renderAll 覆盖）
       const exp = questExpOf(q);
+      const expPacksOut = expPacksOf(q);
       const expTask = exp > 0 ? (async () => {
+        if (expPacksOut.length) {
+          for (const it of expPacksOut) Materials.gain(it.name, it.count, { bound: true });
+          // 新手不知道"背包里多了个经验包"，给一条明确的去处提示（否则会以为是经验没发）
+          if (window.UI && window.UI.addLog) {
+            const tag = expPacksOut.map(x => `${x.name}×${x.count}`).join('、');
+            window.UI.addLog(`获得经验包：${tag}（绑定）—— 去 <b>背包 · 消耗品</b> 点一下使用，换经验给任选魂兽`);
+          }
+          return;
+        }
+        // 开关切回 'direct' 时走这里：直接喂当前出战宠（挂机仍是升级主力，任务经验是爽快补给）
         const pet = (window.Pet && window.Pet.getActivePet && window.Pet.getActivePet()) || null;
         if (pet && window.Pet.grantExp) window.Pet.grantExp(pet, exp);
       })() : null;
@@ -745,7 +794,8 @@
       // 状态到这儿已经全部落定，发奖和落盘互不依赖，并行跑：
       // 串行等两次云端往返要 1 秒多，各材料之间也无依赖，一起并行。
       await Promise.all([
-        Promise.all(pairs.map(([name, amt]) => Materials.gain(name, amt))),
+        // 任务发的材料一律绑定（2026-09-16 用户拍板）：能自用、能上交任务，不能拿去卖
+        Promise.all(pairs.map(([name, amt]) => Materials.gain(name, amt, { bound: true }))),
         expTask,
         gearTask,
         saveProgress()
@@ -770,7 +820,10 @@
       // 装备名放进奖励列表：玩家领到的是哪一件必须看得见，否则"送了装备"等于没送
       const gear = (await gearTask) || [];
       for (const eq of gear) rewards.unshift(`${(eq.rarity && eq.rarity.label) || ''}装备「${eq.name}」`);
-      if (exp > 0) rewards.unshift(`经验 +${exp}`);
+      // 奖励清单：发的是包就写包名（玩家点开背包要对得上），直发才写"经验 +N"
+      if (expPacksOut.length) {
+        for (const it of expPacksOut) rewards.unshift(`${it.name} ×${it.count}`);
+      } else if (exp > 0) rewards.unshift(`经验 +${exp}`);
       return { ok: true, rewards, exp, gear, id: q.id, name: q.name };
     } catch (e) {
       // 发货没走完：保持「已交」并尽力落盘，绝不回滚
@@ -859,6 +912,6 @@
     getExtra, setExtra, resetGuideChain,
     saveProgressStrict, isCloudLoaded,
     isFinished, isUnlocked, isAreaCleared,
-    questExpOf, QUEST_EXP_FIXED, chooseGuideDirection, completion
+    questExpOf, expPacksOf, QUEST_EXP_FIXED, chooseGuideDirection, completion
   };
 })();

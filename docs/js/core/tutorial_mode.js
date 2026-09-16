@@ -530,13 +530,34 @@
   async function useExpPack(name) {
     const M = window.Materials;
     if (!M || !M.spend) return { ok: false, error: '材料系统未就绪' };
+    /* 两套经验包共用这一个入口（背包「消耗品」栏点一下就走这里）：
+     *   ① 引导经验包（TM().expPacks，带 cap）：把名下魂兽顶到 cap 级 —— 教学期免刷怪专用
+     *   ② 通用经验包（Config.exp.expPacks，带 amount）：给【当前出战魂兽】加固定经验（2026-09-16）
+     * 为什么不给"选择目标宠"：任务经验原本就是给出战宠的，保持一致；想练新宠先切换出战再吃。 */
     const pack = ((TM().expPacks) || []).find(p => p.name === name);
-    if (!pack) return { ok: false, error: '未知经验包' };
+    // ⚠️ 经验包挂在 Config 顶层（Config.expPacks），不是 Config.exp.expPacks
+    const gen = (Config.expPacks || []).find(p => p.name === name) || null;
+    if (!pack && !gen) return { ok: false, error: '未知经验包' };
     if ((M.getQuantity(name) || 0) <= 0) return { ok: false, error: '没有' + name };
-    // 档位锁死的前置检查：全部已达标 → 用了也白用，省着
+
     const Pet = window.Pet;
     const pets = (Pet && Pet.getPets) ? (Pet.getPets() || []) : [];
     if (!pets.length) return { ok: false, error: '名下没有魂兽' };
+
+    // ---- 通用经验包：喂当前出战宠 ----
+    if (gen) {
+      const pet = (Pet.getActivePet && Pet.getActivePet()) || pets[0];
+      if (!pet) return { ok: false, error: '当前没有出战魂兽' };
+      const before = Number(pet.level) || 1;
+      const spent0 = await M.spend(name, 1);
+      if (!spent0.ok) return { ok: false, error: spent0.error || '使用失败' };
+      if (Pet.grantExp) Pet.grantExp(pet, Number(gen.amount) || 0);
+      const after = Number(pet.level) || before;
+      if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
+      return { ok: true, exp: Number(gen.amount) || 0, level: after, levelUp: after > before, petName: pet.name };
+    }
+
+    // ---- 引导经验包：档位锁死，全部已达标 → 用了也白用，省着 ----
     if (pets.every(p => (Number(p.level) || 1) >= pack.cap)) {
       return { ok: false, error: '名下魂兽都已 ≥ Lv' + pack.cap + '，别浪费' };
     }

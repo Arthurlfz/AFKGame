@@ -527,7 +527,7 @@ body {
 .q-mark--accept { color:var(--accent-hi); }
 .q-mark--submit { color:#7fae7f; }
 .quest-progress { height:8px; background:var(--line); border-radius:2px; overflow:hidden; margin:5px 0; }
-.quest-progress-bar { height:100%; background:var(--accent); }
+.quest-progress-bar { height:100%; background:var(--accent); transition:width .3s ease; }
 .quest-list-meta { font-size:0.75rem; color:var(--text-dim); }
 .quest-detail-col { flex:1; min-width:0; }
 .quest-detail { padding:4px 2px; }
@@ -904,9 +904,18 @@ img.pet-avatar-sprite { display:block; width:24px; height:24px; object-fit:conta
 /* 文字行内的小头像（如「路线：<头像> 暴食之母」）：跟文字齐平，不独占一行、不撑行高 */
 img.pet-avatar-sprite.inline { display:inline-block; vertical-align:-6px; margin-right:4px; }
 #tab-battle .at-racer img.pet-avatar-sprite { width:100%; height:100%; object-fit:cover; border-radius:50%; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
-.roster-pet-icon { display:flex; align-items:center; justify-content:center; width:104px; height:104px; }
-.roster-pet-icon img.pet-avatar-sprite { width:104px; height:104px; object-fit:contain; margin:0 auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.55)); }
-.roster-pet-icon span { font-size:6.5rem; line-height:1; }
+.roster-pet-icon { display:flex; align-items:center; justify-content:center; }
+/* 战斗页队伍格：格子 60×60（2026-09-15 由 108 缩小），里面的头像容器必须跟着格子走。
+ * 🔴 教训：当时只改了 `.roster-pet` 的尺寸，没改这里写死的 104×104 →
+ * 头像比格子大一圈、溢出来和上下邻格挤在一起（用户："这几个头像立绘挤在一起了"）。
+ * 现在一律用 100%，以后改格子尺寸不用两处同步。 */
+#tab-battle .roster-pet-icon { width:100%; height:100%; padding:2px; overflow:hidden; }
+#tab-battle .roster-pet-icon img.pet-avatar-sprite,
+#tab-battle .roster-pet-icon img.pet-sprite {
+  width:100%; height:100%; object-fit:contain; margin:0 auto;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));
+}
+#tab-battle .roster-pet-icon span { font-size:2.5rem; line-height:1; }
 .pet-card .icon img.pet-avatar-sprite { width:100%; height:100%; object-fit:contain; }
 /* 进化/合成/涅槃面板里的主宠 es-icon 和路线 es-route-icon：固定 56-64px，居中 */
 .es-pet .es-icon { display:inline-flex; align-items:center; justify-content:center; width:72px; height:72px; }
@@ -1097,32 +1106,74 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   width:100%; max-width:none; margin:0 auto;
   flex:1 1 auto; min-height:0;
 }
-/* 对战区独占整页：只做纯容器，不套面板外框（属性/背包已移到独立页面） */
+/* ============================================================
+ * 对战区：整块「场景」+ 四角 HUD（2026-09-15 颠覆式改版）
+ * 参照放置/挂机类网游的通行做法：**场景铺满整块内容区**，信息与操作做成
+ * 半透明小浮片贴在画面四角（左上有宠物状态、右上有敌人状态、左下是本局战报、
+ * 底部中央是唯一操作、右下是消息小窗），不再用上下两条把画面切掉一截。
+ * 之前那版是「三块面板共用一个窗口」，观感像后台页；现在是「一个场景 + 若干浮片」。
+ * ============================================================ */
 #tab-battle .bp-arena {
+  position:relative;               /* HUD 浮片的定位基准 */
   flex:1 1 0; min-height:0;
-  display:flex; flex-direction:column; gap:8px;
+  display:flex; flex-direction:column; gap:0;
 }
-/* 顶部 / 底部细带：只放信息，不做成面板 */
-#tab-battle .bp-topbar,
-#tab-battle .bp-bottombar {
-  display:flex; align-items:center; gap:12px; flex:none;
-  padding:6px 10px;
-  background-color:rgba(12,11,10,.72);
-  border:1px solid rgba(212,168,67,.22); border-radius:3px;
+/* 顶部 HUD：贴顶居中，只回答「我在哪张图 / 怎么回去」。浮在场景上，不占高度。
+ * 刻意不给边框 / 投影：HUD 要像「长在画面上的字」，画一圈金边就成了贴在亮云上的卡片。 */
+#tab-battle .bp-topbar {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:8;
+  width:max-content; max-width:min(72%, 780px);
+  display:flex; align-items:center; gap:12px;
+  padding:7px 16px 7px 12px;
+  background-color:rgb(10 12 13 / .66);
+  background-image:var(--ui-paper-texture);
+  backdrop-filter:blur(4px);
+  border:0; border-radius:var(--radius-xs);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--action-gold-rgb)/ .16),
+    inset 0 1px 0 rgb(236 230 210 / .05),
+    0 3px 14px rgb(0 0 0 / .42);
 }
+/* 底栏本身不再是一块：两个子块各自成为浮片（左下战报 / 底部中央操作），
+ * display:contents 让它们直接以 .bp-arena 为定位基准，DOM 一行不动。 */
+#tab-battle .bp-bottombar { display:contents; }
+/* 页名降级成小标签：玩家每次进来都知道自己在哪，不该是最亮的一行（前面一个朱印小点） */
 #tab-battle .bp-topbar .bp-title {
-  font-family:var(--font-title); font-weight:700; font-size:var(--fs-lg);
-  letter-spacing:1px; color:var(--accent-hi); white-space:nowrap;
+  font-family:var(--font-title); font-weight:700; font-size:var(--fs-sm);
+  letter-spacing:2px; color:var(--text-dim); white-space:nowrap;
+  /* 碑刻感：下缘一道暗影、上缘一线微亮，字像刻在墨牌上而不是浮在上面 */
+  text-shadow:0 1px 0 rgb(0 0 0 / .6), 0 -1px 0 rgb(236 230 210 / .07);
+}
+#tab-battle .bp-title::after {
+  content:''; display:inline-block; width:5px; height:5px; margin-left:7px;
+  background:var(--accent); border-radius:1px; vertical-align:middle; opacity:.85;
 }
 #tab-battle .bp-hint {
-  font-family:var(--font-body); font-weight:400; font-size:var(--fs-xs);
-  letter-spacing:0; color:var(--text-faint); white-space:nowrap;
+  font-family:var(--font-body); font-weight:400; font-size:var(--fs-2xs);
+  letter-spacing:.5px; color:var(--text-faint); white-space:nowrap;
 }
 /* 地图信息吃掉中间空白，把「返回地图」推到最右 */
 #tab-battle .battle-area-info {
   flex:1 1 auto; min-width:0; margin-left:auto;
-  font-size:var(--fs-sm); color:var(--text-dim); line-height:1.4;
+  font-size:var(--fs-sm); color:var(--text-dim); line-height:1.4; text-align:right;
 }
+/* 野图口径：地图名当主角 + 推荐成长标签（标签颜色按当前宠物成长给「合适 / 偏高 / 危险」） */
+#tab-battle .bai-inner { display:inline-flex; align-items:center; gap:8px; min-width:0; }
+#tab-battle .bai-name {
+  font-family:var(--font-title); font-weight:700; font-size:var(--fs-lg);
+  color:var(--text-hi); letter-spacing:2px;
+  text-shadow:0 1px 0 rgb(0 0 0 / .65), 0 -1px 0 rgb(236 230 210 / .08);
+}
+#tab-battle .bai-rec {
+  display:inline-flex; align-items:center; padding:1px 7px;
+  border:1px solid var(--line); border-radius:var(--radius-xs);
+  font-size:var(--fs-2xs); color:var(--text-dim); white-space:nowrap;
+}
+#tab-battle .bai-rec.is-ok { border-color:rgb(var(--spd-rgb)/ .5); color:var(--spd); }
+#tab-battle .bai-rec.is-warn { border-color:rgb(var(--action-gold-rgb)/ .55); color:var(--accent-hi); }
+#tab-battle .bai-rec.is-risk { border-color:rgb(var(--hp-hi-rgb)/ .55); color:var(--hp-hi); }
+#tab-battle .bai-empty { color:var(--text-faint); }
+#tab-battle .bai-empty .eic { color:var(--accent); }
 
 /* ---- 对战主画面：16:9 恒定比例 ----
  * 舞台外层吃掉所有剩余高度并居中；container-type:size 让内部能读到"可用高"（cqh），
@@ -1138,27 +1189,108 @@ select.sell-input option { background:var(--panel); color:var(--text); }
      消除 16:9 固定比例在超宽/窄视口下左右/上下留出的深色黑边。
      角色立绘用 cq 容器单位定位，会随舞台尺寸自动缩放；背景 repeat-x 无限平铺不露底。 */
   width:100%; height:100%;
-  background:#111114; border:1px solid rgb(var(--action-gold-rgb)/.3);
-  border-radius:3px; overflow:hidden;
+  /* 场景卡：铺满整块内容区，只留圆角（HUD 浮片压在它上面，所以这里不能再画边框，
+   * 否则浮片与卡边之间会多出两道线）。 */
+  background:#111114; border:0; border-radius:var(--radius-md); overflow:hidden;
 }
-/* 左侧出战宠物竖列（悬停看属性 / 点击切换）：贴紧左边框，半透明不遮战斗画面 */
+/* ============================================================
+ * 战斗页「装饰层」（2026-09-15）
+ * 之前这页只有功能区、一点装饰都没有：画面很美，但 UI 是裸线框，像未完成的原型。
+ * 定调沿用全站「古典水墨 + 羊皮纸做旧」——画面是一幅画，UI 是嵌在画上的墨牌：
+ *   ① 场景：内描边 + 暗角 + 四角回纹，把画面收成一幅卷轴里的画；
+ *   ② HUD 浮片：纸纹 + 内描边 + 朱印竖条（与 .fs-panel__head 同一套语言）；
+ *   ③ 队伍栏 / 消息条：同上材质，再接一道云纹金线。
+ * 全部纯 CSS、只取 design-tokens、不引图片、不动结构与逻辑。
+ * ⚠️ 动画一律靠设计 tokens 里的 prefers-reduced-motion 全局兜底。
+ * ============================================================ */
+/* ① 场景暗角 + 内描边：边缘沉下去，HUD 与飘字才立得住 */
+#tab-battle .battle-arena::after {
+  content:''; position:absolute; inset:0; z-index:5; pointer-events:none;
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--action-gold-rgb)/ .13),
+    inset 0 0 86px 24px rgb(0 0 0 / .5);
+}
+/* 四角回纹角饰 + 卷云角点：全部用渐变换算出来的线，不引图片、不加元素。
+ * 2026-09-15 二版：单线太单薄，改成「装裱双线」—— 外侧一道长 L、内侧一道短 L 错开，
+ * 角点再压一颗朱印小方，古画装裱的层次就出来了。 */
+#tab-battle .battle-arena::before {
+  content:''; position:absolute; inset:9px; z-index:6; pointer-events:none;
+  --cl:30px; --cw:1px;   /* 外线长 30 */
+  --sl:13px;             /* 内线长 13 */
+  background-image:
+    /* 外线（四角 L） */
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+    /* 内线（四角短 L，透明度更低） */
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    linear-gradient(rgb(var(--action-gold-rgb)/ .38), rgb(var(--action-gold-rgb)/ .38)),
+    /* 四角朱印方点 */
+    radial-gradient(circle, var(--accent) 0 2px, transparent 2px),
+    radial-gradient(circle, var(--accent) 0 2px, transparent 2px),
+    radial-gradient(circle, var(--accent) 0 2px, transparent 2px),
+    radial-gradient(circle, var(--accent) 0 2px, transparent 2px);
+  background-repeat:no-repeat;
+  background-size:
+    var(--cl) var(--cw), var(--cw) var(--cl),
+    var(--cl) var(--cw), var(--cw) var(--cl),
+    var(--cl) var(--cw), var(--cw) var(--cl),
+    var(--cl) var(--cw), var(--cw) var(--cl),
+    var(--sl) var(--cw), var(--cw) var(--sl),
+    var(--sl) var(--cw), var(--cw) var(--sl),
+    var(--sl) var(--cw), var(--cw) var(--sl),
+    var(--sl) var(--cw), var(--cw) var(--sl),
+    5px 5px, 5px 5px, 5px 5px, 5px 5px;
+  background-position:
+    left top, left top, right top, right top,
+    left bottom, left bottom, right bottom, right bottom,
+    9px 9px, 9px 9px, right 9px top 9px, right 9px top 9px,
+    9px bottom 9px, 9px bottom 9px, right 9px bottom 9px, right 9px bottom 9px,
+    2px 2px, right 2px top 2px, 2px bottom 2px, right 2px bottom 2px;
+  opacity:.6;
+}
+/* 左侧出战宠物竖列（悬停看属性 / 点击切换）：贴紧左边框，半透明不遮战斗画面。
+ * 2026-09-15：格子 108 → 60、列宽 112 → 74（原来一列大方块吃掉画面左侧一整条，
+ * 队伍栏在挂机游戏里就该是「一眼认得出是谁」的小头像，不需要占那么大地方）。 */
 #tab-battle .pet-roster {
-  position:absolute; left:6px; top:8px; bottom:8px; width:112px; z-index:6;
-  display:flex; flex-direction:column; gap:6px; padding:6px 2px;
+  /* 高度跟内容走（bottom:auto + max-height）：原来 bottom:8px 让它撑满整条画面高度，
+   * 只带 3 只宠时下面拖出几百像素的空框，像左侧挂了一条空抽屉。 */
+  position:absolute; left:8px; top:8px; bottom:auto; width:74px; z-index:6;
+  max-height:calc(100% - 16px);
+  display:flex; flex-direction:column; gap:6px; padding:6px 4px;
   overflow-y:auto;
-  background:rgba(10,9,8,.55); border:1px solid rgba(212,168,67,.18); border-radius:4px;
+  background-color:rgb(10 12 13 / .38);
+  background-image:var(--ui-paper-texture);
+  backdrop-filter:blur(4px);
+  border:0; border-radius:var(--radius-xs);
+  box-shadow:inset 0 0 0 1px rgb(var(--action-gold-rgb)/ .14);
 }
 #tab-battle .pet-roster .roster-pet { background:rgba(14,14,16,.72); }
 #tab-battle .pet-roster::-webkit-scrollbar{width:4px;}
 #tab-battle .pet-roster::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px;}
 #tab-battle .roster-pet {
-  position:relative; width:108px; height:108px; flex:none;
-  display:flex; align-items:center; justify-content:center; font-size:6.5rem;
-  background:#0e0e10; border:1px solid var(--line); border-radius:3px; cursor:pointer;
+  position:relative; width:60px; height:60px; flex:none;
+  display:flex; align-items:center; justify-content:center; font-size:3rem;
+  background-color:rgb(6 8 9 / .5); border:1px solid var(--line-weak); border-radius:var(--radius-xs); cursor:pointer;
   transition:border-color .15s, transform .15s;
 }
 #tab-battle .roster-pet:hover { border-color:var(--accent); transform:translateY(-2px); }
 #tab-battle .roster-pet.active { border-color:var(--accent-hi); box-shadow:0 0 0 1px var(--accent-hi) inset; }
+/* 出战格右上角一小片金色角标：一眼认出「现在打的是它」（比整圈描边更含蓄） */
+#tab-battle .roster-pet.active::after {
+  content:''; position:absolute; top:0; right:0; width:0; height:0;
+  border-top:9px solid var(--accent); border-left:9px solid transparent;
+}
+/* 挂机中的状态点缓慢呼吸（纯氛围；reduced-motion 由设计 tokens 全局兜底） */
+#tab-battle .status-badge.fighting::before { animation:status-breath 2.4s ease-in-out infinite; }
+@keyframes status-breath { 0%,100% { opacity:1; } 50% { opacity:.4; } }
 #tab-battle .roster-pet .rp-lv { position:absolute; right:4px; bottom:3px; font-size:var(--fs-2xs); color:var(--text-dim); }
 /* 竖列 tooltip（悬停看属性，避免选错） */
 /* 战斗页宠物竖列共享 tooltip（body 层 fixed，不随竖列重建） */
@@ -1222,7 +1354,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   align-items:flex-start;
 }
 #tab-battle .fighter-pet .stage-avatar {
-  position:absolute; left:clamp(70px, 8%, 120px); bottom:clamp(48px, 13cqh, 94px);
+  /* bottom 抬高到 HUD 之上：底部中央现在浮着操作按钮，立绘贴地会被它切掉脚 */
+  /* left 下限 70 → 92：左侧队伍列现在占 8~82px，立绘原来会压在它右缘上（横向重叠 12px） */
+  position:absolute; left:clamp(92px, 9%, 132px); bottom:clamp(76px, 15cqh, 108px);
   align-items:flex-start; pointer-events:auto;
 }
 /* 敌方：立绘在右下贴地（站到 front 前景上）；信息块在右上角 */
@@ -1230,7 +1364,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   align-items:flex-end;
 }
 #tab-battle .fighter-enemy .stage-avatar {
-  position:absolute; right:clamp(48px, 6%, 96px); bottom:clamp(48px, 13cqh, 94px);
+  position:absolute; right:clamp(48px, 6%, 96px); bottom:clamp(76px, 15cqh, 108px);
   align-items:flex-end; pointer-events:auto;
 }
 /* 立绘容器（我方 280 / 敌方 260），保留原 attacking/hit 动效（撞/受击闪红抖） */
@@ -1412,41 +1546,67 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .at-racer img.pet-sprite {
   width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;
 }
-.roster-pet-icon img.pet-sprite {
-  width:34px; height:34px; object-fit:contain; display:block; margin:0 auto;
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));
-}
-/* 信息块（名字/血条/经验/攻击条）：我方左上角 / 敌方右上角 */
+/* 队伍格里的立绘尺寸已并入上面的 `#tab-battle .roster-pet-icon` 段（统一 100%），
+ * 这里不再留一条写死 44px 的第二层 —— 两层同名尺寸叠着，改哪层都不确定生效。 */
+/* 信息块（名字/血条/经验/攻击条）：我方左上角 / 敌方右上角
+ * 2026-09-15 重排：原来同一批属性在文件头尾各写了一遍（末尾那层带 !important 味的硬编码色覆盖），
+ * 这里合并成唯一一处；进度条改成等宽吃满卡片，数字用 tabular 等宽域。 */
 #tab-battle .fighter-info {
-  position:absolute; z-index:7; padding:8px 12px; min-width:min(170px, 26cqw);
-  background:rgba(8,8,10,.78); border:1px solid rgb(var(--action-gold-rgb)/.4); border-radius:4px;
-  box-shadow:0 6px 18px rgba(0,0,0,.55);
+  position:absolute; z-index:7;
+  /* 宽度写死（不再靠 min-width 让它自己撑）：绝对定位 + flex 条子会让「内容多的一边」
+   * 撑出很宽的一张卡，敌我两张卡宽度不一致。写死后左右两块一样大，条子长度也稳定。 */
+  width:min(248px, 34cqw); padding:9px 12px 10px;
+  background-color:rgba(8,8,10,.72);
+  backdrop-filter:blur(4px);
+  border:1px solid rgb(var(--action-gold-rgb)/.28);
+  border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-panel);
   pointer-events:auto;
 }
-/* 信息块贴画面上沿两侧，横向让开宠物列（左 62px）与行动条（右 32px） */
-#tab-battle .fighter-pet .fighter-info { left:clamp(70px, 8%, 120px); top:10px; }
-#tab-battle .fighter-enemy .fighter-info { right:clamp(44px, 5%, 90px); top:10px; }
+/* 信息块 = 左上 / 右上两块 HUD。左侧要让开宠物竖列（6px 起、112px 宽）并留间距；
+ * top 从 10 下移到 66：顶部 HUD 浮片现在贴在正中，两者错开一行才不会叠。 */
+#tab-battle .fighter-pet .fighter-info { left:clamp(102px, 8%, 132px); top:66px; }
+#tab-battle .fighter-enemy .fighter-info { right:clamp(44px, 5%, 90px); top:66px; }
 /* 名字 */
 #tab-battle .combat-name {
-  font-family:var(--font-title); font-size:1.25rem; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5);
-  line-height:1.25; white-space:nowrap;
+  font-family:var(--font-title); font-size:1.25rem; font-weight:700; color:var(--text-hi);
+  text-shadow:0 1px 0 rgb(0 0 0 / .7), 0 -1px 0 rgb(236 230 210 / .06), 0 2px 8px rgba(0,0,0,.6);
+  letter-spacing:1px; line-height:1.25; white-space:nowrap;
 }
-#tab-battle .fighter-enemy .combat-name { font-size:1.083rem; font-weight:400; color:#c0c0c0; text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5); }
-/* 血条/攻击条行 */
-#tab-battle .bar-row { display:flex; align-items:center; gap:6px; margin-top:8px; }
+#tab-battle .fighter-enemy .combat-name { font-size:var(--fs-lg); font-weight:400; color:var(--text-dim); }
+/* 血条/攻击条行：条子吃满剩余宽度，两条等宽对齐 */
+#tab-battle .bar-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
 #tab-battle .hp-shell {
-  width:120px; height:11px; background:#0a0a0c; border-radius:2px; overflow:hidden;
+  flex:1 1 auto; min-width:56px; height:10px;
+  background:var(--inset); border-radius:var(--radius-xs); overflow:hidden;
 }
 #tab-battle .hp-bar { height:100%; width:100%; min-width:0; transition:width .15s ease; }
 #tab-battle .hp-bar.pet-hp { background:#27ae60; }   /* 我方血条：翠绿 */
 #tab-battle .hp-bar.enemy-hp { background:#c0392b; } /* 敌方血条：血红 */
 #tab-battle .hp-bar.is-low { background:#e74c3c; }
 #tab-battle .hp-text {
-  font-family:var(--font-num); font-size:0.95rem; color:#8a8580; text-shadow:0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.5);
-  font-variant-numeric:tabular-nums; white-space:nowrap;
+  font-family:var(--font-num); font-size:var(--fs-sm); color:var(--text-dim);
+  font-variant-numeric:tabular-nums; white-space:nowrap; text-shadow:0 1px 2px rgba(0,0,0,.9);
 }
-#tab-battle .atk-shell { width:120px; height:11px; background:#0a0a0c; border-radius:2px; overflow:hidden; }
+#tab-battle .atk-shell { background:var(--inset); }
 #tab-battle .atk-bar { height:100%; width:0%; background:var(--action-gold); min-width:0; }
+/* 经验条：与血条同一套骨架，颜色走枯金 token
+ *（原来写死亮金 #fbbf24 / #f59e0b，和全站水墨色不是一套，调主色时它不会跟着变） */
+#tab-battle .battle-exp { margin:6px 0 0; max-width:100%; min-width:0; }
+#tab-battle .battle-exp-meta {
+  display:flex; justify-content:space-between; gap:8px; margin:0 1px 4px;
+  font-size:var(--fs-2xs); color:var(--text-faint); letter-spacing:.5px; line-height:1;
+}
+#tab-battle .battle-exp-meta b { color:var(--accent-hi); font-family:var(--font-num); font-weight:700; }
+#tab-battle .battle-exp-track {
+  height:4px; background:var(--inset); border:1px solid var(--line-weak);
+  border-radius:var(--radius-xs); overflow:hidden;
+}
+#tab-battle .battle-exp-track i {
+  display:block; height:100%; border-radius:inherit;
+  background:linear-gradient(90deg, var(--accent-dim), var(--accent) 70%, var(--accent-hi));
+  transition:width .28s ease;
+}
 /* 中央飘字区：整舞台居中，伤害/经验飘字在此浮现 */
 #tab-battle .stage-mid {
   position:absolute; inset:0; pointer-events:none; z-index:4;
@@ -1486,9 +1646,10 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .rarity-blue { color:#4aa3ff; }
 #tab-battle .rarity-gold { color:#ffb84a; font-weight:700; }
 /* ---- 最右 32px：行动条轨道（贴容器右缘） ---- */
+/* 轨道不透明底色已删除：它此前在画面右缘糊出一条黑带（像画面被裁了一块），
+ * 底色统一交给下面第 6 节的半透明 HUD 版；这里只留定位与裁切。 */
 #tab-battle .at-track {
   position:absolute; top:0; right:0; bottom:0; width:32px;
-  background:#0a0a0c; border-left:1px solid rgb(var(--action-gold-rgb)/.18);
   overflow:hidden;
 }
 /* 轨道金色进度填充：从顶到底渐变，高度 = 当前领先方进度（JS 驱动） */
@@ -1546,29 +1707,60 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   18%  { opacity:1; transform:translateY(0); }
   100% { opacity:0; transform:translateY(-30px); }
 }
-/* 战斗控制：按钮底部居中，不贴边 */
-/* 挂机控制：贴在底部细带左侧（细带自带边框，这里不再重复画分割线） */
-#tab-battle .fight-control {
-  display:flex; align-items:center; gap:14px; flex:none;
-  padding:0; border-top:0;
+/* 左下 HUD：本局战报（信息归左，操作归中）。
+ * 数字按「越近越亮」分层：状态(亮) → 本轮(中) → 累计/掉落(最灰)。 */
+#tab-battle .fight-status {
+  position:absolute; left:12px; bottom:12px; z-index:8;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  min-width:0; margin:0; padding:7px 14px 7px 11px;
+  background-color:rgb(10 12 13 / .66);
+  background-image:var(--ui-paper-texture);
+  backdrop-filter:blur(4px);
+  border:0; border-radius:var(--radius-xs);
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--action-gold-rgb)/ .16),
+    inset 0 1px 0 rgb(236 230 210 / .05),
+    0 3px 14px rgb(0 0 0 / .42);
 }
-#tab-battle .fight-status { display:flex; align-items:center; gap:10px; min-width:0; }
+/* 朱印竖条：两块 HUD 浮片各带一道，与 .fs-panel__head::before 同一套语言
+ *（一块「墨牌」的记号，比外面再套一圈边框轻得多） */
+#tab-battle .bp-topbar::before,
+#tab-battle .fight-status::before {
+  content:''; width:3px; align-self:stretch; flex:none;
+  background:linear-gradient(180deg, var(--accent-hi), var(--accent-dim));
+  border-radius:1px;
+}
+/* 状态徽章：这是「现在在干嘛」的读数，不是可点的控件 —— 去掉按钮外壳，
+ * 改成一颗状态圆点 + 文字（2026-09-15：原来长得跟旁边的按钮一样，玩家会去点它）。 */
 #tab-battle .status-badge {
-  display:inline-flex; align-items:center; min-height:26px; padding:4px 12px;
-  background:var(--btn-bg); border:1px solid var(--btn-border); border-radius:var(--radius-sm);
-  box-shadow:var(--shadow-btn); color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:1px;
+  display:inline-flex; align-items:center; gap:6px;
+  padding:0; background:none; border:0; box-shadow:none;
+  color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:1px;
 }
-#tab-battle .status-badge.fighting { border-color:var(--accent); color:var(--accent-hi); }
-#tab-battle .status-badge.healing, #tab-battle .status-badge.recovering { border-color:var(--energy); color:#9ab1c8; }
-#tab-battle .status-badge.stopped { border-color:var(--danger); color:var(--danger-hi); }
+#tab-battle .status-badge::before {
+  content:''; width:6px; height:6px; flex:none; border-radius:50%; background:var(--metal-dim);
+}
+#tab-battle .status-badge.fighting { color:var(--accent-hi); }
+#tab-battle .status-badge.fighting::before { background:var(--accent-hi); }
+#tab-battle .status-badge.healing, #tab-battle .status-badge.recovering { color:var(--spd); }
+#tab-battle .status-badge.healing::before, #tab-battle .status-badge.recovering::before { background:var(--spd); }
+#tab-battle .status-badge.stopped { color:var(--danger-hi); }
+#tab-battle .status-badge.stopped::before { background:var(--danger-hi); }
 #tab-battle .fight-count { color:var(--text-dim); white-space:nowrap; font-size:var(--fs-sm); }
 #tab-battle .fight-count b { color:var(--accent-hi); font-family:var(--font-num); }
-#tab-battle .fight-action { display:flex; align-items:center; gap:8px; }
+/* 累计战报：历史数字，最弱一档；左侧加一道竖线，免得两串数字连读成一串 */
+#tab-battle .fight-total {
+  padding-left:12px; border-left:1px solid var(--line-weak);
+  color:var(--text-faint); font-size:var(--fs-xs); white-space:nowrap;
+}
+#tab-battle .fight-total b { color:var(--text-dim); font-family:var(--font-num); font-weight:400; }
+/* 底部中央 HUD：全页唯一的操作，压在视线最容易落到的位置（按钮自带底，不再套浮片壳） */
+#tab-battle .fight-action {
+  position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:8;
+  display:flex; align-items:center; gap:8px;
+}
 #tab-battle .fight-action .fs-btn { min-width:130px; }
 #tab-battle #btn-active-skill { min-width:156px; color:var(--action-gold); }
-/* 累计统计 */
-#tab-battle .stat-row { display:flex; gap:20px; margin-left:auto; flex:none; padding:0; border-top:0; color:var(--text-dim); font-size:var(--fs-sm); }
-#tab-battle .stat-row b { color:var(--accent-hi); font-family:var(--font-num); }
 
 /* 当前装备 3 槽（锻铁凹槽） */
 #tab-battle .equip-slots { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
@@ -1586,12 +1778,22 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 #tab-battle .equip-slot .slot-item .sub { display:none; }
 /* 响应式：画面尺寸已由 min(100%, 100cqh*16/9) 自动跟随，这里只收紧小屏上的部件 */
 @media (max-width:520px) {
-  #tab-battle .fighter-info { min-width:120px; padding:8px 10px; }
+  /* 小屏：卡片吃更多舞台宽度、血量数字降到最小档，保证条子还有可见长度 */
+  #tab-battle .fighter-info { width:min(248px, 52cqw); padding:8px 10px; }
+  #tab-battle .hp-text { font-size:var(--fs-2xs); }
   #tab-battle .at-track { width:26px; }
-  #tab-battle .fight-control { align-items:flex-start; flex-direction:column; }
-  #tab-battle .fight-action { width:100%; justify-content:flex-end; }
-  #tab-battle .bp-bottombar { flex-direction:column; align-items:stretch; gap:6px; }
-  #tab-battle .stat-row { margin-left:0; }
+  /* 小屏：四角 HUD 浮片会互相压成一团 → 全部退回上下流式排布 */
+  #tab-battle .bp-topbar,
+  #tab-battle .fight-status,
+  #tab-battle .fight-action {
+    position:static; top:auto; left:auto; right:auto; bottom:auto;
+    transform:none; width:auto; max-width:none;
+  }
+  #tab-battle .bp-bottombar { display:flex; flex-direction:column; gap:6px; }
+  #tab-battle .fight-status { justify-content:center; }
+  #tab-battle .fight-action { justify-content:center; }
+  #tab-battle .console-splitter { display:block; }
+  #tab-battle .inline-console { position:static; width:auto; height:130px; }
 }
 #starter-screen {
   /* 层级表 220 档：模态层，必须盖住背包窗口等浮窗 */
@@ -1720,7 +1922,7 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   #tab-battle .fighter-pet .stage-avatar { width:200px; height:200px; font-size:6.5rem; line-height:200px; }
   #tab-battle .fighter-enemy .stage-avatar { width:190px; height:190px; font-size:6rem; line-height:190px; }
   #tab-battle .fighter-enemy.is-mutant .stage-avatar { width:208px; height:208px; font-size:6.6rem; line-height:208px; }
-  #tab-battle .fighter-info { min-width:138px; padding:7px 9px; }
+  #tab-battle .fighter-info { padding:7px 9px; }
   #tab-battle .fighter-info .combat-name { font-size:1.05rem; }
   #tab-battle .fighter-enemy .fighter-info .combat-name { font-size:.95rem; }
   #tab-battle .fighter-pet { bottom:8px; left:22px; }
@@ -2213,9 +2415,27 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .inline-console .chat-input-row { flex: none; padding: 6px 8px 8px; }
 .inline-console .chat-input { padding: 5px 8px; font-size: 0.806rem; }
 .inline-console .chat-send { padding: 5px 12px; font-size: 0.806rem; }
-/* 战斗页：battle-page 增加分栏，bp-arena 让出下边给 console（默认 65/35） */
-#tab-battle .battle-page { flex: 1 1 0; min-height: 0; }
+/* 战斗页：场景吃满，消息压成场景下方的一条 HUD 条（2026-09-15 二改）。
+ * 一改曾把消息做成右下角浮窗 —— 实测它会压住右下角的怪物立绘，观感很乱；
+ * 现在它是流内的一条 104px（原来是下半屏 35%），画面只让出这一条，
+ * 要翻历史点条里的「⌕ 全屏」开抽屉。
+ * ⚠️ 只覆盖 #tab-battle 作用域 —— 世界地图页 / 宠物页仍是原来的上下分栏。 */
+#tab-battle .battle-page { position:relative; flex: 1 1 0; min-height: 0; }
 #tab-battle .battle-page .bp-arena { flex: 1 1 0; min-height: 0; }
+#tab-battle .console-splitter { display: none; }
+#tab-battle .inline-console {
+  /* relative 而不是 static：让下面那条云纹金线以它自己为基准（static 会跑到 battle-page 顶上） */
+  position:relative; flex:0 0 190px; width:auto; height:auto; min-height:0;
+  background-color:rgb(10 12 13 / .9);
+  background-image:var(--ui-paper-texture);
+  border:0; border-radius:var(--radius-xs);
+  box-shadow:none;
+}
+/* 云纹金线：消息条顶上一条中间亮、两端隐的金线（把「条」和「画面」分开，又不切一条硬边） */
+#tab-battle .inline-console::before {
+  content:''; position:absolute; left:0; right:0; top:0; height:1px; pointer-events:none;
+  background:linear-gradient(90deg, transparent, rgb(var(--action-gold-rgb)/ .55), transparent);
+}
 
 #tab-codex .codex-table-wrap { overflow-x: auto; margin-bottom: var(--gap-sm); }
 #tab-codex .fs-table th:not(:first-child),
@@ -2606,6 +2826,31 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .bag-window .bag-slot .poe-item .qmark { position:absolute; font-size:15px; color:var(--accent); font-family:var(--font-title); opacity:.9; text-shadow:0 0 7px rgb(var(--action-gold-rgb) / .5); }
 /* 角标不挡点击/拖拽 */
 .bag-window .bag-slot .poe-item .corner { pointer-events:none; }
+/* 绑定角标（2026-09-16「任务产出全绑定」）：左上角一个「绑」字，与右下角数量角标对角，
+ * 两个同时出现也不重叠、不挡图标。
+ * 🔴 选择器**不带任何祖先**（上线第一版写成 `#tab-bag .poe-item .bind-mark` ⇒ 完全不生效，
+ *    因为背包现在的容器是 .bag-window / .bag-slot，`#tab-bag` 根本不是它的祖先 —— 玩家反馈"绑定看不到"）。
+ *    `.poe-item` 全项目只出现在背包里，所以全局挂是安全的；以后别再加祖先前缀。 */
+.poe-item .bind-mark {
+  position:absolute; left:1px; top:1px; z-index:3;
+  font:700 9px/1.35 var(--font-body); padding:0 2px;
+  color:#ffd98a; background:rgb(58 24 6 / .9);
+  border:1px solid rgb(var(--action-gold-rgb) / .6); border-radius:var(--radius-xs);
+  pointer-events:none;
+}
+/* 绑定格子描金边：一眼分出哪堆不能卖。
+ * ⚠️ 必须写全 `.bag-window .bag-slot .poe-item.q-bound` —— 上面 `.bag-window .bag-slot .poe-item.q-mat`
+ * （同样 4 个类）在后面那条之前，只写 `.poe-item.q-bound`(2 个类) 会被它压掉，边框色白改。 */
+.bag-window .bag-slot .poe-item.q-bound,
+#tab-bag .poe-item.q-bound { border-color:rgb(var(--action-gold-rgb) / .55); }
+.bag-window .bag-slot .poe-item.q-bound .nm,
+#tab-bag .poe-item.q-bound .nm { color:var(--accent-hi); }
+/* 悬停卡里的「绑定」小标签 */
+.poe-item .bind-tag,
+.mat-tip .bind-tag {
+  display:inline-block; margin-left:4px; padding:0 4px; font-size:var(--fs-2xs);
+  color:#ffd98a; border:1px solid rgb(var(--action-gold-rgb) / .5); border-radius:var(--radius-xs);
+}
 .bag-window .bag-item-grid.bag-grid-empty::after {
   content: attr(data-empty);
   position: absolute; inset: 0;
@@ -3657,6 +3902,92 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 .pet-tab-pane[data-pet-pane="profile"] .pet-more-stats .pet-stats-sub { margin-top: 8px; }
 
+/* ============================================================
+ * 资料页 · 属性区重排（2026-09-15）
+ * 原来：5 个主属性 + 6 个次级属性**各占一个小牌匾**（边框 + 渐变 + 金色外发光）。
+ * 这违反项目自己的规范 —— 数据面板不该给每个数字套盒子（盒子应是一组一个，
+ * 靠分隔线与字重分层），而且禁用霓虹外发光。11 个盒子还把「一眼读完的 5 个数」切成 5 块。
+ * 现在：一组读数放在一张卡里，成长占更宽更大，其余靠竖线分隔；语义色保留、发光全去掉。
+ * ============================================================ */
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main {
+  display:flex; align-items:stretch; gap:0; margin-top:12px;
+  padding:9px 4px;
+  background-color:rgb(10 12 13 / .34);
+  background-image:var(--ui-paper-texture);
+  border:1px solid rgb(var(--action-gold-rgb)/ .16);
+  border-radius:var(--radius-xs);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat {
+  flex:1 1 0; min-width:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  padding:2px 8px;
+  background:none; border:0; border-radius:0; box-shadow:none;
+  border-left:1px solid rgb(var(--action-gold-rgb)/ .12);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat:first-child { border-left:0; }
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat::after { display:none; }
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat-label {
+  font-size:var(--fs-2xs); color:var(--text-faint); letter-spacing:2px; text-shadow:none;
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat-value {
+  font-size:var(--fs-lg); font-weight:700; text-shadow:none;
+}
+/* 成长 = 这一页最重要的数（紫色强调，项目唯一的强调色） */
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat-growth {
+  flex:1.5 1 0; background:none; border-left:0;
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat-growth .pstat-value {
+  font-size:var(--fs-2xl); color:var(--r-purple); text-shadow:none; letter-spacing:1px;
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-main .pstat-growth .pstat-label { color:var(--r-purple); }
+/* 次级属性：同样改成一行读数（原本是 6 个小盒子） */
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-sub {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(76px, 1fr)); gap:0; margin-top:8px;
+  padding:7px 2px;
+  background-color:rgb(10 12 13 / .28);
+  border:1px solid rgb(var(--action-gold-rgb)/ .12);
+  border-radius:var(--radius-xs);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-sub .pstat {
+  padding:2px 6px; background:none; border:0; border-radius:0; box-shadow:none;
+  border-left:1px solid rgb(var(--action-gold-rgb)/ .1);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-sub .pstat:first-child { border-left:0; }
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-sub .pstat::after { display:none; }
+.pet-tab-pane[data-pet-pane="profile"] .pet-stats-sub .pstat-value { font-size:var(--fs-sm); text-shadow:none; }
+
+/* 顶部那一排 tab：原来 flex:1 把 5 个词平均分满整行，中间空一大段 → 收拢到左边 */
+.pet-tabs { justify-content:flex-start; }
+.pet-tab { flex:0 0 auto; padding:10px 26px; }
+
+/* 资料页 · 「下一步」区块（进化下一形态 + 装备摘要）—— 一块卡、三行读数，与上面属性区同款 */
+.pet-tab-pane[data-pet-pane="profile"] .pet-next {
+  margin-top:12px; padding:10px 14px 12px;
+  background-color:rgb(10 12 13 / .3);
+  background-image:var(--ui-paper-texture);
+  border:1px solid rgb(var(--action-gold-rgb)/ .16);
+  border-radius:var(--radius-xs);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pn-head {
+  font-family:var(--font-title); font-size:var(--fs-sm); letter-spacing:3px; color:var(--accent);
+  padding-bottom:6px; margin-bottom:4px;
+  border-bottom:1px solid rgb(var(--action-gold-rgb)/ .14);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pn-row {
+  display:flex; align-items:baseline; gap:10px; padding:6px 0;
+}
+.pet-tab-pane[data-pet-pane="profile"] .pn-row + .pn-row { border-top:1px dashed rgb(var(--action-gold-rgb)/ .1); }
+.pet-tab-pane[data-pet-pane="profile"] .pn-label {
+  flex:none; width:72px; font-size:var(--fs-2xs); color:var(--text-faint); letter-spacing:1px;
+}
+.pet-tab-pane[data-pet-pane="profile"] .pn-value {
+  flex:1 1 auto; min-width:0; font-size:var(--fs-sm); color:var(--text-hi);
+}
+.pet-tab-pane[data-pet-pane="profile"] .pn-value b { color:var(--accent-hi); font-weight:700; }
+.pet-tab-pane[data-pet-pane="profile"] .pn-tip {
+  flex:none; max-width:48%; text-align:right; font-size:var(--fs-2xs); color:var(--text-faint);
+}
+
 /* 进化页 · 头像放大 + 框内垂直居中 */
 .pet-wrap--altar .evolve-stage .es-main,
 .pet-wrap--altar .evolve-stage .es-target {
@@ -4087,11 +4418,12 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 
 /* ---------- 6. 行动条轨道视觉升级 ---------- */
+/* 半透明 HUD 化（2026-09-15）：原来是 95% 不透明的深色竖条，贴在画面右缘像一道黑边；
+ * 现在只留一层很淡的底，刻度与终点线走 token 色（原来写死 rgba(251,191,36)，调主色时不会跟着变）。 */
 #tab-battle .at-track {
-  background: linear-gradient(to bottom,
-    rgba(10, 10, 12, 0.95),
-    rgba(20, 20, 25, 0.95));
-  border-left: 1px solid rgba(251, 191, 36, 0.25);
+  background-color:rgb(8 10 11 / .34);
+  backdrop-filter:blur(2px);
+  border-left:1px solid rgb(var(--action-gold-rgb)/ .14);
 }
 /* 轨道刻度线 */
 #tab-battle .at-track::before {
@@ -4102,10 +4434,18 @@ select.sell-input option { background:var(--panel); color:var(--text); }
     to bottom,
     transparent 0,
     transparent calc(25% - 1px),
-    rgba(251, 191, 36, 0.15) calc(25% - 1px),
-    rgba(251, 191, 36, 0.15) 25%
+    rgb(var(--action-gold-rgb)/ .14) calc(25% - 1px),
+    rgb(var(--action-gold-rgb)/ .14) 25%
   );
   pointer-events: none;
+}
+/* 含义标注：这根竖轨此前一个字都没有，玩家读不出它在比什么（竖排两个字，压在头像下层） */
+#tab-battle .at-track::after {
+  content: '出手';
+  position: absolute; top:6px; left:50%; transform:translateX(-50%);
+  writing-mode:vertical-rl; letter-spacing:2px;
+  font-size:var(--fs-2xs); color:var(--text-faint);
+  opacity:.75; pointer-events:none; z-index:0;
 }
 #tab-battle .at-racer {
   background: radial-gradient(circle at 35% 35%,
@@ -4118,20 +4458,20 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 #tab-battle .at-racer.leading {
   box-shadow:
-    0 0 12px rgba(251, 191, 36, 0.7),
-    0 0 24px rgba(251, 191, 36, 0.35),
+    0 0 12px rgb(var(--action-gold-rgb)/ .7),
+    0 0 24px rgb(var(--action-gold-rgb)/ .35),
     inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 #tab-battle .at-racer--enemy.leading {
   box-shadow:
-    0 0 12px rgba(239, 68, 68, 0.7),
-    0 0 24px rgba(239, 68, 68, 0.35),
+    0 0 12px rgb(var(--hp-hi-rgb)/ .7),
+    0 0 24px rgb(var(--hp-hi-rgb)/ .35),
     inset 0 1px 2px rgba(255, 255, 255, 0.2);
 }
 #tab-battle .at-finish {
   height: 3px;
   background: linear-gradient(to right, transparent, var(--action-gold), transparent);
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+  box-shadow: 0 0 12px rgb(var(--action-gold-rgb)/ .6);
 }
 
 /* ---------- 7. 氛围粒子（血雾飘动） ---------- */
@@ -4188,44 +4528,10 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   100% { opacity: 0; transform: translateX(-50%) scaleX(2) scaleY(1.8); }
 }
 
-/* ---------- 10. 信息条（头顶血条）优化 ---------- */
-/* 信息条更紧凑、更通透 */
-#tab-battle .fighter-info {
-  padding: 6px 10px;
-  background: rgba(8, 8, 10, 0.7);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 3px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-#tab-battle .combat-name {
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 10px rgba(0, 0, 0, 0.6);
-}
-#tab-battle .hp-text {
-  font-size: 0.85rem;
-  color: #d4cfc5;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-}
-/* 经验条美化 */
-#tab-battle .battle-exp {
-  margin-top: 4px;
-}
-#tab-battle .battle-exp-track {
-  height: 4px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 2px;
-  overflow: hidden;
-}
-#tab-battle .battle-exp-track i {
-  background: linear-gradient(to right, #fbbf24, #f59e0b);
-  box-shadow: 0 0 4px rgba(245, 158, 11, 0.5);
-}
-#tab-battle .battle-exp-meta span {
-  font-size: 0.75rem;
-  color: #a8a096;
-}
+/* ---------- 10. 信息条（头顶血条）
+ * 2026-09-15 清理：这一层的 #tab-battle .fighter-info / .combat-name / .hp-text /
+ * .battle-exp* 与文件前半段同名规则重复（后者只是硬编码色覆盖），已合并到前面的
+ * 「信息块」那一段，这里不再留第二层 —— 两层同名样式叠着，改哪层都不确定生效。 */
 
 /* ============================================================
  * 通天塔（2026-09-10）—— 详情页 / 战斗页刻度条 / 结算诊断

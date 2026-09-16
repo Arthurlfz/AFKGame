@@ -180,10 +180,18 @@ C(`
   A(cc2 && cc2.data === 'ALREADY_CLAIMED', '服务端领取记录：同一条第二次被拒（ALREADY_CLAIMED）');
   const cc3 = await C(`Supabase.completeQuest('__probe','2026-9-12')`);
   A(cc3 && cc3.data === 'OK', '带周期键的是另一条记录（日常/周常每个周期各一次）');
-  A(r1 && r1.exp > 0, `任务奖励经验为主（n1 给 经验 +${r1.exp || 0}，材料为辅助）`);
-  // 新手档=固定 300 经验：交 n1 后经验应累加或触发升级，两者都算"经验生效"。
-  A(C(`Pet.getActivePet().level`) > lvBefore0 || C(`Pet.getActivePet().exp`) >= expBefore0 + (r1.exp || 0),
-    '任务经验已计入当前出战宠物（经验累加或触发升级）');
+  A(r1 && r1.exp > 0, `任务奖励含经验（n1 折算 ${r1.exp || 0} 点经验，材料为辅助）`);
+  /* 2026-09-16 用户拍板：任务经验改成发【经验包】（绑定），不再直接喂宠物。
+   * 所以这里改成验证三件事（比旧断言更严）：
+   *   ① 经验确实折成了包（而不是某天被悄悄改回直发）；
+   *   ② 背包里真的多了对应数量的包（新手档 300 经验 = 3 × 微光经验屑@100）；
+   *   ③ 包是【绑定】的（可自用、不可交易），且宠物没被直接加经验。 */
+  const packsOfN1 = C(`JSON.stringify(Quest.expPacksOf(Config.drop.quests.find(q=>q.id==='n1'))||[])`);
+  A(/微光经验屑/.test(packsOfN1), `n1 的经验折成了经验包（${packsOfN1}）`);
+  A(C(`Materials.getQuantity('微光经验屑')`) >= 3, '交完 n1 背包里多了 3 个微光经验屑（300 经验 = 3×100）');
+  A(C(`Materials.getBoundQuantity('微光经验屑')`) >= 3, '经验包是【绑定】的（能自用、不能交易）');
+  A(C(`Pet.getActivePet().exp`) === expBefore0 && C(`Pet.getActivePet().level`) === lvBefore0,
+    '不再直接喂宠物 —— 换经验这一步由玩家自己在背包点使用');
   A(C(`(Quest.getGuideQuest()||{}).id`) === 'n2', '交完 n1 后引导条自动指向 n2（前置依赖生效）');
   const r2 = await C(`Quest.completeQuest('n1')`);
   A(r2 && r2.error, '一次性任务不能重复交（提示：' + (r2.error || '') + '）');
@@ -300,7 +308,14 @@ C(`
   A(C(`Quest.getGroups('series', Quest.getQuests().filter(q=>q.kind==='series')).length`) === 10,
     '系列数据层始终是完整的 10 章（与面板只显示已解锁不冲突）');
   A(seriesHtml.indexOf('undefined') === -1, '分组渲染无 undefined 泄漏');
-  A(seriesHtml.indexOf('全部展开') !== -1 && seriesHtml.indexOf('全部折叠') !== -1, '面板提供全部展开/折叠');
+  /* 头部的「全部展开 / 全部折叠」只在【多分组】时才渲染（ui-quest.js：groups.length > 1）——
+   * 只有 1 组时没什么可展开的，不渲染按钮是正确行为。
+   * ⚠️ 这条断言原来无条件要求按钮存在，新号只解锁第 1 章时必然 1 组 ⇒ 必然失败；
+   *    之前长期被上面那条"任务经验计入宠物"的失败挡住没暴露（2026-09-16 才发现）。
+   *    这里按实际分组数对账，别再写死"必须有按钮"。 */
+  const seriesGroups = C(`Quest.getGroups('series', Quest.getQuests().filter(q=>q.kind==='series'&&q.unlocked)).length`);
+  A(seriesGroups <= 1 || (seriesHtml.indexOf('全部展开') !== -1 && seriesHtml.indexOf('全部折叠') !== -1),
+    '多分组时面板提供全部展开/折叠（当前 ' + seriesGroups + ' 组，1 组时不要求）');
   C(`UI.renderQuestPanel('daily')`);
   A(panel().indexOf('收集任务') !== -1, '日常面板渲染出「收集任务」分组（日常 → 收集 → 具体任务）');
   // 循环（委托）要该图守关 Boss 首通才解锁 → 先上报一次 Boss 击杀并交掉首通任务，再看分组渲染
@@ -389,7 +404,10 @@ C(`
   const pe2r = await C(`Quest.completeQuest('pe2')`);
   A(pe2r && pe2r.ok, '提交 pe2（腐噜兽试炼）成功');
   A(pe2r && pe2r.exp === 600, `pe2 完成给固定经验 600（实际 ${pe2r && pe2r.exp}）`);
-  A(pe2r && (pe2r.rewards || []).join('').indexOf('经验 +600') >= 0, 'pe2 奖励列表含「经验 +600」');
+  /* 2026-09-16：600 经验现在折成 6 个「微光经验屑」(100/个) 发进背包（绑定），
+   * 所以奖励列表里是**包名**而不是"经验 +600"—— 奖励展示必须和玩家背包里真拿到的东西对得上。 */
+  A(pe2r && (pe2r.rewards || []).join('').indexOf('微光经验屑 ×6') >= 0,
+    'pe2 奖励列表含「微光经验屑 ×6」（600 经验 = 6×100，绑定包）');
   A(C(`Quest.getQuests().find(q=>q.id==='pe2').finished`) === true, 'pe2 已标记完成');
 
   /* ---------- 兑换任务行为：每日 / 每周 各自的硬上限（2026-09-10 新增分类） ---------- */

@@ -149,12 +149,16 @@
     const pct = q.need ? Math.min(100, Math.round(q.progress / q.need * 100)) : 0;
     const st = stateOf(q);
     const cat = cats().find(c => c.id === q.kind) || { label: '任务' };
-    // 经验是任务奖励的主体（2026-08-30 用户拍板），材料是辅助：奖励列表第一行显示经验
+    /* 经验奖励的**实际形态**由 quest.js 的 QUEST_EXP_MODE 决定（2026-09-16 起：折算成经验包）。
+     * 这里必须问它要清单，不能自己写"经验 +N"—— 否则卡片写经验、背包里多出来的是包，玩家对不上账。 */
     const expVal = (window.Quest && window.Quest.questExpOf) ? window.Quest.questExpOf(q) : 0;
+    const expPacksOut = (window.Quest && window.Quest.expPacksOf) ? (window.Quest.expPacksOf(q) || []) : [];
     const rewardRows = Object.entries(q.reward || {}).map(([n, a]) => `${escapeHtml(n)} ×${a}`);
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
     if (gearCount > 0) rewardRows.push(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 装备 ×${gearCount}`);
-    if (expVal > 0) rewardRows.unshift(`经验 +${expVal}`);
+    if (expPacksOut.length) {
+      for (const it of expPacksOut) rewardRows.unshift(`${escapeHtml(it.name)} ×${it.count}`);
+    } else if (expVal > 0) rewardRows.unshift(`经验 +${expVal}`);
     // matList 多材料任务：逐种列出材料名 + 背包持有量（够 888 标绿，差的标红提示还缺多少）
     const matRows = Array.isArray(q.matList)
       ? q.matList.map(n => {
@@ -203,6 +207,7 @@
     const pct = q.need ? Math.min(100, Math.round(q.progress / q.need * 100)) : 0;
     const st = stateOf(q);
     const expVal = Quest.questExpOf ? Quest.questExpOf(q) : 0;
+    const expPacksOut = (Quest.expPacksOf ? Quest.expPacksOf(q) : []) || [];
     const mats = Object.entries(q.reward || {}).map(([n, a]) => `<span class="quest-card-mat">${escapeHtml(n)} ×${a}</span>`).join('');
     // 送装备的任务（新手链 t2）：卡片上要写清楚，玩家才知道「做完这条就有装备穿了」
     const gearCount = Number((q.rewardGear && q.rewardGear.count) || q.rewardGear || 0);
@@ -213,7 +218,11 @@
     const nextHtml = pv
       ? `<span class="quest-card-next">完成可得 ${escapeHtml(pv.labels.join('、'))} <i>→ 下一步「${escapeHtml(pv.next.name)}」</i></span>`
       : '';
-    const rewards = `<span class="quest-card-exp">经验 +${expVal}</span>` + mats + gearHtml + nextHtml;
+    // 发的是经验包就逐个列包名（玩家点开背包要对得上），直发模式才写"经验 +N"
+    const expHtml = expPacksOut.length
+      ? expPacksOut.map(it => `<span class="quest-card-exp">${escapeHtml(it.name)} ×${it.count}</span>`).join('')
+      : `<span class="quest-card-exp">经验 +${expVal}</span>`;
+    const rewards = expHtml + mats + gearHtml + nextHtml;
     let btn;
     if (!q.unlocked) btn = `<button class="quest-card-btn locked" disabled>${q.lockText || '未解锁'}</button>`;
     else if (q.finished) btn = `<button class="quest-card-btn finished" disabled>${doneLabel(q)}</button>`;
@@ -645,7 +654,7 @@
   function guideHint(it) {
     try {
       if (!it || !it.isTutorial || !it.target) return;
-      if (!window.Onboarding || !window.Onboarding.hotspot) return;
+      if (!window.Onboarding || !window.Onboarding.spotlight) return;
       let tries = 0;
       const attempt = function () {
         let rc = null;
@@ -654,11 +663,15 @@
           if (el && typeof el.getBoundingClientRect === 'function') rc = el.getBoundingClientRect();
         } catch (e) { rc = null; }
         if ((rc && rc.width > 1 && rc.height > 1) || ++tries >= 15) {
-          window.Onboarding.hotspot(it.target, {
+          window.Onboarding.spotlight(it.target, {
             title: it.name || '下一步',
-            npc: it.npc || '',
+            npc: (it.hint || it.npc || '') + ((it.hint && it.npc) ? '<div style="margin-top:8px;opacity:.62;font-size:.9em;line-height:1.6">' + it.npc + '</div>' : ''),
             npcName: '引路人',
-            npcTitle: '魂兽向导'
+            npcTitle: '魂兽向导',
+            cta: '知道了',
+            onSkip: function () {
+              try { if (window.TutorialMode && window.TutorialMode.markSkipped) window.TutorialMode.markSkipped(); } catch (e) { /* 忽略 */ }
+            }
           });
           return;
         }
@@ -921,6 +934,9 @@
   window.UI.renderQuestPanel = renderQuestPanel;
   window.UI.renderQuestTracker = renderQuestTracker;
   window.UI.renderQuestBadge = renderQuestBadge;
+  // 红点指路（ui-guide-dots.js）要按任务推「该去哪个入口」，直接复用这里唯一的推导函数
+  // —— 不另抄一份，免得任务类型改了红点不跟着变。
+  window.UI.guideOf = guideOf;
 
   if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('DOMContentLoaded', initQuestUI);

@@ -11,7 +11,11 @@
 
   const Supabase = window.Supabase;
 
-  let local = {}; // { name: quantity }
+  let local = {};       // { name: quantity } 总数量
+  /* 绑定数量（2026-09-16 策划拍板：任务产出全绑定，不可交易）
+   * 🔴 不变式：boundLocal[name] ≤ local[name]（云端 materials 表有同名 check 约束）。
+   * 可自由交易的数量 = getFreeQuantity = 总数 − 绑定数。 */
+  let boundLocal = {};  // { name: quantity }
 
   /* ---------- 待上报队列（掉落是高频的，攒一批再发） ----------
    * 原来每次掉材料都 await cloudGain（getUser + rpc 两次往返，实测共约 340ms），
@@ -27,6 +31,7 @@
   };
   let lastRateWarnAt = 0;  // 限流提示节流（不刷屏）
   let pending = {};        // { 材料名: 待上报数量 }
+  let pendingBound = {};   // { 材料名: 其中「绑定」的待上报数量 }
   let flushTimer = null;
 
   function warnRateLimited() {
@@ -41,15 +46,19 @@
   /* ---------- 获得材料（掉落 / 发奖时调用） ---------- */
   // 本地立即生效；云端走队列（不 await 网络）。
   // 需要立刻落盘的场景自己调 flushMaterials()：消耗材料前、交任务发奖后、离场前。
-  function gain(name, amount) {
-    gainLocal(name, amount);
-    enqueue(name, amount);
+  /* 第三参 opts.bound：这批是不是绑定（任务产出传 true）。
+   * 绑定的只在本地与云端各记一份「绑定数量」，总量照常加 —— 两者是包含关系不是并列。 */
+  function gain(name, amount, opts) {
+    const bound = !!(opts && opts.bound);
+    gainLocal(name, amount, bound);
+    enqueue(name, amount, bound);
     return { ok: true, cloud: 'pending' };
   }
 
-  function enqueue(name, amount) {
+  function enqueue(name, amount, bound) {
     const amt = amount || 1;
     pending[name] = (pending[name] || 0) + amt;
+    if (bound) pendingBound[name] = (pendingBound[name] || 0) + amt;
     if (flushTimer) return;
     flushTimer = setTimeout(() => { flushTimer = null; flushMaterials(); }, FLUSH_MS);
   }
@@ -62,21 +71,28 @@
   async function flushMaterials() {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     const batch = pending;
+    const batchBound = pendingBound;   // 这批里绑定的部分（与 batch 同 key 对齐）
     const names = Object.keys(batch);
     if (!names.length) return;
     pending = {};
+    pendingBound = {};
     const failed = {};
+    const failedBound = {};
     let hitRateLimit = false;
     await Promise.all(names.map(async (name) => {
-      const r = await cloudGain(name, batch[name]);
+      const r = await cloudGain(name, batch[name], batchBound[name] || 0);
       if (r && r.error) {
         failed[name] = batch[name];
+        failedBound[name] = batchBound[name] || 0;
         if (r.rateLimited) hitRateLimit = true; // 服务端限流：放慢重试节奏，别继续撞锁
       }
     }));
     const failedNames = Object.keys(failed);
     if (!failedNames.length) return;
-    for (const n of failedNames) pending[n] = (pending[n] || 0) + failed[n];
+    for (const n of failedNames) {
+      pending[n] = (pending[n] || 0) + failed[n];
+      pendingBound[n] = (pendingBound[n] || 0) + (failedBound[n] || 0);
+    }
     // 失败必须重试（本地已加、云端还没记，不补上去刷新就丢这批收益）；限流时退避到窗口结束
     const delay = hitRateLimit ? rateWindowMs() : FLUSH_MS;
     if (hitRateLimit) warnRateLimited();
@@ -98,8 +114,7 @@
     const { data, error } = await Supabase.getClient().rpc('spend_material', { p_name: name, p_amount: amount });
     if (error) return { ok: false, error: error.message };
     if (data === false) return { ok: false, error: `${name} 余额不足（云端）` };
-    local[name] -= amount;
-    if (local[name] <= 0) delete local[name];
+    applyLocalDeduct(name, amount);
     return { ok: true };
   }
 
@@ -152,33 +167,43 @@
       return { ok: false, error: msg || '材料扣减失败' };
     }
     if (res && res.data === false) return { ok: false, error: '材料不足（云端）' };
-    for (const n of Object.keys(need)) {
-      local[n] -= need[n];
-      if (local[n] <= 0) delete local[n];
-    }
+    for (const n of Object.keys(need)) applyLocalDeduct(n, need[n]);
     return { ok: true };
   }
 
   /* ---------- 本地 / 云端拆分（性能优化：本地先行 → 异步同步 → 失败回滚用） ---------- */
   // 纯本地累加（不回写云端；界面立即生效，云同步单独调 cloudGain）
-  function gainLocal(name, amount) {
+  // bound：这批算绑定（任务产出），只影响「能交易多少」，总量一样加
+  function gainLocal(name, amount, bound) {
     amount = amount || 1;
     local[name] = (local[name] || 0) + amount;
+    if (bound) boundLocal[name] = (boundLocal[name] || 0) + amount;
+  }
+  /* 本地扣减统一走这里：**绑定的先扣**（绑定不可交易，先消耗掉对玩家更有利，
+   * 也与云端 spend_material / spend_materials 的 greatest(0, bound_qty - n) 同口径）。 */
+  function applyLocalDeduct(name, amount) {
+    if (boundLocal[name]) {
+      boundLocal[name] -= amount;
+      if (boundLocal[name] <= 0) delete boundLocal[name];
+    }
+    local[name] -= amount;
+    if (local[name] <= 0) delete local[name];
   }
   // 纯本地扣减（购买后同步扣材料 / 云同步失败回滚用）；余额不足返回 { ok:false } 不改动
   function spendLocal(name, amount) {
     amount = amount || 1;
     if ((local[name] || 0) < amount) return { ok: false, error: `${name} 不足` };
-    local[name] -= amount;
-    if (local[name] <= 0) delete local[name];
+    applyLocalDeduct(name, amount);
     return { ok: true };
   }
   // 仅云端累加（RPC add_material；本地已由 gainLocal 加过，这里不重复加本地）
-  async function cloudGain(name, amount) {
+  // bound：这次上报的量里有多少是绑定的（云端记进 bound_qty 列）
+  async function cloudGain(name, amount, bound) {
     amount = amount || 1;
+    const bn = Math.max(0, Math.min(Math.round(Number(bound) || 0), amount));
     const user = await Supabase.getCurrentUser();
     if (!user) return { ok: true, cloud: false }; // 未登录：本地累计即可
-    const { error } = await Supabase.getClient().rpc('add_material', { p_name: name, p_amount: amount });
+    const { error } = await Supabase.getClient().rpc('add_material', { p_name: name, p_amount: amount, p_bound: bn });
     if (error) {
       // 本地已加过（gainLocal），云没记上；带 rateLimited 标记让 flush 退避重试而不是静默丢
       const msg = String((error && (error.message || error.details)) || error || '');
@@ -198,6 +223,7 @@
   // rows: [{ name, quantity }, ...] → 整体替换本地（云端权威）
   function setCloudMaterials(rows) {
     const next = {};
+    const nextBound = {};
     for (const r of rows || []) {
       const q = Number(r && r.quantity) || 0;
       /* 只收正数：云端会留着 quantity=0 的空行（扣到 0 不删行），
@@ -206,41 +232,58 @@
        * gain / spend / spendLocal 一直都是「到 0 就删键」，这里补齐同一条不变式。 */
       if (q <= 0) continue;
       next[r.name] = (next[r.name] || 0) + q;
+      // 绑定数量（云端列 bound_qty）：同类多行合并时一并累加，且不得超过本品种总数
+      const b = Math.min(Number(r && r.bound_qty) || 0, q);
+      if (b > 0) nextBound[r.name] = (nextBound[r.name] || 0) + b;
     }
     // 把还没上报的补回去：那是当前这个号已经拿到、但云端还没记账的部分。
     // 不加回去的话，玩家在上报窗口（4 秒）内刷新页面，这批掉落就凭空没了
     // ——云端查不到（还没报），本地又被云端快照覆盖。
     // 换号走 clearAll()（先补报再清空），不会串到别的号上。
     for (const n of Object.keys(pending)) next[n] = (next[n] || 0) + pending[n];
+    for (const n of Object.keys(pendingBound)) nextBound[n] = (nextBound[n] || 0) + pendingBound[n];
     // 不变式：local 里只存正数（数量为 0 的品种 = 没有这个品种）
     for (const n of Object.keys(next)) if (!(next[n] > 0)) delete next[n];
+    // 不变式：绑定只记在还存在的品种上，且 ≤ 总数（与云端 check 约束同口径）
+    for (const n of Object.keys(nextBound)) {
+      if (!(nextBound[n] > 0) || !next[n]) delete nextBound[n];
+      else if (nextBound[n] > next[n]) nextBound[n] = next[n];
+    }
     local = next;
+    boundLocal = nextBound;
   }
 
   // 登出 / 换号：先把还没上报的补报到当前号（否则这批收益白丢），再彻底清空。
   async function clearAll() {
     await flushMaterials();
     local = {};
+    boundLocal = {};
     pending = {};
+    pendingBound = {};
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   }
 
   /* ---------- 查询 ---------- */
   const getQuantity = name => local[name] || 0;
   const getLocal = () => ({ ...local });
+  // 绑定数量 / 可交易数量（市场上架、赠送等只能用 free 这部分）
+  const getBoundQuantity = name => boundLocal[name] || 0;
+  const getFreeQuantity = name => Math.max(0, (local[name] || 0) - (boundLocal[name] || 0));
+  const getBoundLocal = () => ({ ...boundLocal });
 
   /* ---------- 云端读取（登录后调用） ---------- */
   async function loadCloudMaterials() {
     const user = await Supabase.getCurrentUser();
     if (!user) return { data: [], error: null };
     return Supabase.getClient().from('materials')
-      .select('name,quantity')
+      .select('name,quantity,bound_qty')
       .order('created_at', { ascending: true });
   }
 
   /* ---------- 对外 API ---------- */
   window.Materials = {
     gain, spend, spendMany, gainLocal, spendLocal, cloudGain, cloudSpend, flushMaterials, clearAll,
-    getQuantity, setCloudMaterials, getLocal, loadCloudMaterials
+    getQuantity, setCloudMaterials, getLocal, loadCloudMaterials,
+    getBoundQuantity, getFreeQuantity, getBoundLocal
   };
 })();

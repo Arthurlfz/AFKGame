@@ -148,7 +148,9 @@ const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } c
   const res1 = await Q('(async () => await Quest.completeQuest("boss1"))()');
   A(!res1 || !res1.error, 'E3. 首通任务可完成');
   A(Q('Quest.isAreaCleared("corrupted-forest")') === true, 'E4. 完成后 isAreaCleared=true');
-  A(gainCalls === 3, 'E5. 首通奖励发放 3 项材料（实际 ' + gainCalls + ' 次）');
+  /* 2026-09-16：任务经验改发经验包 ⇒ 发奖时多一次 Materials.gain。
+   * boss1 是主线（1000 经验）= 1 个残魂经验囊 ⇒ 3 项材料 + 1 个包 = 4 次。 */
+  A(gainCalls === 4, 'E5. 首通奖励发放 3 项材料 + 1 个经验包（实际 ' + gainCalls + ' 次）');
   const before = gainCalls;
   Q('Quest.reportType("boss", 1, { areaId: "corrupted-forest" })');
   await Q('(async () => await Quest.completeQuest("boss1"))()');

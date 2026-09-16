@@ -54,9 +54,15 @@ const furySrc = fury.sources.map(s => s.where + '｜' + s.what).join(' ');
 A(W.areaName(10).indexOf('腐变之源') >= 0, 'materialWeightsByTier 的键能翻成图名：10 → ' + W.areaName(10));
 A(furySrc.indexOf('图10 腐变之源') >= 0, '腐印·暴怒 的来源里点出了"最高在 图10 腐变之源"（实际：' + fury.sources.map(s => s.where).join(' / ') + '）');
 
-/* ---- ⑥ 手写兜底的只有极少数（多了说明在拿手写替配置） ---- */
+/* ---- ⑥ 手写兜底的只有极少数（多了说明在拿手写替配置） ----
+ * 判定标准没变：**能从配置/代码派生的一律派生，手写只用来兜底**。
+ * 2026-09-16 由 6 提到 12：经验包 5 档登记进 materialInfo（它们存在 materials 表里、
+ *   玩家会在词条页查"怎么来、怎么用"），而这两项都只能手写 ——
+ *   发放逻辑在 quest.js（按经验折算成包）、效果在 tutorial_mode.useExpPack。
+ *   5 档其实是**同一类物品的 5 个档位**，不是 5 种新东西，所以放宽到 12 仍能守住原意
+ *   （现在 10 条，只要有人再手工写第 13 条这条就会红，逼他去想想能不能派生）。 */
 const handN = all.filter(n => C.materialInfo[n].use || C.materialInfo[n].from).length;
-A(handN <= 6, '手写「怎么用/来源」的条目控制在 6 条以内（当前 ' + handN + ' 条：'
+A(handN <= 12, '手写「怎么用/来源」的条目控制在 12 条以内（当前 ' + handN + ' 条：'
   + all.filter(n => C.materialInfo[n].use || C.materialInfo[n].from).join('、') + '）');
 
 console.log(failures ? 'MAT WIKI TESTS FAILED: ' + failures : 'ALL MAT WIKI TESTS PASSED');

@@ -73,6 +73,10 @@
       : kind === 'item'? `${payload.name}`
         : kind === 'material'? `${payload.name} ×${payload.qty}`
           : `${window.Drop.makeEggName(payload)}`;
+    // 绑定部分不给卖：材料的上架上限 = 可交易数量（总数 − 绑定数）
+    const sellMax = kind === 'material'
+      ? Math.max(0, Number(payload.free != null ? payload.free : payload.qty) || 0)
+      : 0;
     const avatar = (kind === 'pet'&& window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(payload.name) : null;
     const body = $('mk-sell-body');
     body.innerHTML = `
@@ -97,8 +101,8 @@
       </div>
       ${kind === 'material' ? `
       <div class="mk-sell-price-row">
-        <label>出售数量（持有 ${payload.qty}）</label>
-        <input type="number" class="mk-sell-qty-input" id="mk-sell-good-qty" min="1" max="${payload.qty}" value="${payload.qty}">
+        <label>出售数量（可交易 ${sellMax}${sellMax < payload.qty ? ` · 另有绑定 ${payload.qty - sellMax} 不可卖` : ''}）</label>
+        <input type="number" class="mk-sell-qty-input" id="mk-sell-good-qty" min="1" max="${sellMax}" value="${sellMax}">
       </div>` : ''}
       <div class="mk-sell-price-row">
         <label>要收多少份（≥1）</label>
@@ -179,7 +183,10 @@
       else if (kind === 'material') {
         const gq = readGoodQty();
         if (!Number.isInteger(gq) || gq < 1) { showToast('上架失败', '请填正整数出售数量'); return; }
-        if (gq > payload.qty) { showToast('上架失败', `最多只能卖 ${payload.qty} 份`); return; }
+        if (gq > sellMax) {
+          showToast('上架失败', sellMax <= 0 ? '这个材料全是绑定的（任务发的），不能卖' : `最多只能卖 ${sellMax} 份，剩下的是绑定部分`);
+          return;
+        }
         res = await Market.listMaterial(payload.name, gq, mat, qty);
         name = `${payload.name} ×${gq}`;
       }
@@ -229,11 +236,15 @@
      * 以前只有 AI 能卖材料 —— 玩家从通天塔/守关 Boss 打出来的高价值材料完全没有出口。 */
     const showMat = showAll || k === 'material';
     const held = (Materials.getLocal ? Materials.getLocal() : {});
+    /* 上架数量只能动「没绑定的那部分」= 总数 − 绑定数（2026-09-16）。
+     * 任务发的材料全是绑定的，所以很多品种会出现「背包里有、市集里没有」——
+     * free=0 的品种干脆不列（列出来也挂不上，只会让玩家反复点、以为坏了）。 */
     const matEntries = showMat
       ? Object.keys(held)
         .filter(n => held[n] > 0 && Market.isPaymentMaterial(n))
-        .map(n => ({ name: n, qty: held[n] }))
-        .sort((a, b) => b.qty - a.qty)
+        .map(n => ({ name: n, qty: held[n], free: Materials.getFreeQuantity ? Materials.getFreeQuantity(n) : held[n] }))
+        .filter(e => e.free > 0)
+        .sort((a, b) => b.free - a.free)
       : [];
 
     const total = pets.length + equips.length + eggEntries.length + matEntries.length;
@@ -349,6 +360,8 @@
     if (div.dataset) div.dataset.cloudId = eq.cloudId;
     else div._cloudId = eq.cloudId;
     const mine = Market.isItemListed(eq.cloudId);
+    // 绑定装备不给上架（2026-09-16「任务产出全绑定」）：能穿、能分解，就是不能卖
+    const bound = eq.bound === true;
     const r = rarityOf(eq);
     const desc = describeItem ? describeItem(eq) : '';
     div.innerHTML = `
@@ -360,8 +373,12 @@
         </div>
       </div>
       <div class="mk-affix">${escapeHtml(desc) || '<span style="color:var(--text-faint)">无词缀</span>'}</div>
-      <div class="mk-card-foot"><button class="mk-btn ${mine ? 'recall': 'buy'}">${mine ? '取回': '上架'}</button></div>`;
+      ${bound
+        ? '<div class="mk-card-foot"><button class="mk-btn" disabled title="任务送的装备是绑定的：能穿、能分解，不能上架">绑定 · 不可上架</button></div>'
+        : `<div class="mk-card-foot"><button class="mk-btn ${mine ? 'recall': 'buy'}">${mine ? '取回': '上架'}</button></div>`}`;
     const btn = div.querySelector('.mk-btn');
+    // 绑定装备直接短路：不给点、也不弹定价窗（2026-09-16「任务产出全绑定」）
+    if (bound) return div;
     btn.onclick = mine ? async () => {
       const listing = Market.getItemListing(eq.cloudId);
       if (!listing) return;
@@ -403,12 +420,13 @@
     div.className = 'mk-card';
     const mat = Market.findMaterial(entry.name);
     const listed = Market.getMaterialListing ? Market.getMaterialListing(entry.name) : null;
+    const free = Number(entry.free != null ? entry.free : entry.qty) || 0;
     div.innerHTML = `
       <div class="mk-card-top">
         <div class="mk-egg-icon">${mat.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m7.5 4.27 9 5.15"/></svg>'}</div>
         <div class="mk-card-info">
           <div class="mk-name">${escapeHtml(entry.name)}</div>
-          <div class="mk-meta">持有 ×${entry.qty}${listed ? ' · 已挂 ×' + (listed.goodQty || 0) : ''}</div>
+          <div class="mk-meta">可交易 ×${free}${free < entry.qty ? `（另有绑定 ×${entry.qty - free} 不可卖）` : ''}${listed ? ' · 已挂 ×' + (listed.goodQty || 0) : ''}</div>
         </div>
       </div>
       <div class="mk-card-foot"><button class="mk-btn ${listed ? 'recall' : 'buy'}">${listed ? '取回' : '上架'}</button></div>`;
