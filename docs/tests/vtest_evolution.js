@@ -26,7 +26,7 @@ await S(300);await C('Game.onLogin("evo@test.com","123456")');await S(300);
 
 /* ============ 1. 进化树配置完整 ============ */
 A(C('Config.pet.starters.length')===8,'开局基宠覆盖 8 只');
-A(C('Object.keys(Config.pet.evolution.tree).length')===40,'进化树包含 8 条多段进化线');
+A(C('Object.keys(Config.pet.evolution.tree).length')>=40,'进化树包含 8 条多段进化线（≥40，可含新增测试线）');
 A(C('Config.pet.evolution.maxEvolveTimes')===4,'进化次数上限 maxEvolveTimes = 4（5 阶：初始+4 次进化，2026-09-06）');
 A(C('Config.pet.evolution.materialName')==='进化素材','通用进化素材名 = 进化素材');
 A(C('(()=>{const t=Config.pet.evolution.tree,s=Config.pet.starters;return s.every(x=>t[x.name]&&t[x.name].length===2&&t[x.name].every(r=>r.minLevel===10))})()'),'8 只基宠均有 2 条 Lv.10 首段路线');

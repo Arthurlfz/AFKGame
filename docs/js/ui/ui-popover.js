@@ -60,13 +60,20 @@
       return;
     }
     currentAnchor = opt.anchor;
+    box.classList.remove('is-closing'); // 上一次的收起动画可能还没播完
+    box.__gen = (box.__gen || 0) + 1;
     content.innerHTML = opt.html || '';
     if (opt.onClick) content.onclick = opt.onClick;
     position(box, opt.anchor);
   }
   function closePopover() {
     const box = $('popover-box');
-    if (box) box.classList.remove('show');
+    if (box) {
+      // 同 dialog：用 __gen 防止「关了又立刻打开」时，旧的定时器把新的 show 摘掉
+      const gen = (box.__gen = (box.__gen || 0) + 1);
+      if (UI.closeWithAnim) UI.closeWithAnim(box, () => { if (box.__gen === gen) box.classList.remove('show'); });
+      else box.classList.remove('show');
+    }
     currentAnchor = null;
   }
 

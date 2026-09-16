@@ -182,7 +182,7 @@
             <div class="nd-boss-row"><span class="k">${esc(info.cardName)}</span><span class="v${canCard ? '' : ' warn'}">× ${esc(info.cardQty || 0)}</span></div>
             <div class="nd-boss-row"><span class="k">刷新</span><span class="v">每日 12:00</span></div>
           </div>
-          <div class="nd-ticket-tip">免费次数用尽后，消耗 1 张重置卡可再开一局。重置卡在魔石商店购买（每周限购）。${!godOk && active ? '<br><b class="tw-warn">当前出战不是神级宠：普通宠满配也上不到顶。</b>' : ''}</div>
+          <div class="nd-ticket-tip">免费次数用尽后，消耗 1 张重置卡可再开一局。重置卡的获取途径暂未开放。${!godOk && active ? '<br><b class="tw-warn">当前出战不是神级宠：普通宠满配也上不到顶。</b>' : ''}</div>
         </div>
         <div class="nd-card">
           <div class="nd-card-title">腐印（腐蚀度）<span class="hint">最多贴 ${esc(X ? X.maxPerRun() : 3)} 条 · 进入时消耗</span></div>

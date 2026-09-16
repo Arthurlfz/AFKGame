@@ -1,0 +1,254 @@
+/* ============================================================================
+   motion.css —— 全局动效基线层（2026-09-16 立）
+   ----------------------------------------------------------------------------
+   职责：只放「跨页面通用」的微交互与状态过渡（按下 / 悬浮 / 浮层出现 / 列表入场）。
+        单个系统的专属演出仍然各回各家：战斗飘字、受击、掉落扫光、鉴定扫光、错峰级联。
+
+   三条硬约束（改这个文件前先读）：
+     1. 只用 transition 与轻量 transform，**不加粒子、不加霓虹外发光**（暗黑挂机基调）；
+     2. 时长一律 ≤ 240ms —— 超过这个数玩家感知到的不是"顺滑"而是"卡"；
+     3. 「减少动态效果」由 design-tokens.css 的全局兜底统一压成 0.01ms，这里不用重复写。
+
+   ⚠️ 浮层淡入一律只动 opacity：这些 tooltip 靠 transform:translateX(-50%) 定位，
+      动画里再写 transform 会把居中顶掉（2026-09-16 实测各浮层的定位方式并不统一）。
+   ============================================================================ */
+
+/* ---------- 1. 按下反馈：点下去要有"顶回去"的手感 ----------
+   .fs-btn / .btn 系列本来就有 :active，这里补齐的是散落在各处、没套按钮类的可点元素
+   （卡片、侧栏、拖拽格）。它们大多已有 transform 的 transition（ui-polish.css）。 */
+button:active:not(:disabled),
+.fs-btn:active:not(:disabled),
+.sb-btn:active,
+.market-item:active,
+.bag-card:active,
+.equip-card:active,
+.area-card:active,
+.poe-item:active {
+  transform: translateY(1px);
+}
+
+/* 卡片 hover 时是 translateY(-2px)（ui-polish.css），按下落到 +1px —— 3px 的落差就是"按进去了" */
+.market-item:active, .bag-card:active, .equip-card:active, .area-card:active {
+  box-shadow: 0 2px 6px rgb(0 0 0 / .45);
+}
+
+/* ---------- 2. 悬浮反馈：图标跟着手走一点点 ---------- */
+.sb-icon { transition: transform .18s ease, filter .18s ease; }
+.sb-btn:hover .sb-icon { transform: translateX(2px); }
+.sb-btn.active .sb-icon { transform: none; }
+
+/* ---------- 3. 浮层淡入（8 处 tooltip 原本都是 display 硬切） ---------- */
+@keyframes fs-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.q-tip::after,
+.bonus-pop,
+.quick-tip,
+.equip-tip,
+.bag-tooltip,
+.pet-tooltip,
+.roster-tooltip,
+#capital-tip {
+  animation: fs-fade-in .13s ease-out;
+}
+
+/* ---------- 4. 模态：遮罩淡入 + 面板托起 ---------- */
+@keyframes fs-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.modal-mask { animation: fs-fade-in .16s ease-out; }
+.modal { animation: fs-modal-in .22s cubic-bezier(.2, .85, .3, 1); }
+
+/* ---------- 5. 列表入场：只淡入、不位移 ----------
+   不做位移是因为背包格 / 装备格有的是绝对定位，位移会把格子顶歪；
+   只取前 10 项错峰，一屏之外的内容不参与（否则筛选一刷新满屏都在闪）。 */
+@keyframes fs-fade-up-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fs-row-in { from { opacity: 0; } to { opacity: 1; } }
+.market-item, .bag-card, .equip-card, .area-card { animation: fs-row-in .2s ease-out both; }
+.market-item:nth-child(-n+10), .bag-card:nth-child(-n+10),
+.equip-card:nth-child(-n+10), .area-card:nth-child(-n+10) {
+  animation-duration: .22s;
+  animation-delay: calc((var(--i, 0)) * 22ms);
+}
+.market-item:nth-child(1), .bag-card:nth-child(1), .equip-card:nth-child(1), .area-card:nth-child(1) { --i: 0; }
+.market-item:nth-child(2), .bag-card:nth-child(2), .equip-card:nth-child(2), .area-card:nth-child(2) { --i: 1; }
+.market-item:nth-child(3), .bag-card:nth-child(3), .equip-card:nth-child(3), .area-card:nth-child(3) { --i: 2; }
+.market-item:nth-child(4), .bag-card:nth-child(4), .equip-card:nth-child(4), .area-card:nth-child(4) { --i: 3; }
+.market-item:nth-child(5), .bag-card:nth-child(5), .equip-card:nth-child(5), .area-card:nth-child(5) { --i: 4; }
+.market-item:nth-child(6), .bag-card:nth-child(6), .equip-card:nth-child(6), .area-card:nth-child(6) { --i: 5; }
+.market-item:nth-child(7), .bag-card:nth-child(7), .equip-card:nth-child(7), .area-card:nth-child(7) { --i: 6; }
+.market-item:nth-child(8), .bag-card:nth-child(8), .equip-card:nth-child(8), .area-card:nth-child(8) { --i: 7; }
+.market-item:nth-child(9), .bag-card:nth-child(9), .equip-card:nth-child(9), .area-card:nth-child(9) { --i: 8; }
+.market-item:nth-child(10), .bag-card:nth-child(10), .equip-card:nth-child(10), .area-card:nth-child(10) { --i: 9; }
+
+/* ---------- 6. 消息流：新消息从下方浮上来 ----------
+   ui-console.js 是增量渲染（只 append 新行），所以只有新到的那几条会播，老消息不会重播。 */
+.chat-msg { animation: fs-fade-up-in .2s ease-out; }
+
+/* ============================================================================
+   第二部分：爽点层（掉宝 / 成长跳变）
+   这些都是"挂机时玩家真正会看的那两秒"，所以才值得单独做演出：
+   掉材料原本只有聊天框一行字，升级原本连个提示圈都没有。
+   ============================================================================ */
+
+/* ---------- 7. 掉落：从怪物身上飞进背包 ----------
+   挂机没有"地上的东西"可捡，那就让东西自己飞回包里 —— 玩家的眼睛会跟着它走。
+   元素由 JS 创建后 append 到 body（不是舞台里）：舞台有 transform/overflow，会把 fixed 定位带歪。 */
+.loot-fly {
+  position: fixed; z-index: 260; pointer-events: none; white-space: nowrap;
+  padding: 3px 9px; border-radius: var(--radius-sm);
+  font: 700 var(--fs-sm) var(--font-body); letter-spacing: 1px;
+  color: var(--text-hi); background: rgb(0 0 0 / .6); border: 1px solid var(--line-hi);
+  box-shadow: 0 4px 14px rgb(0 0 0 / .5);
+  transition: transform .62s cubic-bezier(.35, 0, .25, 1), opacity .62s ease-in;
+}
+.loot-fly.is-gold { color: var(--r-gold); border-color: rgb(var(--r-gold-rgb) / .7); text-shadow: var(--shadow-glow-gold); }
+.loot-fly.is-blue { color: var(--r-blue); border-color: rgb(var(--r-blue-rgb) / .6); text-shadow: var(--shadow-glow-blue); }
+.loot-fly.is-evo  { color: var(--exp); border-color: rgb(var(--r-purple-rgb) / .55); }
+
+/* ---------- 8. 掉落横幅：只有"值钱的东西"才配打断你的视线 ----------
+   普通材料不出横幅（出就等于没出）—— 判据是档位 tier3，或金装 / 蛋。 */
+.loot-banner {
+  position: fixed; left: 50%; top: 26%; z-index: 265; pointer-events: none; text-align: center;
+  animation: loot-banner 1.7s ease-out forwards;
+}
+.loot-banner .lb-k { font: 700 11px var(--font-body); letter-spacing: 6px; color: var(--text-faint); }
+.loot-banner .lb-n {
+  margin-top: 4px; font-family: var(--font-title); font-weight: 700; font-size: 27px; letter-spacing: 2px;
+  color: var(--r-gold); text-shadow: 0 2px 0 rgb(0 0 0 / .6), 0 0 18px rgb(var(--r-gold-rgb) / .35);
+}
+.loot-banner .lb-s { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-dim); }
+.loot-banner.is-blue .lb-n { color: var(--r-blue); text-shadow: 0 2px 0 rgb(0 0 0 / .6), 0 0 18px rgb(var(--r-blue-rgb) / .35); }
+.loot-banner .lb-line {
+  width: 0; height: 1px; margin: 8px auto 0; background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: lb-line 1.7s ease-out forwards;
+}
+@keyframes loot-banner {
+  0%   { opacity: 0; transform: translate(-50%, 12px) scale(.94); }
+  14%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  72%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -14px) scale(1); }
+}
+@keyframes lb-line { 0%, 14% { width: 0; } 40% { width: 220px; } 100% { width: 220px; opacity: 0; } }
+
+/* ---------- 9. 升级：立绘脚下金环 + "LEVEL UP" ----------
+   ⚠️ 立绘那圈光（.level-up）原本写好了却没人触发（ui-battle.js 里的取值写错），这里只补样式。 */
+.levelup-banner {
+  position: fixed; left: 50%; top: 34%; z-index: 265; pointer-events: none; text-align: center;
+  animation: levelup-banner 1.8s cubic-bezier(.2, .8, .3, 1) forwards;
+}
+.levelup-banner .lu-k {
+  font-family: var(--font-title); font-weight: 700; font-size: 22px; letter-spacing: 8px;
+  color: var(--accent-hi); text-shadow: 0 2px 0 rgb(0 0 0 / .65), 0 0 20px rgb(var(--action-gold-rgb) / .45);
+}
+.levelup-banner .lu-n { margin-top: 2px; font-size: var(--fs-md); color: var(--text-dim); }
+@keyframes levelup-banner {
+  0%   { opacity: 0; transform: translate(-50%, 10px) scale(.9); }
+  16%  { opacity: 1; transform: translate(-50%, 0) scale(1.04); }
+  26%  { transform: translate(-50%, 0) scale(1); }
+  74%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -12px) scale(1); }
+}
+
+/* ---------- 10. Boss 出场：一道横幅压过来 + 舞台沉一下 ----------
+   Boss 是稀有事件（1/1600），玩家可能几百场才见一次，不能悄无声息地出现。 */
+.boss-banner {
+  position: fixed; left: 0; right: 0; top: 30%; z-index: 265; pointer-events: none; text-align: center;
+  animation: boss-banner 2.2s ease-out forwards;
+}
+.boss-banner .bb-k {
+  display: inline-block; padding: 2px 18px; letter-spacing: 10px; font-size: var(--fs-sm); font-weight: 700;
+  color: var(--hp-hi); border-top: 1px solid rgb(var(--hp-hi-rgb) / .5); border-bottom: 1px solid rgb(var(--hp-hi-rgb) / .5);
+}
+.boss-banner .bb-n {
+  margin-top: 6px; font-family: var(--font-title); font-size: 30px; font-weight: 700; letter-spacing: 4px;
+  color: var(--text-hi); text-shadow: 0 2px 0 rgb(0 0 0 / .7), 0 0 22px rgb(var(--hp-hi-rgb) / .35);
+}
+@keyframes boss-banner {
+  0%   { opacity: 0; transform: translateX(-48px); }
+  10%  { opacity: 1; transform: none; }
+  82%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateX(48px); }
+}
+.battle-stage.boss-arrive { animation: boss-arrive 1.1s ease-out; }
+@keyframes boss-arrive {
+  0%   { filter: brightness(1.5) saturate(1.3); }
+  100% { filter: none; }
+}
+
+/* ---------- 11. 揭幕（进化 / 合成 / 涅槃）：一道光扫过，把结果推到眼前 ----------
+   这是本作"成长跳变"的那一下 —— 攒很久才做一次，必须给足仪式感。 */
+.celebrate {
+  position: fixed; inset: 0; z-index: 270; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  animation: celebrate-veil 2s ease-out forwards;
+}
+/* 中央一圈暗幕，让标题从画面里"浮"出来（不是全屏遮黑，只是压暗四周） */
+.celebrate::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgb(0 0 0 / .62) 0%, rgb(0 0 0 / .38) 45%, transparent 72%);
+}
+/* 横向扫过的一道窄光（无粒子，纯渐变） */
+.celebrate::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+  background: linear-gradient(90deg, transparent, rgb(var(--action-gold-rgb) / .9), transparent);
+  transform: scaleX(0); transform-origin: left center;
+  animation: celebrate-sweep 2s cubic-bezier(.2, .8, .3, 1) forwards;
+}
+.celebrate .cb-k {
+  position: relative; font-family: var(--font-title); font-weight: 700; font-size: 24px; letter-spacing: 10px;
+  color: var(--accent-hi); text-shadow: 0 2px 0 rgb(0 0 0 / .7), 0 0 24px rgb(var(--action-gold-rgb) / .4);
+}
+.celebrate .cb-n { position: relative; font-family: var(--font-title); font-size: 30px; font-weight: 700; letter-spacing: 3px; color: var(--text-hi); }
+.celebrate .cb-s { position: relative; font-size: var(--fs-md); color: var(--text-dim); }
+.celebrate.is-god .cb-k { color: var(--r-gold); }
+.celebrate.is-mutant .cb-k { color: var(--r-blue); }
+@keyframes celebrate-veil {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  74%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes celebrate-sweep {
+  0%   { transform: scaleX(0); opacity: 0; }
+  10%  { transform: scaleX(0); opacity: 1; }
+  34%  { transform: scaleX(1); opacity: 1; }
+  60%  { transform: scaleX(1); opacity: 0; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* ============================================================================
+   第三部分：氛围层
+   ============================================================================ */
+
+/* ---------- 12. 数字跳动：钱/材料变了会弹一下 ----------
+   inline 元素吃不到 transform，所以这里强制 inline-block（数字都是短文本，不会撑坏布局）。 */
+.num-bump { display: inline-block; animation: num-bump .5s ease-out; }
+@keyframes num-bump {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.22); color: var(--accent-hi); }
+  100% { transform: scale(1); }
+}
+
+/* 背包按钮脉冲：任何东西飞进背包时，背包图标自己亮一下。
+   这是一层兜底信号 —— 飞行物在窗口很宽/被顶栏挡住时可能没被注意到，
+   但"东西已经进包了"这件事不能丢。 */
+@keyframes bag-pulse {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.12); color: var(--accent-hi); box-shadow: 0 0 12px rgb(var(--action-gold-rgb) / .5); }
+  100% { transform: scale(1); }
+}
+.topbar-btn.bag-pulse { animation: bag-pulse .46s ease-out; }
+
+/* ---------- 13. 浮层关闭：原来"啪"一下就没了，现在收一下 ---------- */
+.is-closing { opacity: 0; transform: translateY(4px) scale(.98); transition: opacity .16s ease, transform .16s ease; }
+
+/* ---------- 14. 切页：只淡入，不做位移 ----------
+   ⚠️ 绝不能给 .tab-page 加 transform：页面内部有 position:fixed 的浮层（背包/宠物 tooltip），
+      祖先一旦有 transform，fixed 就变成相对祖先定位，浮层会整体跑偏。 */
+.tab-page.page-enter { animation: page-enter .26s ease-out; }
+@keyframes page-enter { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- 15. 敌方待机呼吸错开节奏 ----------
+   两边同频呼吸看着像在照镜子。改 duration（不是 delay）—— delay 会被攻击/受击动画一起吃掉，
+   那样每次出手都会先卡 1.3 秒才动。 */
+#tab-battle .fighter-enemy .stage-avatar img.pet-breathe { animation-duration: 3.1s; }

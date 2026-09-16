@@ -26,7 +26,8 @@
   const PET_POOL = [
     { name: '腐噜兽' }, { name: '疫毛兽' }, { name: '尸犬' },
     { name: '血狐' }, { name: '骨狼' }, { name: '幽影兔' },
-    { name: '瘟熊' }, { name: '毒沼蛙' }
+    { name: '瘟熊' }, { name: '毒沼蛙' },
+    { name: '墨灵' }
   ];
 
   /* ---------- 数据模型 ---------- */
@@ -463,18 +464,14 @@
       max: Math.max(min, Math.round(base * (1 + j)))
     };
   }
-  /* ---------- 满级经验池 ----------
-   * 溢出经验（满级后的、以及升到满级时多出来的）攒进 pet.expPool，
-   * 每满 perCrystal 凝 1 颗晶石（走 Materials，账号级、云端同步）；返回本次凝出的数量。 */
+  /* ---------- 满级溢出经验：直接丢弃（2026-09-16）----------
+   * 原先这里把溢出经验攒进 pet.expPool、按 perCrystal 凝成「凝魂晶石」。
+   * 🔴 整套机制已按用户意见删除（「没必要有了」，理由见 config.js 的 pet 段说明）：
+   *   它是全自动产出，而两个出口（魂铸要牺牲宠物 / 涅槃加成不划算）都太弱 ⇒ 只涨不消。
+   * 函数与返回值**保留**：grantExp 与老调用点（开发者面板 / 测试）不用改；返回恒为 0。
+   * ⚠️ 满级后挂机的溢出经验现在是**纯浪费** —— 这是用户知情的代价，别再"顺手"加回产出。 */
   function addExpPool(pet, amt) {
-    const EP = Config.pet.expPool;
-    if (!EP || amt <= 0) return 0;
-    pet.expPool = (pet.expPool || 0) + amt;
-    const n = Math.floor(pet.expPool / EP.perCrystal);
-    if (n <= 0) return 0;
-    pet.expPool -= n * EP.perCrystal;
-    if (window.Materials) window.Materials.gain(EP.material, n);
-    return n;
+    return 0;
   }
   // 返回 { leveled, newLevel, maxed, crystal }，由调用方决定是否播报
   // maxed=true 表示本次调用时已达等级上限（经验条保持满，经验转入经验池）

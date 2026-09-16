@@ -176,6 +176,71 @@
     }
   }
 
+  /* ---------- 动效层（2026-09-16）----------
+   * 只有三件事，但全站都要用，所以放通用层：
+   *   setNum     数字变化时滚动 + 弹一下（材料 / 魔石 / 经验）
+   *   celebrate  进化 / 合成 / 涅槃的揭幕演出
+   *   closeWithAnim 浮层收起（原来弹窗是"啪"一下消失）
+   * ⚠️ 全是纯表现：**任何环境缺失都要静默跳过**，绝不能因为没有 document 就把业务流程打断。 */
+  function hasDom() { return typeof document !== 'undefined' && !!document.body; }
+  function raf(fn) {
+    if (typeof window !== 'undefined' && window.requestAnimationFrame) return window.requestAnimationFrame(fn);
+    return setTimeout(fn, 16);
+  }
+  function nowMs() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+
+  function setNum(el, value, opt) {
+    if (!el) return;
+    opt = opt || {};
+    const to = Number(value) || 0;
+    const from = (el.__num == null) ? to : Number(el.__num);
+    el.__num = to;
+    const put = (v) => { el.textContent = opt.fmt ? opt.fmt(v) : String(v); };
+    // 变化太小不滚动（差 1~2 点还滚会显得神经质）；没有 rAF 的环境（测试桩）直接落值
+    const canRoll = Math.abs(to - from) >= 2 && typeof window !== 'undefined' && !!window.requestAnimationFrame;
+    if (canRoll) {
+      const dur = Math.min(600, 180 + Math.abs(to - from) * 4);
+      const t0 = nowMs();
+      const step = () => {
+        const k = Math.min(1, (nowMs() - t0) / dur);
+        put(Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))));
+        if (k < 1 && el.__num === to) raf(step); // 期间又被改成新目标 → 停手，交给新一轮
+      };
+      raf(step);
+    } else {
+      put(to);
+    }
+    if (from !== to && el.classList && el.classList.add) {
+      el.classList.remove('num-bump');
+      void el.offsetWidth; // 强制重排：不加这行，连着两次变化只会播一次动画
+      el.classList.add('num-bump');
+      setTimeout(() => el.classList && el.classList.remove('num-bump'), 520);
+    }
+  }
+
+  /* 揭幕：一道光横扫 + 中央标题。2 秒后自行消失，不吃点击（pointer-events:none）。 */
+  function celebrate(opt) {
+    if (!hasDom()) return;
+    opt = opt || {};
+    const box = document.createElement('div');
+    box.className = 'celebrate' + (opt.kind === 'god' ? ' is-god' : (opt.kind === 'mutant' ? ' is-mutant' : ''));
+    const parts = [];
+    if (opt.title) parts.push('<div class="cb-k">' + escapeHtml(opt.title) + '</div>');
+    if (opt.name) parts.push('<div class="cb-n">' + escapeHtml(opt.name) + '</div>');
+    if (opt.sub) parts.push('<div class="cb-s">' + escapeHtml(opt.sub) + '</div>');
+    box.innerHTML = parts.join('');
+    document.body.appendChild(box);
+    setTimeout(() => { if (box.parentNode) box.parentNode.removeChild(box); }, 2100);
+  }
+
+  /* 浮层收起：先加 .is-closing 播收起，动画时长到再执行真正的移除。
+   * ⚠️ done 里只能做「摘掉 show」这一件事 —— 队列里的下一条由调用方自己安排。 */
+  function closeWithAnim(el, done) {
+    if (!el || !hasDom()) { if (done) done(); return; }
+    el.classList.add('is-closing');
+    setTimeout(() => { el.classList.remove('is-closing'); if (done) done(); }, 170);
+  }
+
   /* ---------- 血统被动卡片渲染（金色主题：宠物头像+名称+描述） ----------
    * 2026-09-10 移除 emoji 占位：图标位放该宠的真实头像（PetSprites 按名字解析），无素材留空。 */
   function bloodlineHtml(pet) {
@@ -270,17 +335,19 @@
     UI.renderCombatantData && UI.renderCombatantData();     // 出战宠物区数据（经验/等级）：战斗中也要刷新
     UI.syncCombatantSnapshot && UI.syncCombatantSnapshot(); // 立绘快照：仅非战斗时同步
     UI.renderRoster && UI.renderRoster();   // 战斗页左侧出战宠物竖列
+    UI.refreshGuideDots && UI.refreshGuideDots();   // 红点指路：跟着任务状态走（有事可做才亮）
     UI.renderMarket();
     UI.renderSellArea();
     UI.renderTradeRecords();
     UI.renderMergeHint();
     UI.renderEvolveHint();
     UI.renderResourceTrial && UI.renderResourceTrial();
-    $('phoenix-num').textContent = String(Materials.getQuantity(Config.drop.phoenixName));
-    $('reforge-num').textContent = String(Materials.getQuantity(Config.craft.reforge.name));
-    $('strip-num').textContent = String(Materials.getQuantity(Config.craft.strip.name));
-    $('holy-num').textContent = String(Materials.getQuantity(Config.craft.holy.name));
-    $('augment-num').textContent = String(Materials.getQuantity(Config.craft.augment.name));
+    // 材料数字：交给 setNum —— 变了会滚一下 + 弹一下（原来是无声无息地换一行字）
+    setNum($('phoenix-num'), Materials.getQuantity(Config.drop.phoenixName), { animate: true });
+    setNum($('reforge-num'), Materials.getQuantity(Config.craft.reforge.name), { animate: true });
+    setNum($('strip-num'), Materials.getQuantity(Config.craft.strip.name), { animate: true });
+    setNum($('holy-num'), Materials.getQuantity(Config.craft.holy.name), { animate: true });
+    setNum($('augment-num'), Materials.getQuantity(Config.craft.augment.name), { animate: true });
     UI.renderQuestTracker && UI.renderQuestTracker(); // 任务追踪栏（ui-quest 定义，未定义时跳过）
     UI.renderShop && UI.renderShop();                 // 魔石商店页（ui-shop 定义，用缓存数据重绘，不打接口）
   }
@@ -298,4 +365,7 @@
   UI.renderAll = renderAll;
   UI.makeDraggable = makeDraggable;
   UI.bloodlineHtml = bloodlineHtml;
+  UI.setNum = setNum;
+  UI.celebrate = celebrate;
+  UI.closeWithAnim = closeWithAnim;
 })();

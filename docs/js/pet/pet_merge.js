@@ -8,7 +8,8 @@
  *  2. 涅槃 nirvana（= 原融合 merge）：主宠吸副宠成长 + 重置等级 + 突破成长上限
  *       - 主宠保留，吸副宠成长；副宠消失；等级重置回 1
  *       - 2026-09-06 第二版手册 2.4：消耗【道具化】= 选中的涅槃道具（默认涅槃丹，吸收 ×1.2）；
- *         涅磐兽不再作为涅槃消耗品（保留掉落与交易）。可选再投入凝魂晶石加乘。
+ *         涅磐兽不再作为涅槃消耗品（保留掉落与交易）。可选再投入锁魂玉定向植入特质。
+ *         ⚠️ 2026-09-16：原「可选再投入凝魂晶石加乘」已删（凝魂晶石整套退役）。
  * 兼容：Merge.merge 保留为 nirvana 的别名（旧测试/旧调用仍可用）
  * 规则（config.synthesize / config.nirvana）
  * 依赖：pet.js / materials.js / supabase.js / market.js（在售检查）
@@ -78,7 +79,8 @@
 
   /* ---------- 涅槃成长计算（纯函数，nirvana 与 UI 预览共用） ---------- */
   // calcNirvanaGrowth(main, sub) → { growth, subRatioPenalty, capApplied, damped }
-  // bonusMult：凝魂晶石加成倍率（1 = 不投入）；预览与实际走同一函数，不会算歪
+  // bonusMult：涅槃丹等「道具加乘」的倍率（1 = 不投入）；预览与实际走同一函数，不会算歪
+  // （2026-09-16：原来是凝魂晶石 + 涅槃丹两处乘算，凝魂晶石退役后只剩道具这一路）
   function calcNirvanaGrowth(main, sub, bonusMult) {
     const M = NV();
     const minLv = M.minLevel || 60;
@@ -197,13 +199,10 @@
     if (!main.cloudId || !sub.cloudId) return { error: '有宠物未同步云端，刷新页面后再试' };
     if (Market.isListed(main.cloudId)) return { error: `${main.name} 正在市场出售，先取回再涅槃` };
     if (Market.isListed(sub.cloudId)) return { error: `${sub.name} 正在市场出售，先取回再涅槃` };
-    /* 凝魂晶石加成（可选）：投入 crystalBonus.amount 颗，本次吸收 ×(1 + absorbBonus)。
-     * 只加成型道具可用（替换型语义冲突），当前涅槃道具都是 add 型。 */
-    const CB = M.crystalBonus;
-    let bonusMult = (useCrystal && CB) ? 1 + CB.absorbBonus : 1;
-    if (bonusMult > 1 && Materials.getQuantity(CB.material) < CB.amount) {
-      return { error: `${CB.material}不足，需要 ${CB.amount} 颗` };
-    }
+    /* 🔴 原「凝魂晶石加成」（额外投入 10 颗 → 本次吸收 ×1.3）已于 2026-09-16 随凝魂晶石整套删除
+     * （理由：那个加成本来就不划算，玩家算了不会点；见 config.nirvana 段说明）。
+     * `useCrystal` 入参**保留**（调用方签名不动），但倍增恒为 1 —— 别再往这里接新加成。 */
+    let bonusMult = 1;
     /* 涅槃消耗【道具化】（2026-09-06 第二版手册 2.4）：
      * 消耗的是选中的涅槃道具（Config.items 里 category=nirvana，默认 defaultItem），
      * 涅磐兽已不再是涅槃消耗品（保留掉落与交易）。当前唯一道具 = 涅槃丹（吸收 ×1.2）。
@@ -228,11 +227,10 @@
       if (Materials.getQuantity(lockItem.name) < 1) return { error: '锁魂玉不足（指定特质需要 1 颗）' };
     }
 
-    /* 三样消耗【一次请求原子扣】（2026-09-15）：凝魂晶石 / 涅槃丹 / 锁魂玉（各 0~1 份）。
+    /* 消耗【一次请求原子扣】（2026-09-15 起；2026-09-16 去掉凝魂晶石那一项，现在只剩涅槃丹 / 锁魂玉）：
      * 原先逐样扣、后一样失败再把前面已扣的 gain 回来 —— 2~3 趟往返，且退回期间玩家能看到
      * "材料被吞了又吐回来"。现在服务端一个事务：要么一起扣掉，要么一样都不扣。 */
     const nirSpends = [];
-    if (useCrystal && bonusMult > 1) nirSpends.push({ name: CB.material, amount: CB.amount });
     if (nirPill) nirSpends.push({ name: nirPill.name, amount: 1 });
     if (lockTraitId && lockItem) nirSpends.push({ name: lockItem.name, amount: 1 });
     const nirPaid = await Materials.spendMany(nirSpends);
@@ -240,7 +238,7 @@
 
     /* ---- 整单失败时把主宠和道具都还原（2026-09-11 修）----
      * 涅槃要串「扣道具 → 更新主宠 → 删副宠」三步，任一步失败都必须回到起点：
-     *   · 只还原宠物不退道具 → 玩家白亏涅槃丹 / 凝魂晶石 / 锁魂玉
+     *   · 只还原宠物不退道具 → 玩家白亏涅槃丹 / 锁魂玉
      *   · 只退道具不还原宠物 → 成长白涨（同一只副宠还能再吃一次）
      * traits 必须深拷贝：implantNirvanaTraits 在原数组上 push，浅拷贝会被一起改掉。 */
     const snapshot = {

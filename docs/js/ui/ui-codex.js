@@ -131,7 +131,7 @@
       + rules([
         `进入：每个副本每天免费 ${T.freeEntriesPerDay != null ? T.freeEntriesPerDay : 3} 次，北京时间 12:00 刷新`,
         `免费次数用完后，每次进入消耗 1 张${escapeHtml(T.ticketName || '资源试炼门票')}`,
-        '门票来源：完成地图委托，每交一轮给 1 张',
+        '门票来源：完成地图委托，每交一轮给 1 张（每轮要交 200 个该图材料 ≈ 8 小时挂机）',
         '流程：每趟连续爬塔，每层一名守卫，血量跨层累计，倒下或通关即结算',
         '档位奖励按【最高到达层数】给，越深越好；不足第一档只给少量补偿',
         '失败保护：不退次数与门票，给少量本路线的基础补偿（绝不是区域材料）'
@@ -154,7 +154,10 @@
       ['血量', '整局只吃一管血：层与层之间、同一层 5 只之间都不回满（这是塔的张力来源）'],
       ['掉落', '奖励分三层：打死杂兵有小随机掉落；打死第 5 只守卫掉得明显更肥；每过 5 层再额外给一次固定档位奖励'],
       ['白图', '不贴腐印也能打满全程；腐印是自愿的加码，不是通关门票'],
-      ['进入', `每日免费 ${W.freePerDay != null ? W.freePerDay : 1} 次（北京时间 12:00 刷新）；用尽后消耗 1 张${escapeHtml(W.resetCardName || '通天塔重置卡')}（魔石商店购买，每周限购 ${(W.resetCard && W.resetCard.limitPerWeek) || '有限'} 张）`],
+      /* ⚠️ 2026-09-16：原文案写「魔石商店购买、每周限购 N 张」是**空承诺**（该商品从未上架）；
+       * 同日又拍板「只卖便利不卖数值」⇒ 它不该上架；任务侧的「塔券铸成」兑换也一并删掉了
+       * ⇒ 重置卡**当前没有获取途径**，文案如实写，别再编一个来源。 */
+      ['进入', `每日免费 ${W.freePerDay != null ? W.freePerDay : 1} 次（北京时间 12:00 刷新）；用尽后消耗 1 张${escapeHtml(W.resetCardName || '通天塔重置卡')}（额外次数的获取途径暂未开放）`],
       ['产出', `高级装备（未鉴定，最高图档底材）${drops ? '、' + drops : ''}`]
     ];
     const affixRows = items.map(it => [
@@ -275,7 +278,7 @@
       + note('分解装备的产出：')
       + table(['品质', '分解产出'], salvageRows)
       // 魂铸
-      + note(`魂铸：把宠物的特质铸进装备，消耗 ${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}，每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀。`)
+      + note(`魂铸：把宠物的特质铸进装备，消耗 ${escapeHtml(SC.material || '合成之石')} ×${SC.materialCount}，每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀。`)
       + table(['魂铸档', '宠物等级', '宠物成长', '特质来源', 'T 阶'], scRows);
   }
 
@@ -395,7 +398,7 @@
         '孵出的是基础形态，高阶形态靠进化'],
       // 门槛一律从 config 派生：写死 40/60 时改了 config 这里不会跟着变，也不报错
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg> 魂铸', `宠物 Lv.${((SC.tiers || {}).elite || {}).minLevel || 40} 起（${((SC.tiers || {}).legend || {}).label || '传承'}档 Lv.${((SC.tiers || {}).legend || {}).minLevel || 60}）`,
-        `${escapeHtml(SC.material || '凝魂晶石')} ×${SC.materialCount}`,
+        `${escapeHtml(SC.material || '合成之石')} ×${SC.materialCount}`,
         '把宠物的血脉 / 觉醒特质铸进装备，让特质跨世代传承',
         `每件装备最多 ${SC.maxSoulAffixes} 条魂铸词缀；传承档需终形态、成长 ≥ ${((SC.tiers || {}).legend || {}).minGrowth || 60}`]
     ];

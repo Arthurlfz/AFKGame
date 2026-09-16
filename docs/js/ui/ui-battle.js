@@ -24,6 +24,11 @@
     if (!name) return '';
     return String(name).replace(/^霸主·/, '').split(' 等级：')[0].trim();
   }
+  // 数字千分位：挂机页的血量/经验都是六到七位，不加分隔符得一格格数（2026-09-15）
+  function groupNum(n) {
+    const v = Math.max(0, Math.round(Number(n) || 0));
+    return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
   // 图标挂载：优先逐帧动画立绘 → 静态立绘 <img> → 空（不回退 emoji，2026-09-10 移除占位头像）。
   function mountIcon(el, name) {
     if (!el) return false;
@@ -65,9 +70,22 @@
      * 野图这边任何一次刷新（renderAll 每隔几秒就会走到这里）都不许把它覆盖成"当前地图"。 */
     const S = window.BattleSession;
     if (S && !S.isIdle() && !S.is('wild')) return;
-    box.innerHTML = area
-      ? `当前地图：<b style="color:#ffcf6b">${escapeHtml(area.name)}</b> · 建议等级 ${escapeHtml(area.recommended)}`
-      : '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 请先到世界地图选择一张地图，即可自动挂机打怪、掉装备和宠物蛋';
+    if (area) {
+      /* 当前地图：地图名当主角（原来最亮的是页名"野外探险"，玩家最常看的这张信息反而最小最灰）。
+       * 推荐成长标签按「出战宠的成长 vs 该图 recGrowth」上色，只做提示，不拦人 ——
+       * 数字口径与世界地图「推荐成长」同一份事实源（Config.battle.areas[].recGrowth）。 */
+      const pet = getActivePet && getActivePet();
+      const growth = Number(pet && pet.growth) || 0;
+      const rec = Number(area.recGrowth) || 0;
+      const gap = rec - growth;
+      const recCls = gap <= 0 ? 'is-ok' : (gap <= 3 ? 'is-warn' : 'is-risk');
+      box.innerHTML = '<span class="bai-inner">'
+        + `<span class="bai-name">${escapeHtml(area.name)}</span>`
+        + (rec ? `<span class="bai-rec ${recCls}">推荐成长 ${rec}</span>` : '')
+        + '</span>';
+    } else {
+      box.innerHTML = '<span class="bai-empty"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 请先到世界地图选择一张地图，选好即自动挂机打怪、掉装备和宠物蛋</span>';
+    }
     // 切换战斗舞台背景图（data-area-id 设在 .battle-stage，触发 CSS 三层背景）
     const stage = document.querySelector('#tab-battle .battle-stage');
     if (stage && typeof stage.setAttribute === 'function') {
@@ -105,6 +123,86 @@
     const t = (Config && Config.drop && Config.drop.lootTiers) ? Config.drop.lootTiers[name] : 0;
     return Number(t) || 1;
   }
+
+  /* ---------- 掉落演出（2026-09-16）----------
+   * 挂机没有"地上的东西"可捡，掉落的反馈原本只有聊天框里一行字 —— 玩家挂机一小时，
+   * 最容易错过的恰恰是"刚掉了好东西"。所以补两层：
+   *   ① 飞入：东西从怪身上飞进顶栏背包（眼睛会跟着走，知道它进包了）
+   *   ② 横幅：只有稀有档（tier3 / 金装 / 蛋）才出。普通材料不打扰 —— 天天出就等于没出。
+   * ⚠️ 纯表现：拿不到坐标 / 不在战斗页时一律静默跳过，绝不影响结算。
+   *
+   * 🔴 起点必须【逐个候选验 rect】（2026-09-16 首次上线后用户反馈"没看到飞"的真因）：
+   *   掉落播报发生在每场结算之后，而那一刻 `#enemy-fighter` 正好被 idle-bridge
+   *   收成 display:none（它要等飘字播完再收起，下一只怪上台才恢复）。
+   *   display:none 的元素 **querySelector 照样能取到**，只是 rect 全 0 ——
+   *   所以"取到元素就用"会让每一次掉落都拿不到起点，飞入永远不出现。
+   *   这里的规矩：取到 → 验 rect → 不行就换下一个候选；全都不行才当作"战斗页不在前台"。 */
+  function rectOf(sel) {
+    const el = document.querySelector(sel);
+    if (!el || !el.getBoundingClientRect) return null;
+    const r = el.getBoundingClientRect();
+    return (r.width && r.height) ? r : null;
+  }
+  function lootOrigin() {
+    // ① 怪身上（东西是从它身上掉的）
+    const av = rectOf('#tab-battle .fighter-enemy .stage-avatar');
+    if (av) return { x: av.left + av.width / 2, y: av.top + av.height * 0.42 };
+    // ② 怪被收起 / 换场空档 → 退回舞台右侧：那本来就是怪站的位置
+    const stage = rectOf('#tab-battle .battle-stage');
+    if (stage) return { x: stage.left + stage.width * 0.72, y: stage.top + stage.height * 0.52 };
+    return null; // 战斗页不在前台：不飞（免得别的页面莫名飘东西）
+  }
+  function flyToBag(text, kind) {
+    if (typeof document === 'undefined' || !document.body) return;
+    // 玩家自己在设置里关了动画 → 尊重，不飞
+    if (document.body.classList && document.body.classList.contains('rm-anim')) return;
+    const bag = $('topbar-bag');
+    const from = lootOrigin();
+    if (!bag || !from || !bag.getBoundingClientRect) return;
+    const to = bag.getBoundingClientRect();
+    if (!to.width) return;
+    // 兜底信号：背包图标自己亮一下（飞行物万一没被注意到，"进包了"这件事也不会丢）
+    if (bag.classList) {
+      bag.classList.remove('bag-pulse');
+      void bag.offsetWidth;
+      bag.classList.add('bag-pulse');
+      setTimeout(() => bag.classList.remove('bag-pulse'), 480);
+    }
+    const el = document.createElement('div');
+    el.className = 'loot-fly' + (kind ? ' ' + kind : '');
+    el.textContent = text;
+    el.style.left = from.x + 'px';
+    el.style.top = from.y + 'px';
+    document.body.appendChild(el);
+    const dx = (to.left + to.width / 2) - from.x;
+    const dy = (to.top + to.height / 2) - from.y;
+    /* 用 Web Animations 而不是 transition：元素刚插进 DOM 就改 transform 时，
+     * 浏览器可能还没算过初始样式 → transition 不生效，东西直接闪到终点（看着就像"没飞"）。
+     * WAAPI 由 JS 直接给时长，不受这个时序影响。老浏览器退回 transition。 */
+    if (el.animate) {
+      el.animate(
+        [{ transform: 'translate(0,0) scale(1)', opacity: 1 },
+         { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.72)', opacity: .15 }],
+        { duration: 620, easing: 'cubic-bezier(.35,0,.25,1)', fill: 'forwards' }
+      );
+    } else {
+      const go = () => {
+        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.72)';
+        el.style.opacity = '.15';
+      };
+      if (window.requestAnimationFrame) window.requestAnimationFrame(go); else setTimeout(go, 16);
+    }
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 720);
+  }
+  /* 舞台横幅：cls 决定样式，lines = [{c:class, t:文本}]，播完自己删 */
+  function stageBanner(cls, lines, life) {
+    if (typeof document === 'undefined' || !document.body) return;
+    const el = document.createElement('div');
+    el.className = cls;
+    el.innerHTML = (lines || []).map(l => '<div class="' + l.c + '">' + escapeHtml(l.t || '') + '</div>').join('');
+    document.body.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, life || 2300);
+  }
   /* 材料名 → 用途配色 class：现读 Config.trade.materials（那里是材料名的唯一定义处），
    * **不在这里另抄一份名单** —— 抄了就是第二份事实源，改了材料表忘了改这儿就静默失效。
    * 分工：**字号 = 稀有度（lootTiers），颜色 = 用途（这里）**，两者不重叠。
@@ -136,7 +234,12 @@
     // 仍只保留掉落日志记录（不引入 toast / 中间弹窗）；金装/蛋保留全屏光效。
     if (!reward || reward.type === 'none') return;
     if (reward.type === 'material') {
-      addLootEntry(`${escapeHtml(reward.material)} ×${reward.qty || 1}`, lootTierOf(reward.material), matClassOf(reward.material));
+      const name = reward.material, qty = reward.qty || 1;
+      addLootEntry(`${escapeHtml(name)} ×${qty}`, lootTierOf(name), matClassOf(name));
+      flyToBag(`${name} ×${qty}`, matClassOf(name) === 'loot-c-evo' ? 'is-evo' : '');
+      if (lootTierOf(name) >= 3) {
+        stageBanner('loot-banner', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: name }, { c: 'lb-s', t: '×' + qty }, { c: 'lb-line', t: '' }]);
+      }
       return;
     }
     if (reward.type === 'equipment') {
@@ -144,12 +247,18 @@
       const q = r.id === 'gold' ? 'fs-q--gold' : (r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white');
       addLootEntry(`${r.label}·${escapeHtml(reward.eq.name)}`,
         r.id === 'gold' ? 3 : (r.id === 'blue' ? 2 : 1), 'loot-q ' + q);
-      if (r.id === 'gold') flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
+      if (r.id === 'gold') {
+        flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
+        stageBanner('loot-banner', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: reward.eq.name }, { c: 'lb-s', t: r.label }, { c: 'lb-line', t: '' }]);
+      } else {
+        flyToBag(`${r.label}·${reward.eq.name}`, r.id === 'blue' ? 'is-blue' : '');
+      }
       return;
     }
     if (reward.type === 'egg') {
       addLootEntry('宠物蛋 ×1（孵化去「背包 → 宠物蛋」）', 3, 'loot-egg');
       flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
+      stageBanner('loot-banner is-blue', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: '宠物蛋' }, { c: 'lb-s', t: '孵化去「背包 → 宠物蛋」' }, { c: 'lb-line', t: '' }]);
       return;
     }
   }
@@ -225,7 +334,7 @@
   }
   function updateEnemyTipHp(enemy) {
     const row = $('enemy-tip')?.querySelector('[data-enemy-hp]');
-    if (row && enemy) row.textContent = `生命：${enemyStat(enemy.hp)} / ${enemyStat(enemy.maxHp)}`;
+    if (row && enemy) row.textContent = `生命：${groupNum(enemyStat(enemy.hp))} / ${groupNum(enemyStat(enemy.maxHp))}`;
   }
   function positionEnemyTip() {
     const tip = $('enemy-tip');
@@ -280,8 +389,8 @@
     $('enemy-icon-name').textContent = enemyName;
     $('enemy-hp-bar').style.width = '100%';
     $('pet-hp-bar').style.width = '100%';
-    $('pet-hp-text').textContent = `${petMaxHp}/${petMaxHp}`;
-    $('enemy-hp-text').textContent = `${enemyMaxHp}/${enemyMaxHp}`;
+    $('pet-hp-text').textContent = `${groupNum(petMaxHp)}/${groupNum(petMaxHp)}`;
+    $('enemy-hp-text').textContent = `${groupNum(enemyMaxHp)}/${groupNum(enemyMaxHp)}`;
     updateEnemyTipHp(getBattleEnemy());
     // 行动条小头像同步本场图标（用头像版，小尺寸更清晰）
     mountIconAvatar($('at-racer-pet'), petName);
@@ -298,12 +407,24 @@
       }
     }
     updateAction(0, 0);
+    /* Boss 出场：名字带「霸主·」前缀（服务端与本地都是这个口径，比 isBoss 字段更可靠）。
+     * Boss 是稀有事件（1/1600，保底 2400 场），玩家可能几百场才见一次，不能悄无声息地出现。 */
+    if (enemyName && String(enemyName).indexOf('霸主·') === 0) {
+      stageBanner('boss-banner', [
+        { c: 'bb-k', t: '霸主降临' },
+        { c: 'bb-n', t: String(enemyName).replace(/^霸主·/, '') }
+      ], 2300);
+      if (stage && stage.classList) {
+        stage.classList.add('boss-arrive');
+        setTimeout(() => stage.classList.remove('boss-arrive'), 1200);
+      }
+    }
   }
   function updateBars(petHp, petMaxHp, enemyHp, enemyMaxHp) {
     $('pet-hp-bar').style.width = Math.max(0, (petHp / petMaxHp) * 100) + '%';
     $('enemy-hp-bar').style.width = Math.max(0, (enemyHp / enemyMaxHp) * 100) + '%';
-    $('pet-hp-text').textContent = `${Math.max(0, Math.round(petHp))}/${petMaxHp}`;
-    $('enemy-hp-text').textContent = `${Math.max(0, Math.round(enemyHp))}/${enemyMaxHp}`;
+    $('pet-hp-text').textContent = `${groupNum(petHp)}/${groupNum(petMaxHp)}`;
+    $('enemy-hp-text').textContent = `${groupNum(enemyHp)}/${groupNum(enemyMaxHp)}`;
     const enemy = getBattleEnemy();
     if (enemy) enemy.hp = Math.max(0, enemyHp);
     updateEnemyTipHp(enemy);
@@ -533,7 +654,7 @@
       const need = Math.max(1, window.Pet.expNeed(pet.level));
       const current = Math.min(Math.max(0, Math.round(pet.exp || 0)), need);
       const progress = Math.round(current / need * 100);
-      text.textContent = `经验 ${current} / ${need}`;
+      text.textContent = `经验 ${groupNum(current)} / ${groupNum(need)}`;
       percent.textContent = `${progress}%`;
       fill.style.width = `${progress}%`;
     }
@@ -677,14 +798,22 @@
   UI.animateHit = animateHit;
   UI.animateVictory = animateVictory;
 
-  // 升级金色光环：宠物立绘脚下金色光环扩散
-  function showLevelUp() {
-    const petIcon = pet-icon;
-    if (!petIcon) return;
-    petIcon.classList.remove('level-up');
-    void petIcon.offsetWidth;
-    petIcon.classList.add('level-up');
-    setTimeout(() => petIcon.classList.remove('level-up'), 1600);
+  /* 升级演出：立绘脚下金环 + "LEVEL UP" 横幅
+   * 🔴 原实现有两个毛病（2026-09-16 修）：① `const petIcon = pet-icon` 是笔错
+   *   （拿的是个不存在的变量，一进来就抛错）；② 全仓没有任何地方调用它。
+   *   结果就是"升级"这件大事在实际游戏里一点表示都没有。 */
+  function showLevelUp(newLevel) {
+    const icon = $('pet-icon');
+    if (icon && icon.classList) {
+      icon.classList.remove('level-up');
+      void icon.offsetWidth;
+      icon.classList.add('level-up');
+      setTimeout(() => icon.classList.remove('level-up'), 1600);
+    }
+    stageBanner('levelup-banner', [
+      { c: 'lu-k', t: 'LEVEL UP' },
+      { c: 'lu-n', t: newLevel ? ('Lv.' + newLevel) : '' }
+    ], 1900);
   }
   UI.showDamage = showDamage;
   UI.showLevelUp = showLevelUp;

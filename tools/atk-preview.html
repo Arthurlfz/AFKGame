@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>攻击动作预览 · 阶段5究极体</title>
+<style>
+  body { background:#141418; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; color:#bbb; font-family:"Microsoft YaHei",sans-serif; }
+  h2 { font-weight:normal; letter-spacing:2px; }
+  .hint { color:#777; font-size:13px; margin-bottom:20px; }
+  .stage { width:280px; height:280px; overflow:hidden; border:1px solid #333; background:radial-gradient(ellipse at 50% 80%, #2a2030 0%, #141418 70%); display:flex; align-items:flex-end; justify-content:center; }
+  .pet { width:256px; height:256px; background:url('atk-aligned/sheet.png') 0 0 no-repeat; background-size:768px 256px; animation:atk 1.0s steps(3) infinite; }
+  @keyframes atk { from { background-position: 0 0; } to { background-position: -768px 0; } }
+  .labels { display:flex; gap:16px; margin-top:28px; }
+  .labels div { text-align:center; color:#999; font-size:12px; }
+  .labels img { width:90px; height:90px; object-fit:contain; border:1px solid #333; background:#222; display:block; margin-bottom:6px; }
+</style>
+</head>
+<body>
+  <h2>阶段5 究极体 · 攻击动作（3帧循环）</h2>
+  <div class="hint">黑底为模拟战斗场景，精灵自动循环播放</div>
+  <div class="stage"><div class="pet"></div></div>
+  <div class="labels">
+    <div><img src="atk-aligned/f0-aligned.png" alt="">蓄力</div>
+    <div><img src="atk-aligned/f1-aligned.png" alt="">挥出</div>
+    <div><img src="atk-aligned/f2-aligned.png" alt="">命中</div>
+  </div>
+</body>
+</html>

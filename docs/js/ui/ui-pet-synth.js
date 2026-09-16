@@ -197,6 +197,13 @@
         addLog(`合成成功！${res.mainName}+${res.subName} 合成了新宠 ${res.baby.name}（成长 ${res.newGrowth.toFixed(1)}）`);
         showToast('合成成功！', `${iconHtml(res.baby.name)} ${res.baby.name}｜成长值 ${res.newGrowth.toFixed(1)}`);
       }
+      // 揭幕演出：普通合成 / 变异 / 神级，三档各一副面孔（神级最亮、变异走幽蓝）
+      if (UI.celebrate) UI.celebrate({
+        title: res.isGod ? '神级降世' : (res.mutated ? '变异诞生' : '合成成功'),
+        name: res.baby.name,
+        sub: '成长值 ' + res.newGrowth.toFixed(1),
+        kind: res.isGod ? 'god' : (res.mutated ? 'mutant' : '')
+      });
       // 全服通告（2026-09-14）：神级宠 / 变异宠合成成功 → 广播给所有在线玩家（消息里带宠物形象）
       if ((res.isGod || res.mutated) && UI.broadcastAnnounce) {
         const dn = (window.Supabase && window.Supabase.getMyDisplayName) ? (window.Supabase.getMyDisplayName() || '') : '';

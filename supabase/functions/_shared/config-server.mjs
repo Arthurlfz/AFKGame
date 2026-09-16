@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-15T05:44:40.564Z
+// 生成时间：2026-09-16T13:08:40.889Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -245,7 +245,11 @@ const serverConfig = {
       "尸牙犬": 84,
       "幽灵犬": 84,
       "影刃兔": 100,
-      "霜影兔": 100
+      "霜影兔": 100,
+      "墨灵": 80,
+      "墨影": 80,
+      "墨煞": 80,
+      "墨渊魔君": 80
     },
     "legacyBase": {
       "name": "莱姆",
@@ -256,10 +260,6 @@ const serverConfig = {
       "spd": 40
     },
     "maxLevel": 60,
-    "expPool": {
-      "perCrystal": 12000,
-      "material": "凝魂晶石"
-    },
     "babyGrowth": {
       "min": 3,
       "max": 8
@@ -722,6 +722,24 @@ const serverConfig = {
             "to": "霜魂兔皇",
             "minLevel": 60
           }
+        ],
+        "墨灵": [
+          {
+            "to": "墨影",
+            "minLevel": 10
+          }
+        ],
+        "墨影": [
+          {
+            "to": "墨煞",
+            "minLevel": 25
+          }
+        ],
+        "墨煞": [
+          {
+            "to": "墨渊魔君",
+            "minLevel": 60
+          }
         ]
       },
       "activeSkills": {
@@ -879,8 +897,8 @@ const serverConfig = {
     "rate": 1,
     "needBase": 22,
     "needExponent": 1.3,
-    "perWinCoef": 4,
-    "perWinExponent": 1,
+    "perWinCoef": 2.4,
+    "perWinExponent": 0.8,
     "perWinJitter": 0.25,
     "perWinMin": 1
   },
@@ -2164,6 +2182,221 @@ const serverConfig = {
       "spd": 4
     }
   },
-  "awakenSkillDamage": 0.2
+  "awakenSkillDamage": 0.2,
+  "resourceTrials": {
+    "enabled": true,
+    "ticketName": "资源试炼门票",
+    "freeEntriesPerDay": 1,
+    "ticketSources": "完成地图委托（每轮交 200 个该图材料 → 1 张）",
+    "floors": 20,
+    "floorLevelStart": 10,
+    "floorLevelEnd": 100,
+    "floorDifficultyStart": 0.3,
+    "floorDifficultyPerFloor": 0.045,
+    "eliteEvery": 5,
+    "eliteMult": 1.1,
+    "baseStats": {
+      "hp": 150000,
+      "atk": 8900,
+      "def": 3600
+    },
+    "mech": {
+      "hitPerLv": 3.5,
+      "dodgeAtRef": 200,
+      "refLevel": 60,
+      "dodgeExp": 1.6
+    },
+    "floorDelayMs": 700,
+    "routes": [
+      {
+        "id": "metamorph",
+        "name": "副本·蜕变试炼",
+        "desc": "定向获得进化素材的 20 层爬塔：层数越深，素材档位越高（进化 → 精粹 → 传说）。",
+        "minLevel": 1,
+        "difficulty": 1,
+        "bgAreaId": "corrupted-forest",
+        "guardian": {
+          "name": "影蚀魔君",
+          "title": "蜕变守护者"
+        },
+        "floorTiers": [
+          {
+            "floor": 5,
+            "items": [
+              {
+                "name": "进化素材",
+                "qty": 3
+              }
+            ]
+          },
+          {
+            "floor": 10,
+            "items": [
+              {
+                "name": "精粹进化素材",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "floor": 15,
+            "items": [
+              {
+                "name": "精粹进化素材",
+                "qty": 2
+              },
+              {
+                "name": "传说进化素材",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "floor": 20,
+            "items": [
+              {
+                "name": "传说进化素材",
+                "qty": 2
+              }
+            ]
+          }
+        ],
+        "consolation": [
+          {
+            "name": "进化素材",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "id": "nirvana",
+        "name": "副本·涅槃试炼",
+        "desc": "定向获得涅槃丹的 20 层爬塔（涅槃时可选消耗，吸收 ×1.2）：爬得越深，丹越多。",
+        "minLevel": 25,
+        "difficulty": 1.35,
+        "bgAreaId": "plague-swamp",
+        "guardian": {
+          "name": "幽火魔狐",
+          "title": "涅槃守护者"
+        },
+        "floorTiers": [
+          {
+            "floor": 5,
+            "items": [
+              {
+                "name": "涅槃丹",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "floor": 10,
+            "items": [
+              {
+                "name": "涅槃丹",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "floor": 15,
+            "items": [
+              {
+                "name": "涅槃丹",
+                "qty": 3
+              }
+            ]
+          },
+          {
+            "floor": 20,
+            "items": [
+              {
+                "name": "涅槃丹",
+                "qty": 4
+              }
+            ]
+          }
+        ],
+        "consolation": [
+          {
+            "name": "合成之石",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "id": "temper",
+        "name": "副本·淬炼试炼",
+        "desc": "定向获得打造通货的 20 层爬塔：高阶层产出神圣石与锁定石（锁前/锁后的唯一来源）。",
+        "minLevel": 1,
+        "difficulty": 1.1,
+        "bgAreaId": "shadow-mountains",
+        "guardian": {
+          "name": "骸骨君主",
+          "title": "淬炼守护者"
+        },
+        "floorTiers": [
+          {
+            "floor": 5,
+            "items": [
+              {
+                "name": "重铸石",
+                "qty": 3
+              }
+            ]
+          },
+          {
+            "floor": 10,
+            "items": [
+              {
+                "name": "增缀石",
+                "qty": 1
+              },
+              {
+                "name": "剥离石",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "floor": 15,
+            "items": [
+              {
+                "name": "神圣石",
+                "qty": 1
+              },
+              {
+                "name": "腐印·荆棘",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "floor": 20,
+            "items": [
+              {
+                "name": "神圣石",
+                "qty": 1
+              },
+              {
+                "name": "锁定石",
+                "qty": 1
+              },
+              {
+                "name": "腐印·屠戮",
+                "qty": 1
+              }
+            ]
+          }
+        ],
+        "consolation": [
+          {
+            "name": "重铸石",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  }
 };
 export default serverConfig;

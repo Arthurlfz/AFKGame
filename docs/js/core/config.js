@@ -97,11 +97,16 @@ window.Config = {
     // maxLevel 与图的等级段必须同步（改这里必须确认图 10 的上限是 60）。
     // 注意：涅槃要求 ≥ nirvana.minLevel（60），上限 = 门槛，60 级即可涅槃。
     maxLevel: 60,
-    /* 满级经验池：满级后溢出经验不再蒸发，先攒进池子，每满 perCrystal 自动凝 1 颗「凝魂晶石」。
-     * 定位：满级挂机 = 凝魂晶石农场，晶石是账号级材料（涅槃加成 / 市场交易），
-     * 让"练满之后继续挂"有产出，而不是纯浪费。
-     * ponytail: 池内零头只存本地不落库（刷新丢 < perCrystal 的部分，晶石本身走 Materials 云端） */
-    expPool: { perCrystal: 12000, material: '凝魂晶石' },
+    /* 🔴 2026-09-16 用户拍板**删除「满级经验池 / 凝魂晶石」整套**（「没必要有了」）。
+     * 原设计：满级后溢出经验攒进池子，每 12000 凝 1 颗凝魂晶石（账号级材料）。
+     * 删掉的理由（用户判断 + 我的核实）：它是**全自动产出**（挂机就凝，约 3~4 颗/小时），
+     *   而两个出口都弱 —— 魂铸要**牺牲一只宠物**（重决策，做得少）、涅槃加成"10 颗换 +1.2 成长"不划算
+     *   ⇒ 实际体感就是"自动喷一堆用不掉的东西"。
+     * ⚠️ 连带：满级后的溢出经验**直接丢弃**（`pet.js` 的 addExpPool 已成空实现），
+     *   这正是当初它存在的理由（"练满之后继续挂有产出"）—— 用户知情并选择接受。
+     * ⚠️ 历史去向：曾考虑过"经验池在涅槃后按 0.5 倒回主宠"，**从未实现**，不要照那条记忆去做。
+     * ⚠️ 老库存（materials 表里的凝魂晶石行）保留不动，只是不再显示、也不再有用途。
+     * ⭐ 魂铸的消耗品改成了「合成之石」（见下方 soulCast）—— 别再把它改回凝魂晶石。 */
     // 孵化的新宠物成长值范围
     babyGrowth: { min: 3, max: 8 },
     // 进化系统：通用素材 + 可配置多层分叉树；每段独立配置等级门槛
@@ -673,9 +678,9 @@ window.Config = {
        * ⚠️ 奖励即钥匙（2026-09-08 v2）：引导关的 reward 一律**清空**，
        *   每一步要用的东西由 `tutorialMode.supplyBox`（钥匙表）在该关激活时发放 —— 两套并行会让玩家
        *   看到两份来源不明的资源，也讲不清"这东西是上一关给的"。唯一例外是 G10（非 isGuide，
-       *   拿不到 grantKeysFor），它的钥匙 凝魂晶石×10 仍放在钥匙表里，由引导段收尾时补发。
+       *   拿不到 grantKeysFor），它的钥匙（魂铸要的 10 个材料，2026-09-16 起 = 合成之石）仍放在钥匙表里，由引导段收尾时补发。
        *   闭环链：G1 经验包→G2 素材→G3 蓝装→G4 重铸石+白装→G5 白装→G6 蛋→G7 合成石+经验包→
-       *           G8 白装→G9 精粹1+传说5+经验包→G10 凝魂晶石×10。
+       *           G8 白装→G9 精粹1+传说5+经验包→G10 合成之石×10（原凝魂晶石，已退役）。
        * 经验包：三档真实道具（见 tutorialMode.expPacks），走钥匙表 type:'exppack'，玩家背包里手动用。
        * boostLevel 字段保留，仅作"这一关的等级门槛"说明，不再驱动发放。
        * npc 字段 = 引路人台词草稿，文案可直接在这里改。target = 单步指引 hotspot 的锚点选择器。 */
@@ -781,7 +786,10 @@ window.Config = {
        *   · 孵化奖励不直接给蛋：蛋是 Drop 的品种资源，任务奖励走 Materials，给了也用不了
        *     → 给进化素材（练宠燃料）；击杀给进化素材、进化给打造石头；每条固定经验 600（QUEST_EXP_FIXED.pet） ---- */
       { id: 'pe1', category: 'pet', type: 'hatch', petName: '腐噜兽', need: 1, unlockLevel: 1, name: '孵化·腐噜兽', reward: { 进化素材: 1 } },
-      { id: 'pe2', category: 'pet', type: 'kill', petName: '腐噜兽', need: 50, unlockLevel: 1, name: '腐噜兽试炼', reward: { 进化素材: 3 } },
+      /* 2026-09-16 任务比例审计：试炼环的需求是「几十杀」（挂机几分钟），奖励原来是该档素材 ×3，
+       * 折算后奖励比付出更值（50 杀 ≈ 8.6 分钟 vs 3 个进化素材 ≈ 18 分钟产量）⇒ 统一收到 ×2。
+       * 口径见 docs/tests/_tmp_audit_quests.js（临时审计脚本）与 docs/资源归属矩阵现状.md。 */
+      { id: 'pe2', category: 'pet', type: 'kill', petName: '腐噜兽', need: 50, unlockLevel: 1, name: '腐噜兽试炼', reward: { 进化素材: 2 } },
       { id: 'pe3', category: 'pet', type: 'evolve', petName: '腐噜兽', need: 1, unlockLevel: 1, name: '腐噜兽的进化', reward: { 重铸石: 2 } },
       { id: 'pe4', category: 'pet', type: 'hatch', petName: '血狐', need: 1, unlockLevel: 7, name: '孵化·血狐', reward: { 进化素材: 2 } },
       { id: 'pe5', category: 'pet', type: 'kill', petName: '血狐', need: 80, unlockLevel: 7, name: '血狐试炼', reward: { 精粹进化素材: 2 } },
@@ -790,7 +798,7 @@ window.Config = {
       { id: 'pe8', category: 'pet', type: 'kill', petName: '瘟熊', need: 80, unlockLevel: 13, name: '瘟熊试炼', reward: { 精粹进化素材: 2 } },
       { id: 'pe9', category: 'pet', type: 'evolve', petName: '瘟熊', need: 1, unlockLevel: 13, name: '瘟熊的进化', reward: { 神圣石: 2 } },
       { id: 'pe10', category: 'pet', type: 'hatch', petName: '疫毛兽', need: 1, unlockLevel: 19, name: '孵化·疫毛兽', reward: { 精粹进化素材: 1 } },
-      { id: 'pe11', category: 'pet', type: 'kill', petName: '疫毛兽', need: 100, unlockLevel: 19, name: '疫毛兽试炼', reward: { 精粹进化素材: 3 } },
+      { id: 'pe11', category: 'pet', type: 'kill', petName: '疫毛兽', need: 100, unlockLevel: 19, name: '疫毛兽试炼', reward: { 精粹进化素材: 2 } },
       { id: 'pe12', category: 'pet', type: 'evolve', petName: '疫毛兽', need: 1, unlockLevel: 19, name: '疫毛兽的进化', reward: { 剥离石: 2 } },
       { id: 'pe13', category: 'pet', type: 'hatch', petName: '骨狼', need: 1, unlockLevel: 25, name: '孵化·骨狼', reward: { 精粹进化素材: 2 } },
       { id: 'pe14', category: 'pet', type: 'kill', petName: '骨狼', need: 120, unlockLevel: 25, name: '骨狼试炼', reward: { 精粹进化素材: 2 } },
@@ -798,10 +806,13 @@ window.Config = {
       { id: 'pe16', category: 'pet', type: 'hatch', petName: '毒沼蛙', need: 1, unlockLevel: 31, name: '孵化·毒沼蛙', reward: { 精粹进化素材: 2 } },
       { id: 'pe17', category: 'pet', type: 'kill', petName: '毒沼蛙', need: 120, unlockLevel: 31, name: '毒沼蛙试炼', reward: { 传说进化素材: 1 } },
       { id: 'pe18', category: 'pet', type: 'evolve', petName: '毒沼蛙', need: 1, unlockLevel: 31, name: '毒沼蛙的进化', reward: { 重铸石: 4 } },
-      { id: 'pe19', category: 'pet', type: 'hatch', petName: '尸犬', need: 1, unlockLevel: 37, name: '孵化·尸犬', reward: { 传说进化素材: 1 } },
+      /* 2026-09-16 任务比例审计：孵化环的成本只是「拿到该品种的蛋孵出来」（蛋是挂机副产，4.2 个/小时），
+       * 原来却是零成本拿【传说】素材（尸犬 ×1 / 幽影兔 ×2）—— 与「传说 = 终阶 / 合成神级专用，一只宠要 2~10 个」的定位不符。
+       * 改成该宠当前阶段的【精粹】×2：新孵的宠要练，精粹才是它真正要用的燃料。 */
+      { id: 'pe19', category: 'pet', type: 'hatch', petName: '尸犬', need: 1, unlockLevel: 37, name: '孵化·尸犬', reward: { 精粹进化素材: 2 } },
       { id: 'pe20', category: 'pet', type: 'kill', petName: '尸犬', need: 150, unlockLevel: 37, name: '尸犬试炼', reward: { 传说进化素材: 2 } },
       { id: 'pe21', category: 'pet', type: 'evolve', petName: '尸犬', need: 1, unlockLevel: 37, name: '尸犬的进化', reward: { 神圣石: 3, 增缀石: 3 } },
-      { id: 'pe22', category: 'pet', type: 'hatch', petName: '幽影兔', need: 1, unlockLevel: 43, name: '孵化·幽影兔', reward: { 传说进化素材: 2 } },
+      { id: 'pe22', category: 'pet', type: 'hatch', petName: '幽影兔', need: 1, unlockLevel: 43, name: '孵化·幽影兔', reward: { 精粹进化素材: 2 } },
       { id: 'pe23', category: 'pet', type: 'kill', petName: '幽影兔', need: 150, unlockLevel: 43, name: '幽影兔试炼', reward: { 传说进化素材: 2 } },
       { id: 'pe24', category: 'pet', type: 'evolve', petName: '幽影兔', need: 1, unlockLevel: 43, name: '幽影兔的进化', reward: { 神圣石: 2 } },
       /* ---- 2026-09-10 每个家族补一条「百战」环（第 4 环）----
@@ -818,43 +829,62 @@ window.Config = {
 
       /* ---- 日常 12 条：每日 00:00 刷新，可重复 ---- */
       /* ---- 地图委托：收集本图材料，交完立即进入下一轮 ---- */
-      /* 循环任务奖励跟图阶挂钩（2026-09-06 手册 2.4）：图1-3 重铸石3-5 / 图4-7 增缀·剥离5-8 / 图8-10 神圣·合成5-8 */
-      { id: 'loop_corrupted_forest', category: 'main', type: 'collect_loop', area: 'corrupted-forest', matName: '枯荣种荚', need: 50, repeatable: true, name: '枯荣采集委托', reward: { 重铸石: 3 }, expReward: 210 },
-      { id: 'loop_plague_swamp', category: 'main', type: 'collect_loop', area: 'plague-swamp', matName: '泣腐之泪', need: 50, repeatable: true, name: '泣腐采集委托', reward: { 重铸石: 4 }, expReward: 570 },
-      { id: 'loop_shadow_mountains', category: 'main', type: 'collect_loop', area: 'shadow-mountains', matName: '白骨残片', need: 50, repeatable: true, name: '白骨采集委托', reward: { 重铸石: 5 }, expReward: 930 },
-      { id: 'loop_bone_wastes', category: 'main', type: 'collect_loop', area: 'bone-wastes', matName: '幽影魂丝', need: 50, repeatable: true, name: '幽影采集委托', reward: { 增缀石: 5 }, expReward: 1290 },
-      { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 50, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 6 }, expReward: 1650 },
-      { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 50, repeatable: true, name: '回响采集委托', reward: { 剥离石: 6 }, expReward: 2010 },
-      { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 50, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 7 }, expReward: 2370 },
+      /* 循环任务奖励跟图阶挂钩（2026-09-06 手册 2.4）：图1-3 重铸石3-5 / 图4-7 增缀·剥离5-8 / 图8-10 神圣·合成5-8
+       * 🔴 2026-09-16 用户第三次纠正（「就是这个地图委托太容易兑换了」）：**需求 50 → 200**（10 张图统一）。
+       *   委托的真正问题不是奖励，是**它是门票的唯一稳定来源、而且可以无限交** ——
+       *   区域材料约 24 个/小时（探针实测），原来 50 个 ≈ **2 小时挂机就换 1 张门票**，
+       *   而 1 张门票 = 1 局副本（1~3 分钟）⇒ 挂一天能刷十几局，副本的"限定次数"等于没有。
+       *   200 个 ≈ **8.3 小时挂机 1 张**（把它变成"每天最多 1 张"的量级），
+       *   ⚠️ 注意区域材料是**只涨不消的堆积物**，玩家手里的存货仍能一次交好几轮 ——
+       *   提需求只是限速，真要彻底限量得给门票加每日上限（属于新机制，先不做）。
+       *   连带：委托的通货/经验奖励频率同步降到 1/4（这是有意的：委托本来就该是"顺手交"）。 */
+      { id: 'loop_corrupted_forest', category: 'main', type: 'collect_loop', area: 'corrupted-forest', matName: '枯荣种荚', need: 200, repeatable: true, name: '枯荣采集委托', reward: { 重铸石: 3 }, expReward: 210 },
+      { id: 'loop_plague_swamp', category: 'main', type: 'collect_loop', area: 'plague-swamp', matName: '泣腐之泪', need: 200, repeatable: true, name: '泣腐采集委托', reward: { 重铸石: 4 }, expReward: 570 },
+      { id: 'loop_shadow_mountains', category: 'main', type: 'collect_loop', area: 'shadow-mountains', matName: '白骨残片', need: 200, repeatable: true, name: '白骨采集委托', reward: { 重铸石: 5 }, expReward: 930 },
+      { id: 'loop_bone_wastes', category: 'main', type: 'collect_loop', area: 'bone-wastes', matName: '幽影魂丝', need: 200, repeatable: true, name: '幽影采集委托', reward: { 增缀石: 5 }, expReward: 1290 },
+      { id: 'loop_blood_rift', category: 'main', type: 'collect_loop', area: 'blood-rift', matName: '血潮凝晶', need: 200, repeatable: true, name: '血潮采集委托', reward: { 增缀石: 6 }, expReward: 1650 },
+      { id: 'loop_echo_cliffs', category: 'main', type: 'collect_loop', area: 'echo-cliffs', matName: '回响之羽', need: 200, repeatable: true, name: '回响采集委托', reward: { 剥离石: 6 }, expReward: 2010 },
+      { id: 'loop_rotfen_bog', category: 'main', type: 'collect_loop', area: 'rotfen-bog', matName: '腐沼黏液', need: 200, repeatable: true, name: '腐沼采集委托', reward: { 剥离石: 7 }, expReward: 2370 },
        /* 循环任务只发打造通货与经验；涅槃材料由资源试炼·涅槃承担。 */
-       { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 50, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 5 }, expReward: 2730 },
-       { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 50, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 6 }, expReward: 3090 },
+       /* 2026-09-16 任务比例审计（最严重的一条）：图 8~10 的委托原来每轮白给【神圣石 5 / 6 / 8】。
+        * 一轮 = 50 个区域材料 ≈ 2~2.5 小时挂机 ⇒ 折合 2~4 个神圣石/小时；而神圣石的主来源
+        * （淬炼试炼 15/20 档）一局只给 1~2 个、每天免费 1 次 —— 挂机把试炼玩法整个架空了，
+        * 且 docs/资源归属矩阵现状.md 的「允许的少量补充」里根本没写地图委托（代码与账本不一致）。
+        * 改成 2 / 2 / 3：委托的核心价值是【门票】（副本入口），神圣石只是顺路的那一点。 */
+       { id: 'loop_ember_hollow', category: 'main', type: 'collect_loop', area: 'ember-hollow', matName: '余烬残灰', need: 200, repeatable: true, name: '余烬采集委托', reward: { 神圣石: 2 }, expReward: 2730 },
+       { id: 'loop_soul_abyss', category: 'main', type: 'collect_loop', area: 'soul-abyss', matName: '魂渊之尘', need: 200, repeatable: true, name: '魂渊采集委托', reward: { 神圣石: 2 }, expReward: 3090 },
       /* ---- 觉醒之路（2026-09-10 v2 觉醒改版）----
        * 觉醒不再 Lv60 自动生效：图 1~10 十种区域材料**每种 888** → 奖励觉醒石 → 宠物页·觉醒页用石头觉醒。
        * repeatable：每只宠觉醒都要一颗石头，任务可反复交。觉醒石不进 Config.trade.materials（天然不可上架）。 */
       { id: 'awaken_road', category: 'pet', type: 'collect', need: 888, repeatable: true, name: '觉醒之路',
         matList: ['枯荣种荚', '泣腐之泪', '白骨残片', '幽影魂丝', '血潮凝晶', '腐变之心', '回响之羽', '腐沼黏液', '余烬残灰', '魂渊之尘'],
         reward: { 觉醒石: 1 }, expReward: 600, unlockLevel: 40 },
-       { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 50, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 8 }, expReward: 3450 },
-      { id: 'd1', category: 'daily', type: 'kill', need: 100, repeat: true, name: '每日巡守·一', reward: { 重铸石: 2 } },
-      { id: 'd2', category: 'daily', type: 'kill', need: 200, repeat: true, name: '每日巡守·二', reward: { 重铸石: 3 } },
+       { id: 'loop_blight_heart', category: 'main', type: 'collect_loop', area: 'blight-heart', matName: '腐变之心', need: 200, repeatable: true, name: '腐变采集委托', reward: { 合成之石: 8, 神圣石: 3 }, expReward: 3450 },
+      /* 2026-09-16 任务比例审计：日常是可重复的，奖励必须**低于**同等挂机产出，否则「做任务」比挂机划算。
+       * d1 原为 100 杀（≈8.6 分钟）给重铸石 2（≈16 分钟产量）⇒ 比值 1.9；d2 同理 1.45。现各降一档。 */
+      { id: 'd1', category: 'daily', type: 'kill', need: 150, repeat: true, name: '每日巡守·一', reward: { 重铸石: 1 } },
+      { id: 'd2', category: 'daily', type: 'kill', need: 300, repeat: true, name: '每日巡守·二', reward: { 重铸石: 2 } },
       /* 收集类日常的解锁等级 = 该材料所在图的等级下限（2026-09-10）：
        * 原先 12 条日常全都没有 unlockLevel，Lv1 就会看到「腐变之心 ×20」（图 10 材料）——
        * 玩家列表里躺着永远做不完的日常。这里按图对齐；通用动作（d1/d2/d9~d12）仍全局可见。 */
       { id: 'd3', category: 'daily', type: 'collect', matName: '枯荣种荚', need: 20, repeat: true, unlockLevel: 1, name: '晨间采集·种荚', reward: { 剥离石: 1 } },
       { id: 'd4', category: 'daily', type: 'collect', matName: '泣腐之泪', need: 20, repeat: true, unlockLevel: 7, name: '晨间采集·泣泪', reward: { 剥离石: 1 } },
-      { id: 'd5', category: 'daily', type: 'collect', matName: '白骨残片', need: 20, repeat: true, unlockLevel: 13, name: '午间拾骨', reward: { 神圣石: 1 } },
-      { id: 'd6', category: 'daily', type: 'collect', matName: '幽影魂丝', need: 20, repeat: true, unlockLevel: 19, name: '午间抽丝', reward: { 神圣石: 1 } },
+      /* 2026-09-16 审计：日常**不许发受控资源**（神圣石的正经来源是淬炼试炼：一局 1~2 个、每天免费 1 次）。
+       * d5/d6/d13 原来每天白给神圣石 3 个 = 试炼一半的产出白送掉了。日常只发基础通货。 */
+      { id: 'd5', category: 'daily', type: 'collect', matName: '白骨残片', need: 20, repeat: true, unlockLevel: 13, name: '午间拾骨', reward: { 重铸石: 1 } },
+      { id: 'd6', category: 'daily', type: 'collect', matName: '幽影魂丝', need: 20, repeat: true, unlockLevel: 19, name: '午间抽丝', reward: { 增缀石: 1 } },
       { id: 'd7', category: 'daily', type: 'collect', matName: '血潮凝晶', need: 20, repeat: true, unlockLevel: 25, name: '暮间凝晶', reward: { 增缀石: 1 } },
       { id: 'd8', category: 'daily', type: 'collect', matName: '腐变之心', need: 20, repeat: true, unlockLevel: 55, name: '暮间取心', reward: { 增缀石: 1 } },
       { id: 'd9', category: 'daily', type: 'craft', need: 3, repeat: true, name: '每日淬炼', reward: { 重铸石: 1 } },
       { id: 'd10', category: 'daily', type: 'salvage', need: 5, repeat: true, name: '每日拆解', reward: { 增缀石: 1 } },
       { id: 'd11', category: 'daily', type: 'hatch', need: 1, repeat: true, name: '每日孵化', reward: { 鉴定石: 1 } },
-      { id: 'd12', category: 'daily', type: 'trade', need: 2, repeat: true, name: '每日交易', reward: { 合成之石: 1 } },
+      /* 2026-09-16 审计：d12/d14 原来的门槛是「点一下按钮」（成交 2 次 / 上架 1 件），
+       * 成本近乎 0 ⇒ 奖励等于白送（比值 3.7 / 4.9）。门槛提到 3 次，仍是顺手完成，但不再是一次就完事。 */
+      { id: 'd12', category: 'daily', type: 'trade', need: 3, repeat: true, name: '每日交易', reward: { 合成之石: 1 } },
       /* ---- 2026-09-10 补 4 条日常：把「玩家本来每天都在做、但没有任务记录」的动作补齐 ----
        * 只发打造通货/鉴定石（铁律 1），不发进化与涅槃材料。 */
-      { id: 'd13', category: 'daily', type: 'soulcast', need: 1, repeat: true, unlockLevel: 40, name: '每日魂铸', reward: { 神圣石: 1 } },
-      { id: 'd14', category: 'daily', type: 'list', need: 1, repeat: true, unlockLevel: 7, name: '每日上架', reward: { 增缀石: 1 } },
+      { id: 'd13', category: 'daily', type: 'soulcast', need: 1, repeat: true, unlockLevel: 40, name: '每日魂铸', reward: { 剥离石: 1 } },
+      { id: 'd14', category: 'daily', type: 'list', need: 3, repeat: true, unlockLevel: 7, name: '每日上架', reward: { 增缀石: 1 } },
       { id: 'd15', category: 'daily', type: 'synth', need: 1, repeat: true, unlockLevel: 40, name: '每日合成', reward: { 重铸石: 2 } },
       { id: 'd16', category: 'daily', type: 'equipDrop', need: 3, repeat: true, unlockLevel: 1, name: '每日拾遗', reward: { 鉴定石: 2 } },
 
@@ -865,13 +895,14 @@ window.Config = {
        *
        * 本作的三条自制规矩（比铁律 1 更严，改动前先读）：
        *   ① **必须有硬上限**：`kind:'exchange'` + `reset:'daily'|'weekly'`，绝不允许 `repeatable`；
-       *   ② **每日只能换低/中价值物**（鉴定石、强化丹A、宠物蛋、门票、凝魂晶石、涅槃丹）；
+       *   ② **每日只能换低/中价值物**（鉴定石、强化丹A、涅槃丹）；
        *      受控高价值物（强化丹B / 天仙玉露 / 锁定石 / 越龙之石 / 重置卡 / 至尊神石）**一律每周 1 次**，
        *      且产出量压到远低于正常来源（例：强化丹B 每周 2 个 vs 通天塔一局就有），
        *      免得把「打淬炼 / 打塔 / 打守关 Boss」这些玩法架空；
        *   ③ **消耗物必须是真富余的**（基础打造通货、区域材料、腐印）——不能拿稀缺物换稀缺物。
        * 归属账本同步在 docs/资源归属矩阵现状.md「允许的少量补充」列，改这里必须改那份文档。
-       * ⚠️ 换出的 通天塔重置卡 / 凝魂晶石 刻意不在 Config.trade.materials 里 → 天然账号绑定，不给 RMT 开门。 */
+       * ⚠️（2026-09-16 更新）门票 / 重置卡不再是兑换产物（资格类道具，见下方各自说明）；
+       *    凝魂晶石整套退役。原「换出的重置卡 / 凝魂晶石不在 trade.materials 里 = 天然绑定」这条仍然成立（对存留物）。 */
 
       /* ---- 定价依据（2026-09-10 用户报「需求数量太少」→ 整体按 ×3~5 重定）----
        * 先算「挂机产出速度」（图 10，`poolByStage[3]` 材料分支 8.45%、700 场/小时、分解装备也算进来）：
@@ -892,10 +923,13 @@ window.Config = {
        *   蛋可以直接挂机刷（4.2 个/小时），36 个剥离石（8.4 小时产出）换 2 个蛋（0.5 小时产出）
        *   = 净亏 17 倍，是死内容。兑换只保留「刷不到 / 很难刷」的资源。 */
 
-      { id: 'ex_day_ticket', kind: 'exchange', reset: 'daily', category: 'daily', type: 'collect', matList: ['重铸石', '增缀石'], need: 24, unlockLevel: 1,
-        name: '门票熔铸', reward: { 资源试炼门票: 3 }, expReward: 120 },
-      { id: 'ex_day_soul', kind: 'exchange', reset: 'daily', category: 'daily', type: 'collect', matName: '神圣石', need: 12, unlockLevel: 40,
-        name: '凝魂换材', reward: { 凝魂晶石: 3 }, expReward: 400 },
+      /* 🔴 「门票熔铸」已于 2026-09-16 删除（用户：「任务给的（副本/塔）重置太多了」）。
+       * 理由：门票/重置卡是**玩法资格**（多打一局），不是可以"农"出来的资源。
+       *   门票的主来源 = 交地图委托（每轮 1 张，`trial-config.js` 注入，`vtest_guide_chain` 守着），
+       *   那条循环本身就够玩家每天打几局；再从兑换里每天白拿 1 张 = 资格类道具变成可农，等于架空限定次数。
+       * 沿革：2026-09-10 建（×3）→ 2026-09-16 收到 ×1 → 同日删除。别再把它加回来。 */
+      /* 🔴 「凝魂换材」（12 神圣石 → 3 凝魂晶石）已于 2026-09-16 删除：产物（凝魂晶石）整套退役。
+       * 顺带它本来就违反兑换规矩 ③（"不能拿稀缺换稀缺"）—— 神圣石是淬炼试炼专属，不该当兑换货币。 */
       { id: 'ex_day_nir_pill', kind: 'exchange', reset: 'daily', category: 'daily', type: 'collect', matName: '合成之石', need: 12, unlockLevel: 25,
         name: '涅槃资粮', reward: { 涅槃丹: 2 }, expReward: 300 },
       /* 传说补遗（2026-09-10 用户点名「传说进化素材是大头」）：
@@ -916,10 +950,18 @@ window.Config = {
        *   它奖励的是"玩了"，不是"打开了"。奖励刻意压小（相对挂机产出是零头）：
        *   任务系统的奖励一旦接近玩法产出，玩家就会为了宝箱玩，而不是为了玩而玩。
        * · 两条都走 quest.js 的提交幂等 / 记账先行 / reset 水位，不新增任何发放逻辑。 */
+      /* 2026-09-16 审计：它是全部任务里「净白拿」最大的一条 —— 交掉 60% 日常（成本≈0）就送
+       * 重铸石3+增缀石2+鉴定石5 ≈ 1.29 小时挂机量，占"每天任务净收益"的七成（当天合计 1.85 小时）。
+       * 任务总量应当明显低于挂机产出，故降一档（≈0.75 小时）：仍是"交完有奖"的正反馈，不与挂机平起平坐。 */
       { id: 'bx_day', kind: 'bonus', reset: 'daily', category: 'daily', type: 'dailyChest', needRatio: 0.6, unlockLevel: 1,
-        name: '今日勤勉', reward: { 重铸石: 3, 增缀石: 2, 鉴定石: 5 }, expReward: 200 },
+        name: '今日勤勉', reward: { 重铸石: 2, 增缀石: 1, 鉴定石: 3 }, expReward: 200 },
+      /* 🔴 2026-09-16 审计（上轮漏掉的最大一条）：它原发【传说×2 + 涅槃丹×3 + 神圣石×5】——
+       * 三种全是受控资源，而门槛只是"交够 100 活跃分"（交 10 条日常就有，本来就要交）。
+       * 上面刚写完"奖励刻意压小、相对挂机产出是零头"，这里却是三种受控资源的每周白拿
+       * （传说该来自蜕变试炼/图 6~8、涅槃丹该来自涅槃试炼、神圣石该来自淬炼试炼）。
+       * 改成基础通货 + 象征性的 2 个神圣石。 */
       { id: 'bx_week', kind: 'bonus', reset: 'weekly', category: 'daily', type: 'meter', need: 100, unlockLevel: 31,
-        name: '本周活跃', reward: { 传说进化素材: 2, 涅槃丹: 3, 神圣石: 5 }, expReward: 2000 },
+        name: '本周活跃', reward: { 神圣石: 2, 增缀石: 5, 鉴定石: 5 }, expReward: 2000 },
 
       /* ---- 每周兑换 6 条（各限 1 次/周；受控高价值物走这里，成本 ≈ 一周的富余物库存） ---- */
       { id: 'ex_week_dan_b', kind: 'exchange', reset: 'weekly', category: 'daily', type: 'collect', matList: ['神圣石', '增缀石'], need: 80, unlockLevel: 31,
@@ -930,8 +972,17 @@ window.Config = {
         name: '锁纹重铸', reward: { 锁定石: 2 }, expReward: 1800 },
       { id: 'ex_week_dragon', kind: 'exchange', reset: 'weekly', category: 'daily', type: 'collect', matList: ['重铸石', '合成之石'], need: 150, unlockLevel: 40,
         name: '龙石回炉', reward: { 越龙之石: 3 }, expReward: 1500 },
-      { id: 'ex_week_reset_card', kind: 'exchange', reset: 'weekly', category: 'daily', type: 'collect', matList: ['腐印·暴怒', '腐印·疾影', '腐印·狂乱'], need: 4, unlockLevel: 43,
-        name: '塔券铸成', reward: { 通天塔重置卡: 1 }, expReward: 1800 },
+      /* 🔴 「塔券铸成」已于 2026-09-16 删除（用户：「任务给的重置卡太多了」）。
+       * 缘由链：2026-09-10 为救「商店关闭导致的断链」建了这条（当时是有意放开）→
+       *   09-16 第一轮把成本 4/种 提到 8/种（24 个腐印）→ 用户仍否，**点明问题不在价格，在"任务能产重置卡"本身**。
+       * 依据：边界基线《副本与资源循环重设计_边界基线_v1》§3 把重置卡定义为
+       *   「主来源 = 付费购买；**明确禁止 = 掉落、任务**、市场交易」。而现在商店也没上架它
+       *   （2026-09-12 拍板「魔石只卖便利、不卖数值」，重置卡 = 多打一局 = 产装备/材料 ⇒ 属数值）。
+       * ⇒ 结论：**塔的额外次数目前没有获取途径**（每天免费 1 次照常）。要开这条路只有两个选择：
+       *   ① 上架商店（60 魔石/张、每周限购 3 张）—— 需推翻"只卖便利"对重置卡的适用（按"卖机会不卖成品"论证）；
+       *   ② 维持无来源（重置卡成为付费预留物）。**两个都由策划定，代码侧已按"无来源"落地。**
+       * ⚠️ 别再把它加回任务表。 */
+
       { id: 'ex_week_god_stone', kind: 'exchange', reset: 'weekly', category: 'daily', type: 'collect', matName: '百变魔石', need: 2, unlockLevel: 60,
         name: '神石重铸', reward: { 至尊神石: 1 }, expReward: 3000 },
 
@@ -968,7 +1019,9 @@ window.Config = {
        * 这是"把任务做完"的收官奖，不是又一个刷传说的口子。 */
       { id: 'ms25', category: 'achieve', type: 'completion', need: 25, name: '任务·四分之一', reward: { 重铸石: 5, 鉴定石: 5 } },
       { id: 'ms50', category: 'achieve', type: 'completion', need: 50, name: '任务·过半', reward: { 神圣石: 3, 增缀石: 5 } },
-      { id: 'ms75', category: 'achieve', type: 'completion', need: 75, name: '任务·近全', reward: { 传说进化素材: 2, 凝魂晶石: 5 } },
+      /* 2026-09-16：凝魂晶石 → 神圣石 ×5（毕业期通货）。这是"把任务做完"的收官奖，
+       * 给淬炼试炼专属的神圣石比给一个即将退役的材料更合适。 */
+      { id: 'ms75', category: 'achieve', type: 'completion', need: 75, name: '任务·近全', reward: { 传说进化素材: 2, 神圣石: 5 } },
 
       /* ---- 章宝箱（2026-09-11 P2，用户拍板）：每章 6 环全清 → 第 7 环开箱 ----
        * id chest{n}：章节靠编号派生（quest-config.chapterIndexOf 已加 chest 分支），needs = boss{n} 首通。
@@ -1002,8 +1055,12 @@ window.Config = {
       { id: 'wk2', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'collect', matName: '血潮凝晶', need: 300, unlockLevel: 25, name: '周常·血晶采撷', reward: { 神圣石: 2 }, expReward: 800 },
       { id: 'wk3', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'craft', need: 40, unlockLevel: 20, name: '周常·锻炉不熄', reward: { 剥离石: 3 }, expReward: 800 },
       { id: 'wk4', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'hatch', need: 15, unlockLevel: 15, name: '周常·新生降临', reward: { 宠物蛋: 5 }, expReward: 600 },
-      { id: 'wk5', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'trialRun', need: 3, unlockLevel: 25, name: '周常·试炼三巡', reward: { 资源试炼门票: 2 }, expReward: 1000 },
-      { id: 'wk6', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'towerRun', need: 2, unlockLevel: 55, name: '周常·登塔双征', reward: { 凝魂晶石: 2 }, expReward: 1500 }
+      /* 2026-09-16：奖励由「资源试炼门票 ×2」改成通货。原设计是"打 3 局送 2 张"的循环激励，
+       * 但门票是**玩法资格**（限定次数），任务再发它 = 把限定次数变成可农 ⇒ 与「门票只能从地图委托来」冲突（用户同一条意见）。 */
+      { id: 'wk5', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'trialRun', need: 3, unlockLevel: 25, name: '周常·试炼三巡', reward: { 增缀石: 3 }, expReward: 1000 },
+      /* 2026-09-16：凝魂晶石 → 越龙之石 ×1（塔系物品）。打 2 局塔自己就能掉 越龙之石（20 档 2 个/局）
+       * ⇒ 只补 1 个不超发，符合「可重复任务的奖励必须低于付出」。 */
+      { id: 'wk6', kind: 'weekly', reset: 'weekly', category: 'daily', type: 'towerRun', need: 2, unlockLevel: 55, name: '周常·登塔双征', reward: { 越龙之石: 1 }, expReward: 1500 }
     ]
   },
 
@@ -1285,9 +1342,9 @@ window.Config = {
       { id: 'evolution-precise', name: '精粹进化素材', icon: '<img class="mat-img" src="assets/ui/ic_essence.png" alt="">', category: 'evo' },
       { id: 'evolution-legend', name: '传说进化素材', icon: '<img class="mat-img" src="assets/ui/ic_crown.png" alt="">', category: 'evo' },
       { id: 'egg',     name: '宠物蛋', icon: '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">', category: 'egg' },
-      /* 凝魂晶石【刻意不在这里】（2026-09-09，边界基线 5.3「账号级凝魂晶石不可交易」）：
-       * 本表同时用作「上架物」和「收款物」白名单 —— 不进这张表 = 天然不可交易，
-       * 与经验包绑定的做法一致（见 tutorialMode.expPacks 注释）。商店直购不受影响。 */
+      /* 本表同时用作「上架物」和「收款物」白名单 —— 不进这张表 = 天然不可交易
+       * （经验包 / 门票 / 重置卡都走这条路，见各自注释）。商店直购不受影响。
+       * 2026-09-16：原注释里点名的「凝魂晶石」已整套退役（材料本身已删登记）。 */
       // 鉴定石：消耗品，鉴定未鉴定装备用（拖到装备上 / 点「鉴定」）。前期好掉、后期稀缺
       { id: 'identify', name: '鉴定石', icon: '<img class="mat-img" src="assets/ui/ic_magnify.png" alt="">', category: 'stone' },
       // 涅槃丹（2026-09-06 新增，手册 2.6）：合成神级宠的保底道具（持有 1 颗 = 100% 出神级宠）。
@@ -1327,7 +1384,7 @@ window.Config = {
       { id: 'affix-silence',name: '腐印·禁疗', icon: '印', category: 'affix' },
       { id: 'affix-judge',  name: '腐印·天罚', icon: '印', category: 'affix' }
       /* 通天塔重置卡【刻意不在这里】：它是付费购买物（魔石商店），可交易=给 RMT 开门，
-       * 与凝魂晶石同一处置逻辑（天然不可交易，商店直购不受影响）。 */
+       * 处置逻辑同「经验包 / 门票」：不进白名单 = 天然不可交易。 */
     ],
     // 交易税：每满 taxPer 收 taxAmount（默认每满 8 收 1）
     taxPer: 8,
@@ -1412,9 +1469,10 @@ window.Config = {
     '强化丹B': { group: 'use-grow' },
     '天仙玉露': { group: 'use-grow' },
     /* --- 合成 / 涅槃 / 觉醒 --- */
-    // 合成之石 / 凝魂晶石：每次合成都吃、攒几十上百个 ⇒ 是货币，留素材区
+    // 合成之石：每次合成都吃、攒几十上百个 ⇒ 是货币，留素材区（2026-09-16 起它同时是**魂铸**的消耗品）
     '合成之石': { group: 'advance' },
-    '凝魂晶石': { group: 'advance' },
+    /* 凝魂晶石已于 2026-09-16 **删除登记**（整套退役）：删掉后背包不再显示它。
+     * 老库存（`materials` 表里的行）保留不动，只是没有任何用途了。 */
     /* 下面 5 件是「合成 / 涅槃时勾选吃掉」的一次性道具（手里几颗）⇒ 归「消耗品 · 合成与涅槃」 */
     '越龙之石': { group: 'use-synth' },
     // 百变魔石的来源写在代码里（drop.js 守关 Boss 的稀有掉落），配置表里查不到 → 手写补一条
@@ -1442,8 +1500,14 @@ window.Config = {
     '腐印·枯竭': { group: 'tower' },
     '腐印·禁疗': { group: 'tower' },
     '腐印·天罚': { group: 'tower' },
-    // 通天塔重置卡：开一局用的门票，用一次少一张 ⇒ 消耗品（腐印留在塔区，那些是攒着贴的）
-    '通天塔重置卡': { group: 'use-ticket' },
+    /* 通天塔重置卡：开一局用的门票，用一次少一张 ⇒ 消耗品（腐印留在塔区，那些是攒着贴的）
+     * ⚠️ 2026-09-16：任务侧来源（每周兑换「塔券铸成」）已按用户意见删除，付费商店也没上架
+     *   ⇒ 它**当前没有任何获取途径**。下面 `from` 是手写兜底 —— 词条系统要求"每件道具都能说清从哪来"
+     *   （`vtest_mat_wiki` 守），如实写"暂未开放"。删掉这条来源后正是它把测试跑红的，别为了绿灯编一个来源。 */
+    '通天塔重置卡': {
+      group: 'use-ticket',
+      from: [{ where: '通天塔', what: '每天 1 次免费之外的额外次数：获取途径暂未开放' }]
+    },
     /* --- 区域材料（图 1~10，每图一种；进化/委托/觉醒之路都在吃它） --- */
     '腐变之心': { group: 'area' },
     '腐沼黏液': { group: 'area' },
@@ -1669,7 +1733,11 @@ window.Config = {
     takeHigherT: true,   // 同类型取高 T，不叠加
   },
   soulCast: {
-    material: '凝魂晶石', materialCount: 10,
+    /* 🔴 2026-09-16：消耗品由「凝魂晶石」换成**合成之石**（凝魂晶石整套已删，见 pet 段的删除说明）。
+     * 选它的三个理由：① 语义通 —— 合成之石本来就是"融合两宠"用的，魂铸也是把宠物特质融进装备；
+     * ② 供给稳（图 4+ 掉落 3.9 个/小时 + 地图委托 + 每日兑换），不会变成新的稀缺品；
+     * ③ 成本对齐 —— 10 个 ≈ 2.6 小时挂机，与原 10 颗晶石（≈2.8 小时）基本持平，魂铸的分量没变。 */
+    material: '合成之石', materialCount: 10,
     tiers: {
       normal: { label: '普通', minLevel: 40, minGrowth: 10, source: 'blood', tierShift: 0 },
       elite: { label: '精锐', minLevel: 40, minGrowth: 40, source: 'blood', tierShift: 1 },
@@ -1754,8 +1822,10 @@ window.Config = {
     requireGodPet: true,    // 只有神级宠才能涅槃
     defaultItem: 'nir_pill',    // 默认涅槃道具
     levelBonus: 0.01,       // 副宠等级加成：吸收 × (1 + (副宠等级-门槛)×levelBonus)，仅 add 型生效
-    // 可选加成：额外投入凝魂晶石，本次吸收 ×(1 + absorbBonus)。仅 add 型道具可用（替换型语义冲突）。
-    crystalBonus: { material: '凝魂晶石', amount: 10, absorbBonus: 0.3, onlyType: 'add' },
+    /* 🔴 原 `crystalBonus`（额外投入 10 颗凝魂晶石 → 本次吸收 ×1.3）已于 2026-09-16 删除：
+     * 凝魂晶石整套退役（见 pet 段），且这个加成本来就不划算（10 颗 ≈ 2.8 小时挂机换 +1.2 成长），
+     * 玩家算了不会点 —— 与其留着当摆设，不如砍掉，让涅槃只剩「涅槃丹 / 锁魂玉」两个真决策。
+     * ⚠️ `pet_merge.js` / `ui-pet-merge.js` 里的 useCrystal 入参保留（调用方签名不动），但倍增恒为 1。 */
     /* 分段阻尼（2026-09-15 拍板，宪法 H-11 ③④）：主宠当前成长越高，本次涅槃【新吸收的成长】越打折。
      *   成长仍无上限（游戏出发点），只是越来越慢 —— 这是「装备 T1% 乘全属性」的配套刹车：
      *   用户担心的「基础×等级×成长×装备% 指数爆炸」，其燃料是成长获取速度，刹车装在这里。
@@ -1863,7 +1933,9 @@ window.Config = {
     starterPack: {
       gear: [{ rarity: 'gold', areaTier: 8, materialTier: 3, count: 1 }],
       mats: [
-        { name: '凝魂晶石', qty: 5 },
+        // 2026-09-16：凝魂晶石 → 合成之石（凝魂晶石退役）。⚠️ 这份 starterPack 其实被本文件末尾的
+        // N 版引导段整体覆盖（运行时用的是那份：合成之石/鉴定石/门票），这里只作存档保留、别照它推演。
+        { name: '合成之石', qty: 5 },
         { name: '神圣石', qty: 3 },
         { name: '重铸石', qty: 3 },
         { name: '增缀石', qty: 3 }
@@ -1883,10 +1955,10 @@ window.Config = {
      * v2 = **奖励即钥匙**：每一项的 taskIds 标注"它是哪一关的钥匙"，
      *      在该关激活时（= 上一关完成的瞬间）由 grantKeysFor(taskId) 发放，账本 keys:{taskId} 守门只发一次。
      *      链：G1 经验包→G2 素材→G3 蓝装→G4 重铸石→G5 白装→G6 蛋→G7 合成石+经验包→
-     *          G8 白装(不绑定，要上架)→G9 精粹1+传说5+经验包→G10 凝魂晶石×10。
+     *          G8 白装(不绑定，要上架)→G9 精粹1+传说5+经验包→G10 合成之石×10（原凝魂晶石，已退役）。
      *      （G4 淬炼的是 G3 穿上身那件，宠物页装备栏点它即可打造，不再多发一件白装。）
      * 数量守恒（改这里必须同步核）：G9 进化 4 次总需 精粹1+传说5（终阶 extra 3 个已算在内）；
-     *   G10 魂铸需 凝魂晶石×10（= soulCast.materialCount，给少了必卡）。
+     *   G10 魂铸需 合成之石×10（= soulCast.materialCount，给少了必卡）。
      * 玩家中途把钥匙弄丢 → 引导条「补发」按钮手动补，每关每种限 1 次（走账本 reissue:*）。
      * 注意：白装不能绑定 —— G8 教学任务本身要求上架装备，绑了就卡死 G8。防刷靠账本，不靠绑定。 */
     supplyBox: {
@@ -1904,7 +1976,10 @@ window.Config = {
         { type: 'mat', name: '精粹进化素材', qty: 1, taskIds: ['g9'] },
         { type: 'mat', name: '传说进化素材', qty: 5, taskIds: ['g9'] },
         { type: 'exppack', cap: 60, qty: 1, taskIds: ['g9'] },
-        { type: 'mat', name: '凝魂晶石', qty: 10, taskIds: ['g10'] }
+        /* 2026-09-16：原为「凝魂晶石 ×10」（= 当时 soulCast.materialCount）。凝魂晶石退役、魂铸消耗改成
+         * 合成之石后，这把 G10 钥匙同步换成合成之石 ×10 —— 数量必须跟 `soulCast.materialCount` 对齐，
+         * 给少了魂铸会卡住（G10 是旧 G 链的最后一环，运行时已被 N 链覆盖，但这份钥匙表要自洽）。 */
+        { type: 'mat', name: '合成之石', qty: 10, taskIds: ['g10'] }
       ]
     },
   },

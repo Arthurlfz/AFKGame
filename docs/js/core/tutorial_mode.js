@@ -628,7 +628,7 @@
     // 只有"真正走过引导"的账号才发礼包（Q6 修复：老账号自动完成新手链 → 不再白拿）
     if (readStarted() && !readSkipped()) {
       // G10 魂铸不是 isGuide（毕业后普通任务），getGuideQuest 永远不会指向它 →
-      // 它的钥匙（凝魂晶石×10 = soulCast.materialCount）只能在引导段收尾时补发，否则必卡。
+      // 它的钥匙（= soulCast.materialCount 个魂铸材料，2026-09-16 起是合成之石）只能在引导段收尾时补发，否则必卡。
       await grantKeysFor('g10');
       // 老档兼容：旧 packClaimed 标记领过的 → 只补账不发货，防账本缺失导致重发
       if (hasClaimedPack()) { await ledgerBackfill('graduatePack'); return; }

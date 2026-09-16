@@ -113,7 +113,7 @@
       }
       const spent = await window.Materials.spend(card, 1);
       if (!spent || spent.ok === false) {
-        return { ok: false, error: (spent && spent.error) || `缺少${card}（魔石商店购买，每周限购）` };
+        return { ok: false, error: (spent && spent.error) || `缺少${card}（额外次数的获取途径暂未开放）` };
       }
       consumed = 'card';
     }

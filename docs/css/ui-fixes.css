@@ -140,12 +140,15 @@ body.esc-close-ready .chat-drawer-host.is-open {
   /* ESC 由 JS 监听，这里只是标记 */
 }
 
-/* ---------- 10. 引路人弹窗打开时，隐藏追踪栏重复的行动按钮 ---------- */
-#dialog-box.show ~ .quest-tracker,
+/* ---------- 10. 引路人弹窗打开时，追踪栏里重复的行动按钮降为次要 ----------
+ * 2026-09-16 修正：这里原来还挂着一条 `#dialog-box.show ~ .quest-tracker`
+ * —— 它把**整个追踪面板**淡到 35% 并禁用点击，于是新手引导一弹窗，
+ *   右上角任务名/进度全糊了、也点不动（玩家反馈"任务面板变半透明"）。
+ *   注释写的是"隐藏重复的**行动按钮**"，实现却把整块面板都罩了进去 = 作用范围写大了。
+ * 现在只淡化按钮（弹窗里本来就有同一个按钮），面板本身保持清楚、可点、可拖。 */
 body:has(#dialog-box.show) .quest-tracker .qt-choices,
 body:has(#dialog-box.show) .quest-tracker .qt-go,
 body:has(#dialog-box.show) .quest-tracker .qt-submit {
-  /* 弹窗已提供行动按钮时，追踪栏按钮降为次要视觉，避免重复困惑 */
   opacity: .35;
   pointer-events: none;
 }

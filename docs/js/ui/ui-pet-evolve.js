@@ -234,6 +234,8 @@
       const itemText = res.boostItem ? `（消耗 ${res.boostItem.name}）` : '';
       addLog(`进化成功！${origName} → 【${res.result}】成长 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}（第 ${res.stage}/5 阶）${changed}${itemText}`);
       showToast('进化成功！', `${origName} → <b style="color:#f2b632">【${res.result}】</b>${changed}<br><small>成长值 ${origGrowth.toFixed(1)} → ${res.newGrowth.toFixed(1)}${itemText}</small>`);
+      // 揭幕演出：进化是"跳变"的那一下，攒很久才做一次，值得给足仪式感
+      if (UI.celebrate) UI.celebrate({ title: '进化', name: '【' + res.result + '】', sub: '成长 ' + origGrowth.toFixed(1) + ' → ' + res.newGrowth.toFixed(1) });
       evolveMainId = res.pet ? res.pet.id : pet.id;
       evolvePreview = null; // 已进化：旧预览（形态/成长都变了）作废
       UI.renderAll();

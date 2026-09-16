@@ -86,4 +86,14 @@ docs/tests/out_*.txt
 docs/tests/result.txt
 /screenshot*.png
 
+# ===== Remotion 视频工程（2026-09-15）：源码入库，依赖与渲染产物不入库 =====
+# 产物 mp4 要发布给玩家，所以渲染完统一拷到 docs/assets/video/（那一份入库）。
+video/node_modules/
+video/out/
+
+# ===== 浏览器测试产出（2026-09-16）：含被占用的 LevelDB/Cache 文件 =====
+# 实测 `git add -A` 会在这里失败（Permission denied: tools/test-out/_pb1/Default/Cache/Cache_Data/sqldb0），
+# 而且几千个缓存文件体积大、无版本价值 ⇒ 整目录忽略，避免以后误 add。
+tools/test-out/
+
 

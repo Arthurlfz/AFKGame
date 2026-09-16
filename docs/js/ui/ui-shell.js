@@ -56,7 +56,17 @@
     const pages = document.querySelectorAll('.tab-page');
     pages.forEach(p => p.classList.remove('active'));
     const target = document.getElementById('tab-' + page);
-    if (target) target.classList.add('active');
+    if (target) {
+      target.classList.add('active');
+      /* 切页淡入（2026-09-16）：原来只有一层 ink-page-in 且重进同页不重放，切页是"啪"一下换。
+       * ⚠️ 只淡入、绝不加位移 —— .tab-page 内部有 position:fixed 的浮层（背包/宠物 tooltip），
+       *    祖先一旦带 transform，fixed 就变成相对祖先定位，那些浮层会整体跑偏。
+       * 用 remove + 强制重排 + add：不然连着切两次同一页，动画不会重播。 */
+      target.classList.remove('page-enter');
+      void target.offsetWidth;
+      target.classList.add('page-enter');
+      setTimeout(() => target.classList.remove('page-enter'), 300);
+    }
     // 百科页内容懒渲染（幂等）：走 hash 变化时不触发 hashchange 的路径（如登录后 hash 残留）也能渲染
     if (page === 'codex' && UI.renderCodex) UI.renderCodex();
     const btns = document.querySelectorAll('.sb-btn');
@@ -131,7 +141,7 @@
       anchor: document.getElementById('btn-settings-sidebar'),
       html: `
         <div class="pop-title"><svg viewBox="0 0 24 24" style="width:1em;height:1em;vertical-align:-0.15em;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg> 设置</div>
-        <div class="pop-desc">宠物养成循环原型<br><span style="color:var(--text-faint)">本地优先 · 云端存档 · 挂机宠物养成</span></div>
+        <div class="pop-desc">永夜灵市 Evernight Bazaar<br><span style="color:var(--text-faint)">本地优先 · 云端存档 · 挂机宠物养成</span></div>
         <div class="set-row">
           <div class="set-row-label">减少动效<small>关闭界面动画，长时间挂机更省眼</small></div>
           <button type="button" class="set-toggle ${rmOn ? 'on' : ''}" id="pop-rm-toggle">${rmOn ? '已开启' : '已关闭'}</button>

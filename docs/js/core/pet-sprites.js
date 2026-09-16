@@ -1,7 +1,7 @@
 /* 宠物形态名 -> 立绘/头像路径（由 meowa 生成素材，勿手改） */
 window.PetSprites = {
   // 素材版本号：每次替换素材图片后递增，防止浏览器缓存旧图
-  V: '20260910a',
+  V: '20260915n',
   // 立绘（全身透明图）路径：查不到时自动去掉「·异变」后缀回退到基础形态
   pathOf: function (name) {
     if (!name) return null;
@@ -99,6 +99,10 @@ window.PetSprites = {
   },
   map:
   {
+  "墨灵": "assets/pets/pack9-moyuan/墨灵.png",
+  "墨影": "assets/pets/pack9-moyuan/墨影.png",
+  "墨煞": "assets/pets/pack9-moyuan/墨煞.png",
+  "墨渊魔君": "assets/pets/pack9-moyuan/墨渊魔君.png",
   "腐噜兽": "assets/pets/pack0-base/monster-00.png",
   "血狐": "assets/pets/pack0-base/monster-01.png",
   "瘟熊": "assets/pets/pack0-base/monster-02.png",
@@ -191,6 +195,10 @@ window.PetSprites = {
   }
 },
   avatarMap: {
+  "墨灵": "assets/pets/avatars/pack9-moyuan/墨灵.png",
+  "墨影": "assets/pets/avatars/pack9-moyuan/墨影.png",
+  "墨煞": "assets/pets/avatars/pack9-moyuan/墨煞.png",
+  "墨渊魔君": "assets/pets/avatars/pack9-moyuan/墨渊魔君.png",
   "腐噜兽": "assets/pets/avatars/pack0-base/腐噜兽.png",
   "血狐": "assets/pets/avatars/pack0-base/血狐.png",
   "瘟熊": "assets/pets/avatars/pack0-base/瘟熊.png",

@@ -69,15 +69,30 @@
   function showPetTip(el, pet) {
     const tip = $('pet-tooltip');
     if (!tip || !el || !pet) return;
-    tip.innerHTML = petTipHtml(pet);
-    const r = el.getBoundingClientRect();
-    tip.style.top = Math.max(6, r.top) + 'px';
-    tip.style.left = (r.right + 10) + 'px';
-    tip.classList.add('show');
-    // 右侧放不下 → 翻到左边（与装备 tooltip 同一套视口避让）
-    if (r.right + 10 + tip.offsetWidth > document.documentElement.clientWidth) {
-      tip.style.left = Math.max(6, r.left - tip.offsetWidth - 10) + 'px';
+    /* 内容渲染失败就干脆不显示 —— 绝不让异常从这里冒出去
+     *（浮窗是纯展示，任何异常都不该影响选宠/列表这些主流程）。 */
+    try {
+      tip.innerHTML = petTipHtml(pet);
+    } catch (e) {
+      return;
     }
+    /* 先 show 再定位：display:none 时 offsetWidth/Height 量出来是 0，
+     * 先量得到真实尺寸，避让才算得准（也不会先闪一下再跳位置）。 */
+    tip.classList.add('show');
+    const r = el.getBoundingClientRect();
+    const de = document.documentElement;
+    // 视口尺寸：documentElement 拿不到时退回 window.inner*（桩环境/个别浏览器）
+    const vw = (de && de.clientWidth) || (window.innerWidth || 0);
+    const vh = (de && de.clientHeight) || (window.innerHeight || 0);
+    const tw = tip.offsetWidth || 252, th = tip.offsetHeight || 240;
+    let left = r.right + 10;
+    // 右边放不下 → 翻到左边
+    if (vw && left + tw > vw - 6) left = Math.max(6, r.left - tw - 10);
+    let top = Math.max(6, r.top);
+    // 下边放不下 → 往上抬（原来只夹了左右：卡片靠屏幕下方时，浮窗整块掉到视口外，看着像"没弹出来"）
+    if (vh && top + th > vh - 6) top = Math.max(6, vh - th - 6);
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
   }
   function hidePetTip() {
     const tip = $('pet-tooltip');
@@ -155,12 +170,50 @@
           '：主动技能伤害+' + Math.round((aw.damage || 0) * 100) + '%' + btxt + '</span>';
       }
     }
+    /* 2026-09-16：**满级经验池 / 凝魂晶石已整条删除**（用户拍板"没必要有了"）⇒ 这一行不再显示，
+     * 满级后的溢出经验直接丢弃。元素若还留在 HTML 里就保持隐藏，兼容旧存档里的 pet.expPool 字段。 */
     const poolEl = $('pet-exp-pool');
-    if (poolEl) {
-      const EP = Config.pet.expPool;
-      const maxed = pet.level >= Config.pet.maxLevel;
-      poolEl.style.display = (maxed && EP) ? '' : 'none';
-      if (maxed && EP) poolEl.textContent = `经验池 ${Math.round(pet.expPool || 0)}/${EP.perCrystal}（满 ${EP.perCrystal} 凝 1 颗${EP.material}）`;
+    if (poolEl) poolEl.style.display = 'none';
+    /* ---------- 「下一步能变什么」：进化下一形态 + 装备摘要 ----------
+     * 资料页原来只回答「现在多强」，属性区下面整块是空的，玩家得不到「接着该干嘛」。
+     * 数据全部现成：Config.pet.evolution.nextStage() / stageOf() / pet.equipment —— 不新增系统。 */
+    const nextEl = $('pet-next');
+    if (nextEl) {
+      const E = Config.pet.evolution || {};
+      const stages = E.stages || [];
+      const cur = (E.stageOf ? E.stageOf(pet) : 1) || 1;
+      const curStage = stages.find(x => x.stage === cur) || null;
+      const nx = E.nextStage ? E.nextStage(pet) : null;
+      const eqCount = Object.values(pet.equipment || {}).filter(Boolean).length;
+      const rows = [];
+      if (nx) {
+        const gap = Math.max(0, (nx.minLevel || 0) - (pet.level || 0));
+        rows.push('<div class="pn-row">'
+          + '<span class="pn-label">下一形态</span>'
+          + `<span class="pn-value">${escapeHtml(curStage ? curStage.label : '当前')} → <b>${escapeHtml(nx.label)}</b></span>`
+          + `<span class="pn-tip">${gap > 0 ? `还差 ${gap} 级（Lv.${nx.minLevel}）` : `等级已够 · Lv.${nx.minLevel}`}</span>`
+          + '</div>');
+        if (nx.material) {
+          rows.push('<div class="pn-row">'
+            + '<span class="pn-label">需要</span>'
+            + `<span class="pn-value">${escapeHtml(nx.material)} ×${nx.amount || 1}</span>`
+            + `<span class="pn-tip">${escapeHtml(nx.desc || '')}</span>`
+            + '</div>');
+        }
+      } else {
+        rows.push('<div class="pn-row">'
+          + '<span class="pn-label">形态</span>'
+          + `<span class="pn-value">已到顶（${escapeHtml(curStage ? curStage.label : '')}）</span>`
+          + '<span class="pn-tip">可走合成 / 涅槃继续变强</span>'
+          + '</div>');
+      }
+      const bnTxt = getBonusText(pet);
+      rows.push('<div class="pn-row">'
+        + '<span class="pn-label">装备</span>'
+        + `<span class="pn-value">已穿 ${eqCount}/12</span>`
+        + `<span class="pn-tip">${bnTxt && bnTxt !== '无' ? escapeHtml(bnTxt) : '暂无加成'}</span>`
+        + '</div>');
+      nextEl.innerHTML = '<div class="pn-head">下一步</div>' + rows.join('');
     }
     const hpText = `${Math.round(getCurHp(pet))}/${s.hp}`;
     if ($('pet-hp').textContent !== hpText) flashStat('pet-hp');

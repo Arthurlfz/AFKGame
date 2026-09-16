@@ -1,8 +1,8 @@
 {
-  "name": "forge-of-souls",
+  "name": "evernight-bazaar",
   "version": "1.0.0",
   "private": true,
-  "description": "Forge of Souls —— 暗黑风挂机养宠 + 宠物/装备真实交易。运行源是 docs/，别去根目录找。",
+  "description": "永夜灵市 Evernight Bazaar —— 暗黑风挂机养宠 + 宠物/装备真实交易。运行源是 docs/，别去根目录找。",
   "scripts": {
     "test": "node tests/run_all.js",
     "test:v": "node tests/run_all.js --verbose",

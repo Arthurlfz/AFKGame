@@ -17,6 +17,9 @@ window.EnemyData = {
     { id: 'wild-bloodfox', name: '血狐', level: 9, spd: 95,
       rarityWeights: { white: 75, blue: 22, gold: 3 }, levelRange: [1, 10], weight: 8,
       eggBaseName: '血狐', enemyType: 'normal' },
+    { id: 'wild-moyuan', name: '墨灵', level: 7, spd: 80,
+      rarityWeights: { white: 80, blue: 18, gold: 2 }, levelRange: [1, 10], weight: 6,
+      eggBaseName: '墨灵', enemyType: 'normal' },
 
     /* ---- 第 2 档（图 2，10~20 级）---- */
     { id: 'wild-bonewolf', name: '骨狼', level: 14, spd: 75,

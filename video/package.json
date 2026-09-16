@@ -1,0 +1,24 @@
+{
+  "name": "evernight-bazaar-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "永夜灵市 · 程序化视频（Remotion）。产物是 mp4，渲染到 docs/assets/video/ 供游戏播放；游戏本身不依赖本工程。",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:opening": "remotion render src/index.ts Opening out/opening.mp4 --codec=h264",
+    "render:opening:webm": "remotion render src/index.ts Opening out/opening.webm --codec=vp8"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.524",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.524"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "typescript": "^5.5.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

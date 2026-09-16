@@ -315,8 +315,8 @@
 
   /* ---------- 魂铸：把宠物血脉/觉醒特质铸进装备（独立词缀，永久不可剥离/重铸/神圣石洗） ----------
    * 档位（config.soulCast.tiers）：普通（Lv40+/成长≥10 铸血脉 T=原阶）｜精锐（Lv40+/成长≥40 铸血脉 T+1 封顶 T1）｜传承（已觉醒/成长≥60 铸觉醒 固定 T1）
-   * 消耗：装备（任意稀有度）+ 1 只宠物（消失）+ 10 凝魂晶石；每件装备最多 1 条；上架后不可打造；随装备走可交易
-   * 流程：本地先行（词缀+扣晶石）→ 云同步（晶石 RPC + equip_items.soul_affix）→ 成功才 removePet+deletePet
+   * 消耗：装备（任意稀有度）+ 1 只宠物（消失）+ 10 合成之石；每件装备最多 1 条；上架后不可打造；随装备走可交易
+   * 流程：本地先行（词缀+扣材料）→ 云同步（材料 RPC + equip_items.soul_affix）→ 成功才 removePet+deletePet
    */
   async function soulCast(eq, pet, tierKey, traitId) {
     const S = Config.soulCast || {};
@@ -335,8 +335,8 @@
       const aw = window.Pet.getAwakenState(pet);
       if (!aw) return { ok: false, error: '传承魂铸需要已觉醒的终形态宠物（去宠物页·觉醒页用觉醒石觉醒）' };
     }
-    const haveCrystal = Materials.getQuantity(S.material);
-    if (haveCrystal < C) return { ok: false, error: '需要 ' + C + ' 颗' + S.material + '（当前 ' + haveCrystal + ' 颗）：满级魂兽挂机会自动凝聚，走完新手引导也会送一份' };
+    const haveMat = Materials.getQuantity(S.material);
+    if (haveMat < C) return { ok: false, error: '需要 ' + C + ' 个' + S.material + '（当前 ' + haveMat + ' 个）：图 4 起挂机掉落，也可用地图委托与每日兑换换' };
 
     // 铸出词缀（soulAffix 驼峰为装备内存字段；DB 列 soul_affix 由序列化映射）
     const defs = Config.petTraits || {};
@@ -365,17 +365,17 @@
       aff = { id: '魂·' + d.label, label: '魂·' + d.label, traitId: best.id, tier, type, value, source: 'soulcast' };
     }
 
-    // 本地先行：词缀 + 本地扣晶石（界面立即生效）
+    // 本地先行：词缀 + 本地扣材料（界面立即生效）
     const oldAffix = eq.soulAffix || null;
     eq.soulAffix = aff;
     const spentLocal = Materials.spendLocal(S.material, C);
     if (!spentLocal.ok) { eq.soulAffix = oldAffix; return { ok: false, error: spentLocal.error || '材料不足' }; }
 
-    // 云端并行：晶石 RPC + equip_items.soul_affix 更新
+    // 云端并行：材料 RPC + equip_items.soul_affix 更新
     if (Materials.flushMaterials) await Materials.flushMaterials();
     const [sp, up] = await Promise.all([
       Materials.cloudSpend(S.material, C),
-      // verify：晶石已扣、宠物马上要删，0 行必须报错触发回滚（否则宠没了、词缀没落库）
+      // verify：材料已扣、宠物马上要删，0 行必须报错触发回滚（否则宠没了、词缀没落库）
       Items.updateCloudItem(eq, { soul_affix: eq.soulAffix }, { verify: true })
     ]);
     const syncErr = (sp && sp.error) || (sp && sp.data === false ? new Error(S.material + ' 余额不足（云端）') : null) || (up && up.error);

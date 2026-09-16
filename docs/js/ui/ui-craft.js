@@ -274,7 +274,7 @@
   const S_TIER_COLOR = { 1: '#c9a86a', 2: '#b99a6a', 3: '#7fae7f' };
   function soulCastHtml(eq, inSell) {
     const S = Config.soulCast || {};
-    const mat = S.material || '凝魂晶石';
+    const mat = S.material || '合成之石';
     const matCount = S.materialCount || 10;
     // 已有魂铸词缀：只读展示，不可再铸
     if (eq.soulAffix) {

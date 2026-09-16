@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数值体检 · 吸血到底超模在哪（2026-09-14）</title>
+<style>
+  :root{
+    --bg:#101516; --panel:#182021; --panel-2:#222d2d; --inset:#0c1112;
+    --line:#354343; --line-weak:#263232; --line-hi:#586563;
+    --text:#d2d3c8; --text-hi:#ece6d2; --text-dim:#9aa49f; --text-faint:#7a8783;
+    --accent:#b89b59; --accent-hi:#e0c77d; --danger:#c76559; --calm:#71999b;
+    --font-body:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-title:"STKaiti","KaiTi","FZKai-Z03","Microsoft YaHei",sans-serif;
+    --font-num:"Consolas","Cascadia Mono","Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:40px 24px 72px; background:var(--bg); color:var(--text);
+    font:15px/1.75 var(--font-body); -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-family:var(--font-title);font-size:30px;letter-spacing:3px;color:var(--accent-hi);margin:0 0 6px;font-weight:700}
+  .sub{color:var(--text-dim);font-size:14px;letter-spacing:.5px;margin:0 0 4px}
+  .meta{color:var(--text-faint);font-size:13px;margin:0 0 34px}
+  h2{
+    font-family:var(--font-title);font-size:19px;letter-spacing:1.5px;color:var(--accent-hi);
+    margin:0 0 4px;font-weight:700;
+  }
+  h2 .idx{color:var(--accent);margin-right:8px;font-family:var(--font-num);font-size:16px}
+  .kicker{color:var(--text-dim);font-size:13px;margin:0 0 18px;letter-spacing:.3px}
+
+  /* 结论：用左侧竖线分组，不给每个数字套盒子 */
+  .verdicts{margin:0 0 44px}
+  .v{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line-weak)}
+  .v:first-child{border-top:0;padding-top:0}
+  .v .mark{flex:none;width:3px;border-radius:1px;background:var(--line-hi);margin-top:6px;align-self:stretch}
+  .v.no .mark{background:var(--calm)}
+  .v.yes .mark{background:var(--danger)}
+  .v .body{flex:1}
+  .v .q{color:var(--text-hi);font-weight:700;font-size:15px;letter-spacing:.3px}
+  .v .q em{font-style:normal;font-family:var(--font-num);font-size:13px;letter-spacing:0;color:var(--text-faint);margin-left:8px}
+  .v .a{color:var(--text-dim);font-size:14px;margin-top:3px}
+  .v .a b{color:var(--text-hi);font-weight:700}
+
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:2px;
+    padding:22px 24px 20px;margin:0 0 16px;
+    box-shadow:inset 0 1px 0 rgb(236 230 210 / .055), 0 8px 22px rgb(0 0 0 / .35);
+  }
+  .note{color:var(--text-dim);font-size:13.5px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-weak)}
+  .note b{color:var(--accent-hi);font-weight:700}
+  svg{display:block;width:100%;height:auto;overflow:visible}
+  .lbl{font:12px var(--font-body);fill:var(--text-dim)}
+  .lbl-hi{font:700 12px var(--font-body);fill:var(--text-hi)}
+  .num{font:12px var(--font-num);fill:var(--text-faint)}
+  .num-hi{font:700 13px var(--font-num);fill:var(--accent-hi)}
+  .grid{stroke:var(--line-weak);stroke-width:1}
+  .axis{stroke:var(--line);stroke-width:1}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;color:var(--text-dim);font-weight:700;font-size:12.5px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  td{padding:6px 10px;border-bottom:1px solid var(--line-weak);color:var(--text)}
+  tr:last-child td{border-bottom:0}
+  td.n{font-family:var(--font-num);text-align:right}
+  td.hi{color:var(--accent-hi);font-weight:700}
+
+  .foot{color:var(--text-faint);font-size:12.5px;line-height:1.9;margin-top:34px;padding-top:18px;border-top:1px solid var(--line-weak)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>吸血到底超模在哪</h1>
+  <p class="sub">装备属性数值体检 · 只测量，不改任何数值</p>
+  <p class="meta">2026-09-14　｜　通天塔 30 层 × 5 只怪 · 真造 12 件满级金装 · 每档 24~30 局蒙特卡洛</p>
+
+  <!-- ============ 结论 ============ -->
+  <div class="verdicts">
+    <div class="v no">
+      <div class="mark"></div>
+      <div class="body">
+        <div class="q">① 怪物太弱？<em>不成立</em></div>
+        <div class="a">第 30 层守卫的血量是第 1 层杂兵的 <b>298 倍</b>、攻击 <b>88 倍</b>，每层难度还递增 12.4%。怪一点都不弱。</div>
+      </div>
+    </div>
+    <div class="v yes">
+      <div class="mark"></div>
+      <div class="body">
+        <div class="q">② 装备属性太强？<em>成立，但只强在吸血</em></div>
+        <div class="a">装备总共给了 <b>+6.8 层</b>，其中吸血一项占 <b>51%</b>，第二名速度只有 18%。<br>
+        而 12 件装备加的攻/血/防加起来只占宠物属性的 <b>1~2% —— 等于没加</b>。</div>
+      </div>
+    </div>
+    <div class="v yes">
+      <div class="mark"></div>
+      <div class="body">
+        <div class="q">③ 属性给太多？<em>吸血是白送的</em></div>
+        <div class="a">护符这个部位 <b>100% 出吸血</b>（部位基底，不吃词缀运气），光戴一个满级护符就有约 <b>13% 吸血</b>，占整套吸血量的 <b>63.4%</b>。</div>
+      </div>
+    </div>
+    <div class="v yes">
+      <div class="mark"></div>
+      <div class="body">
+        <div class="q">④ 公式有结构问题？<em>有两个真问题</em></div>
+        <div class="a"><b>问题 A：塔不给回血，吸血成了唯一的续航来源。</b>同一套装备，在塔里吸血占装备收益的 51%，在野图挂机里只值 <b>0.1%</b>。<br>
+        <b>问题 B：吸血是滚雪球。</b>攻击 ×1.5 时，吸血的价值比攻击 ×0.6 时高 <b>30%</b>。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 图 1 ============ -->
+  <div class="panel">
+    <h2><span class="idx">01</span>吸血 → 能打到第几层</h2>
+    <p class="kicker">其余 11 项装备属性一字不动，只改吸血。曲线起点 0% 就是「摘掉吸血」。</p>
+    <div id="c1"></div>
+    <div class="note">
+      全曲线就 <b>0% → 3% 这一小步最值钱</b>（一层就跳 +1.6 层）；3% 之后是缓坡，一路加 50% 也只多 6 层。
+      <br>换算成人话：<b>10.8% 吸血 ≈ 把宠物攻/血/防全部 ×1.6 倍；28% 吸血 ≈ ×2.5 倍。</b>
+    </div>
+  </div>
+
+  <!-- ============ 图 2 ============ -->
+  <div class="panel">
+    <h2><span class="idx">02</span>装备收益归谁</h2>
+    <p class="kicker">逐项把某一属性换回裸装值，其余保持满装，看掉几层。裸装 3.0 层 → 满装 9.9 层。</p>
+    <div id="c2"></div>
+    <div class="note">
+      <b>攻 / 血 / 防 / 命中 的贡献是 0。</b>这条结构吃掉的不只是平衡 —— 它意味着「掉到一件高攻武器」在塔里毫无手感，
+      而「掉到吸血」是天壤之别。<b>掉落爽感受影响。</b>
+    </div>
+  </div>
+
+  <!-- ============ 图 3 ============ -->
+  <div class="panel">
+    <h2><span class="idx">03</span>吸血是从哪来的</h2>
+    <p class="kicker">真造 400 套满级金装，逐套统计来源。</p>
+    <div id="c3"></div>
+    <table>
+      <thead><tr><th>统计量</th><th style="text-align:right">数值</th></tr></thead>
+      <tbody>
+        <tr><td>吸血合计（中位）</td><td class="n hi">18.8%</td></tr>
+        <tr><td>护符基底贡献（中位，不吃运气）</td><td class="n hi">13.0%</td></tr>
+        <tr><td>护符基底占整套的比例（中位）</td><td class="n hi">63.4%</td></tr>
+        <tr><td>词缀贡献（中位，要靠运气）</td><td class="n">7.0%</td></tr>
+        <tr><td>带吸血词缀的部位件数（中位）</td><td class="n">4 / 12 件</td></tr>
+        <tr><td>护符出吸血的概率</td><td class="n hi">100%</td></tr>
+        <tr><td>其他部位出吸血的概率</td><td class="n">24% ~ 34%</td></tr>
+        <tr><td>分布 p10 / p90 / p99 / 上限</td><td class="n">12.8% / 24.9% / 32.5% / 32.9%</td></tr>
+        <tr><td>能达到 28% 的套的比例</td><td class="n">约 4%（100 套里约 4 套）</td></tr>
+      </tbody>
+    </table>
+    <div class="note">护符基底吸血写的是 4 点，但它会跟着图档（×3.25）和底材档（×0.6~1.5）一起被放大 → <b>7.8% ~ 19.5%</b>。</div>
+  </div>
+
+  <!-- ============ 图 4 ============ -->
+  <div class="panel">
+    <h2><span class="idx">04</span>同一个吸血，在塔里和野图里差多少</h2>
+    <p class="kicker">通天塔：整局一管血、中途不给回血。野图：系统每秒免费回 20% 血。</p>
+    <div id="c4"></div>
+    <div class="note">
+      <b>问题 A 的根子在塔的规则，不在吸血数值。</b>野图里吸血被系统的免费回血彻底淹没（挂机 1 小时只差 1~3 场，0.1%），
+      只有在「不给回血」的塔里，它才变成最强的属性。
+      <br>旁证：塔里本来就有一条「腐印·禁疗」（本局吸血全部失效）—— 说明设计上早默认吸血是塔的最强续航杠杆，只是没人量过它到底占多大比重。
+    </div>
+  </div>
+
+  <!-- ============ 图 5 ============ -->
+  <div class="panel">
+    <h2><span class="idx">05</span>越强越值钱：吸血的滚雪球</h2>
+    <p class="kicker">两组都用「已摘掉吸血的同一套装备」，只差补上去的 28% 吸血。</p>
+    <div id="c5"></div>
+    <div class="note">
+      吸血 = <b>你打出的伤害 × 吸血率</b>。所以攻 / 暴击 / 暴伤越强，回血越快 → 越站得住 → 越能上高层 → 装备越好。<b>这是一个正反馈环。</b>
+    </div>
+  </div>
+
+  <p class="foot">
+    测量方法：控制变量 + 真造装备（不是代理点数）+ 蒙特卡洛（每档 24~30 局，用标准误判断差异显著性，z ≥ 1.96 才算数）。<br>
+    模型已复现实测：裸装 3 层（你报 3 层）、中位金装 11~12 层（你报 11 层）、官方满配 21~23 层（项目记录 21 层）。<br>
+    数据来源：<code>docs/tests/probe_lifesteal_audit.js</code>（一次性探针，报告产出后已删除）。完整结论见 <code>docs/数值体检_吸血与装备属性_2026-09-14.md</code>。
+  </p>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  function mk(tag, attrs){
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function txt(x, y, s, cls, anchor){
+    var t = mk('text', { x:x, y:y, 'class':cls || 'lbl', 'text-anchor': anchor || 'start' });
+    t.textContent = s; return t;
+  }
+  function host(id, w, h){
+    var box = document.getElementById(id);
+    var svg = mk('svg', { viewBox:'0 0 ' + w + ' ' + h, role:'img' });
+    box.appendChild(svg); return svg;
+  }
+
+  /* ---------- 01 吸血梯度曲线 ---------- */
+  (function(){
+    var D = [[0,6.42],[3,8.00],[6,8.96],[9,9.63],[12,10.00],[15,10.71],[18,11.17],[21,11.42],
+             [24,11.83],[28,12.21],[32,12.63],[40,13.25],[50,13.92]];
+    var W=900,H=340,L=74,R=54,T=26,B=54;
+    var x = function(v){ return L + (v/50)*(W-L-R); };
+    var y = function(v){ return H-B - ((v-6)/(14-6))*(H-T-B); };
+    var svg = host('c1', W, H);
+
+    // 网格 + Y 轴刻度
+    for (var f=6; f<=14; f++){
+      svg.appendChild(mk('line', { x1:L, y1:y(f), x2:W-R, y2:y(f), 'class':'grid' }));
+      svg.appendChild(txt(L-12, y(f)+4, f+'', 'num', 'end'));
+    }
+    svg.appendChild(txt(L-12, T-10, '层', 'lbl', 'end'));
+    svg.appendChild(mk('line', { x1:L, y1:H-B, x2:W-R, y2:H-B, 'class':'axis' }));
+    svg.appendChild(mk('line', { x1:L, y1:T, x2:L, y2:H-B, 'class':'axis' }));
+
+    // 最陡段高亮：0% → 3%
+    svg.appendChild(mk('rect', { x:x(0), y:T, width:x(3)-x(0), height:H-B-T, fill:'rgb(184 155 89 / .10)' }));
+    svg.appendChild(txt((x(0)+x(3))/2, T+16, '最陡', 'lbl-hi', 'middle'));
+
+    // 折线
+    var pts = D.map(function(d){ return x(d[0]) + ',' + y(d[1]); }).join(' ');
+    svg.appendChild(mk('polyline', { points:pts, fill:'none', stroke:'#b89b59', 'stroke-width':2.4,
+      'stroke-linejoin':'round', 'stroke-linecap':'round' }));
+
+    // 点 + 数值
+    D.forEach(function(d, i){
+      var end = (i === 0 || i === D.length-1);
+      svg.appendChild(mk('circle', { cx:x(d[0]), cy:y(d[1]), r:end?5:3.4,
+        fill:end?'#e0c77d':'#182021', stroke:'#b89b59', 'stroke-width':2 }));
+      svg.appendChild(txt(x(d[0]), y(d[1])-12, d[1].toFixed(2), end?'num-hi':'num', 'middle'));
+      svg.appendChild(txt(x(d[0]), H-B+20, d[0]+'%', 'lbl', 'middle'));
+    });
+    svg.appendChild(txt(W/2, H-12, '吸血率', 'lbl', 'middle'));
+
+    // 起点 / 终点差
+    svg.appendChild(mk('line', { x1:x(0), y1:y(6.42), x2:x(50), y2:y(6.42), stroke:'#586563',
+      'stroke-width':1, 'stroke-dasharray':'3 4' }));
+    svg.appendChild(txt(x(25), y(6.42)+22, '全程 +7.5 层', 'lbl', 'middle'));
+  })();
+
+  /* ---------- 02 装备收益归谁 ---------- */
+  (function(){
+    var D = [ ['吸血',3.46],['速度',1.25],['暴击率',0.75],['暴击伤害',0.67],['闪避',0.67],
+              ['受伤减免',0.33],['穿透',0.04],['伤害加成',0.04],['攻击',0.04],['生命',0],['防御',0],['命中',0] ];
+    var TOTAL = 6.84;
+    var W=900, rowH=30, H=D.length*rowH+34, L=110, R=150, T=16;
+    var max = 3.46;
+    var svg = host('c2', W, H);
+    svg.appendChild(mk('line', { x1:L, y1:T-6, x2:L, y2:H-24, 'class':'axis' }));
+    D.forEach(function(d, i){
+      var yy = T + i*rowH + 12;
+      var w = max > 0 ? (d[1]/max)*(W-L-R) : 0;
+      svg.appendChild(txt(L-14, yy+4, d[0], i===0?'lbl-hi':'lbl', 'end'));
+      svg.appendChild(mk('rect', { x:L, y:yy-8, width:Math.max(w,0), height:16, rx:1,
+        fill: i===0 ? '#b89b59' : (d[1] > 0.3 ? '#586563' : '#354343') }));
+      if (i===0){
+        svg.appendChild(txt(L+w+12, yy+4, '3.46 层 · 占 ' + Math.round(d[1]/TOTAL*100) + '%', 'num-hi'));
+      } else if (d[1] > 0){
+        svg.appendChild(txt(L+w+12, yy+4, d[1].toFixed(2) + ' 层' + (d[1] < 0.1 ? '（可为 0）' : ''), 'num'));
+      } else {
+        svg.appendChild(txt(L+12, yy+4, '0 层 —— 装备等于没加', 'num'));
+      }
+    });
+  })();
+
+  /* ---------- 03 吸血来源构成 ---------- */
+  (function(){
+    var W=900,H=132,L=0,R=0,T=42;
+    var svg = host('c3', W, H);
+    var base=63.4, affix=36.6, bw=W-L-R;
+    svg.appendChild(txt(0, 16, '整套吸血 = 护符基底 + 词缀', 'lbl-hi'));
+    svg.appendChild(txt(0, 34, '（逐套算比例再取中位，n = 400 套）', 'num'));
+    svg.appendChild(mk('rect', { x:L, y:T, width:bw*base/100, height:34, fill:'#b89b59', rx:1 }));
+    svg.appendChild(mk('rect', { x:L+bw*base/100, y:T, width:bw*affix/100, height:34, fill:'#354343', rx:1 }));
+    svg.appendChild(txt(L+16, T+22, '护符基底  ' + base + '%  ·  约 13.0%（戴上就有）', 'lbl-hi'));
+    svg.appendChild(txt(L+bw*base/100+16, T+22, '词缀 ' + affix + '%  ·  约 7.0%（靠运气）', 'lbl'));
+    svg.appendChild(txt(L, T+58, '护符：100% 出吸血', 'lbl'));
+    svg.appendChild(txt(L+200, T+58, '其他 11 个部位：24% ~ 34% 出吸血', 'lbl'));
+    svg.appendChild(txt(L+520, T+58, '吸血合计中位 18.8%', 'lbl-hi'));
+  })();
+
+  /* ---------- 04 塔 vs 野图 ---------- */
+  (function(){
+    var W=900,H=170,L=0,R=0,T=44;
+    var svg = host('c4', W, H);
+    var maxV = 51;
+    var rows = [
+      { k:'通天塔（一管血打到底）', v:51, t:'装备收益的 51%', c:'#b89b59' },
+      { k:'野图挂机（每秒免费回 20% 血）', v:0.1, t:'约 0.1%（挂机 1 小时差 1~3 场）', c:'#586563' }
+    ];
+    rows.forEach(function(r, i){
+      var yy = T + i*62;
+      svg.appendChild(txt(0, yy, r.k, i===0?'lbl-hi':'lbl'));
+      svg.appendChild(mk('rect', { x:0, y:yy+12, width:W, height:22, fill:'#0c1112', rx:1 }));
+      var w = Math.max((r.v/maxV)*W, r.v > 0 ? 4 : 0);
+      svg.appendChild(mk('rect', { x:0, y:yy+12, width:w, height:22, fill:r.c, rx:1 }));
+      svg.appendChild(txt(w+12, yy+29, r.t, i===0?'num-hi':'num'));
+    });
+    svg.appendChild(txt(0, T+142, '同一套装备、同一只宠，只有场景规则不同。', 'num'));
+  })();
+
+  /* ---------- 05 滚雪球 ---------- */
+  (function(){
+    var D = [[0.6,5.00],[0.8,5.67],[1.0,5.90],[1.25,6.37],[1.5,6.50]];
+    var W=900,H=300,L=78,R=70,T=34,B=54;
+    var x = function(v){ return L + ((v-0.6)/0.9)*(W-L-R); };
+    var y = function(v){ return H-B - ((v-4.5)/2.5)*(H-T-B); };
+    var svg = host('c5', W, H);
+    for (var v=5; v<=6.5; v+=0.5){
+      svg.appendChild(mk('line', { x1:L, y1:y(v), x2:W-R, y2:y(v), 'class':'grid' }));
+      svg.appendChild(txt(L-12, y(v)+4, v.toFixed(1), 'num', 'end'));
+    }
+    svg.appendChild(txt(L-12, T-12, '吸血值几层', 'lbl', 'end'));
+    svg.appendChild(mk('line', { x1:L, y1:H-B, x2:W-R, y2:H-B, 'class':'axis' }));
+    svg.appendChild(mk('line', { x1:L, y1:T, x2:L, y2:H-B, 'class':'axis' }));
+    var pts = D.map(function(d){ return x(d[0]) + ',' + y(d[1]); }).join(' ');
+    svg.appendChild(mk('polyline', { points:pts, fill:'none', stroke:'#c76559', 'stroke-width':2.4,
+      'stroke-linejoin':'round', 'stroke-linecap':'round' }));
+    D.forEach(function(d){
+      svg.appendChild(mk('circle', { cx:x(d[0]), cy:y(d[1]), r:3.6, fill:'#182021', stroke:'#c76559', 'stroke-width':2 }));
+      svg.appendChild(txt(x(d[0]), y(d[1])-13, d[1].toFixed(2), 'num', 'middle'));
+      svg.appendChild(txt(x(d[0]), H-B+20, '×' + d[0].toFixed(2), 'lbl', 'middle'));
+    });
+    svg.appendChild(txt(W/2, H-12, '宠物攻击力倍率', 'lbl', 'middle'));
+    svg.appendChild(txt(x(1.5)+4, y(6.5)-32, '+30%', 'num-hi', 'middle'));
+  })();
+
+})();
+</script>
+</body>
+</html>

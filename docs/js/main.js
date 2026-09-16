@@ -131,6 +131,8 @@
       if (info.leveled) {
         addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/></svg> ${pet.name} 升级 Lv.${info.newLevel}！经验 +${xp}，属性大幅提升！`, 'battle');
         if (info.maxed) addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg> ${pet.name} 已满级（等级上限 Lv.${Config.pet.maxLevel}）`, 'battle');
+        // 升级演出：立绘金环 + LEVEL UP 横幅（纯表现，失败不影响结算）
+        try { if (UI.showLevelUp) UI.showLevelUp(info.newLevel); } catch (e) { /* 演出失败不阻断结算 */ }
         // 升级是大事：等级 + 经验立即写云端，刷新页面都不丢
         syncPetProgress(pet, true);
       } else {

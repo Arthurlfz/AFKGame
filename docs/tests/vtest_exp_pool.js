@@ -1,4 +1,9 @@
-// vtest_exp_pool.js —— 满级经验池 + 凝魂晶石（涅槃加成 / 可交易）专项自测
+// vtest_exp_pool.js —— 【2026-09-16 重写】凝魂晶石退役 + 魂铸新材料 守值
+// 原名是「满级经验池 + 凝魂晶石专项自测」，但那套机制已按用户拍板**整条删除**
+// （用户：「没必要有了」；理由与沿革见 config.js 的 pet 段说明）。
+// 本文件改为守两件事：
+//   ① 凝魂晶石 / 满级经验池 / 涅槃晶石加成 **确实已被删除**（防以后有人"顺手"加回来）
+//   ② 替代方案生效：魂铸的消耗品是「合成之石」
 const fs=require('fs'),vm=require('vm');
 const VTF=require('./vtest_files');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
@@ -11,77 +16,49 @@ vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
 for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])VTF.load(ctx,f);
 let failures=0;const A=(ok,msg)=>{if(ok)console.log('PASS: '+msg);else{console.error('FAIL: '+msg);failures++}};const C=code=>vm.runInContext(code,ctx);const S=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{await S(300);await C('Game.onLogin("exppool@test.com","123456")');await S(300);
-const EP=C('Config.pet.expPool'),NV=C('Config.nirvana'),MAX=C('Config.pet.maxLevel');
-A(!!EP&&EP.perCrystal>0&&!!EP.material,'经验池已配置：每 '+EP?.perCrystal+' 经验凝 1 颗'+EP?.material);
-A(NV.crystalBonus&&NV.crystalBonus.material===EP.material,'凝魂晶石用途落在涅槃加成上');
-// ⚠️ 2026-09-09 改：边界基线 v1 第 5.3 节明确「账号级凝魂晶石不可交易」——
-// 它已从 Config.trade.materials 移除，因此不能作为收款物。这条断言以前是反的。
-A(C('Market.isPaymentMaterial("'+EP.material+'")')===false,'凝魂晶石账号绑定，不可作为交易支付材料');
+const MAX=C('Config.pet.maxLevel');
 
-/* ---- 1. 满级后经验入池，攒满才凝晶 ---- */
+/* ---- 1. 已退役的三样东西：一个都不许回来 ---- */
+A(C('Config.pet.expPool')===undefined,'满级经验池配置已删除（Config.pet.expPool 不存在）');
+A(C('Config.nirvana.crystalBonus')===undefined,'涅槃的凝魂晶石加成已删除（Config.nirvana.crystalBonus 不存在）');
+A(C('!(Config.materialInfo||{})["凝魂晶石"]'),'凝魂晶石已从材料登记表移除（背包不再显示它）');
+
+/* ---- 2. 满级溢出经验：不产任何材料、不再往池里累加 ---- */
 await C('(async()=>{const p=Pet.createPet("腐噜兽","x",10,100,20,10,8);p.level='+MAX+';Pet.addPet(p);await Supabase.savePet(p);globalThis.__m=p})()');await S(80);
-let r=C('Pet.grantExp(globalThis.__m,'+(EP.perCrystal-1)+')');
-A(r.maxed===true&&r.crystal===0&&C('Math.round(globalThis.__m.expPool)')===EP.perCrystal-1,'满级后不足门槛：经验只入池，不产晶石（池 '+(EP.perCrystal-1)+'）');
-A(C('Materials.getQuantity("'+EP.material+'")')===0,'未达门槛时材料为 0');
-r=C('Pet.grantExp(globalThis.__m,1)');
-A(r.crystal===1&&C('Math.round(globalThis.__m.expPool)')===0,'攒满门槛：凝出 1 颗且池清零');
-A(C('Materials.getQuantity("'+EP.material+'")')===1,'凝魂晶石进入账号材料（持有 1）');
+let r=C('Pet.grantExp(globalThis.__m,999999)');
+A(r.maxed===true,'满级时 grantExp 仍返回 maxed（经验条封顶逻辑没被牵连）');
+A(r.crystal===0,'满级溢出经验不再产出任何材料（crystal 恒为 0）');
+A(C('globalThis.__m.expPool||0')===0,'不再往经验池累加（expPool 保持 0）');
 
-/* ---- 2. 升到满级时多出来的经验不蒸发 ---- */
-// 升到满级那一下：先填满足以升级的量，再让"超过满级经验条上限"的部分进池（这部分原本直接蒸发）
-const needMax=C('Pet.expNeed('+MAX+')');
-await C('(async()=>{const p=Pet.createPet("血狐","x",10,85,30,8,110);p.level='+(MAX-1)+';p.exp=Pet.expNeed(p.level)-1;Pet.addPet(p);await Supabase.savePet(p);globalThis.__n=p})()');await S(80);
-r=C('Pet.grantExp(globalThis.__n,'+(needMax+EP.perCrystal+1)+')');
-A(r.leveled===true&&r.newLevel===MAX&&r.maxed===true,'最后一级升满：Lv.'+(MAX-1)+' → Lv.'+MAX);
-A(r.crystal===1&&C('Materials.getQuantity("'+EP.material+'")')===2,'升满时超出经验条上限的 '+EP.perCrystal+' 经验同样凝成 1 颗（累计 2）');
-A(C('globalThis.__n.exp')===C('Pet.expNeed('+MAX+')'),'满级后经验条保持封顶');
-
-/* ---- 3. 涅槃投入凝魂晶石：吸收 +30%，石头两样都扣 ---- */
+/* ---- 3. 涅槃：只剩「涅槃丹」一条加乘路径 ---- */
 async function mkPet(tag,growth,level){await C(`(async()=>{const p=Pet.createPet("腐噜兽","x",${growth},100,20,10,8);p.level=${level};p.isGodPet=true;/* 2026-09-06：只有神级宠能涅槃 */Pet.addPet(p);const s=await Supabase.savePet(p);p.cloudId=s.data.id;globalThis.__${tag}=p})()`);await S(80);return C(`globalThis.__${tag}.id`)}
-// 材料用 gain 入库（走云端 RPC，spend 才扣得动），断言一律看"本次增减"，不受前面用例存量影响
-const qCrystal=()=>C('Materials.getQuantity("'+EP.material+'")'),qBeast=()=>C('Materials.getQuantity("涅磐兽")');
-// 涅槃消耗已道具化（手册 2.4）：不再消耗涅磐兽，只有可选的涅槃丹
-const qPill=()=>C('Materials.getQuantity("涅槃丹")');
-const CB_AMT=NV.crystalBonus.amount;
+const nb=()=>C('Materials.getQuantity("涅槃丹")');
 
-/* ---- 3. 涅槃投入凝魂晶石：吸收 +30%，石头两样都扣 ---- */
+// 3a. 不投任何道具：10 + 8×0.5 = 14
 const a=await mkPet('a',10,60),b=await mkPet('b',8,60);
-let c0=qCrystal();
-await C('Materials.gain("'+EP.material+'",'+CB_AMT+')');await C('Materials.gain("涅槃丹",3)');await S(60);
-let b0=qPill();   // 发完道具再取基准：本次只看涅槃扣没扣
-r=await C(`Merge.nirvana(${a},${b},true)`);
-A(r.ok===true,'投入晶石涅槃成功'+(r.error?'（'+r.error+'）':''));
-A(Math.abs(r.newGrowth-Math.round((10+8*0.5*1.3)*10)/10)<0.05,'晶石加成：10 + 8×0.5×1.3 = '+r.newGrowth);
-A(Math.abs(C('Merge.calcNirvanaGrowth({growth:10},{growth:8,level:60},1.3).growth')-r.newGrowth)<0.05,'预览与实测同源（calcNirvanaGrowth 带加成倍率）');
-A(qCrystal()===c0,'凝魂晶石净扣 '+CB_AMT+' 颗（'+c0+' → '+qCrystal()+'）');
-A(qPill()===b0,'未选用涅槃道具时一颗不扣（'+b0+' → '+qPill()+'）');
+r=await C(`Merge.nirvana(${a},${b},false)`);
+A(r.ok===true&&Math.abs(r.newGrowth-14)<0.05,'不投道具：10 + 8×0.5 = '+r.newGrowth+(r.error?'（'+r.error+'）':''));
 
-/* ---- 3b. 选用涅槃丹：吸收再 ×1.2，消耗 1 颗 ---- */
+// 3b. ⭐ 旧入参 useCrystal=true 必须【被忽略】—— 这是"加成真的删了"的硬证据
 const a2=await mkPet('a2',10,60),b2=await mkPet('b2',8,60);
-await C('Materials.gain("'+EP.material+'",'+CB_AMT+')');await C('Materials.gain("涅槃丹",1)');await S(60);
-b0=qPill();
-r=await C(`Merge.nirvana(${a2},${b2},true,true)`);
-A(r.ok===true&&Math.abs(r.newGrowth-Math.round((10+8*0.5*1.3*1.2)*10)/10)<0.05,'晶石 + 涅槃丹：10 + 8×0.5×1.3×1.2 = '+r.newGrowth+(r.error?'（'+r.error+'）':''));
-A(b0-qPill()===1,'涅槃丹消耗 1 颗');
+r=await C(`Merge.nirvana(${a2},${b2},true)`);
+A(r.ok===true&&Math.abs(r.newGrowth-14)<0.05,'useCrystal=true 被忽略（仍为 14，不再 ×1.3）：'+r.newGrowth+(r.error?'（'+r.error+'）':''));
+A(Math.abs(C('Merge.calcNirvanaGrowth({growth:10},{growth:8,level:60},1).growth')-14)<0.05,'预览同源：倍率 1 时 = 14');
 
-/* ---- 4. 不投晶石走原数值 ---- */
-const c=await mkPet('c',10,60),d=await mkPet('d',8,60);
-c0=qCrystal();b0=qPill();
-await S(60);
-r=await C(`Merge.nirvana(${c},${d},false)`);
-A(r.ok===true&&Math.abs(r.newGrowth-14)<0.05,'不投晶石：10 + 8×0.5 = '+r.newGrowth+(r.error?'（'+r.error+'）':''));
-A(qCrystal()===c0,'不投晶石时晶石一颗不动');
-A(qPill()===b0,'不投晶石也不用道具时不扣任何道具');
+// 3c. 涅槃丹仍生效：10 + 8×0.5×1.2 = 14.8，且只扣 1 颗
+const a3=await mkPet('a3',10,60),b3=await mkPet('b3',8,60);
+await C('Materials.gain("涅槃丹",1)');await S(60);
+const b0=nb();
+r=await C(`Merge.nirvana(${a3},${b3},false,true)`);
+A(r.ok===true&&Math.abs(r.newGrowth-14.8)<0.05,'涅槃丹加成仍在：10 + 8×0.5×1.2 = '+r.newGrowth+(r.error?'（'+r.error+'）':''));
+A(b0-nb()===1,'涅槃丹消耗 1 颗');
 
-/* ---- 5. 晶石不足：拒绝涅槃，且不白扣涅磐兽 ---- */
-const e=await mkPet('e',10,60),f=await mkPet('f',8,60);
-// 先把晶石清空再补到「刚好差 1 颗」，否则前面用例攒下的存量会让这次误判为材料充足
-await C('Materials.spend("'+EP.material+'",'+qCrystal()+')');
-c0=qCrystal();b0=qPill();
-await C('Materials.gain("'+EP.material+'",'+(CB_AMT-1)+')');await S(60);
-r=await C(`Merge.nirvana(${e},${f},true)`);
-A(!!r.error&&/不足/.test(r.error),'晶石不足时涅槃被拒绝：'+(r.error||''));
-A(qPill()===b0,'拒绝时涅槃道具未被扣（不白花稀有材料）');
-A(qCrystal()===c0+CB_AMT-1,'拒绝时晶石保持原样');
-console.log(failures?'EXP POOL TESTS FAILED: '+failures:'ALL EXP POOL TESTS PASSED');process.exit(failures?1:0)
+/* ---- 4. 替代方案：魂铸的消耗品 = 合成之石 ---- */
+A(C('Config.soulCast.material')==='合成之石','魂铸消耗品是合成之石（替代已退役的凝魂晶石）');
+A(C('Config.soulCast.materialCount')===10,'魂铸消耗 10 个（与原设计的分量对齐：10 个 ≈ 2.6 小时挂机）');
+await C('(function(){const p=Pet.createPet("腐噜兽","x",10,100,20,10,8);p.level=40;p.traits=[{id:"嗜血",tier:2}];Pet.addPet(p);globalThis.__sc=p;return p.id})()');await S(60);
+const sc=await C('Craft.soulCast({identified:true,name:"测试装备",slot:"武器"},globalThis.__sc,"normal")');
+A(sc&&sc.ok===false&&/合成之石/.test(sc.error||''),'魂铸材料不足时提示的是「合成之石」：'+((sc&&sc.error)||''));
+
+console.log(failures?'SOULCAST / RETIRED-MECHANICS TESTS FAILED: '+failures:'ALL SOULCAST & RETIRED-MECHANICS TESTS PASSED');process.exit(failures?1:0)
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

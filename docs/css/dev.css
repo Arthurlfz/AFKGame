@@ -170,3 +170,90 @@
 .dev-player-ops { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dev-banned { font-size: .72rem; color: #e07060; border: 1px solid rgba(224,112,96,.4); padding: 1px 7px; border-radius: 9px; }
 .dev-hint-inline { font-size: .76rem; color: var(--text-faint, #8a867f); line-height: 1.5; }
+
+/* ============================================================
+ * 宠物数值总表页（ui-dev-pets.js）
+ * 层次靠分组标题 / 细分隔线 / 字重，不给每个数字套盒子；强调色只用枯金一处。
+ * 颜色一律取 design-tokens 变量，不写死色值。
+ * ============================================================ */
+
+/* 抽屉加宽：宠物表列多。修饰类只在宠物页挂（renderBody 切 Tab 时切换），
+ * 不动 .dev-drawer 的全局宽度，避免影响其余页。 */
+.dev-drawer.dev-drawer-wide { width: 880px; }
+
+/* 7 个页签在窄抽屉里会挤：收窄间距与内边距（所有页共用，观感不变） */
+.dev-tabs { gap: 6px; padding: 12px 12px; }
+.dev-tab { gap: 4px; padding: 9px 2px; font-size: .86rem; }
+
+/* ---------- 页头状态条 ---------- */
+.devp-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 14px 16px; border-bottom: 1px solid var(--line); background-color: var(--panel);
+}
+.devp-head-title { font-family: var(--font-title); font-size: 1.05rem; font-weight: 700; color: var(--accent-hi); letter-spacing: 1px; margin-right: 8px; }
+.devp-head-sub { font-size: .78rem; color: var(--text-faint); }
+.devp-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.devp-changed {
+  font-size: .78rem; color: var(--text-faint); padding: 3px 10px;
+  border: 1px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums;
+}
+.devp-changed.is-on {
+  color: var(--accent-hi); border-color: rgb(var(--action-gold-rgb) / .5);
+  background-color: rgb(var(--action-gold-rgb) / .1);
+}
+.devp-warn {
+  margin: 12px 16px; padding: 10px 12px; font-size: .82rem; line-height: 1.6; color: var(--text);
+  background-color: var(--inset); border: 1px solid var(--hp-hi); border-left-width: 3px; border-radius: var(--radius-xs);
+}
+.devp-warn b { color: var(--hp-hi); }
+
+/* ---------- 血统线块 ---------- */
+.devp-global, .devp-line { margin: 0 16px 16px; }
+.devp-line-head { flex-wrap: wrap; }
+.devp-line-name { font-family: var(--font-title); }
+.devp-line-meta { margin-left: auto; font-size: .78rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.devp-group { margin-bottom: 18px; }
+.devp-group:last-child { margin-bottom: 4px; }
+.devp-group-title {
+  font-size: .76rem; font-weight: 800; letter-spacing: 1.5px; color: rgb(var(--action-gold-rgb) / .9);
+  margin-bottom: 8px; border-left: 3px solid rgb(var(--action-gold-rgb) / .5); padding-left: 9px;
+}
+.devp-sub { font-size: .86rem; color: var(--text); margin-bottom: 4px; }
+.devp-desc { font-size: .8rem; color: var(--text-dim); margin-bottom: 8px; line-height: 1.5; }
+.devp-note-inline { font-size: .78rem; color: var(--text-faint); margin: 6px 0 0; line-height: 1.5; }
+.devp-muted { font-size: .78rem; color: var(--text-faint); }
+.devp-arrow { color: var(--accent); }
+
+/* ---------- 数值网格（标签 + 等宽数字，纵向可扫读） ---------- */
+.devp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); column-gap: 16px; }
+.devp-cell {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 0; border-bottom: 1px solid var(--line-weak);
+}
+.devp-cell-label { font-size: .8rem; color: var(--text-dim); white-space: nowrap; }
+.devp-num {
+  width: 76px; flex: none; text-align: right; box-sizing: border-box;
+  padding: 4px 7px; font-size: .84rem; border-radius: var(--radius-xs);
+  background-color: var(--inset); color: var(--text); border: 1px solid var(--line);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+}
+.devp-num:focus { outline: none; border-color: var(--accent); }
+.devp-cell.is-changed { border-bottom-color: rgb(var(--action-gold-rgb) / .45); }
+.devp-cell.is-changed .devp-num { color: var(--accent-hi); border-color: rgb(var(--action-gold-rgb) / .5); }
+
+/* ---------- 表格（形态链 / 技能） ---------- */
+.devp-table { font-size: .84rem; }
+.devp-table th, .devp-table td { padding: 5px 8px; }
+.devp-branch { width: 36px; text-align: center; font-weight: 800; color: var(--accent); }
+.devp-numcell { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+/* 表格里的数值格不再画一层底边，避免和表头分隔线叠成双层 */
+.devp-table .devp-cell { padding: 0; border-bottom: 0; }
+.devp-table .devp-num { width: 74px; }
+
+.devp-foot { margin: 0 16px 22px; font-size: .78rem; color: var(--text-faint); line-height: 1.6; }
+
+@media (max-width: 700px) {
+  .dev-drawer.dev-drawer-wide { width: 94vw; }
+  .devp-grid { grid-template-columns: 1fr; }
+}

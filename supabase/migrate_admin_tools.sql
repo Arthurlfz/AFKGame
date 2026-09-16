@@ -30,6 +30,75 @@ begin
 end; $$;
 grant execute on function public.admin_save_config(jsonb) to authenticated;
 
+-- ---------- 配置发布留档 + 回滚（2026-09-16） ----------
+-- 为什么要留档：数值一发布就对全服生效，改错了不能只靠"下次再改回来"——必须能一键回到上一版。
+-- prev_config 存"上一版发布内容"；发布时把当前内容挪进去，还原时再换回来（可反复来回）。
+-- ⚠️ 更新 config 时必须走 admin_save_config —— 直接改表不会留档，回滚就没得回。
+alter table public.game_config_overrides add column if not exists prev_config jsonb;
+alter table public.game_config_overrides add column if not exists prev_updated_at timestamptz;
+
+create or replace function public.admin_save_config(p_config jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_old jsonb; v_old_at timestamptz;
+begin
+  if auth.jwt() ->> 'email' <> '776492620@qq.com' then return jsonb_build_object('ok', false, 'error', 'forbidden'); end if;
+  -- 只收 JSON 对象：传数组/标量进来会把结算配置整个换成不可用的形状，服务端解析直接炸
+  if p_config is null or jsonb_typeof(p_config) <> 'object' then
+    return jsonb_build_object('ok', false, 'error', 'config 必须是 JSON 对象');
+  end if;
+  select config, updated_at into v_old, v_old_at from public.game_config_overrides where id = true;
+  insert into public.game_config_overrides(id, config, prev_config, prev_updated_at, updated_at, updated_by)
+  values (true, p_config, v_old, v_old_at, now(), auth.uid())
+  on conflict (id) do update set
+    prev_config     = public.game_config_overrides.config,
+    prev_updated_at = public.game_config_overrides.updated_at,
+    config          = excluded.config,
+    updated_at      = excluded.updated_at,
+    updated_by      = excluded.updated_by;
+  return jsonb_build_object('ok', true);
+end; $$;
+grant execute on function public.admin_save_config(jsonb) to authenticated;
+
+create or replace function public.admin_restore_prev_config()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_prev jsonb;
+begin
+  if auth.jwt() ->> 'email' <> '776492620@qq.com' then return jsonb_build_object('ok', false, 'error', 'forbidden'); end if;
+  select prev_config into v_prev from public.game_config_overrides where id = true;
+  if v_prev is null or jsonb_typeof(v_prev) <> 'object' then
+    return jsonb_build_object('ok', false, 'error', '没有上一版可还原');
+  end if;
+  -- SET 右侧一律取【旧行值】，所以这两句等于互换：还原后还能再"还原"回刚才那版
+  update public.game_config_overrides
+     set config          = prev_config,
+         updated_at      = now(),
+         updated_by      = auth.uid(),
+         prev_config     = config,
+         prev_updated_at = updated_at
+   where id = true;
+  return jsonb_build_object('ok', true);
+end; $$;
+grant execute on function public.admin_restore_prev_config() to authenticated;
+
+-- 面板用：告诉我云端有没有配置、有没有上一版、上次发布是什么时候（不改任何数据）
+create or replace function public.admin_config_meta()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb; v_at timestamptz; v_prev jsonb; v_prev_at timestamptz;
+begin
+  if auth.jwt() ->> 'email' <> '776492620@qq.com' then return '{}'::jsonb; end if;
+  select config, updated_at, prev_config, prev_updated_at into v, v_at, v_prev, v_prev_at
+    from public.game_config_overrides where id = true;
+  if v is null then return jsonb_build_object('has_config', false, 'has_prev', false); end if;
+  return jsonb_build_object(
+    'has_config', v is not null,
+    'has_prev', v_prev is not null,
+    'updated_at', v_at,
+    'prev_updated_at', v_prev_at,
+    'size', length(v::text)
+  );
+end; $$;
+grant execute on function public.admin_config_meta() to authenticated;
+
 -- 管理员工具 RPC：玩家管理 + 运营统计
 -- 用法：Supabase Dashboard → SQL Editor → 整段粘贴 → Run（幂等，可重复执行）
 -- 全部函数校验调用者邮箱 = 管理员邮箱（与 grant_gems 一致），非管理员返回空或 'forbidden'。

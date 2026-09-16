@@ -78,7 +78,14 @@
     clearTimeout(autoTimer);
     autoTimer = null;
     showing = false;
-    if (box) box.classList.remove('show');
+    /* 收起动画：先播 .is-closing，170ms 后再摘 show。
+     * ⚠️ 用 __gen 防串场：队列里下一条对话会立刻 render（重新 add show），
+     *    这时旧的那个定时器不能再把新对话的 show 摘掉。 */
+    if (box) {
+      const gen = (box.__gen = (box.__gen || 0) + 1);
+      if (UI.closeWithAnim) UI.closeWithAnim(box, () => { if (box.__gen === gen) box.classList.remove('show'); });
+      else box.classList.remove('show');
+    }
     if (queue.length) {
       const next = queue.shift();
       render(next);

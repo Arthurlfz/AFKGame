@@ -49,22 +49,32 @@
     o[ks[ks.length - 1]] = v;
   }
 
-  /* ---------- 调参字段表（构建时读取当前值作为「默认值」用于复原） ---------- */
+  /* ---------- 调参字段表（构建时读取当前值作为「默认值」用于复原） ----------
+   * 声明式：加一个可调项 = 补一行 { path, label, min, max, step }，不用动渲染代码。
+   * path 支持点路径（含数组下标，如 synthesize.randomBoost.0）。
+   * 大表格（按图档的材料权重、装备基座倍率等）不适合滑杆，放这里反而更难读 —— 不进本表。
+   * 宠物相关数值统一在「宠物」页（ui-dev-pets.js）。 */
   const SCHEMA = [
-    { group: '经验', fields: [
+    { group: '经验与等级', fields: [
       { path: 'exp.rate', label: '全局经验倍率', min: 0.1, max: 10, step: 0.1 },
-      { path: 'exp.perWinCoef', label: '每场经验系数', min: 1, max: 30, step: 1 },
-      { path: 'exp.needExponent', label: '升级需求指数', min: 1.0, max: 2.0, step: 0.05, note: '改这个升级曲线会变，谨慎' },
-      { path: 'exp.perWinJitter', label: '经验波动', min: 0, max: 1, step: 0.05 }
+      { path: 'exp.perWinCoef', label: '每场经验系数', min: 1, max: 30, step: 1, note: '调升级快慢只动这一个' },
+      { path: 'exp.needExponent', label: '升级需求指数', min: 1.0, max: 2.0, step: 0.05, note: '改这个整条升级曲线会变，谨慎' },
+      { path: 'exp.perWinJitter', label: '经验波动', min: 0, max: 1, step: 0.05 },
+      { path: 'pet.maxLevel', label: '等级上限', min: 10, max: 100, step: 1, note: '图 1-10 覆盖 Lv1-60，改前先确认地图等级段' }
     ] },
-    { group: '掉落', fields: [
+    { group: '掉落 · 总盘', fields: [
       { path: 'drop.pool.equipment', label: '装备掉率权重', min: 0, max: 100, step: 1, note: '四项是相对权重，一起归一化，改比例不改总盘' },
       { path: 'drop.pool.egg', label: '蛋掉率权重', min: 0, max: 100, step: 1 },
       { path: 'drop.pool.material', label: '材料掉率权重', min: 0, max: 1000, step: 5 },
       { path: 'drop.pool.none', label: '无掉落权重', min: 0, max: 3000, step: 10 }
     ] },
+    { group: '掉落 · 分阶段装备率', fields: [
+      { path: 'drop.poolByStage.1.equipment', label: '新手期(图1-3)', min: 0, max: 100, step: 1, note: '阶段池按图序号取：图1-3 / 图4-7 / 图8-10' },
+      { path: 'drop.poolByStage.2.equipment', label: '成长期(图4-7)', min: 0, max: 100, step: 1 },
+      { path: 'drop.poolByStage.3.equipment', label: '毕业期(图8-10)', min: 0, max: 100, step: 1 }
+    ] },
     { group: '战斗节奏', fields: [
-      { path: 'battle.speedScale', label: '攻速比例尺', min: 4, max: 30, step: 1 },
+      { path: 'battle.speedScale', label: '攻速比例尺', min: 4, max: 30, step: 1, note: '战斗快慢的唯一旋钮' },
       { path: 'battle.nextFightDelay', label: '场间隔(ms)', min: 0, max: 3000, step: 50 },
       { path: 'battle.stopHpRatio', label: '停手血量比', min: 0.05, max: 0.8, step: 0.05 },
       { path: 'battle.critRate', label: '暴击率', min: 0, max: 0.5, step: 0.01 },
@@ -73,6 +83,43 @@
     { group: '怪物强度', special: 'monsterMult', label: '全局怪物数值倍率', min: 0.5, max: 2, step: 0.05, default: 1 },
     { group: '回血', fields: [
       { path: 'regen.hpPerSecRatio', label: '每秒回血比例', min: 0.02, max: 1, step: 0.01 }
+    ] },
+    { group: '成长门槛', fields: [
+      { path: 'synthesize.minLevel', label: '合成等级门槛', min: 1, max: 100, step: 1 },
+      { path: 'nirvana.minLevel', label: '涅槃等级门槛', min: 1, max: 100, step: 1, note: '只有神级宠能涅槃' },
+      { path: 'synthesize.normalGrowthCap', label: '普通宠成长软上限', min: 10, max: 300, step: 5, note: '超过部分减半；神级宠无上限' },
+      { path: 'pet.babyGrowth.min', label: '孵化成长下限', min: 1, max: 100, step: 1 },
+      { path: 'pet.babyGrowth.max', label: '孵化成长上限', min: 1, max: 100, step: 1 },
+      { path: 'pet.godPets.minGrowth', label: '成神成长门槛', min: 0, max: 200, step: 1 },
+      /* 2026-09-16：原 `pet.expPool.perCrystal`（满级经验池·每颗晶石）与 `nirvana.crystalBonus.*`（晶石加成）
+       * 两项随凝魂晶石整套删除，调参项一并摘掉（留空注释，别再往这里加回已退役的字段）。 */
+    ] },
+    { group: '涅槃吸收', fields: [
+      { path: 'nirvana.levelBonus', label: '副宠等级加成', min: 0, max: 0.2, step: 0.005, note: '吸收 ×(1 + (副宠等级−门槛)×此值)，仅 add 型道具' },
+      { path: 'nirvana.damping.0.mult', label: '阻尼①(成长>100)', min: 0, max: 1, step: 0.05, note: '主宠当前成长越高，本次新吸收的成长越打折（多段叠乘）；阈值在 config.nirvana.damping[].at' },
+      { path: 'nirvana.damping.1.mult', label: '阻尼②(成长>150)', min: 0, max: 1, step: 0.05 },
+      { path: 'nirvana.damping.2.mult', label: '阻尼③(成长>200)', min: 0, max: 1, step: 0.05 }
+    ] },
+    { group: '合成与变异', fields: [
+      { path: 'synthesize.mutation.chance', label: '变异概率', min: 0, max: 1, step: 0.01 },
+      { path: 'synthesize.mutation.growthBonus.0', label: '变异成长加成下限', min: 0, max: 50, step: 0.5 },
+      { path: 'synthesize.mutation.growthBonus.1', label: '变异成长加成上限', min: 0, max: 50, step: 0.5 },
+      { path: 'synthesize.randomBoost.0', label: '合成随机加成下限', min: 0, max: 50, step: 0.5 },
+      { path: 'synthesize.randomBoost.1', label: '合成随机加成上限', min: 0, max: 50, step: 0.5 }
+    ] },
+    { group: '打造与分解', fields: [
+      { path: 'craft.reforge.amount', label: '重铸石消耗', min: 1, max: 20, step: 1 },
+      { path: 'craft.strip.amount', label: '剥离石消耗', min: 1, max: 20, step: 1 },
+      { path: 'craft.holy.amount', label: '神圣石消耗', min: 1, max: 20, step: 1 },
+      { path: 'craft.augment.amount', label: '增缀石消耗', min: 1, max: 20, step: 1 },
+      { path: 'craft.lock.amount', label: '锁定石消耗', min: 1, max: 20, step: 1 },
+      { path: 'salvage.blue.augment', label: '蓝装分解产增缀', min: 0, max: 20, step: 1, note: '白装无产出' },
+      { path: 'salvage.gold.reforge', label: '金装分解产重铸', min: 0, max: 20, step: 1 }
+    ] },
+    { group: '交易市场', fields: [
+      { path: 'trade.maxListings', label: '每人挂单上限', min: 1, max: 50, step: 1 },
+      { path: 'trade.taxPer', label: '税率分母（每满）', min: 1, max: 100, step: 1, note: '⚠️ 改税率必须同步 supabase/migrate_material_trade.sql 里 buy_pet / buy_equip 两处常量' },
+      { path: 'trade.taxAmount', label: '税量（每满收）', min: 0, max: 20, step: 1 }
     ] },
     { group: '市场机器人', fields: [
       { path: 'marketBot.enabled', label: '市场机器人开关', bool: true },
@@ -86,13 +133,8 @@
       { path: 'traitInherit.subKeep', label: '合成副宠特质继承率', min: 0, max: 1, step: 0.05 },
       { path: 'traitInherit.up', label: '继承升阶概率', min: 0, max: 1, step: 0.01, note: '特质继承时 T 阶 +1 概率（封顶 T1）' },
       { path: 'traitNirvana.implantChance', label: '涅槃特质植入率', min: 0, max: 1, step: 0.01 },
-      { path: 'soulCast.materialCount', label: '魂铸消耗凝魂晶石', min: 1, max: 50, step: 1 },
+      { path: 'soulCast.materialCount', label: '魂铸消耗合成之石', min: 1, max: 50, step: 1 },
       { path: 'awakenSkillDamage', label: '觉醒技能伤害加成', min: 0, max: 0.5, step: 0.05 }
-    ] },
-    { group: '成长系统', fields: [
-      { path: 'synthesize.mutation.chance', label: '变异概率', min: 0, max: 1, step: 0.01 },
-      { path: 'nirvana.absorbRatio', label: '涅槃吸收比例', min: 0, max: 1, step: 0.01 },
-      { path: 'nirvana.minLevel', label: '涅槃门槛等级', min: 1, max: 100, step: 1 }
     ] }
   ];
   // 构建默认值；配置里缺字段的项标记 _missing，渲染时兜底显示且不影响其他项
@@ -114,19 +156,115 @@
     return d;
   }
 
+  /* ---------- 云端发布：白名单裁剪 / 深合并 / 发布前校验 ----------
+   * 为什么必须裁函数：Config 里混着函数（pet.evolution.skillOf / godPets.byName / expPackOf …），
+   *   JSON.stringify 会把它们**静默丢掉**；而旧的「读取云端配置」是 Object.assign 整键覆盖 ——
+   *   一点就把 Config.pet 换成没有函数的版本，宠物技能与进化当场崩（2026-09-16 拆的这颗弹）。
+   * 为什么只挑白名单：免得把纯 UI 配置、新手引导覆盖、管理员邮箱这些带进云端
+   *   （game_config_overrides 的 RLS 允许所有登录玩家读整行）。 */
+  const CLOUD_WHITELIST = [
+    'exp', 'drop', 'battle', 'regen',
+    'synthesize', 'nirvana', 'traitHatch', 'traitInherit', 'traitNirvana', 'soulCast', 'awakenSkillDamage',
+    'trade', 'craft', 'salvage', 'equipment', 'items',
+    'pet', 'bloodlinePassive'
+  ];
+
+  // 深拷贝并剔除函数键（对象递归，数组照抄）
+  function stripFunctions(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map(stripFunctions);
+    const out = {};
+    Object.keys(v).forEach(k => {
+      if (typeof v[k] === 'function') return;
+      out[k] = stripFunctions(v[k]);
+    });
+    return out;
+  }
+  // 打包要发布的快照：白名单段（函数已剔）+ 云端自己的服务端键
+  function buildSnapshot() {
+    const out = {};
+    CLOUD_WHITELIST.forEach(k => { if (Config[k] !== undefined) out[k] = stripFunctions(Config[k]); });
+    /* 云端表里除了数值段还住着服务端自己用的键：bot = 市场机器人总开关，
+     * 数据库定时任务按它决定收不收货。发布是整列替换，不带上就一次冲掉（2026-09-13 踩过）。 */
+    const cur = window.ServerConfig && window.ServerConfig.get ? window.ServerConfig.get() : null;
+    if (cur && cur.bot) out.bot = cur.bot;
+    return out;
+  }
+  /* 深合并：本地是函数的键【永不覆盖】。
+   * 这是"读取云端配置"的安全底线 —— 云端快照天生没有函数，覆盖了等于删代码。 */
+  function mergeInto(target, src) {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) return target;
+    Object.keys(src).forEach(k => {
+      if (typeof target[k] === 'function') return;
+      const sv = src[k];
+      if (sv && typeof sv === 'object' && !Array.isArray(sv)
+        && target[k] && typeof target[k] === 'object' && !Array.isArray(target[k])) {
+        mergeInto(target[k], sv);
+      } else {
+        target[k] = sv;
+      }
+    });
+    return target;
+  }
+  // 发布前校验：只拦"会让游戏算错数或跑不起来"的形状问题，不做平衡判断（平衡是人拍板的事）
+  function validateSnapshot(s) {
+    const errs = [];
+    const num = v => typeof v === 'number' && Number.isFinite(v);
+    const need = (cond, msg) => { if (!cond) errs.push(msg); };
+    const exp = s.exp || {}, pet = s.pet || {}, drop = s.drop || {}, battle = s.battle || {}, trade = s.trade || {};
+    need(num(exp.perWinCoef) && exp.perWinCoef > 0, '经验：每场经验系数必须是正数');
+    need(num(exp.needBase) && exp.needBase > 0, '经验：升级需求基数必须是正数');
+    need(num(pet.maxLevel) && pet.maxLevel >= 10, '宠物：等级上限异常');
+    const stg = (pet.evolution && pet.evolution.stages) || [];
+    need(stg.length === 5, '宠物：进化阶段必须是 5 阶（当前 ' + stg.length + ' 阶）');
+    for (let i = 1; i < stg.length; i++) {
+      need(stg[i].minLevel > stg[i - 1].minLevel,
+        '宠物：进化门槛必须递增（' + stg[i - 1].label + ' ' + stg[i - 1].minLevel + ' → ' + stg[i].label + ' ' + stg[i].minLevel + '）');
+    }
+    need(((pet.starters || []).length) === 8, '宠物：基宠必须是 8 只（当前 ' + ((pet.starters || []).length) + ' 只）');
+    const pool = drop.pool || {};
+    need(num(pool.none) && num(pool.material) && num(pool.equipment), '掉落：掉落池权重缺失');
+    need(num(battle.speedScale) && battle.speedScale >= 4, '战斗：攻速比例尺异常（过小会让动作卡住）');
+    need(num(trade.taxPer) && trade.taxPer >= 1, '交易：税率分母异常（0 会除零）');
+    return errs;
+  }
+
   /* ---------- Tab 状态 ---------- */
   let activeTab = 'tune';
+
+  /* ---------- 外部页注册点 ----------
+   * 让「宠物数值总表」这类体量较大的页独立成文件（ui-dev-pets.js），
+   * 而不必把它塞进本文件、也不必复制一份 renderBody。
+   * 注册时机：脚本加载时（早于首次 renderBody）；未注册的扩展页 Tab 会自动隐藏。 */
+  const EXT_TABS = {};
+  function registerTab(id, def) {
+    if (!id) return;
+    EXT_TABS[id] = Object.assign({ id: id }, def || {});
+  }
+
+  /* 页签清单（内置页 + 预留的扩展页位）。ext:true = 该页由外部文件注册，没注册就不显示。 */
+  const TABS = [
+    { id: 'tune',   idx: '1', short: '调参', title: '数值调参' },
+    { id: 'pets',   idx: '2', short: '宠物', title: '宠物数值总表', ext: true },
+    { id: 'res',    idx: '3', short: '资源', title: '资源发放' },
+    { id: 'sim',    idx: '4', short: '模拟', title: '模拟器' },
+    { id: 'fast',   idx: '5', short: '快进', title: '养成快进' },
+    { id: 'player', idx: '6', short: '玩家', title: '玩家管理' },
+    { id: 'stats',  idx: '7', short: '数据', title: '运营数据' }
+  ];
+  const hasPanel = (id) => {
+    const t = TABS.filter(x => x.id === id)[0];
+    if (t && !t.ext) return true;
+    return !!(EXT_TABS[id] && EXT_TABS[id].render);
+  };
+
   function tabBarHtml() {
     const mk = (id, idx, short, full) =>
       '<button class="dev-tab' + (activeTab === id ? ' active' : '') + '" data-tab="' + id + '" title="' + full + '">' +
       '<span class="dev-tab-idx">' + idx + '</span>' + short + '</button>';
-    return '<div class="dev-tabs">' +
-      mk('tune', '1', '调参', '数值调参') +
-      mk('res', '2', '资源', '资源发放') +
-      mk('sim', '3', '模拟', '模拟器') +
-      mk('fast', '4', '快进', '养成快进') +
-      mk('player', '5', '玩家', '玩家管理') +
-      mk('stats', '6', '数据', '运营数据') + '</div>';
+    return '<div class="dev-tabs">' + TABS
+      .filter(e => !e.ext || EXT_TABS[e.id])
+      .map(e => mk(e.id, e.idx, e.short, e.title)).join('') + '</div>';
   }
 
   /* ============ Tab 1：数值调参 ============ */
@@ -169,14 +307,20 @@
       }).join('');
       html += groupHtml(g.group, rows);
     });
-    // 复原 / 导出（放在数值调参面板底部）
-    html += '<section class="dev-group"><div class="dev-group-title">配置</div>' +
-      '<div class="dev-actions-row">' +
+    // 复原 / 导出 / 发布（放在数值调参面板底部）
+    html += '<section class="dev-group"><div class="dev-group-title">配置发布</div>' +
+      '<div class="dev-note" id="dev-cloud-meta">云端：读取中…</div>' +
+      '<div class="dev-actions-row" style="margin-top:8px">' +
         '<button class="btn-mini ghost" id="dev-reset-all">一键复原全部</button>' +
         '<button class="btn-mini primary" id="dev-export">导出当前配置 JSON</button>' +
-        '<button class="btn-mini primary" id="dev-cloud-save" title="把当前调参保存到 Supabase"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 保存到云端</button>' +
-        '<button class="btn-mini ghost" id="dev-cloud-load" title="从 Supabase 读取调参"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 读取云端配置</button>' +
       '</div>' +
+      '<div class="dev-actions-row" style="margin-top:8px">' +
+        '<button class="btn-mini primary" id="dev-cloud-save" title="把当前数值发布到 Supabase"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 发布到云端</button>' +
+        '<button class="btn-mini ghost" id="dev-cloud-load" title="从 Supabase 读取已发布的配置"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg> 读取云端</button>' +
+        '<button class="btn-mini ghost" id="dev-cloud-restore" title="还原到上一版发布内容"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 5v5h5"/></svg> 还原上一版</button>' +
+      '</div>' +
+      '<div class="dev-note">发布只上传数值段（' + CLOUD_WHITELIST.length + ' 段，函数不会上传），上传前做结构校验、自动留档上一版。' +
+        '生效范围：市场机器人 + 你本账号的服务端结算。普通玩家结算读的是代码内置数值 —— 要让所有人同步，仍需改 config.js 并重跑 gen_server_config.js。</div>' +
       '<div class="dev-export-box" id="dev-export-box" style="display:none">' +
         '<div class="dev-export-hint">当前 Config 完整 JSON（复制后手动合并回 config.js）：</div>' +
         '<textarea id="dev-export-text" class="dev-export-text" readonly></textarea>' +
@@ -252,31 +396,85 @@
     const resetAll = $('dev-reset-all'); if (resetAll) resetAll.onclick = resetAllFields;
     const exp = $('dev-export'); if (exp) exp.onclick = doExport;
     const copy = $('dev-copy'); if (copy) copy.onclick = copyExport;
+    /* ---------- 发布 / 读取 / 还原 ----------
+     * 三个动作的共同前提：只动"数值段"，函数一律不碰。
+     * 发布 = 白名单裁剪 + 结构校验 + 留档；读取 = 深合并（绝不整键覆盖）；还原 = 换回上一版。 */
+    const cloudBusy = (btn, on) => { if (btn) btn.disabled = !!on; };
     const cloudSave = $('dev-cloud-save');
     if (cloudSave) cloudSave.onclick = async () => {
-      if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可保存云端配置');
+      if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可发布配置');
       const S = window.Supabase;
-      /* ⚠️ 这里存的是「整份 Config 快照」，admin_save_config 会把 jsonb 整个替换掉。
-       * 机器人总开关（server-config.js 写的 bot 键）不在 Config 里 —— 不手动带上，
-       * 一按「保存云端配置」开关就被冲掉，回到本地默认（2026-09-13）。 */
-      const payload = Object.assign({}, Config);
-      const cur = window.ServerConfig && window.ServerConfig.get ? window.ServerConfig.get() : null;
-      if (cur && cur.bot) payload.bot = cur.bot;
-      const r = S && S.getClient ? await S.getClient().rpc('admin_save_config', { p_config: payload }) : { error: { message: '未连接 Supabase' } };
-      UI.showToast && UI.showToast(r.error ? '保存失败' : '已保存', r.error ? r.error.message : '新结算将使用云端配置');
+      if (!S || !S.getClient) return UI.showToast && UI.showToast('未连接', 'Supabase 未就绪');
+      const snap = buildSnapshot();
+      const errs = validateSnapshot(snap);
+      if (errs.length) {
+        return UI.showToast && UI.showToast('没通过校验，未发布',
+          errs.slice(0, 2).join('；') + (errs.length > 2 ? '（共 ' + errs.length + ' 项）' : ''));
+      }
+      const kb = Math.round(JSON.stringify(snap).length / 1024);
+      const ok = !window.confirm || window.confirm('发布到云端？\n\n'
+        + '· 只发数值段（' + CLOUD_WHITELIST.length + ' 段，约 ' + kb + 'KB），函数不会上传\n'
+        + '· 上一版自动留档，可一键还原\n'
+        + '· 生效范围：市场机器人 + 你本账号的服务端结算\n'
+        + '· 普通玩家结算仍用代码内置数值\n\n确认发布？');
+      if (!ok) return;
+      cloudBusy(cloudSave, true);
+      const r = await S.getClient().rpc('admin_save_config', { p_config: snap });
+      cloudBusy(cloudSave, false);
+      if (r.error || (r.data && r.data.ok === false)) {
+        return UI.showToast && UI.showToast('发布失败', (r.data && r.data.error) || (r.error && r.error.message) || '未知错误');
+      }
+      UI.showToast && UI.showToast('已发布', '云端已更新，上一版已留档');
+      loadCloudMeta();
     };
     const cloudLoad = $('dev-cloud-load');
     if (cloudLoad) cloudLoad.onclick = async () => {
       if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可读取云端配置');
       const S = window.Supabase;
-      const r = S && S.getClient ? await S.getClient().rpc('admin_get_config') : { error: { message: '未连接 Supabase' } };
+      if (!S || !S.getClient) return UI.showToast && UI.showToast('未连接', 'Supabase 未就绪');
+      cloudBusy(cloudLoad, true);
+      const r = await S.getClient().rpc('admin_get_config');
+      cloudBusy(cloudLoad, false);
       if (r.error) return UI.showToast && UI.showToast('读取失败', r.error.message);
-      if (r.data && typeof r.data === 'object') {
-        Object.assign(Config, r.data);
-        renderBody();
-        UI.showToast && UI.showToast('已读取', '当前页面配置已更新');
+      const data = r.data;
+      if (!data || typeof data !== 'object' || !Object.keys(data).length) {
+        return UI.showToast && UI.showToast('云端还没发布过', '当前数值仍是 config.js 里的');
       }
+      /* 🔴 深合并，不是 Object.assign —— 云端快照没有函数，整键覆盖会把
+       *   pet.evolution.skillOf / godPets.byName 这类直接抹掉，宠物技能与进化当场崩。 */
+      mergeInto(Config, data);
+      renderBody();
+      UI.showToast && UI.showToast('已读取', '本页数值已按云端配置更新（未改代码）');
     };
+    const cloudRestore = $('dev-cloud-restore');
+    if (cloudRestore) cloudRestore.onclick = async () => {
+      if (!isAdmin()) return UI.showToast && UI.showToast('无权限', '仅管理员可还原');
+      const S = window.Supabase;
+      if (!S || !S.getClient) return UI.showToast && UI.showToast('未连接', 'Supabase 未就绪');
+      if (window.confirm && !window.confirm('还原到上一版发布内容？\n\n当前这版会变成「上一版」，可以再换回来。')) return;
+      cloudBusy(cloudRestore, true);
+      const r = await S.getClient().rpc('admin_restore_prev_config');
+      cloudBusy(cloudRestore, false);
+      if (r.error || (r.data && r.data.ok === false)) {
+        return UI.showToast && UI.showToast('还原失败', (r.data && r.data.error) || (r.error && r.error.message) || '未知错误');
+      }
+      UI.showToast && UI.showToast('已还原', '云端已回到上一版；点「读取云端」可应用到本页');
+      loadCloudMeta();
+    };
+
+    /* 云端状态条：有没有发布过、上一版是什么时候。读不到就留空，不弹错误。 */
+    async function loadCloudMeta() {
+      const el = $('dev-cloud-meta');
+      if (!el) return;
+      const S = window.Supabase;
+      if (!isAdmin() || !S || !S.getClient) { el.textContent = ''; return; }
+      const r = await S.getClient().rpc('admin_config_meta');
+      if (r.error || !r.data || !r.data.has_config) { el.textContent = '云端：还没发布过数值'; return; }
+      const when = t => { try { return new Date(t).toLocaleString('zh-CN', { hour12: false }); } catch (e) { return String(t || ''); } };
+      el.textContent = '云端：' + when(r.data.updated_at) + ' 发布（约 ' + Math.round((r.data.size || 0) / 1024) + 'KB）'
+        + (r.data.has_prev ? '｜上一版 ' + when(r.data.prev_updated_at) + '（可还原）' : '｜还没有上一版');
+    }
+    loadCloudMeta();
   }
   function resetAllFields() {
     SCHEMA.forEach(g => {
@@ -326,8 +524,16 @@
     return groups.filter(g => g.names.length);
   }
   function collectEggSpecies() {
+    // 蛋品种 = 进化树「根节点」（基宠），比 starters 全：测试宠（如墨灵）不走开局选宠池，
+    // 但仍是可孵化/可进化的基宠，必须能在这里补发蛋。
     const sp = (Config.pet && Config.pet.starters) || [];
-    return sp.map(s => s.name).filter(Boolean);
+    const tree = (Config.pet.evolution && Config.pet.evolution.tree) || {};
+    const children = new Set();
+    Object.values(tree).forEach(rs => rs.forEach(r => children.add(r.to)));
+    const roots = Object.keys(tree).filter(k => !children.has(k));
+    const names = new Set(sp.map(s => s.name).filter(Boolean));
+    roots.forEach(k => names.add(k));
+    return Array.from(names);
   }
   function activePetInfo() {
     const p = window.Pet && window.Pet.getActivePet && window.Pet.getActivePet();
@@ -687,14 +893,14 @@
     let pet;
     if (active) pet = JSON.parse(JSON.stringify(active));
     else pet = Pet.createPet('腐噜兽', '', startGr, 50, 20, 15, 55, '腐噜兽');
-    pet.level = startLv; pet.exp = 0; pet.expPool = 0;
-    // 防满级时 grantExp 顺手凝晶石污染 Materials：临时换成空操作（单线程，循环内无其他调用）
-    const origGain = Materials.gain; Materials.gain = () => ({});
+    pet.level = startLv; pet.exp = 0;
+    /* 2026-09-16：原先这里要把 `Materials.gain` 临时换成空操作，防「满级时 grantExp 顺手凝晶石」污染材料。
+     * 凝魂晶石退役后 `addExpPool` 已是空实现（满级溢出经验直接丢弃）⇒ 这层补丁一并删除。 */
     const counts = { none: 0, material: 0, equipment: 0, egg: 0 };
     const mat = {}, egg = {};
     let totalExp = 0, levelUps = 0; const levelSeries = [];
     const step = Math.max(1, Math.floor(N / 200));
-    try {
+    {
       for (let i = 0; i < N; i++) {
         const r = await Drop.rollReward(enemy, area, { dry: true });
         counts[r.type] = (counts[r.type] || 0) + 1;
@@ -707,7 +913,7 @@
         if (pet.level > before) levelUps++;
         if (i % step === 0) levelSeries.push({ battle: i, level: pet.level });
       }
-    } finally { Materials.gain = origGain; }
+    }
     levelSeries.push({ battle: N - 1, level: pet.level });
     return { counts, mat, egg, totalExp, finalLevel: pet.level, levelUps, levelSeries, N, area };
   }
@@ -915,9 +1121,8 @@
     html += groupHtml('一键涅槃（免素材）',
       '<div class="dev-inline">' +
         '<select class="dev-input" id="fast-sub2" style="flex:1">' + (subOpts || '<option value="">（无可用的副宠）</option>') + '</select>' +
-        '<label class="dev-check"><input type="checkbox" id="fast-crystal"> 用凝魂晶石加成</label>' +
         '<button class="btn-mini primary" id="fast-nir-go">涅槃</button></div>' +
-      '<div class="dev-note">消耗涅磐兽（自动补发）+ 可选晶石；副宠消失，主宠吸成长并重置等级</div>');
+      '<div class="dev-note">免素材涅槃（自动补发涅槃丹；凝魂晶石加成已于 2026-09-16 随该材料删除）；副宠消失，主宠吸成长并重置等级</div>');
     html += groupHtml('结算明细',
       '<div class="dev-inline"><button class="btn-mini ghost" id="fast-detail-go">刷新明细</button></div>' +
       '<div id="fast-detail" class="dev-detail"></div>');
@@ -1050,11 +1255,13 @@
       const p = needPet(); if (!p) return;
       const subId = $('fast-sub2') && $('fast-sub2').value; if (!subId) { toast('❌ 选副宠', ''); return; }
       if (!(await isLoggedIn())) { toast('❌ 请先登录', ''); return; }
-      const M = Config.nirvana;
-      Materials.gain(M.material.name, M.material.amount);
-      const useC = $('fast-crystal') && $('fast-crystal').checked;
-      if (useC && M.crystalBonus) Materials.gain(M.crystalBonus.material, M.crystalBonus.amount);
-      const res = await Merge.nirvana(p.id, subId, useC);
+      /* 2026-09-16 顺手修的真 bug：原先是 `Materials.gain(M.material.name, M.material.amount)`，
+       * 但 `Config.nirvana` 里**根本没有 material 字段**（涅槃消耗早已道具化 = 涅槃丹）⇒ 必然抛 TypeError，
+       * 一键涅槃一直是坏的。改成正主：补发 1 颗涅槃丹。
+       * 同时删掉「可选晶石加成」两行（凝魂晶石已退役），`useCrystal` 入参保留但恒传 false。 */
+      const nirPill = Config.itemOf ? Config.itemOf(Config.nirvana && Config.nirvana.defaultItem || 'nir_pill') : null;
+      if (nirPill) Materials.gain(nirPill.name, 1);
+      const res = await Merge.nirvana(p.id, subId, false);
       if (res && res.error) { toast('❌ ' + res.error, ''); return; }
       if (UI.renderAll) UI.renderAll();
       toast('涅槃完成', p.name + ' 成长→' + (typeof p.growth === 'number' ? p.growth.toFixed(1) : '?'));
@@ -1310,13 +1517,23 @@
     if (!body) return;
     let html = tabBarHtml();
     const panels = { tune: renderTunePanel, res: renderResourcePanel, sim: renderSimPanel, fast: renderFastPanel, player: renderPlayerPanel, stats: renderStatsPanel };
-    html += (panels[activeTab] || renderTunePanel)();
+    const binders = { tune: bindTunePanel, res: bindResourcePanel, sim: bindSimPanel, fast: bindFastPanel, player: bindPlayerPanel, stats: bindStatsPanel };
+    // 外部注册页并入（ui-dev-pets.js 等）
+    Object.keys(EXT_TABS).forEach(id => {
+      if (EXT_TABS[id].render) panels[id] = EXT_TABS[id].render;
+      if (EXT_TABS[id].bind) binders[id] = EXT_TABS[id].bind;
+    });
+    // 注册页的脚本没加载时，别把 activeTab 卡在一个没人渲染的 id 上
+    if (!panels[activeTab]) activeTab = 'tune';
+    html += panels[activeTab]();
     body.innerHTML = html;
     body.querySelectorAll('.dev-tab').forEach(t => {
       t.onclick = () => { activeTab = t.dataset.tab; renderBody(); };
     });
-    const binders = { tune: bindTunePanel, res: bindResourcePanel, sim: bindSimPanel, fast: bindFastPanel, player: bindPlayerPanel, stats: bindStatsPanel };
-    (binders[activeTab] || bindTunePanel)();
+    binders[activeTab]();
+    // 宠物总表列宽大，抽屉按页加宽（修饰类只在本页挂，不动全局宽度）
+    const drawer = document.querySelector('.dev-drawer');
+    if (drawer) drawer.classList.toggle('dev-drawer-wide', activeTab === 'pets');
   }
 
   /* ---------- 抽屉开关 ---------- */
@@ -1342,6 +1559,28 @@
     if (!btn) return;
     btn.style.display = isAdmin() ? '' : 'none';
   }
+
+  /* ---------- 对外接口（供 ui-dev-pets.js 等独立页使用；也供 vtest 校验） ---------- */
+  window.DevPanel = {
+    registerTab: registerTab,
+    // 内存中的 Config 引用：改它 = 本机立即生效（刷新复原，与调参页同一套语义）
+    config: function () { return Config; },
+    getByPath: getByPath,
+    setByPath: setByPath,
+    isAdmin: isAdmin,
+    // 发布链路的三件套：测试直接用它守"快照里不许有函数"
+    cloudWhitelist: CLOUD_WHITELIST,
+    buildSnapshot: buildSnapshot,
+    mergeInto: mergeInto,
+    validateSnapshot: validateSnapshot,
+    // 重渲染面板本身（改完字段后刷新数值显示）
+    refresh: function () { renderBody(); },
+    // 切到某一页并渲染（给外部页面跳转用；也便于自动化验证某一页能渲染）
+    openTab: function (id) { activeTab = hasPanel(id) ? id : 'tune'; renderBody(); },
+    // 让面板外的页面（宠物页/战斗页/图鉴）看到新数值；只在提交/失焦时调，别在 input 里调
+    applyAll: function () { if (UI && UI.renderAll) UI.renderAll(); },
+    toast: function (title, desc) { if (UI && UI.showToast) UI.showToast(title, desc); }
+  };
 
   /* ---------- 初始化 ---------- */
   function initDev() {

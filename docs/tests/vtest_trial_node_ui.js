@@ -44,6 +44,8 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/core/config.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/trial/trial-config.js', 'utf8'), ctx);
 vm.runInContext('Config.resourceTrials.floorDelayMs = 1;', ctx); // 测试加速
+// 每日免费次数从 Config 读（2026-09-16：原先三处硬编码 3，配置改成 1 就全红 —— 断言该守「展示的是配置值」）
+const FREE = ctx.Config.resourceTrials.freeEntriesPerDay;
 vm.runInContext(fs.readFileSync('../js/core/worldmap.js', 'utf8'), ctx);
 const TEST_PET = { id: 'p1', name: '小炎', level: 30, growth: 8, stats: { atk: 900, def: 300, hp: 9000 }, curHp: 9000 };
 ctx.Pet = {
@@ -108,8 +110,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   });
   canvas.querySelectorAll = sel => (sel === '.wm-marker--trial' ? markers : []);
   UI.refreshTrialMarkers();
-  ok(markers.every(m => m.querySelector('.wm-marker-remain').textContent === '免费3'),
-    '徽标显示今日免费剩余 3 次（免费3 / 免费3 / 免费3）');
+  ok(markers.every(m => m.querySelector('.wm-marker-remain').textContent === '免费' + FREE),
+    `徽标显示今日免费剩余 ${FREE} 次（读 Config，免费${FREE} ×3）`);
 
   // ② 点击副本节点 → 详情页渲染（层数档位预览 + 进入按钮）
   UI.showTrialDetail({ routeId: 'metamorph', name: '副本·蜕变试炼', type: 'trial', x: 8, y: 10 });
@@ -121,7 +123,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(html.indexOf('第 5 层') >= 0 && html.indexOf('第 10 层') >= 0 && html.indexOf('第 15 层') >= 0 && html.indexOf('第 20 层') >= 0,
     '详情页按层数档位展示奖励预览（5/10/15/20 层）');
   ok(html.indexOf('血量跨层累计') >= 0, '详情页标明血量跨层累计规则');
-  ok(html.indexOf('免费') >= 0 && html.indexOf('/3') >= 0, '详情页展示每日免费次数（免费 3/3）');
+  ok(html.indexOf('免费') >= 0 && html.indexOf('/' + FREE) >= 0, `详情页展示每日免费次数（免费 ${FREE}/${FREE}）`);
   ok(html.indexOf('资源试炼门票') >= 0, '详情页展示门票信息');
   ok(html.indexOf('nd-trial-go') >= 0, '详情页有「进入」按钮');
 
@@ -149,7 +151,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(settleHtml.indexOf('通关') >= 0, '结算面板显示通关结果');
   ok(settleHtml.indexOf('20</b>/20') >= 0 || settleHtml.indexOf('到达 <b>20</b>') >= 0, '结算面板显示到达 20/20 层');
   ok(settleHtml.indexOf('传说进化素材') >= 0, '结算面板展示第 20 层档位奖励（传说进化素材）');
-  ok(settleHtml.indexOf('今日免费剩余 2') >= 0, '结算面板显示消耗后今日免费剩余（3→2）');
+  ok(settleHtml.indexOf('今日免费剩余 ' + (FREE - 1)) >= 0, `结算面板显示消耗后今日免费剩余（${FREE}→${FREE - 1}）`);
   ok(settleHtml.indexOf('ts-again') >= 0, '结算面板有「再打一次」按钮');
 
   console.log('ALL TRIAL NODE UI SMOKE TESTS PASSED');
