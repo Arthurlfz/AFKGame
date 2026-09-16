@@ -26,15 +26,22 @@
     const M = Config.nirvana || Config.merge || {};
     list.innerHTML = '';
     const mainPet = getPets().find(p => p.id === mergeMainId);
-    // 主宠候选：可涅槃（未穿装备、可merge、已存档、不在售）
-    const cands = getPets().filter(p => {
-      const ec = Object.values(p.equipment || {}).filter(Boolean).length;
-      return !ec && Merge.canMerge(p) && p.cloudId && !(Market && Market.isListed(p.cloudId));
-    });
+    /* 主宠候选：等级够 + 已存档 + 不在售。
+     * 🔴 2026-09-17 修（用户实测「神宠无法涅槃，都不能选择」）：
+     *   这里以前套用了 `Merge.canMerge(p)` —— 那是【副宠】的门槛，含"未穿装备"这一条。
+     *   副宠涅槃后会【消失】，穿着装备会连带出事，所以它必须脱；
+     *   而主宠涅槃后是【保留】的（只重置等级），装备跟着留着完全没问题。
+     *   误用的后果：穿着一套装备的神宠在主宠列表里**直接不出现**，
+     *   玩家看到的是"我的神宠根本选不了"（实测：血月神狐 Lv60 神级、穿满 12 件 → 列表空）。
+     *   服务端 `pet_merge.js` 的 nirvana 对主宠也只校验等级、不校验装备 —— UI 现已与服务端同口径。 */
+    const minLv = M.minLevel || 60;
+    // 判据住在 core（Merge.canNirvanaMain），UI 不再自己拼条件 —— 避免再被误改成副宠那套
+    const cands = getPets().filter(p =>
+      Merge.canNirvanaMain(p) && !(Market && Market.isListed(p.cloudId)));
     if (!cands.length) {
       const empty = document.createElement('div');
       empty.className = 'quick-empty';
-      empty.textContent = '没有可涅槃的宠物（需未穿装备、不在出售）';
+      empty.textContent = '没有可涅槃的宠物（需 Lv.' + minLv + ' 以上、不在出售）';
       list.appendChild(empty);
       renderMergeStage(null);
       return;

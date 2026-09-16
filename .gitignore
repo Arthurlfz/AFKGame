@@ -69,7 +69,10 @@ docs/_preview_*.png
 docs/onboarding-demo.html
 docs/battle-demo.html
 docs/css/onboarding-demo.css
-docs/css/ui-onboarding.css
+# ⚠️ 2026-09-17 从这里删掉了一行 `docs/css/ui-onboarding.css`：
+#   它是【正式引导引擎的样式表】（游戏.html:30 引用），却被误归进"demo 临时文件"这组忽略掉了
+#   ⇒ 该文件从来没进过仓库 ⇒ **线上 GitHub Pages 一直 404**，引导聚光灯（压屏挖洞）的样式全丢。
+#   同组的 onboarding-demo.* 才是 demo（那两个文件 09-10 已删）。别再把它加回来。
 docs/AI假人经济系统策划_v1.md
 docs/游戏UI体检报告.md
 

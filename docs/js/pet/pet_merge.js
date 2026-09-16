@@ -53,10 +53,20 @@
       !Object.values(p.equipment || {}).some(Boolean)
     );
   }
-  // 涅槃（融合）素材门槛：读 nirvana.minLevel（60）
+  // 涅槃（融合）【副宠】门槛：读 nirvana.minLevel（60）—— 副宠会消失，必须没穿装备
   const canMerge = pet => {
     const minLv = NV().minLevel || 60;
     return pet.level >= minLv && !Object.values(pet.equipment || {}).some(Boolean);
+  };
+  /* 涅槃【主宠】门槛：只要求等级 —— ⭐ 刻意【不】检查装备。
+   *   主宠涅槃后是保留的（只重置等级），身上那套装备跟着留着完全没问题；
+   *   只有副宠（会消失）才必须脱装备。
+   *   🔴 2026-09-17 补这个函数的原因：UI 曾把 `canMerge`（副宠判据）套在主宠筛选上，
+   *   结果**穿满装备的神宠在主宠列表里直接不出现**，玩家报「神宠无法涅槃，都不能选择」。
+   *   与服务端口径一致：`nirvanaInner` 对主宠也只校验等级。 */
+  const canNirvanaMain = pet => {
+    const minLv = NV().minLevel || 60;
+    return pet.level >= minLv && !!pet.cloudId;
   };
   // 合成素材门槛：读 synthesize.minLevel（40）—— 血泪：合成页曾误用 canMerge(读60)，
   // 全队 Lv40 却一只都显示不出来，玩家以为"没宠/没发经验包"。
@@ -586,7 +596,7 @@
     nirvana,              // 涅槃：主宠涨成长（新）
     synthesize,           // 合成：出全新变异宠（新）
     merge: nirvana,       // 兼容别名：旧调用 Merge.merge = 涅槃
-    getMergeCandidates, canMerge, canSynthesize,
+    getMergeCandidates, canMerge, canNirvanaMain, canSynthesize,
     calcNirvanaGrowth, calcSynthesizeGrowth,
     inheritSynthTraits, implantNirvanaTraits, cultivate,
     // 神级宠（手册 2.6）
