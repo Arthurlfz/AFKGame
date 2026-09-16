@@ -56,10 +56,16 @@ declare
   v_admins jsonb;
 begin
   -- 管理员名单：优先读 game_config_overrides 的 dev.adminEmails，兼容既有硬编码口径
-  select coalesce(config -> 'dev' -> 'adminEmails', '[]'::jsonb)
+  /* ⚠️ 2026-09-17 修：这里必须给表起别名再限定 `g.id`。
+   * 本函数的 returns table(...) 里有一个叫 `id` 的输出列 —— 在 plpgsql 里那是**变量**，
+   * 于是裸写 `where id = true` 会撞上 game_config_overrides 自己的 id 列：
+   *   column reference "id" is ambiguous
+   * 表现就是开发者面板里「读取失败：column reference "id" is ambiguous」。
+   * 已有两处同样写法（本文件 + migrate_ops_board.sql）都一起加了别名。 */
+  select coalesce(g.config -> 'dev' -> 'adminEmails', '[]'::jsonb)
     into v_admins
-    from public.game_config_overrides
-   where id = true;
+    from public.game_config_overrides g
+   where g.id = true;
 
   if v_email is null
      or not (coalesce(v_admins, '[]'::jsonb) @> to_jsonb(v_email)

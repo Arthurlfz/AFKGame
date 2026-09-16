@@ -31,10 +31,11 @@ declare
   v_admins jsonb;
   v_out    jsonb;
 begin
-  select coalesce(config -> 'dev' -> 'adminEmails', '[]'::jsonb)
+  -- ⚠️ 表要起别名并限定 g.id：函数输出列与表列同名时裸写 id 会 ambiguous（详见 migrate_feedback.sql 注释）
+  select coalesce(g.config -> 'dev' -> 'adminEmails', '[]'::jsonb)
     into v_admins
-    from public.game_config_overrides
-   where id = true;
+    from public.game_config_overrides g
+   where g.id = true;
 
   if v_email is null
      or not (coalesce(v_admins, '[]'::jsonb) @> to_jsonb(v_email)
