@@ -42,7 +42,13 @@
 - Supabase ref `asklogeayzlqpeejuvjj`（`core/supabase.js`）；EF 部署 `npx -y supabase functions deploy <name>`；🔴 **EF 不会自动部署** → 改了 `supabase/functions/**` 收尾必须提醒用户。
 - ⭐ **AI 可以直接执行数据库 DDL**（2026-09-16 验证）：调 `invoke_integration(id:"supabase", type:"database")` 连上后，
   用 `supabase_execute_sql` 就能跑建表/加列/加约束（多语句用分号隔开也能一次执行）。
-  ⇒ **别再让用户手动去 Dashboard 跑迁移了**（旧记录"AI 执行不了"已过时）。EF 部署仍需 `supabase login`（交互式）。
+  ⇒ **别再让用户手动去 Dashboard 跑迁移了**（旧记录"AI 执行不了"已过时）。
+- ⭐ **EF 部署也不需要交互式 `supabase login`**（2026-09-16 起，已实测）：PAT 落在项目根 `.env` 的 `SUPABASE_ACCESS_TOKEN`
+  （⚠️ `.gitignore:41` 已忽略、`git ls-files .env` 为空 → 安全；⛔ 别把 token 写到别处，也别回显）：
+  `$env:SUPABASE_ACCESS_TOKEN = (Select-String -Path .env -Pattern '^SUPABASE_ACCESS_TOKEN=').Line -replace '^SUPABASE_ACCESS_TOKEN=',''`
+  → `npx -y supabase functions deploy <name> --project-ref asklogeayzlqpeejuvjj`。
+  ⚠️ ref 是 **20 位**（`asklogeayzlqpeejuvjj`），从 `docs/js/core/supabase.js:15` 抄，别凭记忆（曾少写 `pee` 报 Invalid project ref）。
+  ⚠️ **用户给过一次凭据就该落盘到约定位置** —— 09-11 那次"会话内联不落盘"，换会话就丢，用户白给一次。
 - 🔴 `savePet` 是无条件 INSERT，更新一律 `updatePet(cloudId,{...})`；**建档确认成功前不许删素材 / 扣材料**；删素材宠先删云端成功再删本地。
 - 🔴 PostgREST **只认表级权限**；jsonb 参数传对象 / 数组别 `JSON.stringify`；改 RPC 参数先 `drop function if exists` 旧签名。
 - ⚠️「本地先行 + 云失败回滚」：失败原因必须可见、回滚还原**全部**本地改动；整块 `innerHTML=` 的结果区一律现查再写。
