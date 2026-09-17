@@ -73,7 +73,10 @@ docs/css/onboarding-demo.css
 #   它是【正式引导引擎的样式表】（游戏.html:30 引用），却被误归进"demo 临时文件"这组忽略掉了
 #   ⇒ 该文件从来没进过仓库 ⇒ **线上 GitHub Pages 一直 404**，引导聚光灯（压屏挖洞）的样式全丢。
 #   同组的 onboarding-demo.* 才是 demo（那两个文件 09-10 已删）。别再把它加回来。
-docs/AI假人经济系统策划_v1.md
+# ⚠️ 2026-09-17 从这里删掉了一行 `docs/AI假人经济系统策划_v1.md`：
+#   该文件 09-16 已移进 `docs/档案/` 并入库，这条规则只剩副作用 ——
+#   哪天有人把它移回根目录，会被**静默忽略**，重演 ui-onboarding.css 那类「本地有、线上 404」。
+#   教训：忽略规则指向的文件一旦入库/搬走，规则就要一起删，不能留。
 docs/游戏UI体检报告.md
 
 # ===== 本地垃圾（2026-09-10 整理：以前没盖住，`git add -A` 会误入库）=====
@@ -94,9 +97,13 @@ docs/tests/result.txt
 video/node_modules/
 video/out/
 
-# ===== 浏览器测试产出（2026-09-16）：含被占用的 LevelDB/Cache 文件 =====
-# 实测 `git add -A` 会在这里失败（Permission denied: tools/test-out/_pb1/Default/Cache/Cache_Data/sqldb0），
-# 而且几千个缓存文件体积大、无版本价值 ⇒ 整目录忽略，避免以后误 add。
-tools/test-out/
+# ===== 浏览器测试产出（2026-09-16）=====
+# ⚠️ 2026-09-17：`tools/` 的入库内容已全部移除（48 个 `patch-*.py`/`bump-v-*.py`/`revert-*.py`
+#   一次性脚本 + `frames-*`/`meowa-atk`/`atk-*` 帧图 —— 逐帧动画实测不可用，
+#   `pet-sprites.js` 的 `ANIM_ENABLED` 已关停；素材需要回溯时从 git 历史取）。
+#   本目录只剩这里被忽略的浏览器缓存，而它当时**被浏览器进程占用、没删干净**，
+#   所以这条规则先留着（否则 `?? tools/` 会一直污染 git status）。
+#   👉 关掉浏览器后手动删掉整个 `tools/` 目录，删完这条规则就可以一起删。
+tools/
 
 
