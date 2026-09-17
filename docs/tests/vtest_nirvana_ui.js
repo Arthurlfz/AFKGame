@@ -71,21 +71,21 @@ function render(fn, label) {
   A(els['merge-confirm'].innerHTML.includes('确认涅槃'), '确认涅槃按钮渲染出来');
 
   /* ---------- 3. 两个复选框的事件都真的绑上了（lockCheck 那个没声明的变量就在这） ---------- */
-  const pillCheck = els['nir-pill-check'], lockCheck = els['nir-lock-check'];
+  // 上面的渲染崩了的话这两个元素根本不会被创建 → 用 {} 兜底，让报告停在"没绑上"这条，而不是抛 TypeError
+  const pillCheck = els['nir-pill-check'] || {}, lockCheck = els['nir-lock-check'] || {};
   A(typeof pillCheck.onchange === 'function', '涅槃丹复选框绑定了 onchange');
   A(typeof lockCheck.onchange === 'function', '锁魂玉复选框绑定了 onchange（漏写 lockCheck 声明 = 这里报错）');
 
   /* ---------- 4. 勾选后真的生效（不只是"没崩"） ---------- */
   C('Materials.gain(Config.itemOf("nir_pill").name, 3); Materials.gain(Config.itemOf("nir_lock").name, 3)');
-  let tErr = null;
-  try { lockCheck.checked = true; lockCheck.onchange(); } catch (e) { tErr = e && (e.message || e); }
-  A(!tErr, '点「锁魂玉」复选框不抛异常' + (tErr ? '（' + tErr + '）' : ''));
+  const fire = (box) => { try { box.checked = true; box.onchange(); return null; } catch (e) { return e && (e.message || e); } };
+  const lockErr = fire(lockCheck);
+  A(!lockErr, '点「锁魂玉」复选框不抛异常' + (lockErr ? '（' + lockErr + '）' : ''));
   A(els['merge-preview'].innerHTML.includes('nir-lock-trait'),
     '勾选锁魂玉后预览里出现「定向植入」特质下拉（useLock 真的生效，不只是没崩）');
 
-  tErr = null;
-  try { pillCheck.checked = true; pillCheck.onchange(); } catch (e) { tErr = e && (e.message || e); }
-  A(!tErr, '点「涅槃丹」复选框不抛异常' + (tErr ? '（' + tErr + '）' : ''));
+  const pillErr = fire(pillCheck);
+  A(!pillErr, '点「涅槃丹」复选框不抛异常' + (pillErr ? '（' + pillErr + '）' : ''));
   A(els['merge-preview'].innerHTML.includes('×1.2'),
     '勾选涅槃丹后预览显示吸收倍率 ×1.2（倍率真的进了预览）');
 
