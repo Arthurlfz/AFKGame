@@ -624,30 +624,10 @@ body.rm-anim *::after {
   font-weight: 700;
 }
 
-/* ===== 2026-09-17 登录页：8 基宠展示层（全身立绘 + 入场/漂浮/悬停动效） ===== */
-.login-pets { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
-.login-pets .pet {
-  position: absolute; width: 118px; height: 118px;
-  pointer-events: auto; cursor: default;
-  opacity: .8;
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / .55));
-  animation: login-pet-in .8s cubic-bezier(.2, .7, .3, 1) both,
-             login-pet-float 4.4s ease-in-out var(--f, 0s) infinite;
-}
-.login-pets .pet img { width: 100%; height: 100%; object-fit: contain;
-  transition: transform .32s ease; }
-.login-pets .pet-name {
-  position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
-  font-family: var(--font-title, "LXGW WenKai"), "STKaiti", serif;
-  font-size: 12px; letter-spacing: .22em; white-space: nowrap;
-  color: rgb(232 220 192 / .9);
-  text-shadow: 0 1px 4px rgb(0 0 0 / .9), 0 0 8px rgb(184 155 89 / .25);
-  opacity: 0; transition: opacity .25s ease;
-}
-.login-pets .pet:hover { opacity: 1; }
-.login-pets .pet:hover img { transform: scale(1.1); }
-.login-pets .pet:hover .pet-name { opacity: 1; }
 .login-panel { position: relative; z-index: 2; }
+  position: relative; z-index: 2;
+}
+
 @media (max-width: 1080px) { .login-pets { display: none; } }
 @keyframes login-pet-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes login-pet-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }

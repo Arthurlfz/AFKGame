@@ -661,7 +661,7 @@
     const age = ageLabel(l);
     div.innerHTML = `
       <div class="mk-card-top">
-        ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg></div>'}
+        ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg></div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
           <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
@@ -884,7 +884,7 @@
     const cnt = $('rpCount');
     if (cnt) cnt.textContent = '共 ' + total + ' 件';
 
-    if (pets.length) renderMarketSection(box, 'pet', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 宠物', pets, (l, pool) => buildPetCard(l, pool), petPool);
+    if (pets.length) renderMarketSection(box, 'pet', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg> 宠物', pets, (l, pool) => buildPetCard(l, pool), petPool);
     if (items.length) renderMarketSection(box, 'item', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ 装备', items, (l, pool) => buildItemCard(l, RARITY_LABEL, pool), itemPool);
     if (mats.length) renderMarketSection(box, 'material', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg> 材料', mats, (l, pool) => buildMaterialCard(l, pool), matPool);
     if (eggs.length) renderMarketSection(box, 'egg', '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 宠物蛋', eggs, (l, pool) => buildEggCard(l, pool), eggPool);

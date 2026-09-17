@@ -467,7 +467,7 @@
     // 防重复：cloudId 已存在则不重复添加
     if (!getPets().some(p => p.cloudId === data.id)) {
       addPet(Pet.petFromRow(data));
-      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg> 买到的宠物已入列：${data.name}（成长 ${data.growth}）`);
+      addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg> 买到的宠物已入列：${data.name}（成长 ${data.growth}）`);
     }
     renderAll();
     refreshStats();
