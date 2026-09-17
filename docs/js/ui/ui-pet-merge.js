@@ -118,8 +118,12 @@
       <div class="stats">${statRows(main)}</div>
     </div>`;
     if (arrow) arrow.innerHTML = '<div class="forge-core"><div class="cauldron fire">焰</div><div class="cauldron-tip">业火炉<br>副宠将被吸收</div></div>';
-    // 副宠候选
-    const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id) : [];
+    /* 副宠候选：必须把涅槃门槛（M.minLevel=60）传进去。
+     * 🔴 2026-09-17 修：以前这里不传 cfg，getMergeCandidates 退回默认 40 级 ⇒
+     *   Lv40~59 的宠会被列成"可当副宠"，玩家点了才被服务端拒（"两只宠物都必须达到 60 级"），
+     *   而界面上写的却是"需要另一只 60 级"。合成页一直是传了配置的（ui-pet-synth.js），
+     *   只有涅槃页漏了 —— 现在两边口径一致。 */
+    const subs = Merge.getMergeCandidates ? Merge.getMergeCandidates(main.id, M) : [];
     if (!subs.length) {
       sb.innerHTML = `<div class="hint">没有可用的副宠（需要另一只 ${M.minLevel} 级、不在出售、没穿装备的宠物）</div>`;
       pb.innerHTML = ''; cb.innerHTML = '';
@@ -211,6 +215,7 @@
     if (pillCheck) {
       pillCheck.onchange = () => { useNirvanaPill = pillCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
     }
+    const lockCheck = document.getElementById('nir-lock-check');
     if (lockCheck) {
       lockCheck.onchange = () => { useLock = lockCheck.checked; renderMergePreview(main, matName, matAmt, haveMat); };
       const lockSel = document.getElementById('nir-lock-trait');
