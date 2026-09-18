@@ -568,7 +568,15 @@
     const area = getCurrentArea();
     if (!area || !enemyData) return null;
     const lv = Number(level) || Number(enemyData.level) || 1;
-    return scaleEnemyStats(Object.assign({}, enemyData, { level: lv }), area);
+    /* 🔴 2026-09-17 修（用户实测「怪物信息里暴击/爆伤/闪避全是 0」）：
+     *   这里以前只做 scaleEnemyStats，**漏了 applyEnemyDefaults** ——
+     *   而 enemy-data 里根本不配暴击/爆伤/命中/闪避（只配名字/类型/速度/掉落），
+     *   于是这条路上的怪这些字段恒为 undefined → 悬浮框显示 0%，玩家以为怪物没这些属性。
+     *   真正的战斗（本地 beginFight）是 `applyEnemyDefaults(scaleEnemyStats(...))`，
+     *   服务端 battle-sim.mjs 构怪时也是同一套 enemyMech 公式 —— 数值一直都在，只是这条显示路没走它。
+     *   ⇒ 现在两边同一个构造，**画面上的怪 = 真打的那只怪**（含托管挂机的演出怪）。
+     *   applyEnemyDefaults 只填空值、可重复调用，这里每次返回新对象，不会互相污染。 */
+    return applyEnemyDefaults(scaleEnemyStats(Object.assign({}, enemyData, { level: lv }), area));
   }
 
   /* ============================================================

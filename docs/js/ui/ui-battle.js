@@ -776,21 +776,45 @@
             <div class="enemy-tip-rows">
               <div class="enemy-tip-row" style="grid-column:1/-1">已装备<b>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + escapeHtml(bonusText) + '）' : ''}</b></div>
             </div>
+          </div>
+          <div class="roster-quick-actions">
+            <button class="rqa-btn" data-rqa="evolve">进化</button>
+            <button class="rqa-btn" data-rqa="synth">合成</button>
+            <button class="rqa-btn" data-rqa="equip">装备</button>
           </div>`;
         const r = anchor.getBoundingClientRect();
         tipBox.style.left = (r.right + 8) + 'px';
         tipBox.style.top = Math.max(6, r.top) + 'px';
         tipBox.classList.add('show');
       };
+      let hoverTarget = null; // 记录当前 hover 的宠物，供按钮点击用
       const hideTip = () => tipBox.classList.remove('show');
       box.addEventListener('mouseover', (e) => {
         const el = e.target.closest ? e.target.closest('.roster-pet') : null;
         if (!el) return;
-        const pet = getPets().find(p => p.id === Number(el.dataset.id));
-        if (pet) showTipFor(pet, el);
+        hoverTarget = getPets().find(p => p.id === Number(el.dataset.id));
+        if (hoverTarget) showTipFor(hoverTarget, el);
       });
       box.addEventListener('mouseout', (e) => {
         if (e.target.closest && e.target.closest('.roster-pet')) hideTip();
+      });
+      // 鼠标移到 tooltip 上不消失；点快捷按钮跳转
+      tipBox.addEventListener('mouseenter', () => { tipBox.classList.add('show'); });
+      tipBox.addEventListener('mouseleave', hideTip);
+      tipBox.addEventListener('click', (e) => {
+        const btn = e.target.closest ? e.target.closest('.rqa-btn') : null;
+        if (!btn || !hoverTarget) return;
+        const action = btn.dataset.rqa;
+        if (action === 'equip') {
+          if (window.UI && UI.switchPage) UI.switchPage('equip');
+        } else {
+          if (window.UI && UI.switchPage) UI.switchPage('pet');
+          setTimeout(() => {
+            const tab = document.querySelector('.pet-tab[data-pet-tab="' + action + '"]');
+            if (tab) tab.click();
+          }, 100);
+        }
+        hideTip();
       });
     }
   }
@@ -844,3 +868,48 @@
   UI.syncCombatantSnapshot = syncCombatantSnapshot;
   UI.renderRoster = renderRoster;
 })();
+
+  /* ========== 战斗页快捷进化入口 ========== */
+  (function initQuickEvo() {
+    const btn = document.getElementById('quick-evo');
+    if (!btn) return;
+    const dot = btn.querySelector('.qevo-dot');
+
+    function checkEvolvable() {
+      try {
+        const Pet = window.Pet;
+        const Evolve = window.Evolve;
+        if (!Pet || !Evolve || !Evolve.canEvolve || !Evolve.getRouteMaterial) return;
+        const pets = Pet.getPets ? Pet.getPets() : [];
+        let anyReady = false;
+        for (const p of pets) {
+          if (!Evolve.canEvolve(p)) continue;
+          const routes = Evolve.getEvolutionRoutes(p);
+          const rm = Evolve.getRouteMaterial(p, 0);
+          if (rm && rm.enough) { anyReady = true; break; }
+        }
+        if (dot) dot.hidden = !anyReady;
+      } catch(e) { /* silent */ }
+    }
+
+    btn.addEventListener('click', () => {
+      if (window.UI && window.UI.switchPage) {
+        window.UI.switchPage('pet');
+        // 切过去后自动点"进化"tab
+        setTimeout(() => {
+          const tab = document.querySelector('.pet-tab[data-pet-tab="evolve"]');
+          if (tab) tab.click();
+        }, 100);
+      }
+    });
+
+    // 每5秒检查一次（用 setTimeout 链 + unref，不阻塞测试进程退出）
+    function scheduleCheck() {
+      const t = setTimeout(() => { checkEvolvable(); scheduleCheck(); }, 5000);
+      if (t.unref) t.unref();
+    }
+    const t0 = setTimeout(checkEvolvable, 1000);
+    if (t0.unref) t0.unref();
+    scheduleCheck();
+  })();
+

@@ -481,6 +481,30 @@
       if (areaId && B.selectArea) B.selectArea(areaId); // 挂机中换图会被拒绝，此时保持当前图
     }
     if (UI.switchPage) UI.switchPage(page);
+    /* 🆕 2026-09-18（用户报「点击会跳转，但**不会自动开始打怪**」）：
+     *   跳到战斗页时顺手把挂机开起来，玩家不用再点一次「开始自动战斗」。
+     * ⚠️ 复用已有入口，**不另写启动/停止逻辑**：
+     *   · `window.Game.startIdleAt()` —— 主按钮 / 世界地图详情页用的同一个（含托管挂机与全部门槛）
+     *   · `window.Game.stopIdle()`   —— 要换图，必须先停旧挂机（挂机中 selectArea 会被拒） */
+    if (page === 'battle') {
+      const G = window.Game;
+      if (G && G.startIdleAt) {
+        Promise.resolve((async () => {
+          const B2 = window.Battle;
+          const cur = B2 && B2.getCurrentArea && B2.getCurrentArea();
+          const running = !!(B2 && B2.isRunning && B2.isRunning())
+            || !!(window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive());
+          // 已经在挂机、且目标就是当前图（或任务没指定图）→ 什么都不做（重复启动会把它停掉）
+          if (running && (!area || (cur && cur.id === area))) return null;
+          if (running && G.stopIdle) await G.stopIdle();
+          return G.startIdleAt(area);
+        })()).then(r => {
+          if (r && r.error && UI.showToast) {
+            UI.showToast('挂机没起来', (G.startIdleErrorText ? G.startIdleErrorText(r) : '请点「开始自动战斗」'));
+          }
+        }).catch(() => { /* 启动失败不阻断跳转 */ });
+      }
+    }
     if (guide && guide.tab) {
       // 装备类跳转（tab:'equip'）：12 槽界面在背包浮窗 · 装备子页（宠物页 equip pane 已删）
       if (guide.tab === 'equip') {

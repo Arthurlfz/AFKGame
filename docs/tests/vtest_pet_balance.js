@@ -6,7 +6,8 @@
  *  3. 立住 trade-off：速度越快 → 单场掉血占比越高、连打场数越少（快脆慢肉）
  *  4. 无独大：不存在某只宠净推进碾压其余（幽影兔旧版独大的回归）
  *  5. 10 图扩展一致性：areas / areaEnemyStats / baseTierMultipliers /
- *     materialTierWeights / areaMaterials / areaEvolutionTiers 数量与 id 全部对齐
+ *     materialTierWeights / areaMaterials 数量与 id 全部对齐，
+ *     且每张图的材料权重表里三档进化素材都在（2026-09-17 起 areaEvolutionTiers 已删）
  *     （档位数与图数不一致会取到 undefined → 生成 NaN 装备）
  * 数值唯一事实源：config.js（starters / speeds / petProfiles / areas / areaEnemyStats）
  * ============================================================ */
@@ -109,11 +110,17 @@ function evaluate(st, L, G, type) {
   const okMat = Object.keys(JSON.parse(C('JSON.stringify(Config.equipment.materialTierWeights)'))).length === areas.length;
   const okEne = Object.keys(enemyTable).length === areas.length;
   const okMatName = JSON.parse(C('JSON.stringify(Config.drop.areaMaterials)'));
-  const okEvo = JSON.parse(C('JSON.stringify(Config.drop.areaEvolutionTiers)'));
-  const missing = ids.filter(id => !enemyTable[id] || !okMatName[id] || !okEvo[id]);
+  /* 🔴 2026-09-17：`areaEvolutionTiers` 已删除（进化素材三档改成独立键全域化）→
+   * 本条原本用它守"素材档与 10 图对齐"，现改守「10 张图的材料权重表里三档进化素材都在」。 */
+  const mwAll = JSON.parse(C('JSON.stringify(Config.drop.materialWeightsByTier)'));
+  const okEvo = ids.every((id, i) => {
+    const t = mwAll[i + 1] || {};
+    return (t['进化素材'] || 0) > 0 && (t['精粹进化素材'] || 0) > 0 && (t['传说进化素材'] || 0) > 0;
+  });
+  const missing = ids.filter(id => !enemyTable[id] || !okMatName[id]);
   A(areas.length === 10, `地图数量 10 张（2026-09-06 精简，当前 ${areas.length}）`);
-  A(okTier && okMat && okEne && !missing.length,
-    `装备图档/底材档/敌人数值/材料/素材档 与 10 图对齐${missing.length ? '，缺：' + missing.join(',') : ''}`);
+  A(okTier && okMat && okEne && okEvo && !missing.length,
+    `装备图档/底材档/敌人数值/材料/进化素材三档 与 10 图对齐${missing.length ? '，缺：' + missing.join(',') : ''}`);
   // 每图 6 级、首尾接得上（2026-09-06 精简后 10 图全是 6 级段，图10 = [55,60] 毕业）
   let spanOk = true;
   areas.forEach((a, i) => {

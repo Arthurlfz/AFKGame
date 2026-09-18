@@ -43,9 +43,14 @@ function render(fn, label) {
     const main = Pet.createPet('血月神狐', null, 75, 120, 40, 12, 100, '血月神狐');
     main.level = 60; main.isGodPet = true; main.evolveStage = 5; main.cloudId = 'c-main';
     Pet.addPet(main);
+    // 神级副宠：2026-09-17 用户拍板「之后肯定是神宠互相吃」→ 神级宠必须能当副宠，
+    // 而且必须在界面上一眼看出是神级（下面有断言钉住这两条，别再"顺手"把它们过滤掉）
+    const godSub = Pet.createPet('血月神狐', null, 88, 120, 40, 12, 100, '血月神狐');
+    godSub.level = 60; godSub.isGodPet = true; godSub.evolveStage = 5; godSub.cloudId = 'c-godsub';
+    godSub.traits = [{ id: Object.keys(Config.petTraits)[0], tier: 2 }];
+    Pet.addPet(godSub);
     const sub = Pet.createPet('疫毛兽', null, 40, 100, 30, 10, 90, '疫毛兽');
     sub.level = 60; sub.cloudId = 'c-sub';
-    sub.traits = [{ id: Object.keys(Config.petTraits)[0], tier: 2 }];   // 副宠带一条特质 → 锁魂玉才可用
     Pet.addPet(sub);
     // 一只【等级不够】的宠：它绝不能出现在副宠候选里（涅槃门槛 60 级）
     const low = Pet.createPet('低等级陪练', null, 20, 80, 20, 8, 80, '骨狼');
@@ -95,8 +100,16 @@ function render(fn, label) {
     `副宠候选里没有 Lv.40 那只（涅槃门槛 Lv.${minLv}，界面提示与候选口径一致）`);
   A(els['merge-sub-box'].innerHTML.includes('疫毛兽'),
     '合格的 Lv.60 副宠出现在候选里');
-  A(C('Merge.getMergeCandidates(globalThis.__mainId, Config.nirvana).length') === 1,
+  A(C('Merge.getMergeCandidates(globalThis.__mainId, Config.nirvana).length') === 2,
     '传入涅槃配置时候选只按 Lv.60 筛（默认 40 会让门槛形同虚设）');
+
+  /* ---------- 6. 神级宠可以当副宠（2026-09-17 用户拍板：「之后肯定是神宠互相吃」） ---------- */
+  A(C('Merge.getMergeCandidates(globalThis.__mainId, Config.nirvana).some(p=>p.isGodPet)'),
+    '神级宠出现在副宠候选里（神宠互相吃是正经玩法，不许"顺手"过滤掉）');
+  A(els['merge-sub-box'].innerHTML.includes('神级'),
+    '副宠卡片标出「神级」（要喂掉的是一只神宠，必须一眼看得出）');
+  A(els['merge-preview'].innerHTML.includes('★ 神级'),
+    '底部确认条也标出「★ 神级」（确认前看得见自己喂掉的是什么）');
 
   console.log(failures ? `\n${failures} 条失败` : '\n全部通过');
   process.exit(failures ? 1 : 0);

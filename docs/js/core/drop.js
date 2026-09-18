@@ -69,7 +69,8 @@
   }
 
   // 抽到 material 时：按"本图档"的 materialWeightsByTier 选具体材料（缺省键=该图还不出）。
-  // 进化素材用占位键'进化素材'承载权重，具体掉 普通/精粹/传说 由 areaEvolutionTiers + evoMaterialWeights 决定。
+  // 🔴 2026-09-17：进化素材的占位键机制**已删除** —— 普通/精粹/传说三档现在是**独立键**，
+  //   各自在每张图都有自己的权重（全域化），本函数不再需要任何占位键解析（除了区域材料那一个）。
   // 词缀：dropQty≥2 时 qty=2；matDrop 已作用在 pool.material 总权重上。
   function pickMaterial(enemy, area, res) {
     const D = Config.drop;
@@ -79,20 +80,11 @@
     const tier = Math.max(1, Math.min(maxTier, areaIdx >= 0 ? areaIdx + 1 : 1));
     const mw = (D.materialWeightsByTier && D.materialWeightsByTier[tier]) || {};
     const sub = [];
-    let evoSlot = 0;
     for (const [name, w] of Object.entries(mw)) {
       if (!w || w <= 0) continue;
-      if (name === '进化素材') { evoSlot = w; continue; } // 占位，下面按本图档位解析具体名字
-      sub.push([name, w]);
+      sub.push([name, w]); // 表里的键基本就是材料名（进化素材三档现在也是真名字了）
     }
-    // 进化素材：按本图可用档（areaEvolutionTiers）+ 档位权重（evoMaterialWeights）选具体名字
-    const evoTiers = (area && area.id && D.areaEvolutionTiers && D.areaEvolutionTiers[area.id]) || null;
-    if (evoSlot > 0 && evoTiers && evoTiers.length) {
-      const ew = D.evoMaterialWeights || {};
-      const evoSub = evoTiers.map(t => [t, ew[t] || 10]);
-      sub.push([weightedPick(evoSub), evoSlot]);
-    }
-    // 区域材料：权重条目里 '区域材料' 是占位符，实际名字取 areaMaterials[area.id].name
+    // 区域材料：'区域材料' 仍是占位符，实际名字取 areaMaterials[area.id].name
     // （如 corrupted-forest → 枯荣种荚）；其余材料名直接用
     let name = weightedPick(sub);
     if (name === '区域材料') {
@@ -139,10 +131,17 @@
         totalEquipDrops++;
         if (window.Quest && window.Quest.reportType) window.Quest.reportType('equipDrop', 1);
         const { error } = await Items.saveItem(eq);
-        // 稀有合成道具（2026-09-07）：百变魔石 10% / 至尊神石 5%，独立于金装必掉
+        // 稀有合成道具：**只剩百变魔石，10%，图 1~10 全局不变**（独立于金装必掉）。
+        // 🔴 2026-09-17（用户拍板）：**「至尊神石」已从守关 Boss 移除，改归通天塔**（见 tower-config 的 materialBands
+        //   + 第 30 层档位保底；每周兑换「神石重铸」保留为够得着的稳定来源）。
+        //   为什么挪走：领主**每小时现身一次**，5% × 每小时一次 = **一天约 1.2 颗**，
+        //   而至尊神石 = 「必定出神级宠」⇒ 等于**一天一只神级宠**，是"很容易给好东西"的最大一个口子。
+        //   改后 ≈ 20 小时一颗（收紧到 1/8）。
+        // ⚠️ 百变魔石**刻意一个数都不改**：① 用户只要求挪走至尊神石（最小作用域）；
+        //   ② 它变多会顺着「两颗百变换一颗至尊」那条兑换链把至尊神石也变容易，与上面的收紧正面对冲。
+        //   ③ 它是中档货（合成 +20% / 六成出神级宠），继续承担"低图 Boss 也能暴富"的捡漏爽点。
         const bossItems = [];
         if (Math.random() < 0.10) { await Materials.gain('百变魔石', 1); bossItems.push({ name: '百变魔石', qty: 1 }); }
-        if (Math.random() < 0.05) { await Materials.gain('至尊神石', 1); bossItems.push({ name: '至尊神石', qty: 1 }); }
         return { type: 'boss', eq, material: mat, bossItems, saveError: error || null };
       }
       return { type: 'boss', eq, material: mat, dry: true };
@@ -209,7 +208,9 @@
     if (tier === 'material') {
       const mat = pickMaterial(enemy, area, res);
       if (!mat) return { type: 'none' };
-      if (!dry) await Materials.gain(mat.name, mat.qty); // 未登录只本地累计
+      // 2026-09-18：地图也开始掉经验包了 ⇒ 掉的必须跟任务/塔一样【绑定】（防"花钱买练级"）。
+      // `Materials.gain` 里也判了一次作兜底，这里显式传是为了让断言测得到。
+      if (!dry) await Materials.gain(mat.name, mat.qty, Materials.isExpPack(mat.name) ? { bound: true } : undefined); // 未登录只本地累计
       return { type: 'material', material: mat.name, qty: mat.qty };
     }
 

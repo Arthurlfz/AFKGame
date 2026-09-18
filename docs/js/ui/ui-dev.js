@@ -87,7 +87,6 @@
     { group: '成长门槛', fields: [
       { path: 'synthesize.minLevel', label: '合成等级门槛', min: 1, max: 100, step: 1 },
       { path: 'nirvana.minLevel', label: '涅槃等级门槛', min: 1, max: 100, step: 1, note: '只有神级宠能涅槃' },
-      { path: 'synthesize.normalGrowthCap', label: '普通宠成长软上限', min: 10, max: 300, step: 5, note: '超过部分减半；神级宠无上限' },
       { path: 'pet.babyGrowth.min', label: '孵化成长下限', min: 1, max: 100, step: 1 },
       { path: 'pet.babyGrowth.max', label: '孵化成长上限', min: 1, max: 100, step: 1 },
       { path: 'pet.godPets.minGrowth', label: '成神成长门槛', min: 0, max: 200, step: 1 },

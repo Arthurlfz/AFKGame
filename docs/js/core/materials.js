@@ -43,13 +43,26 @@
     if (window.UI && window.UI.showToast) { try { window.UI.showToast('⏳ 同步降速', msg); } catch (e) { /* 提示失败不挡流程 */ } }
   }
 
+  /* ---------- 经验包判定（2026-09-18） ----------
+   * ⭐ 【唯一判定处】：名字在 `Config.expPacks` 名单里 = 经验包。
+   *   掉落（drop.js）与塔结算（tower-rewards.gainMat）**都必须调它**，
+   *   不许各自再抄一份名单 —— "同一逻辑两份"是本项目头号病因。
+   * 为什么需要它：经验包一律【绑定】（防"花钱买练级"绕过涅槃的练级成本）。
+   *   原来经验包只在任务与塔里产（那两条路都自己绑了）；
+   *   2026-09-18 起**地图也开始掉经验包**，而掉落走的是 `Materials.gain` 不带 bound
+   *   ⇒ 不接上就等于开出"可交易的经验"。 */
+  const isExpPack = name => ((window.Config && window.Config.expPacks) || []).some(p => p.name === name);
+
   /* ---------- 获得材料（掉落 / 发奖时调用） ---------- */
   // 本地立即生效；云端走队列（不 await 网络）。
   // 需要立刻落盘的场景自己调 flushMaterials()：消耗材料前、交任务发奖后、离场前。
   /* 第三参 opts.bound：这批是不是绑定（任务产出传 true）。
    * 绑定的只在本地与云端各记一份「绑定数量」，总量照常加 —— 两者是包含关系不是并列。 */
   function gain(name, amount, opts) {
-    const bound = !!(opts && opts.bound);
+    /* 2026-09-18：**经验包一律绑定**，而且是 `gain` 自己认（不用调用方记得传）。
+     * 为什么放在这里：地图掉落 / 任务发奖 / 塔结算都要绑，放调用点就会漏（漏一处 = 开出可交易的经验）。
+     * ⭐ 顺带的好处：测试里的 Materials 桩不用再加 isExpPack 也能正确跑。 */
+    const bound = !!(opts && opts.bound) || isExpPack(name);
     gainLocal(name, amount, bound);
     enqueue(name, amount, bound);
     return { ok: true, cloud: 'pending' };
@@ -284,6 +297,6 @@
   window.Materials = {
     gain, spend, spendMany, gainLocal, spendLocal, cloudGain, cloudSpend, flushMaterials, clearAll,
     getQuantity, setCloudMaterials, getLocal, loadCloudMaterials,
-    getBoundQuantity, getFreeQuantity, getBoundLocal
+    getBoundQuantity, getFreeQuantity, getBoundLocal, isExpPack
   };
 })();

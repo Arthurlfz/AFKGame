@@ -8,7 +8,8 @@
  *      ⭐ 腐蚀度期望值：equipPct > approvalFailPct × 2（用户拍板的定价锚，负项不得入库）
  *   ④ 资格：每日免费 1 次 → 用尽后必须重置卡；无卡拒绝；换日重置；与副本次数互不干扰
  *   ⑤ 推进：全赢通关 / 死在第 N 层按最高到达层数取档 / 不足 5 层只给补偿
- *   ⑥ 掉落：材料按深度分档（浅层不出塔专属高级材料）；塔不发区域材料（资源归属红线）
+ *   ⑥ 掉落：三段全域（每段都含全部塔物品，**权重**随深度爬）；浅层权重必须远低于深层；
+ *      塔不发区域材料（资源归属红线）
  *   ⑦ 称号：层数与腐蚀度双门槛
  *   ⑧ 模式：beginTrialFloor 收到 mode='tower' 与 healBlock；每层开打前用 hpCarry 覆盖回血
  *   ⑨ worldmap.towerPoint 存在且不与野图/副本点位重复
@@ -65,9 +66,15 @@ ctx.Pet = {
   setCurHp: (p, hp) => { p.curHp = Math.max(0, Math.min(hp, pet.hp)); setCurHpCalls.push(Math.round(hp)); }
 };
 let flushCount = 0;
+let gainBound = {};   // 2026-09-17：记录哪些掉落带 bound（经验包必须绑定，普通材料不许绑）
 ctx.Materials = {
   getQuantity: name => bag[name] || 0,
-  gain: (name, n) => { bag[name] = (bag[name] || 0) + n; },
+  // 2026-09-18：桩也要有 isExpPack（真模块有），否则塔结算那条路会 TypeError
+  isExpPack: name => ((ctx.Config && ctx.Config.expPacks) || []).some(p => p.name === name),
+  gain: (name, n, opts) => {
+    bag[name] = (bag[name] || 0) + n;
+    if (opts && opts.bound) gainBound[name] = (gainBound[name] || 0) + n;
+  },
   flushMaterials: async () => { flushCount++; },
   spend: async (name, n) => {
     if ((bag[name] || 0) < n) return { ok: false, error: name + ' 不足' };
@@ -296,12 +303,21 @@ async function runTower(affixIds, opts) {
   /* ============ ⑥ 掉落：深度分档 + 不发区域材料 ============ */
   const deepNames = [];
   (TC.materialBands || []).forEach(b => Object.keys(b.weights || {}).forEach(n => deepNames.push(n)));
+  /* 🔴 2026-09-17「塔前期加厚」——以下两条断言被**有意推翻**，替换说明：
+   *   旧 = 「浅层（1~10）只出基础打造石，不出塔专属高级材料」+「深层（21~30）才出越龙之石/天仙玉露」。
+   *     用户实测反馈「塔的东西你也要修改一下，tmd给的东西也太垃圾了特别是前期」——
+   *     根因正是这个"层段开/关"的设计：band1 到当时为止**一件塔专属物都没有**（神圣石/越龙之石/天仙玉露/强化丹B 全 0）。
+   *   新 = 「三段全域 + 权重差」（用户口径：「塔的掉落我也希望是全域掉落，只是权重不同」）。
+   *     ⚠️ 而且"只放深层"对 99% 玩家是**摆设**：校准画像里中档（满成长+金装=普通宠毕业）中位只到第 10 层。
+   *   现在守两条：① 浅层**有**塔专属货（打得浅也拿得到真东西）② 浅层权重必须**远低于**深层（梯度不塌）。 */
   const shallow = (TC.materialBands || []).find(b => b.from === 1);
-  ok(shallow && !shallow.weights['神圣石'] && !shallow.weights['越龙之石'] && !shallow.weights['天仙玉露'],
-    '浅层（1~10）只出基础打造石，不出塔专属高级材料');
+  ok(shallow && shallow.weights['神圣石'] > 0 && shallow.weights['越龙之石'] > 0 && shallow.weights['天仙玉露'] > 0,
+    '浅层（1~10）也能出塔专属材料（2026-09-17 起全域化，只是权重低）');
   const deep = (TC.materialBands || []).filter(b => b.from >= 21)[0];
   ok(deep && deep.weights['越龙之石'] > 0 && deep.weights['天仙玉露'] > 0,
-    '深层（21~30）才出越龙之石 / 天仙玉露（用户拍板的「层数门槛」刹车）');
+    '深层（21~30）出越龙之石 / 天仙玉露（依然最肥的那一段）');
+  ok(shallow && deep && shallow.weights['天仙玉露'] < deep.weights['天仙玉露'],
+    `浅层的塔专属货权重远低于深层（天仙玉露 ${shallow && shallow.weights['天仙玉露']} vs ${deep.weights['天仙玉露']}）`);
   ok(deepNames.indexOf('区域材料') < 0, '塔的掉落表里没有「区域材料」（资源归属红线：区域材料只能地图产）');
 
   /* 2026-09-10 用户追问「从地图移走、说要归塔的那些东西真接进来了吗」→ 立成硬断言：
@@ -317,7 +333,8 @@ async function runTower(affixIds, opts) {
   const yulong = (TC.materialBands || []).find(b => b.from === 11 && b.to === 20) || {};
   ok((yulong.weights || {})['越龙之石'] > 0,
     '越龙之石在 11~20 层就出现（合成 Lv40 解锁 + 它是默认合成道具 → 不能只在 21 层以上出）');
-  // 全塔掉落 roll 1000 次：绝不出现区域材料、且浅层不出现高级材料
+  // 全塔掉落 roll 1800 次：绝不出现区域材料，且每层掉的东西必须在该层的档位表里
+  // （2026-09-17 起"浅层不出高级材料"不再是红线 —— 三段全域化，见上方 ⑥ 的替换说明）
   ctx.TowerRewards.setRnd(seqRnd(99));
   let violation = null;
   for (let f = 1; f <= 30; f++) {
@@ -477,6 +494,32 @@ async function runTower(affixIds, opts) {
   flushCount = 0;
   await runTower([], { winUntilMobs: 2 * per });
   ok(flushCount > 0, '一局结束时已把材料补报云端（flush ' + flushCount + ' 次）');
+
+  /* ============ ⑫ 经验包掉落（2026-09-17 用户要求「塔里面还需要增加一些掉落经验包才行」） ============
+   * 背景：塔层战斗走 battle.js 的 trial/tower 分支，**不发经验**（经验唯一发放点是 main.js 的
+   *   handleFightEnd，只服务野图挂机）⇒ 塔是唯一「花时间但等级零回报」的玩法，而涅槃后要重练回 Lv60。
+   * 守三件：① 池子里的包名必须真在 Config.expPacks 名单里（写错名字 = 掉出一个配置里没有的东西）
+   *        ② 发放时【绑定】——防花钱买练级绕过涅槃的练级成本
+   *        ③ 10 万档只做通关档位大奖，不进随机池（一包 ≈ 一只宠练到 58 级，抽到就是巨跳） */
+  const packNames = C('(Config.expPacks || []).map(p => p.name)');
+  const inBands = new Set();
+  (TC.materialBands || []).forEach(b => Object.keys(b.weights || {}).forEach(n => { if (packNames.indexOf(n) >= 0) inBands.add(n); }));
+  ok(inBands.size >= 4, '材料池接上了 4 档经验包（' + Array.from(inBands).join('/') + '；第 5 档走通关档位）');
+  const wrongName = [];
+  (TC.materialBands || []).forEach(b => Object.keys(b.weights || {}).forEach(n => {
+    if (/经验/.test(n) && packNames.indexOf(n) < 0) wrongName.push(n);
+  }));
+  ok(wrongName.length === 0, '池子里的经验包名字都在 Config.expPacks 名单里' + (wrongName.length ? '｜写错：' + wrongName.join('、') : ''));
+  const t30 = (TC.floorTiers || []).find(t => t.floor === 30) || {};
+  ok((t30.items || []).some(i => i.name === '幽冥经验髓'), '第 30 层通关档给「幽冥经验髓」×1（最高档经验包）');
+  ok(!(TC.materialBands || []).some(b => (b.weights || {})['幽冥经验髓'] > 0), '10 万档经验包不进随机掉落池（只做通关大奖）');
+
+  // 绑定口径：经验包必须 bound，普通材料不许 bound（塔产材料照常可交易）
+  gainBound = {};
+  C('window.TowerRewards.gainMat("残魂经验囊", 2)');
+  C('window.TowerRewards.gainMat("鉴定石", 3)');
+  ok((gainBound['残魂经验囊'] || 0) === 2, '经验包发放带绑定（残魂经验囊 ×2 全 bound，不可交易）');
+  ok(!(gainBound['鉴定石'] > 0), '普通材料照常可交易（鉴定石 未标 bound）');
 
   console.log('\nALL TOWER TESTS PASSED (' + passCount + ' asserts)');
 })();

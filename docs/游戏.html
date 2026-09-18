@@ -34,7 +34,7 @@
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
-<link rel="stylesheet" href="css/ui-fixes.css?v=20260917zfix12">
+<link rel="stylesheet" href="css/ui-fixes.css?v=20260918ux1">
 <!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
 <link rel="stylesheet" href="css/session-guard.css?v=20260910sess1">
 <style id="boot-style">
@@ -196,7 +196,7 @@
     <div class="title">永夜灵市<span class="title-en">EVERNIGHT BAZAAR</span></div>
     <div class="spacer"></div>
     <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><img class="top-ico" src="assets/ui/nav/ic_top_bag.png" alt="">背包</button>
-    <button class="topbar-btn" id="topbar-quest" title="任务（快捷键 Q）"><img class="top-ico" src="assets/ui/nav/ic_top_quest.png" alt="">任务</button>
+    <button class="topbar-btn" id="topbar-quest" data-page="quest" title="任务（快捷键 Q）"><img class="top-ico" src="assets/ui/nav/ic_top_quest.png" alt="">任务</button>
     <button class="topbar-btn" id="topbar-feedback" title="反馈 / 提意见（会自动带上当前页面和最近的错误记录）"><svg class="eic fb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v4"/><path d="M12 14h.01"/></svg>反馈</button>
     <!-- 挂机状态：由 ui-battle.updateStatus 同步，点一下回世界地图 -->
     <div class="idle-chip" id="topbar-idle" title="挂机状态 · 点击回到世界地图">空闲</div>
@@ -213,6 +213,7 @@
       <button class="sb-btn" data-page="pet"><span class="sb-icon"><img src="assets/ui/nav/pet.png" alt=""></span><span class="sb-label">宠物资料</span></button>
       <button class="sb-btn" data-page="market"><span class="sb-icon"><img src="assets/ui/nav/market.png" alt=""></span><span class="sb-label">市集</span></button>
       <button class="sb-btn" data-page="shop"><span class="sb-icon"><img class="eic-img" src="assets/ui/ic_gem.png" alt=""></span><span class="sb-label">魔石商店</span></button>
+      <div class="sb-divider-label">其他</div>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon"><img src="assets/ui/nav/chat.png" alt=""></span><span class="sb-label">聊天</span></button>
       <button class="sb-btn" data-page="codex"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">百科</span></button>
       <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon"><img src="assets/ui/nav/settings.png" alt=""></span><span class="sb-label">设置</span></button>
@@ -366,6 +367,11 @@
                 <span class="status-badge idle" id="status-badge">空闲</span>
                 <span class="fight-count">本轮 <b id="fight-count">0</b> 场</span>
                 <span class="fight-total">累计 <b id="stat-fights">0</b> 场 · 掉落装备 <b id="stat-equips">0</b> 件</span>
+                <button class="quick-evo-btn" id="quick-evo" title="有宠物可以进化了，点这里直接去">
+                  <img src="assets/ui/nav/pet.png" alt="">
+                  <span>进化</span>
+                  <i class="qevo-dot" hidden></i>
+                </button>
               </div>
               <div class="fight-action">
                 <button class="fs-btn fs-btn--primary" id="btn-battle">开始自动战斗</button>
@@ -412,6 +418,14 @@
 <div class="pcol">
               <div class="panel">
                 <div class="panel-title">宠物列表<span class="hint">点击切换出战 · 悬停看属性</span></div>
+                <div class="pet-list-filter">
+                  <input type="text" id="pet-search" placeholder="搜索宠物名…" class="pet-search-input">
+                  <select id="pet-filter" class="pet-filter-select">
+                    <option value="all">全部</option>
+                    <option value="evolvable">可进化</option>
+                    <option value="equipped">有装备</option>
+                  </select>
+                </div>
                 <div class="pet-list" id="pet-list"></div>
               </div>
             </div><div class="pcol">
@@ -979,7 +993,7 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260917fix1"></script>
+<script src="js/core/config.js?v=20260918damp1"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
@@ -1003,31 +1017,31 @@ window.PetSprites = {
 </script>
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
-<script src="js/core/worldmap.js?v=20260910tower2"></script>
+<script src="js/core/worldmap.js?v=20260917full1"></script>
 <script src="js/core/supabase.js?v=20260917fix1"></script>
 <!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
 <script src="js/core/auth-session.js?v=20260910sess1"></script>
 <!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
 <script src="js/core/server-session.js?v=20260910sess2"></script>
-<script src="js/equipment/equipment.js?v=20260915mech6"></script>
-    <script src="js/pet/pet.js?v=20260916soul1"></script>
+<script src="js/equipment/equipment.js?v=20260917refs1"></script>
+    <script src="js/pet/pet.js?v=20260918pet1"></script>
 <script src="js/core/items.js?v=20260916bind1"></script>
-<script src="js/core/materials.js?v=20260916bind1"></script>
-<script src="js/core/mat-wiki.js?v=20260916mat1420260914wiki2"></script>
-<script src="js/core/drop.js?v=20260916cap1"></script>
+<script src="js/core/materials.js?v=20260918exppack1"></script>
+<script src="js/core/mat-wiki.js?v=20260917full1"></script>
+<script src="js/core/drop.js?v=20260918exppack1"></script>
 <script src="js/core/market.js?v=20260916cap1"></script>
 <script src="js/core/market_bot.js?v=20260916mat14"></script>
 <script src="js/core/server-config.js?v=20260916cloudnote1"></script>
 <script src="js/equipment/equipment_craft.js?v=20260916soul1"></script>
 <script src="js/equipment/salvage.js?v=20260914equip1"></script>
-<script src="js/pet/pet_merge.js?v=20260917fix1"></script>
-<script src="js/pet/pet_evolve.js?v=20260915spend1"></script>
+<script src="js/pet/pet_merge.js?v=20260917growth1"></script>
+<script src="js/pet/pet_evolve.js?v=20260918fusion2"></script>
 <script src="js/core/quest.js?v=20260916pack2"></script>
 <script src="js/core/tutorial_mode.js?v=20260916soul1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
-<script src="js/core/battle.js?v=20260915mech6"></script>
+<script src="js/core/battle.js?v=20260917enemy1"></script>
 <script src="js/trial/trial-config.js?v=20260916reset3"></script>
 <!-- 任务表结构规范化层（2026-09-10）：给任务补 kind(一级分类) / group(二级分组) / chapter / reset。
      放在 config 与 trial-config 之后（它们才是任务表的写入方），quest.js 读表是懒加载所以顺序安全。 -->
@@ -1037,46 +1051,47 @@ window.PetSprites = {
 <script src="js/trial/trial-engine.js?v=20260915mech1"></script>
 <!-- 通天塔（2026-09-10）：一个文件一个职责。顺序 = 依赖方向：
      config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
-<script src="js/tower/tower-config.js?v=20260916reset1"></script>
+<script src="js/tower/tower-config.js?v=20260918exppack1"></script>
 <script src="js/tower/tower-affix.js?v=20260914affix2"></script>
 <script src="js/tower/tower-access.js?v=20260916reset1"></script>
-<script src="js/tower/tower-rewards.js?v=20260911tower2"></script>
+<script src="js/tower/tower-rewards.js?v=20260918exppack1"></script>
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
-<script src="js/tower/tower-engine.js?v=20260915mech1"></script>
+<script src="js/tower/tower-engine.js?v=20260917exppack1"></script>
 <script src="js/core/battle-sim.global.js?v=20260915mech6"></script>
 <script src="js/core/idle-bridge.js?v=20260915dmg1"></script>
 <script src="js/ui/ui-boot.js?v=20260917b3"></script>
-<script src="js/ui/ui-common.js?v=20260917p3"></script>
+<script src="js/ui/ui-common.js?v=20260918fusion1"></script>
 <script src="js/ui/ui-console.js?v=20260914reveal1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260916name1"></script>
-<script src="js/ui/ui-worldmap.js?v=20260914reveal1"></script>
+<script src="js/ui/ui-worldmap.js?v=20260918questidle1"></script>
 <script src="js/ui/ui-capital.js?v=20260910egg7"></script>
 
 <script src="js/ui/ui-login.js?v=20260917p1"></script>
 <script src="js/ui/ui-dialog.js?v=20260916mo1"></script>
 <script src="js/ui/ui-popover.js?v=20260916mo1"></script>
 <script src="js/ui/ui-onboarding.js?v=20260917fix1"></script>
-<script src="js/ui/ui-quest.js?v=20260917qicon1"></script>
+<script src="js/ui/ui-quest.js?v=20260918questidle1"></script>
 <!-- 红点指路：哪里有任务做，就在哪个入口亮红点（数据来自任务系统，本文件只管亮灯） -->
-<script src="js/ui/ui-guide-dots.js?v=20260916dot2"></script>
+<script src="js/ui/ui-guide-dots.js?v=20260918dot1"></script>
+<script src="js/ui/ui-shortcuts.js?v=20260918sc1"></script>
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
 <script src="js/trial/ui-trial-battle.js?v=20260913console1"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
 <!-- 通天塔 UI（2026-09-10）：详情页 → 整页战斗驱动 → 结算面板 -->
-<script src="js/tower/ui-tower-entry.js?v=20260916reset1"></script>
-<script src="js/tower/ui-tower-battle.js?v=20260913console1"></script>
+<script src="js/tower/ui-tower-entry.js?v=20260917resetcard1"></script>
+<script src="js/tower/ui-tower-battle.js?v=20260917esc1"></script>
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
-<script src="js/ui/ui-battle.js?v=20260917fix1"></script>
+<script src="js/ui/ui-battle.js?v=20260918ux2"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260917qicon1"></script>
-<script src="js/ui/ui-pet-evolve.js?v=20260916mo1"></script>
-<script src="js/ui/ui-pet-merge.js?v=20260917fix2"></script>
+<script src="js/ui/ui-pet.js?v=20260918ux1"></script>
+<script src="js/ui/ui-pet-evolve.js?v=20260918fusion2"></script>
+<script src="js/ui/ui-pet-merge.js?v=20260917fix3"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260916mo1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
 <script src="js/ui/ui-bag.js?v=20260917fix1"></script>
 <script src="js/ui/ui-mat-entry.js?v=20260916mat14"></script>
-<script src="js/ui/ui-equipment.js?v=20260917fix1"></script>
+<script src="js/ui/ui-equipment.js?v=20260918eq1"></script>
 <script src="js/ui/ui-craft.js?v=20260916soul1"></script>
 <script src="js/ui/ui-market.js?v=20260917qicon1"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
@@ -1084,16 +1099,16 @@ window.PetSprites = {
 <script src="js/ui/ui-market-notify.js?v=20260917fix1"></script>
 <script src="js/ui/ui-market-pulse.js?v=20260917fix1"></script>
 <script src="js/ui/ui-feedback.js?v=20260917fix1"></script>
-<script src="js/ui/ui-codex.js?v=20260917qicon1"></script>
+<script src="js/ui/ui-codex.js?v=20260917resetcard1"></script>
 <script src="js/ui/ui-shop.js?v=20260917fix1"></script>
-<script src="js/ui/ui-dev.js?v=20260917fix1"></script>
+<script src="js/ui/ui-dev.js?v=20260917growth1"></script>
 <!-- 宠物数值总表页（注册到开发者面板，必须排在 ui-dev.js 之后） -->
 <script src="js/ui/ui-dev-pets.js?v=20260916pets1"></script>
 <script src="js/ui/ui-dev-feedback.js?v=20260917fix2"></script>
 <script src="js/ui/ui-dev-ops.js?v=20260917fix2"></script>
 <!-- 片头（Remotion 产物）：放在 main 之前，登录页可见时才有动作 -->
 <script src="js/ui/ui-intro.js?v=20260916intro1"></script>
-<script src="js/main.js?v=20260917qicon1"></script>
+<script src="js/main.js?v=20260918questidle1"></script>
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
 <script src="js/ui-fixes.js?v=20260917qicon1"></script>
 <script src="js/skill-effects.js?v=20260910fx11"></script>

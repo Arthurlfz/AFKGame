@@ -146,7 +146,7 @@ A(r5.ok!==true&&/终阶/.test(r5.error),'阶段链走完才是真上限：终阶
 /* ============ 6. 进化素材接入战斗掉落（改法一：单池·一场一抽） ============ */
 C('Config.drop.pool = { none:0, material:1, equipment:0, egg:0 }');
 C('Config.drop.poolByStage = { 1: { none:0, material:1, equipment:0, egg:0 } }'); // 2026-09-06：按阶段池优先于 pool，mock 必须覆盖（图1=stage1）
-C('Config.drop.materialWeightsByTier[1] = { "进化素材": 1 }'); // 图1档只留进化素材占位权重，配合 areaEvolutionTiers=['进化素材'] 解析为普通进化素材
+C('Config.drop.materialWeightsByTier[1] = { "进化素材": 1 }'); // 图1档只留「普通进化素材」（2026-09-17 起它是真键，不再需要占位键解析）
 const rr = await C('Drop.rollReward({ eggBaseName:"血狐" }, { id:"corrupted-forest" })');
 A(rr && rr.type === 'material' && rr.material === '进化素材' && rr.qty === 1, 'rollReward 掉落通用进化素材 ×1');
 A(C('Materials.getQuantity("进化素材")') >= 1, '进化素材已计入材料库存（掉落生效）');

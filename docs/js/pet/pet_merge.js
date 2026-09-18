@@ -131,10 +131,11 @@
     if (mutated && S.mutation) {
       growth += randInt(S.mutation.growthBonus[0], S.mutation.growthBonus[1]);
     }
-    const cap = S.normalGrowthCap || 100;
-    if (growth > cap) {
-      growth = cap + (growth - cap) / 2;
-    }
+    /* 2026-09-17 用户拍板：**取消普通宠成长软上限**（原 `normalGrowthCap = 100`，超过部分减半）。
+     * 理由：成长封顶是「三处叠加」的（数据库 check + 这里 + 培育封顶），而涅槃侧早已无上限，
+     *   三者互相矛盾 —— 玩家成长堆到 100 就被硬卡，且超 100 连库都写不进去。
+     * 现在客户端不再设任何成长上限；长线节奏改由「养副宠的成本」控制
+     *   （合成要吃掉两只宠、新宠等级回 1，不是靠一个数字刹车）。 */
     return Math.round(growth * 10) / 10;
   }
 
@@ -559,8 +560,10 @@
     return list;
   }
 
-  // 神宠培育（2026-09-11 新增）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3），成长 100 封顶。
-  // 普通宠不能用（成长走进化/合成）；道具云端原子扣，失败不涨。
+  /* 神宠培育（2026-09-11 新增）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3）。
+   * ⚠️ 2026-09-17 用户拍板：**取消「成长 100 封顶」**（原来 >= 100 直接拒绝、写入时 Math.min(100,…)）。
+   *   每轮能吃几次仍由 godPets.cultivateMax 控制（涅槃后重置一轮），成长本身无上限。
+   * 普通宠不能用（成长走进化/合成）；道具云端原子扣，失败不涨。 */
   async function cultivate(petId, itemId) {
     const k = 'cul:' + petId + ':' + itemId;
     if (inFlight.has(k)) return { error: '培育进行中，请勿重复点击' };
@@ -574,14 +577,14 @@
       if (!item || !item.godGrowth) return { error: '所选道具不能用于神宠培育' };
       const maxCul = (Config.pet && Config.pet.godPets && Config.pet.godPets.cultivateMax) || 10;
       if ((pet.cultivateUsed || 0) >= maxCul) return { error: '本轮培育次数已用完（' + maxCul + '/' + maxCul + '），涅槃后可重置' };
-      if ((pet.growth || 0) >= 100) return { error: '成长已达 100，培育封顶' };
+
       if (Materials.getQuantity(item.name) < 1) return { error: item.name + '不足' };
       const spent = await Materials.spend(item.name, 1);
       if (!spent.ok) return { error: spent.error || '道具扣减失败' };
       const g = item.godGrowth;
       const add = Math.round((g[0] + Math.random() * (g[1] - g[0])) * 10) / 10;
       const oldGrowth = pet.growth;
-      pet.growth = Math.min(100, Math.round((pet.growth + add) * 10) / 10);
+      pet.growth = Math.round((pet.growth + add) * 10) / 10;   // 无成长上限（2026-09-17 取消 100 封顶）
       pet.cultivateUsed = (pet.cultivateUsed || 0) + 1;
       if (pet.cloudId) {
         const r = await Supabase.updatePet(pet.cloudId, { growth: pet.growth, cultivate_used: pet.cultivateUsed }, { verify: true });

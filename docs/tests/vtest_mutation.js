@@ -129,11 +129,17 @@ A(r&&r.ok===true&&xmain.growth>100,`涅槃：成长无上限（100 → ${xmain.g
 A(xmain.level===1,'涅槃仍重置等级为 1');
 // 分段阻尼：主宠成长越高，本次新吸收越打折（键控在宠物成长上，不键控在账号上）
 {
+  /* 2026-09-18：原来这里写死「成长 250 = 高成长」，但阻尼门槛当天从 {100,150,200}
+   * 整体后移到 **{1000,1500,2000}** ⇒ 250 不再触发阻尼，断言会假红。
+   * ⭐ 改成**从 Config 派生**采样点（取最高门槛 +100），以后再调门槛这条不会红 ——
+   *   写死数字去追配置，就是"第二份事实源"，迟早脱节。 */
+  const hiG = C('(function(){const d=Config.nirvana.damping||[];const mx=d.reduce(function(a,x){return Math.max(a,Number(x.at||0));},0);return mx+100;})()');
   const raw = C('(function(){return Merge.calcNirvanaGrowth({growth:20,level:60},{growth:100,level:60})})()');
-  const hi = C('(function(){return Merge.calcNirvanaGrowth({growth:250,level:60},{growth:100,level:60})})()');
-  const mult = C('(function(){const d=Config.nirvana.damping||[];let m=1;for(const x of d) if(250>Number(x.at||0)) m*=Number(x.mult||1);return m})()');
+  const hi = C(`(function(){return Merge.calcNirvanaGrowth({growth:${hiG},level:60},{growth:100,level:60})})()`);
+  const mult = C(`(function(){const d=Config.nirvana.damping||[];let m=1;for(const x of d) if(${hiG}>Number(x.at||0)) m*=Number(x.mult||1);return m})()`);
   A(raw.damped===false && Math.abs(raw.absorb-50)<0.2, `低成长不衰减：吸收 ${raw.absorb}（副宠 100 × 50%）`);
-  A(hi.damped===true && Math.abs(hi.absorb-50*mult)<0.5, `高成长分段阻尼：吸收 ${hi.absorb}（无阻尼 50 × ${mult.toFixed(3)}）`);
+  A(hi.damped===true && Math.abs(hi.absorb-50*mult)<0.5,
+    `高成长分段阻尼（采样成长 ${hiG}）：吸收 ${hi.absorb}（无阻尼 50 × ${mult.toFixed(3)}）`);
 }
 
 /* ============ 9. 普通宠（非神级宠）涅槃被拒（2026-09-06 手册 2.7） ============ */

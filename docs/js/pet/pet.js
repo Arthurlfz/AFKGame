@@ -93,6 +93,7 @@
         if (p2 && p2.then) p2.then(function () {}, function () {});
       }
     }
+    if (window.UI && window.UI.renderRoster) window.UI.renderRoster();
   }
   // 从本地列表移除宠物（融合消耗副宠等用）；若移除的是出战宠物，自动切换出战第一只
   function removePet(id) {

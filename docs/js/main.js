@@ -79,6 +79,26 @@
     return r || { error: 'UNKNOWN' };
   }
 
+  /* ---------- 统一的「停止挂机」入口（2026-09-18，与 startIdleAt 对称） ----------
+   * 为什么收口：以前只有世界地图详情页里有一份**私有实现**（换图/换宠时先停旧挂机）。
+   *   现在任务胶囊的「去做」也要"跳过去顺手开打" —— 同样要先停旧挂机（挂机中 selectArea 会被拒），
+   *   两份就会漂。⇒ 提到这里，`Game.stopIdle` 与 `Game.startIdleAt` 成为唯一的一对。
+   * 停止顺序与原因封装在 `IdleBridge.handoff()` 里（先结算最后一段 → 只拆本地、不发 stop，
+   *   服务器侧由紧接着的 battle_session('start')「停旧建新」一条事务接替）—— 调用方只管"交棒"。 */
+  async function stopIdle() {
+    const IB = window.IdleBridge;
+    const B = window.Battle;
+    const managed = !!(IB && IB.isActive && IB.isActive());
+    const local = !!(B && B.isRunning && B.isRunning());
+    if (!managed && !local) return { ok: true, idle: false };
+    if (managed && IB.handoff) await IB.handoff();
+    if (B && B.stopAutoBattle) B.stopAutoBattle();
+    // 本地挂机经验是本地记账，停之前补写一次云端（托管由服务器写库，不能本地补）
+    if (!managed) flushPetProgress();
+    syncButton();
+    return { ok: true, idle: true };
+  }
+
   /* ---------- 累计统计（战斗场数/获得装备数） ---------- */
   function refreshStats() {
     // 服务器托管挂机：本地战斗循环不跑 → Battle.getTotalFights() 永远停在进托管前的值，
@@ -896,6 +916,6 @@
   // flushPetProgress 导出：ui-worldmap 详情页停本地挂机时也要把经验补写云端（与主按钮同一份逻辑）
   // startIdleAt / startIdleErrorText 导出：世界地图详情页的「开始挂机」直接调它们
   // （不再"延时点击主按钮"—— 那要靠按钮那一刻的状态机，任一条不满足就静默失败）
-  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats, flushPetProgress, startIdleAt, startIdleErrorText };
+  window.Game = { init, onLogin, onSignup, onLogout, refreshPets, refreshItems, restorePetEquipment, afterBuyPet, afterBuyItem, startGameRuntime, refreshStats, flushPetProgress, startIdleAt, startIdleErrorText, stopIdle };
   init();
 })();

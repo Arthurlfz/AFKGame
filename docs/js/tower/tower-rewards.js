@@ -87,6 +87,19 @@
     return { kind: 'none' };
   }
 
+  /* ---------- 塔产材料的统一发放（2026-09-17） ----------
+   * 🔴 **经验包一律绑定**（不可交易），其余材料照常可交易。
+   * 判据 = 名字在 `Config.expPacks` 名单里（那是经验包配置的唯一真源，不另写第二份名单）。
+   * 为什么绑定：① 与任务产出的经验包口径一致（任务包全绑定）；
+   *   ② 经验包一旦可交易 = 能花钱/挂机买练级，而「练级成本」正是涅槃成长爬升的唯一刹车
+   *      （fos-balance 的测算：塔放练级口子 = 成长爬升失控）。 */
+  function gainMat(name, qty) {
+    const M = window.Materials;
+    if (!M || !M.gain || !name) return;
+    // 经验包一律绑定（防"花钱买练级"绕过涅槃的练级成本）。`Materials.gain` 里也判了一次作兜底。
+    M.gain(name, qty, M.isExpPack(name) ? { bound: true } : undefined);
+  }
+
   /* 云端存档待办队列（模块级）。
    * 为什么不能只靠调用方传的 pending：rollLayer 是同步的、没有 pending 可传，
    * 旧代码因此把层掉落的装备写成「发起写入但不等待」—— 玩家在结算面板看到 N 件、
@@ -169,9 +182,7 @@
     // 档位材料
     const items = ((tier && Array.isArray(tier.items)) ? tier.items : consolationItems())
       .map(i => ({ name: i.name, qty: num(i.qty, 1) }));
-    for (const it of items) {
-      if (window.Materials && window.Materials.gain) window.Materials.gain(it.name, it.qty);
-    }
+    for (const it of items) gainMat(it.name, it.qty);   // 统一发放：经验包自动绑定（见 gainMat）
 
     // 档位装备
     const gear = [];
@@ -206,5 +217,5 @@
     };
   }
 
-  window.TowerRewards = { rollLayer, settle, preview, tierFor, titleFor, bandWeights, setRnd, makeGear };
+  window.TowerRewards = { rollLayer, settle, preview, tierFor, titleFor, bandWeights, setRnd, makeGear, gainMat };
 })();

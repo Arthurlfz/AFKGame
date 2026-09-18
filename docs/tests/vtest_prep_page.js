@@ -68,7 +68,17 @@ ctx.UI = {
  * 主按钮那个桩仍然保留，用来断言**详情页没有再走按钮那条路**（clicks 不再增长）。 */
 ctx.Game = {
   startIdleAt: async areaId => { calls.starts.push(areaId); return { ok: true }; },
-  startIdleErrorText: () => '启动失败'
+  startIdleErrorText: () => '启动失败',
+  /* 2026-09-18：停挂机的实现从 ui-worldmap 私有函数收到 `main.js` 的 `Game.stopIdle`
+   * （与 startIdleAt 对称的一对，任务胶囊也要用）。桩要镜像真 API，否则 handoff 不会被调到。
+   * 保持与 `main.js:stopIdle` 同序：托管走 handoff（先结算）→ 再停本地。 */
+  stopIdle: async () => {
+    const IB = ctx.IdleBridge, B = ctx.Battle;
+    const isManaged = !!(IB && IB.isActive && IB.isActive());
+    if (isManaged && IB.handoff) await IB.handoff();
+    if (B && B.stopAutoBattle) B.stopAutoBattle();
+    return { ok: true, idle: true };
+  }
 };
 els['btn-battle'] = stubEl('btn-battle');
 els['btn-battle'].click = () => { calls.clicks++; };

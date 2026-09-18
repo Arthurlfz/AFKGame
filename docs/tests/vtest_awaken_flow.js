@@ -1,6 +1,6 @@
 /* ============================================================
  * vtest_awaken_flow.js —— 2026-09-10 v2 觉醒改版全链路
- *   ① 配置契约：任务「觉醒之路」（图1~10区域材料×888求和 → 觉醒石×1，可反复）
+ *   ① 配置契约：任务「觉醒之路」（图1~10区域材料×100求和 → 觉醒石×1，可反复）
  *   ② 觉醒石不可上架（不在 Config.trade.materials）
  *   ③ 任务流：求和进度 → 交任务扣料发石
  *   ④ 觉醒状态：永久标记 awakened（与等级无关，非终形态不生效，变异/神级继承）
@@ -28,7 +28,7 @@ const q = C(`(function(){
 })()`);
 A(q.have, '任务 awaken_road 已配置');
 A(q.repeatable === true, '任务可反复提交（每只宠都要一颗觉醒石）');
-A(q.need === 888, '需求数量 = 888');
+A(q.need === 100, '需求数量 = 100（2026-09-17 由 888 收到 100，理由见 config 里 awaken_road 上方注释）');
 A(q.reward === 1, '奖励 = 觉醒石 ×1');
 A(Array.isArray(q.mats) && q.mats.length === 10 && q.mats.every(m => q.areaMats.includes(m)), 'matList = 图1~10 的 10 种区域材料（与 areaMaterials 一致）');
 A(q.unlock === 40, '解锁等级 40');
@@ -45,14 +45,14 @@ A(!tradable.includes('觉醒石'), '觉醒石不在交易材料表（天然不�
     await Supabase.getClient().auth.signInWithPassword({ email: 'a@b.c', password: 'x' });
     const p = Pet.createPet('血月魔狐', null, 60, 300, 80, 40, 50, '血狐');
     p.level = 40; Pet.addPet(p); Pet.setActive(p.id); globalThis.__ap = p;
-    // 10 种材料每种 900 ≥ 888
+    // 10 种材料每种 900 ≥ 100
     globalThis.__aq.matList.forEach(n => Materials.gain(n, 900));
     await Materials.flushMaterials();
     return true;
   })()`);
   const before = C(`globalThis.__aq.matList.reduce((m,n)=>Math.min(m,Materials.getQuantity(n)),Infinity)`);
   const st = C(`(Quest.getQuests().find(x => x.id === 'awaken_road'))`);
-  A(st && st.have === 900 && st.done, `每种短板进度生效（每种 ${st ? st.have : 'NaN'}/888，done）`);
+  A(st && st.have === 900 && st.done, `每种短板进度生效（每种 ${st ? st.have : 'NaN'}/100，done）`);
   const short = C(`(function(){
     const one = globalThis.__aq.matList[0];
     Materials.spendLocal(one, 100);   // 挖空一种 → 进度按最短板掉到 800
@@ -60,13 +60,13 @@ A(!tradable.includes('觉醒石'), '觉醒石不在交易材料表（天然不�
     Materials.gainLocal(one, 100);    // 补回来
     return s.have;
   })()`);
-  A(short === 800, `短板判定：一种不够 888 → 总进度按它算（${short}）`);
+  A(short === 800, `短板判定：进度按最少的那种算（${short}）`);
   const res = await C(`Quest.completeQuest('awaken_road')`);
   A(res && res.ok, `交任务成功${res && res.error ? '（' + res.error + '）' : ''}`);
   const stone = C(`Materials.getQuantity('觉醒石')`);
   A(stone === 1, '觉醒石到账 ×1');
   const after = C(`globalThis.__aq.matList.reduce((m,n)=>Math.min(m,Materials.getQuantity(n)),Infinity)`);
-  A(before - after === 888, `交任务每种扣料 888（每种 ${before} → ${after}）`);
+  A(before - after === 100, `交任务每种扣料 100（每种 ${before} → ${after}）`);
   const again = await C(`Quest.completeQuest('awaken_road')`);
   A(again && again.ok === true || (again && again.error && /差/.test(again.error)), 'repeatable：可再次提交（材料不足时报缺口，不报"已交过"）');
 

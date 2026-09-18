@@ -6,7 +6,7 @@ const VTF=require('./vtest_files');
 const mem=(()=>{const m={};return{getItem:k=>k in m?m[k]:null,setItem:(k,v)=>{m[k]=String(v)},removeItem:k=>{delete m[k]}}})();
 function el(){return{setAttribute(){},removeAttribute(){},getAttribute:()=>null,textContent:'',innerHTML:'',style:{setProperty(){}},dataset:{},classList:{add(){},remove(){},toggle(){},contains(){return false}},appendChild(c){this.children.push(c)},append(){},addEventListener(t,f){this.handlers=this.handlers||{};this.handlers[t]=f},querySelector:()=>el(),querySelectorAll:()=>[],children:[],removeChild(){},remove(){},scrollTop:0,scrollHeight:0,disabled:false,value:'0'}}
 const els={};
-const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){}},els:els,session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
+const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:global.fetch,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,Blob,FormData,Headers,Request,Response,ReadableStream,WritableStream,crypto:global.crypto,WebSocket:globalThis.WebSocket,navigator:{lock:undefined},location:{href:'http://x'},localStorage:mem,document:{getElementById:id=>els[id]||(els[id]=el()),createElement:()=>el(),querySelectorAll:()=>[],querySelector:()=>null,addEventListener(){}},addEventListener(){},removeEventListener(){},els:els,session:null,petsTable:[],itemsTable:[],listingsTable:[],itemListTable:[],materialsTable:[],petEggTable:[],uidSeq:0,rpcCalls:[],delCalls:[]};
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
@@ -88,6 +88,33 @@ C('IdleBridge.isActive = function(){ return true; }; IdleBridge.getTotalFights =
 C('Game.refreshStats()');
 A(C('els["stat-fights"] && els["stat-fights"].textContent')==='7777','托管时顶栏累计场数取服务器值 7777（不再是停滞的本地计数）');
 C('IdleBridge.isActive = globalThis.__origIsActive2; IdleBridge.getTotalFights = globalThis.__origTotal;');
+
+// 4.4 怪物悬浮框的「战斗属性」必须有值（2026-09-17 用户实测「暴击/爆伤/闪避全部显示 0」）
+//     根因：画面怪走 Battle.scaleEnemyOf，而它漏了 applyEnemyDefaults ——
+//     enemy-data 根本不配暴击/爆伤/命中/闪避（只配名字/类型/速度/掉落），
+//     于是这条路上的怪这些字段恒为 undefined → 悬浮框全显示 0。
+//     真打的怪（beginFight）是 applyEnemyDefaults(scaleEnemyStats(...))，服务端 battle-sim.mjs 同源。
+C(`(function(){
+  globalThis.__origIs3 = IdleBridge.isActive;
+  IdleBridge.isActive = function(){ return true; };
+  const scaled = Battle.scaleEnemyOf(EnemyData.list[0], 30);
+  globalThis.__showEnemy2 = scaled;
+  IdleBridge.getShowEnemy = function(){ return globalThis.__showEnemy2; };
+  UI.resetBattle('宠物 等级：30级', '怪 等级：30级', 100, 100);
+})()`);
+A(C('globalThis.__showEnemy2.critRate') > 0, '画面怪带暴击率（' + C('globalThis.__showEnemy2.critRate') + '，不是 undefined）');
+A(C('globalThis.__showEnemy2.critDamage') > 0, '画面怪带暴击伤害（' + C('globalThis.__showEnemy2.critDamage') + '）');
+A(C('globalThis.__showEnemy2.hit') > 0 && C('globalThis.__showEnemy2.dodge') > 0,
+  '画面怪带命中/闪避（命中 ' + C('globalThis.__showEnemy2.hit') + ' / 闪避 ' + C('globalThis.__showEnemy2.dodge') + '）');
+// 悬浮框是玩家真正看到的那一层：暴击/暴伤/命中/闪避 不许是 0（吸血野怪本来就是 0，不算）
+const __tipHtml = els['enemy-tip'] ? els['enemy-tip'].innerHTML : '';
+A(__tipHtml.includes('战斗属性'), '怪物悬浮框渲染出来了（UI.resetBattle 走到 renderEnemyTip）');
+A(!/(暴击|暴伤|命中|闪避)<b>0%?<\/b>/.test(__tipHtml),
+  '悬浮框里没有「暴击/暴伤/命中/闪避 = 0」这种假数据');
+// 数值必须与真账同源：屏幕上的闪避 = config.enemyMech 公式（普通怪 Lv30）
+A(C('globalThis.__showEnemy2.dodge') === C('Math.round(Config.battle.enemyMech.dodgeAtRef.normal * Math.pow(30 / Config.battle.enemyMech.refLevel, Config.battle.enemyMech.dodgeExp))'),
+  '悬浮框的闪避与 config.enemyMech 公式逐位一致（显示不是另算一份）');
+C('IdleBridge.isActive = globalThis.__origIs3;');
 
 console.log('ALL UI TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

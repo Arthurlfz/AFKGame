@@ -35,7 +35,9 @@ const Eq = vm.runInContext('window.Equipment', ctx);
 // 生成装备所需的函数全集（按依赖顺序：被调用的在前定义无所谓，函数声明会提升）
 const FUNCS = [
   'affixCategory', 'affixCount', 'pickRarity', 'affixFixedOf',
-  'rollAffixTier', 'rollAffixCount', 'affixTiersFor', 'rollBaseHit', 'levelOfAreaTier',
+  // tierPool 是 rollAffixTier 的依赖（2026-09-17 抽出，让「算概率」与「真抽取」共用一份池子逻辑）：
+  // 漏了它服务端副本会缺函数 → 服务端掉落直接崩，所以它必须在清单里。
+  'tierPool', 'rollAffixTier', 'rollAffixCount', 'affixTiersFor', 'rollBaseHit', 'levelOfAreaTier',
   'rarityIdFromCount', 'syncRarity', 'generateEquipment'
 ];
 

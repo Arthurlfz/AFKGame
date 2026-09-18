@@ -9,7 +9,7 @@
  * 口径（全部来自 config.js 里的掉落配置，不是拍脑袋）：
  *   场/小时 = 700（项目基准，见 drop.pool 注释）
  *   每场产出 = poolByStage（按图序号选阶段）× materialWeightsByTier（按图档子权重）
- *   进化素材 = 占位键 '进化素材' 的产量，再按 areaEvolutionTiers + evoMaterialWeights 分到具体档位
+ *   进化素材 = 三档各自是独立键（2026-09-17 起），直接按 `materialWeightsByTier` 折算
  *   不可挂机获得的资源（神圣石/传说以外的塔货/涅槃丹/凝魂晶石…）→ 标 [受控]，不折算小时
  * ============================================================ */
 const fs = require('fs');
@@ -44,16 +44,8 @@ function ratesAt(tier) {
   const am = C.drop.areaMaterials[areas[tier - 1].id];
   if (am && out['区域材料'] != null) { out[am.name] = out['区域材料']; delete out['区域材料']; }
 
-  // 进化素材占位键 → 按该图允许的档位 + evoMaterialWeights 拆分
-  const evo = w['进化素材'];
-  if (evo != null) {
-    const allowed = C.drop.areaEvolutionTiers[areas[tier - 1].id] || [];
-    const ew = C.drop.evoMaterialWeights || {};
-    const esum = allowed.reduce((a, n) => a + (ew[n] || 1), 0) || 1;
-    const totalEvo = pMat * (evo / sum) * FLOORS;
-    delete out['进化素材'];
-    allowed.forEach(n => { out[n] = totalEvo * (ew[n] || 1) / esum; });
-  }
+  // 🔴 2026-09-17：进化素材三档已是**独立键**（`areaEvolutionTiers` + `evoMaterialWeights` 那套占位键机制已删），
+  //   上面第 39 行那个通用循环已经把它们各自折算好了，这里**不再需要任何拆分**。
   return out;
 }
 
@@ -80,7 +72,7 @@ const CONTROLLED = {
   '涅槃丹': '涅槃试炼（20 层 = 4 个）',
   '凝魂晶石': '满级经验池凝出（账号绑定）',
   '资源试炼门票': '地图委托每轮 1 张（每轮需该图材料 200 个）',
-  '通天塔重置卡': '当前无获取途径（2026-09-16 删掉任务来源；付费商店未上架）',
+  '通天塔重置卡': '每周兑换「塔券铸成」限 1 张（2026-09-17 晚加回；付费商店仍未上架）',
   '至尊神石': '合成 / 首通 Boss',
   '觉醒石': '觉醒之路（图 1~10 材料各 888）',
   '百变魔石': '图 10 掉落'

@@ -140,10 +140,16 @@
     }
 
     // 区域材料：这张图的专属材料
-    Object.keys(D.areaMaterials || {}).forEach((areaId, i) => {
+    // 🔴 图号必须按 `Config.battle.areas` 的**真实序号**算，**不能用 areaMaterials 的对象键序号**：
+    //    两者顺序不一致（`blight-heart` 排在 areaMaterials 键的第 6 位、实际是图 10），
+    //    2026-09-17 做「产出归属总表」时查出这个 bug —— 当时 5 种区域材料的词条图号全是错的
+    //    （腐变之心写成图6、回响之羽图7、腐沼黏液图8、余烬残灰图9、魂渊之尘图10，全部各错一位）。
+    const areasCfg = (CF.battle && CF.battle.areas) || [];
+    Object.keys(D.areaMaterials || {}).forEach(areaId => {
       if ((D.areaMaterials[areaId] || {}).name !== name) return;
-      const area = (CF.battle && CF.battle.areas || []).find(a => a.id === areaId);
-      push(area ? ('图' + (i + 1) + ' ' + area.name) : areaId, '该图专属材料', null);
+      const idx = areasCfg.findIndex(a => a.id === areaId);
+      const area = idx >= 0 ? areasCfg[idx] : null;
+      push(area ? ('图' + (idx + 1) + ' ' + area.name) : areaId, '该图专属材料', null);
     });
 
     // 通天塔：材料池（按层段）/ 档位奖励 / 保底

@@ -137,7 +137,13 @@
    * （每档权重：T1 5 / T2 15 / T3 30 / T4 25 / T5 25）。
    * 稀有度（颜色）不参与 T 阶判定；ilvl 为空视为 100（存量不追溯）。
    * 掉落 / 重铸 / 增缀全部走这一个函数。 */
-  function rollAffixTier(ilvl) {
+  /* T 阶池（唯一构建处，2026-09-17 从 rollAffixTier 里抽出）：
+   *   池 = 门槛已达标的 tier（ilvl 10 → 只有 T4/T5；ilvl 80 → T1~T5 全在池里），权重取该等级的分段表。
+   * ⚠️ 为什么必须抽出来：**「算概率」与「真抽取」只许有一份实现**。
+   *   百科页曾自己复刻一份算概率的代码、漏了门槛过滤 → 算出「图 10 掉 T1 底材 42%」（真实 0%），
+   *   挂了两周没人发现（因为复刻出的数字看着很正常）。
+   * 服务端副本靠 gen_equip_gen.js 抽取本函数（FUNCS 清单里有 tierPool）→ 改名要同步改清单。 */
+  function tierPool(ilvl) {
     const lv = ilvl == null ? 100 : Number(ilvl);
     const gates = (Config.equipment.affixIlvlGates || {});
     // T1 概率按装备等级分段上调（2026-09-15）：取「满足的最高段」权重；没有分段表时退回整表
@@ -148,12 +154,32 @@
       for (const s of segs) if (lv >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
       if (seg && seg.weights) weights = seg.weights;
     }
-    // 池子 = 门槛已达标的 tier（ilvl 10 → 只有 T4/T5；ilvl 80 → T1~T5 全在池里）
-    const entries = Object.entries(gates)
+    return Object.entries(gates)
       .filter(([, g]) => lv >= Number(g))
       .map(([t]) => ({ tier: Number(t), weight: Number(weights[t]) || 0 }));
+  }
+  function rollAffixTier(ilvl) {
+    const entries = tierPool(ilvl);
     if (!entries.length) return 5;
     return Util.pickWeighted(entries).tier;
+  }
+  /* T 阶概率（百分数，四舍五入）：给百科 / 装备详情这类**展示层**用。
+   * 展示层一律调这里，不许自己复刻算法（见 tierPool 的注释）。
+   * 返回如 { 1: 15, 2: 19, 3: 66 }；门槛不达标的档不会出现在结果里（低等级查 T1 就是 undefined）。 */
+  function tierOdds(ilvl) {
+    const pool = tierPool(ilvl);
+    const sum = pool.reduce((s, e) => s + e.weight, 0);
+    const out = {};
+    if (!sum) return out;
+    pool.forEach(e => { out[e.tier] = Math.round(e.weight / sum * 100); });
+    return out;
+  }
+  /* 该装备等级能抽到的最好档（T1 最优）= 门槛达标里数字最小的那个。展示层同样用它，别自己算。 */
+  function bestTierAt(ilvl) {
+    const lv = ilvl == null ? 100 : Number(ilvl);
+    const gates = (Config.equipment.affixIlvlGates || {});
+    const ok = Object.keys(gates).map(Number).filter(t => lv >= (Number(gates[t]) || 0));
+    return ok.length ? Math.min.apply(null, ok) : 5;
   }
   // 词缀总条数（含基础词缀 1 条）：按装备等级查 affixCountByIlvl 区间随机。
   // 颜色是这条数的结果（1 白 / 2 蓝 / 3+ 金，syncRarity 收尾），不再反向由颜色定条数。
@@ -485,6 +511,8 @@
     // 生成链的内部纯函数：导出只为让 supabase/gen_equip_gen.js 能 toString() 出源码
     // 生成服务端副本（构建期抽取，不手抄 —— 手抄必漂移）
     affixTiersFor, rollBaseHit, levelOfAreaTier, rarityIdFromCount, affixFixedOf, isPercentAffix,
+    // 展示层口径（百科/装备详情）：概率与最好档都从 tierPool 现算，展示层不许自己复刻
+    tierPool, tierOdds, bestTierAt,
     equipItem, unequip, getEquipBonuses, describeItem, formatAffix, formatAffixHtml, affixRange, rarityOf, baseOf
   };
 })();

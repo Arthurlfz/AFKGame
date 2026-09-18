@@ -213,7 +213,26 @@
         + `<span class="pn-value">已穿 ${eqCount}/12</span>`
         + `<span class="pn-tip">${bnTxt && bnTxt !== '无' ? escapeHtml(bnTxt) : '暂无加成'}</span>`
         + '</div>');
-      nextEl.innerHTML = '<div class="pn-head">下一步</div>' + rows.join('');
+      // 快捷操作按钮：可进化/可合成时直接跳转对应 tab
+      let actions = '';
+      if (nx) {
+        const gap = Math.max(0, (nx.minLevel || 0) - (pet.level || 0));
+        if (gap <= 0) {
+          actions += '<button class="pn-action" data-goto-tab="evolve">去进化 →</button>';
+        }
+      }
+      actions += '<button class="pn-action" data-goto-tab="synth">去合成 →</button>';
+      actions += '<button class="pn-action" data-goto-tab="merge">去涅槃 →</button>';
+      nextEl.innerHTML = '<div class="pn-head">下一步</div>' + rows.join('') +
+        '<div class="pn-actions">' + actions + '</div>';
+      // 绑定跳转
+      nextEl.querySelectorAll('.pn-action').forEach(btn => {
+        btn.onclick = () => {
+          const tabName = btn.dataset.gotoTab;
+          const tab = document.querySelector('.pet-tab[data-pet-tab="' + tabName + '"]');
+          if (tab) tab.click();
+        };
+      });
     }
     const hpText = `${Math.round(getCurHp(pet))}/${s.hp}`;
     if ($('pet-hp').textContent !== hpText) flashStat('pet-hp');
@@ -350,13 +369,25 @@
   }
 
   /* ---------- 宠物栏（切换出战 / 上架） ---------- */
+  let petSearchQ = '';
+  let petFilterMode = 'all';
   function renderPetList() {
     const list = $('pet-list');
     list.innerHTML = '';
     // 出战宠可能为空（刚被卖掉/上架），不能拿它当必然存在的前提，否则整个宠物页渲染会崩
     const active = getActivePet();
     const activeId = active ? active.id : null;
-    for (const pet of getPets()) {
+    const Evolve = window.Evolve;
+    let pets = getPets();
+    // 搜索过滤
+    if (petSearchQ) pets = pets.filter(p => p.name && p.name.includes(petSearchQ));
+    // 筛选
+    if (petFilterMode === 'evolvable' && Evolve && Evolve.canEvolve) {
+      pets = pets.filter(p => Evolve.canEvolve(p));
+    } else if (petFilterMode === 'equipped') {
+      pets = pets.filter(p => Object.values(p.equipment || {}).filter(Boolean).length > 0);
+    }
+    for (const pet of pets) {
       const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length; // 已穿装备数
       const card = document.createElement('div');
       const isActive = pet.id === activeId;
@@ -387,6 +418,17 @@
       }
       bindPetTip(card, pet);
       list.appendChild(card);
+    }
+    // 绑定搜索框和筛选下拉（只绑一次）
+    const searchEl = $('pet-search');
+    const filterEl = $('pet-filter');
+    if (searchEl && !searchEl.__bound) {
+      searchEl.__bound = true;
+      searchEl.addEventListener('input', () => { petSearchQ = searchEl.value.trim(); renderPetList(); });
+    }
+    if (filterEl && !filterEl.__bound) {
+      filterEl.__bound = true;
+      filterEl.addEventListener('change', () => { petFilterMode = filterEl.value; renderPetList(); });
     }
   }
 

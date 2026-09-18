@@ -396,7 +396,36 @@
   UI.renderAll = renderAll;
   UI.makeDraggable = makeDraggable;
   UI.bloodlineHtml = bloodlineHtml;
+  /* ---------- 融合过渡动画（进化/合成时的中间态） ----------
+   * 点确认 → 显示全屏暗层 + 旋转墨环 + "正在融合…"
+   * 服务器返回成功 → 墨环变金 + "融合成功"，0.9s 后淡出
+   * 服务器返回失败 → 直接淡出
+   * 用法：const close = UI.showFusion(); ... await evolve(); close(true) / close(false) */
+  function showFusion() {
+    if (!hasDom()) return function(){};
+    const box = document.createElement('div');
+    box.className = 'fusion-overlay';
+    box.innerHTML =
+      '<div class="fusion-ring"></div>' +
+      '<div class="fusion-text">正在融合…</div>';
+    document.body.appendChild(box);
+    let closed = false;
+    return function done(success) {
+      if (closed) return;
+      closed = true;
+      if (success) {
+        box.classList.add('is-success');
+        var t = box.querySelector('.fusion-text');
+        if (t) t.textContent = '融合成功';
+        setTimeout(function(){ if (box.parentNode) box.parentNode.removeChild(box); }, 900);
+      } else {
+        box.parentNode.removeChild(box);
+      }
+    };
+  }
+
   UI.setNum = setNum;
   UI.celebrate = celebrate;
   UI.closeWithAnim = closeWithAnim;
+  UI.showFusion = showFusion;
 })();

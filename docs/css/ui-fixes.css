@@ -631,3 +631,153 @@ body.rm-anim *::after {
 @media (max-width: 1080px) { .login-pets { display: none; } }
 @keyframes login-pet-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes login-pet-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+/* ========== 27. 进化页紧凑化：解决下面信息看不到 ========== */
+/* 上方两个宠物框从 430px 压到 260px，头像从 180px 压到 120px */
+.pet-wrap--altar .evolve-stage .es-main,
+.pet-wrap--altar .evolve-stage .es-target {
+  min-height: 260px !important;
+}
+.pet-wrap--altar .evo-card .avatar {
+  width: 120px !important; height: 120px !important;
+  font-size: 3rem !important;
+}
+/* 方向卡小一点 */
+.alt-route { padding: 8px 6px 6px; }
+.alt-route .ic { width: 48px; height: 48px; }
+.alt-route .ic img.pet-avatar-sprite,
+.alt-route .ic img.pet-sprite { width: 38px; height: 38px; }
+/* 属性表更紧凑 */
+.cmp-table td { padding: 3px 10px; }
+.cmp-table th { padding: 4px 10px; }
+/* 预览区间距收紧 */
+.alt-routes { margin-top: 6px; gap: 8px; }
+.req-row { margin-top: 8px; gap: 10px; }
+.es-preview { padding: 10px 12px; }
+
+/* ========== 28. 融合过渡动画（进化/合成中间态） ========== */
+.fusion-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(8, 6, 4, .82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fusion-fade-in .25s ease-out;
+}
+@keyframes fusion-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fusion-ring {
+  width: 100px; height: 100px;
+  border: 2px solid rgba(201, 168, 76, .15);
+  border-top-color: rgba(201, 168, 76, .7);
+  border-radius: 50%;
+  animation: fusion-spin 1.1s linear infinite;
+  margin-bottom: 24px;
+}
+.fusion-overlay.is-success .fusion-ring {
+  border-top-color: #e8c569;
+  border-color: rgba(201, 168, 76, .35);
+  box-shadow: 0 0 30px rgba(201, 168, 76, .3);
+  animation: fusion-spin .6s linear infinite;
+}
+@keyframes fusion-spin {
+  to { transform: rotate(360deg); }
+}
+.fusion-text {
+  font-family: var(--font-title, serif);
+  font-size: 1.2rem; letter-spacing: 4px;
+  color: var(--accent-hi, #e8c569);
+  text-shadow: 0 0 12px rgba(201, 168, 76, .4);
+}
+.fusion-overlay.is-success .fusion-text {
+  color: #f2d98a;
+  text-shadow: 0 0 20px rgba(201, 168, 76, .6);
+}
+
+/* ========== 29. 战斗页快捷进化按钮 ========== */
+.quick-evo-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; margin-left: 12px;
+  background: var(--inset, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 6px;
+  color: var(--text-dim, #999); font-size: 13px; font-weight: 600;
+  cursor: pointer; position: relative;
+  transition: all .15s;
+}
+.quick-evo-btn img { width: 18px; height: 18px; object-fit: contain; }
+.quick-evo-btn:hover { color: var(--accent-hi, #e8c569); border-color: var(--accent, #c9a84c); }
+.quick-evo-btn .qevo-dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #e05555; box-shadow: 0 0 6px rgba(224,85,85,.6);
+}
+
+/* ========== 30. 资料页快捷操作按钮 ========== */
+.pn-actions {
+  display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(255,255,255,.08));
+}
+.pn-action {
+  flex: 1; padding: 8px 12px;
+  background: var(--inset, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 6px;
+  color: var(--accent-hi, #e8c569); font-size: 13px; font-weight: 600;
+  cursor: pointer; text-align: center;
+  transition: all .15s;
+}
+.pn-action:hover {
+  background: rgba(201,168,76,.12);
+  border-color: var(--accent, #c9a84c);
+}
+
+/* ========== 31. 战斗页宠物tooltip快捷按钮 ========== */
+.roster-quick-actions {
+  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.rqa-btn {
+  flex: 1; padding: 5px 0;
+  background: rgba(201,168,76,.1);
+  border: 1px solid rgba(201,168,76,.3);
+  border-radius: 4px;
+  color: #e8c569; font-size: 12px; font-weight: 600;
+  cursor: pointer; text-align: center;
+}
+.rqa-btn:hover {
+  background: rgba(201,168,76,.25);
+}
+
+/* ========== 32. 侧边栏分组标签 ========== */
+.sb-divider-label {
+  margin: 12px 14px 4px; padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(255,255,255,.08));
+  font-size: 11px; color: var(--text-dim, #888);
+  letter-spacing: 2px; text-align: center;
+}
+@media (max-width: 1024px) {
+  .sb-divider-label { display: none; }
+}
+
+/* ========== 33. 宠物列表搜索筛选 ========== */
+.pet-list-filter {
+  display: flex; gap: 8px; margin-bottom: 8px;
+}
+.pet-search-input {
+  flex: 1; padding: 6px 10px;
+  background: var(--inset, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 4px;
+  color: var(--text, #eee); font-size: 13px;
+}
+.pet-search-input::placeholder { color: var(--text-dim, #888); }
+.pet-filter-select {
+  padding: 6px 8px;
+  background: var(--inset, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 4px;
+  color: var(--text, #eee); font-size: 13px;
+}

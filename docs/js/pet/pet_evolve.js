@@ -116,15 +116,15 @@
   const withIdleHold = fn => (window.IdleBridge && window.IdleBridge.duringPetEdit)
     ? window.IdleBridge.duringPetEdit(fn) : fn();
 
-  async function evolve(petId, routeIndex, boostOverride, boostItemId) {
+  async function evolve(petId, routeIndex, boostOverride, boostItemId, opt) {
     const k = 'evo:' + petId;
     if (inFlight.has(k)) return { error: '进化进行中，请勿重复点击' };
     inFlight.add(k);
-    try { return await withIdleHold(() => evolveInner(petId, routeIndex, boostOverride, boostItemId)); }
+    try { return await withIdleHold(() => evolveInner(petId, routeIndex, boostOverride, boostItemId, opt)); }
     finally { inFlight.delete(k); }
   }
 
-  async function evolveInner(petId, routeIndex, boostOverride, boostItemId) {
+  async function evolveInner(petId, routeIndex, boostOverride, boostItemId, opt) {
     const cfg = E();
     const pet = getPets().find(p => p.id === petId);
     if (!pet) return { error: '宠物不存在' };
@@ -164,6 +164,9 @@
     if (boostItem && Materials.getQuantity(boostItem.name) < 1) {
       return { error: `${boostItem.name}不足` };
     }
+
+    // 所有前置检查通过 → 通知 UI 层弹融合动画（等级/材料不够时不会走到这里）
+    if (opt && opt.onFuseStart) opt.onFuseStart();
 
     // ---- 执行：一次请求把素材【原子】扣掉（成功才继续） ----
     // extra 与主素材同名 → 合并成一笔扣（分开扣会“先扣的吃掉余额”导致第二笔失败）

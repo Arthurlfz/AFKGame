@@ -42,7 +42,8 @@ vm.createContext(ctx);
 for (const f of ['../js/core/config.js', '../js/core/worldmap.js', '../js/core/battle-session.js',
                  '../js/trial/trial-access.js', '../js/tower/tower-config.js', '../js/tower/tower-affix.js',
                  '../js/tower/tower-access.js', '../js/tower/tower-rewards.js', '../js/tower/tower-preview.js',
-                 '../js/tower/tower-engine.js', '../js/tower/ui-tower-entry.js', '../js/tower/ui-tower-settle.js']) {
+                 '../js/tower/tower-engine.js', '../js/tower/ui-tower-entry.js', '../js/tower/ui-tower-settle.js',
+                 '../js/tower/ui-tower-battle.js']) {
   vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
 }
 const C = code => vm.runInContext(code, ctx);
@@ -109,5 +110,25 @@ ok(t.indexOf('levelStart') >= 0 && C('Config.tower.curve.levelStart') === 60 && 
   '详情页/配置口径：怪 Lv60 起步、第 30 层 Lv120');
 ok(C('(Config.tower.guardianSkills||[]).length') >= 6 && C('(Config.tower.mobSkills||[]).length') >= 4,
   '配置里有守卫/杂兵技能池（详情页与百科都据此展示）');
+
+/* ============ ⑤ 史诗播报不许把图标转义成源码（2026-09-17 用户实机抓到的 bug） ============
+ * 起因：`logEpic(text)` 内部用 `esc(text)` 包住整串，而三个调用方都把 <svg> 拼进了 text
+ *   ⇒ 图标被转义成字面源码，玩家在消息中心看到 `<svg class="eic" viewBox="0 0 24 24" …>` 一坨文本
+ *   （用户原话：「这个出现在我 console 里面了，让别人看到不是感觉像 bug 嘛」）。
+ * 守的是：塔的开场/通关播报渲染出的 html 里**不许出现转义后的 `&lt;svg`**，
+ *   同时**必须真的有 `<svg`** —— 修过头变成"图标全没了"也要红。 */
+C('globalThis.__towerLogs = [];');
+C('window.UI.consoleLog = function (cat, html) { globalThis.__towerLogs.push({ cat: cat, html: html }); };');
+C('UI.onTowerEvent({ type: "start", total: 30, mobsPerFloor: 5, corrosion: 12 });');
+C('UI.onTowerEvent({ type: "clear", total: 30 });');
+{
+  const logs = C('globalThis.__towerLogs') || [];
+  ok(logs.length >= 3, '塔的开场/通关播报都发出去了（' + logs.length + ' 条）');
+  const leaked = logs.filter(l => /&lt;svg/.test(String(l.html)));
+  ok(leaked.length === 0, '播报里没有「被转义成源码的图标」（坏 ' + leaked.length + ' 条）'
+    + (leaked.length ? '：' + leaked[0].html.slice(0, 80) : ''));
+  const iconOk = logs.filter(l => /<svg class="eic"/.test(String(l.html)));
+  ok(iconOk.length === logs.length, '每条播报的图标都正常渲染成 svg（' + iconOk.length + '/' + logs.length + '）');
+}
 
 console.log('\nALL TOWER UI TESTS PASSED (' + passCount + ' asserts)');

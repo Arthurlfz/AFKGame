@@ -37,11 +37,16 @@ const matOk = C(`(()=>{const mat={};
 A(matOk,'每个点位专属材料名与 Config.drop.areaMaterials 一致');
 
 /* ============ 3. 进化素材档位正确 ============ */
+// 🔴 2026-09-17：`areaEvolutionTiers` 已删除，进化素材三档改成**独立键**（全域 + 每图权重不同）。
+//   所以"本图出哪几档"不再来自配置，而是**从权重表现场派生** —— 期望值也照这个口径算。
 const evoOk = C(`(()=>{const evo={};
   window.WorldMap.points.forEach(p=>{const pv=window.WorldMap.buildPreview(p);evo[p.areaId]=pv.evoTiers});
-  const expect=window.Config.drop.areaEvolutionTiers;
-  return Object.keys(expect).every(id=>JSON.stringify(evo[id])===JSON.stringify(expect[id]));})()`);
-A(evoOk,'每个点位进化素材档位与 Config.drop.areaEvolutionTiers 一致');
+  const areas=window.Config.battle.areas, mw=window.Config.drop.materialWeightsByTier;
+  const NAMES=['进化素材','精粹进化素材','传说进化素材'];
+  return areas.every((a,i)=>{const t=mw[i+1]||{};
+    const want=NAMES.filter(n=>(t[n]||0)>0);
+    return JSON.stringify(evo[a.id])===JSON.stringify(want);});})()`);
+A(evoOk,'每个点位进化素材档位 = 该图权重表里权重>0 的那几档');
 
 /* ============ 4. 金装概率是有效数值 ============ */
 const goldOk = C(`window.WorldMap.points.every(p=>{const v=window.WorldMap.buildPreview(p).gold;return typeof v==='number'&&v>=0;})`);
@@ -69,7 +74,14 @@ const distOk = C(`(()=>{
     if(!Array.isArray(pv.dropDist)) return false;
     if(pv.dropDist.length!==Object.keys(tbl).length) return false; // 行数=表键数
     const sum = pv.dropDist.reduce((s,d)=>s+d.pct,0);
-    return Math.abs(sum-100)<=2;                    // 百分比之和≈100
+    /* 百分比之和≈100 —— 容差必须**跟着行数走**，不能硬编码。
+     * pct 是逐行 Math.round(w/总重*100) 的展示值，N 行最多累计 ±N/2 的舍入误差。
+     * 旧的硬编码 ±2 是运气而不是契约：图 9 有 22 行（12 种腐印权重 0.15~4，其中 6 行四舍五入后为 0%），
+     * 光舍入就能到 ±3 —— 2026-09-17 上调普通进化素材权重时真被撞红一次（占比和 103）。
+     * 现在用「整数舍入理论上允许的最大偏差」，既不看运气，也仍能抓到真错：
+     * 例如误除以 maxW 而不是总重，图 9 会得 ≈306，远超容差。 */
+    const tol = Math.ceil(pv.dropDist.length/2)+1;
+    return Math.abs(sum-100)<=tol;
   });
 })()`);
 A(distOk,'每个点位材料掉落分布由 materialWeightsByTier 正确推导（行数匹配、占比和≈100%）');

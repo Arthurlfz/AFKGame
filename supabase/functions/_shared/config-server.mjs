@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-16T13:08:40.889Z
+// 生成时间：2026-09-17T09:15:09.537Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -1116,42 +1116,42 @@ const serverConfig = {
       },
       "shadow-mountains": {
         "hp": 771,
-        "atk": 155,
+        "atk": 171,
         "def": 66
       },
       "bone-wastes": {
         "hp": 924,
-        "atk": 184,
+        "atk": 202,
         "def": 79
       },
       "blood-rift": {
         "hp": 1172,
-        "atk": 230,
+        "atk": 253,
         "def": 101
       },
       "echo-cliffs": {
         "hp": 1380,
-        "atk": 270,
+        "atk": 297,
         "def": 119
       },
       "rotfen-bog": {
         "hp": 1640,
-        "atk": 314,
+        "atk": 345,
         "def": 139
       },
       "ember-hollow": {
         "hp": 1890,
-        "atk": 359,
+        "atk": 395,
         "def": 158
       },
       "soul-abyss": {
         "hp": 2185,
-        "atk": 369,
+        "atk": 406,
         "def": 164
       },
       "blight-heart": {
         "hp": 2520,
-        "atk": 411,
+        "atk": 452,
         "def": 182
       }
     },

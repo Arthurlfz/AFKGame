@@ -85,22 +85,26 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   A(keys.filter(t => t !== 10).every(t => !has(t, '涅磐兽')), '涅磐兽只出现在图 10，不向低图泄露');
   A(has(10, '涅磐兽') && mw[10]['涅磐兽'] < 1,
     `图 10 极低概率掉落涅磐兽（权重 ${mw[10]['涅磐兽']}，小于表内任何材料的权重下限 1）`);
-  A([1, 2, 3].every(t => !has(t, '合成之石') && !has(t, '神圣石')), '合成之石/神圣石 图1-3 不出现（成长期 图4 才解锁）');
+  // 🔴 2026-09-17：合成之石改成**全域**（图1-3 补极小权重 3/5/8）——
+  //   "有/无门槛"改成"权重差"是本次总口径；合成 Lv40 才解锁，浅图给一点不构成浪费。
+  A([1, 2, 3].every(t => has(t, '合成之石') && mw[t]['合成之石'] <= 8),
+    '合成之石 图1-3 出现但权重极小（≤8，做成长线的"偶尔能见"而非"值得来刷"）');
   A([4, 5, 6, 7, 8, 9, 10].every(t => has(t, '合成之石')), '合成之石 图4-10 都出现（成长期 图4 解锁）');
   // 2026-09-09 产出削减：神圣石移出地图（归通天塔，淬炼试炼 Lv43+ 是唯一活来源）
   A(Object.keys(mw).every(t => !has(t, '神圣石')), '神圣石不进地图掉落表（归通天塔 + 淬炼试炼承担）');
   A(Object.keys(mw).every(t => !has(t, '越龙之石') && !has(t, '天仙玉露') && !has(t, '强化丹B')),
     '越龙之石/天仙玉露/强化丹B 不进地图掉落表（归通天塔）');
-  const evoTiers = JSON.parse(C('JSON.stringify(Config.drop.areaEvolutionTiers)'));
-  A(evoTiers['echo-cliffs'].includes('传说进化素材') && evoTiers['ember-hollow'].includes('传说进化素材'),
-    '传说进化素材的稳定来源收束在图6-8');
-  // 2026-09-10 用户报「传说卡手」：图 9~10 由「完全不掉」改成「只出传说 + 极低权重」。
-  // 归属表禁止的是「图 9~10 **稳定刷取**」，不是「偶尔出一两个」—— 所以断言改守「只出最高档 + 权重远低于图 8」。
-  A(evoTiers['soul-abyss'].join() === '传说进化素材' && evoTiers['blight-heart'].join() === '传说进化素材',
-    '图 9~10 只产出传说档进化素材（不产普通/精粹）');
-  A(has(9, '进化素材') && has(10, '进化素材'), '图 9~10 有进化素材占位键（否则那一档根本不参与抽取）');
-  A(mw[9]['进化素材'] * 4 <= mw[8]['进化素材'] && mw[10]['进化素材'] * 4 <= mw[8]['进化素材'],
-    `图 9~10 的进化素材权重远低于图 8（${mw[9]['进化素材']} / ${mw[10]['进化素材']} vs ${mw[8]['进化素材']}）→ 属「不稳定掉落」而非「稳定刷取」`);
+  /* 进化素材（2026-09-17 改口径）：
+   *   旧断言守「图 9~10 只出传说档 + 权重 ≤ 图 8 的 1/4」——那是治「传说卡手」的补丁，
+   *   副作用是入门两阶在图 9~10 彻底断供（用户报「被简单物资卡脚」）。
+   *   现在守「三档全域」+「梯度仍在」：每张图三档都有，且图 9~10 的传说权重仍是该图最高。 */
+  A([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(t =>
+    has(t, '进化素材') && has(t, '精粹进化素材') && has(t, '传说进化素材')),
+    '进化素材三档在 10 张图都出现（全域，梯度靠权重不靠"有/无"）');
+  A(mw[9]['传说进化素材'] > mw[9]['进化素材'] && mw[10]['传说进化素材'] > mw[10]['进化素材'],
+    `图 9~10 仍是传说档权重最高（${mw[9]['传说进化素材']} / ${mw[10]['传说进化素材']}）→ 梯度没被抹平`);
+  A(mw[8]['传说进化素材'] > mw[1]['传说进化素材'] * 100,
+    `传说档深处远高于浅处（图8 ${mw[8]['传说进化素材']} vs 图1 ${mw[1]['传说进化素材']}）`);
   const loops = JSON.parse(C('JSON.stringify(Config.drop.quests || [])')).filter(q => q.type === 'collect_loop');
   A(loops.every(q => !q.reward || (!q.reward['涅槃丹'] && !q.reward['涅磐兽'] && !q.reward['百变魔石'])),
     '地图循环任务不发放涅槃材料或稀有合成道具');
@@ -122,9 +126,8 @@ const white = JSON.parse(C('JSON.stringify(Config.equipment.rarities[0])'));
   const tiers = JSON.parse(C('JSON.stringify(Config.drop.lootTiers || {})'));
   const names = new Set();
   for (const t of Object.keys(mw2)) for (const k of Object.keys(mw2[t])) names.add(k);
-  // 进化素材在 materialWeightsByTier 里是占位键，实际名字在 evoMaterialWeights
-  const evo = JSON.parse(C('JSON.stringify(Config.drop.evoMaterialWeights || {})'));
-  for (const k of Object.keys(evo)) names.add(k);
+  // 2026-09-17：进化素材三档已是 materialWeightsByTier 里的**真键**（`evoMaterialWeights` 已删），
+  // 所以上面第 128 行的循环已经把它们的名字收齐，不再需要额外登记。
 
   const keys = Object.keys(tiers);
   A(keys.length > 0, `掉落播报档位表非空（${keys.length} 条）`);

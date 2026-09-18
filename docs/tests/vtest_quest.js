@@ -46,15 +46,16 @@ C(`
   /* ---------- 数据完整性（口径 = quest-config.js 派生的一级分类 kind） ---------- */
   const total = C('Config.drop.quests.length');
   // 2026-09-11 P2：+章宝箱 10 + 副本/塔分档成就 6 + 周常 6 → 160 → 182
-  // 2026-09-16：182 → 180（删「门票熔铸」「塔券铸成」两条资格类兑换）→ **179**（再删「凝魂换材」，凝魂晶石退役）
-  A(total === 179, '任务总数 179 条（实际 ' + total + '）');
+  // 2026-09-16：182 → 180（删「门票熔铸」「塔券铸成」两条资格类兑换）→ 179（再删「凝魂换材」，凝魂晶石退役）
+  // 2026-09-17 晚：179 → **180**（「塔券铸成」按用户拍板「A」加回：每周限 1 张、成本 36 个腐印）
+  A(total === 180, '任务总数 180 条（实际 ' + total + '）');
   const count = kind => C(`Config.drop.quests.filter(q=>q.kind==='${kind}').length`);
   A(count('guide') === 6, '引导 6 条（N1-N6）');
   A(count('series') === 70, '系列 70 条（10 章 × 7 条：6 环 + 章宝箱）');
   A(count('pet') === 32, '宠物 32 条（8 宠 × 4 环：孵化 / 试炼 / 进化 / 百战）');
   A(count('daily') === 16, '日常 16 条');
   A(count('weekly') === 6, '周常 6 条（2026-09-11 新分类，reset 全部 weekly）');
-  A(count('exchange') === 9, '兑换 9 条（每日 4 + 每周 5；卵石相易 09-10 删、门票熔铸与塔券铸成 09-16 删、凝魂换材同日删）');
+  A(count('exchange') === 10, '兑换 10 条（每日 4 + 每周 6；卵石相易 09-10 删、门票熔铸与塔券铸成 09-16 删、凝魂换材同日删；塔券铸成 09-17 晚加回）');
   A(count('bonus') === 2, '目标 2 条（今日勤勉 + 本周活跃）');
   A(count('loop') === 11, '循环 11 条（10 条地图委托 + 觉醒之路）');
   A(count('achieve') === 27, '成就 27 条（21 + 副本/塔分档 6）');
@@ -112,16 +113,17 @@ C(`
     '每条兑换都带硬重置周期（每日/每周）—— 否则就是无限刷，会取代地图与试炼');
   A(C(`Config.drop.quests.filter(q=>q.kind==='exchange').every(q=>!q.repeatable)`),
     '兑换不准标 repeatable（那会绕过每日/每周上限）');
-  // 2026-09-16：6 → 5。删掉「塔券铸成」（通天塔重置卡）—— 门票/重置卡是**玩法资格**（限定次数），
-  // 不该能从任务里农出来；依据见 config.js 里那段删除说明与边界基线 §3。
-  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.reset==='weekly').length`) === 5, '每周兑换 5 条');
+  // 2026-09-16：6 → 5（删「塔券铸成」—— 门票/重置卡是**玩法资格**，不该能从任务里农出来）。
+  // 2026-09-17 晚：5 → **6**（用户拍板「A：加回兑换」）。但**只每周 1 张**、付出是塔自己的副产（腐印 ×36），
+  //   所以它≠"任务能农重置卡"；三道护栏写在 config.js 那条任务上，改它之前先读。
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.reset==='weekly').length`) === 6, '每周兑换 6 条');
   // 传说补遗（2026-09-10 用户点名）：必须是硬上限的兑换，且单条 ≤2 个传说（归属表铁律 3）
   A(C(`(function(){var q=Config.drop.quests.find(function(x){return x.id==='ex_day_legend';});
        return !!q && q.reset==='daily' && q.reward['传说进化素材']<=2 && q.unlockLevel===31;})()`),
     '「传说补遗」是每日限 1 次的兑换（保底 2 个传说，不靠运气/不退低级图）');
-  // 2026-09-16：12 → 10（同上：删掉「门票熔铸」与「塔券铸成」两条资格类兑换）
-  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.category==='exchange').length`) === 9,
-    '兑换任务的 category 已对齐成 exchange（9 条，不谎报自己是日常）');
+  // 2026-09-17 晚：9 → 10（「塔券铸成」加回；「门票熔铸」仍未加回）
+  A(C(`Config.drop.quests.filter(q=>q.kind==='exchange'&&q.category==='exchange').length`) === 10,
+    '兑换任务的 category 已对齐成 exchange（10 条，不谎报自己是日常）');
   A(C(`Quest.getGroups('exchange', Quest.getQuests().filter(q=>q.kind==='exchange')).length`) === 2,
     '兑换按重置周期分成「每日兑换 / 每周兑换」两组');
   // ⑤ Quest 侧的分组聚合 API

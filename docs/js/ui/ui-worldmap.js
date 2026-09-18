@@ -321,13 +321,12 @@
     const allAreas = (window.Config && window.Config.battle && window.Config.battle.areas) || [];
     const tierNo = allAreas.findIndex(a => a.id === point.areaId) + 1;
     const mwCfg = ((window.Config.drop || {}).materialWeightsByTier || {})[tierNo] || {};
-    const evoTiersCfg = ((window.Config.drop || {}).areaEvolutionTiers || {})[point.areaId] || [];
     const areaMatCfg = ((window.Config.drop || {}).areaMaterials || {})[point.areaId];
     const dropNames = [];
     if (areaMatCfg && areaMatCfg.name) dropNames.push(areaMatCfg.name);
-    evoTiersCfg.forEach(e => dropNames.push(e));
+    // 2026-09-17：进化素材三档已是独立键（`areaEvolutionTiers` 已删），照常按名字列出即可
     Object.keys(mwCfg).forEach(k => {
-      if (k !== '区域材料' && k !== '进化素材') dropNames.push(k);
+      if (k !== '区域材料') dropNames.push(k);
     });
     dropNames.push('装备（未鉴定）');
     dropNames.push('宠物蛋');
@@ -436,17 +435,10 @@
      * 顺序与原因都封装在 IdleBridge.handoff() 里（先结算最后一段 → 只拆本地、不发 stop，
      * 服务器侧由紧接着的 battle_session('start')「停旧建新」一条事务接替）——
      * UI 层不需要知道这些先后，只管说"我要交棒"。 */
-    const stopRunningIdle = async () => {
-      const IB = window.IdleBridge;
-      const B = window.Battle;
-      const managed = !!(IB && IB.isActive && IB.isActive());
-      const local = !!(B && B.isRunning && B.isRunning());
-      if (!managed && !local) return;
-      if (managed && IB.handoff) await IB.handoff();
-      if (B && B.stopAutoBattle) B.stopAutoBattle();
-      // 本地挂机经验是本地记账，停之前补写一次云端（托管由服务器写库，不能本地补）
-      if (!managed && window.Game && window.Game.flushPetProgress) window.Game.flushPetProgress();
-    };
+    /* 2026-09-18：实现收到 `main.js` 的 `window.Game.stopIdle`（与 startIdleAt 对称的一对）——
+     * 任务胶囊的「去做」也要停旧挂机再开打，两份实现会漂，所以只留一处。 */
+    const stopRunningIdle = () => (window.Game && window.Game.stopIdle
+      ? window.Game.stopIdle() : Promise.resolve({ ok: true, idle: false }));
     // 进战斗页（不自动挂机）
     const enterBattle = () => {
       const el2 = $('area-detail');

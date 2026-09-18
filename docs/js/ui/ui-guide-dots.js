@@ -47,13 +47,22 @@
     // 任务层任何异常都不许拖垮红点（它只是提示，不是主流程）
     try {
       const g = Quest.getGuideQuest ? Quest.getGuideQuest() : null;
-      add(g && g.guide);
+      // 引导任务：没做完 → 红点亮在操作页；做完了待交 → 红点亮在任务按钮
+      if (g && g.guide) {
+        if (g.done) {
+          pages['quest'] = (pages['quest'] || 0) + 1;
+        } else {
+          add(g.guide);
+        }
+      }
       const list = (Quest.getQuests ? Quest.getQuests() : []) || [];
       for (let i = 0; i < list.length; i++) {
         const q = list[i];
         if (!q || q.finished || q.unlocked === false) continue;
-        // 已达成、可提交 → 指回它的入口去领奖（引导链那条上面已经加过）
-        if (q.done && UI && UI.guideOf) add(UI.guideOf(q));
+        // 已达成、可提交 → 红点亮在任务按钮（去交任务），不是操作页
+        if (q.done) {
+          pages['quest'] = (pages['quest'] || 0) + 1;
+        }
       }
     } catch (e) { /* 忽略 */ }
 

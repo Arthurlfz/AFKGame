@@ -95,11 +95,12 @@
 
   /* ---------- 掉落预览（从 Config 推导，纯展示） ---------- */
   // 专属材料名 + 进化素材档位 + 金装概率倾向 + 各图材料掉落分布（materialWeightsByTier）
+  // 🔴 2026-09-17：进化素材三档改成**独立键**（`areaEvolutionTiers` 已删），
+  //   所以"本图出哪几档"不再读配置，直接看权重表里有没有这三个名字。
+  const EVO_NAMES = ['进化素材', '精粹进化素材', '传说进化素材'];
   function buildPreview(point) {
     const D = (window.Config && window.Config.drop) || {};
     const am = (D.areaMaterials || {})[point.matKey];
-    // areaEvolutionTiers 的 value 本身就是素材名数组（如 ['进化素材','精粹进化素材']）
-    const evoTier = (D.areaEvolutionTiers || {})[point.matKey] || [];
     // 金装概率：取该图怪物池 rarityWeights.gold 的最大值作展示（值已是百分比，如 3 = 3%）
     const goldChance = goldPctOfArea(point.areaId);
     // 材料掉落分布：按图档取 materialWeightsByTier，换算占材料分支的比例与相对条形长度
@@ -107,6 +108,7 @@
     const areaIdx = areas.findIndex(x => x.id === point.areaId);
     const tier = areaIdx >= 0 ? areaIdx + 1 : -1;
     const wTbl = tier > 0 ? (D.materialWeightsByTier || {})[tier] : null;
+    const evoTier = wTbl ? EVO_NAMES.filter(n => (wTbl[n] || 0) > 0) : [];
     let dropDist = null;
     if (wTbl) {
       const vals = Object.keys(wTbl).map(k => wTbl[k] || 0);
@@ -120,8 +122,7 @@
           name: k === '区域材料' && am ? am.name : k,
           weight: w,
           pct: Math.round(w / total * 100),   // 占材料分支百分比（数值精确）
-          bar: Math.round(w / maxW * 100),    // 相对条形长度（视觉对比，最长=100%）
-          variants: k === '进化素材' ? evoTier : null // 进化素材档位（普通/精粹/传说）
+          bar: Math.round(w / maxW * 100)     // 相对条形长度（视觉对比，最长=100%）
         };
       }).sort((x, y) => y.weight - x.weight);
     }

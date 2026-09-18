@@ -39,7 +39,8 @@ addNames(C.trade && C.trade.materials, 'trade 白名单');
 Object.keys(C.craft || {}).forEach(k => addRef(C.craft[k] && C.craft[k].name, 'craft.' + k));
 Object.keys(C.drop.materialWeightsByTier || {}).forEach(t => addWeights(C.drop.materialWeightsByTier[t], '地图掉落表 图' + t));
 Object.keys(C.drop.areaMaterials || {}).forEach(k => add(C.drop.areaMaterials[k] && C.drop.areaMaterials[k].name, '区域材料表'));
-addWeights(C.drop.evoMaterialWeights, '进化素材档位');
+// 2026-09-17：`evoMaterialWeights` 已随占位键机制删除（三档进化素材现在是 materialWeightsByTier 里的真键，
+// 上面第 40 行那个循环已经把它们的名字收进来了），这里不再需要单独登记。
 addWeights(C.drop.lootTiers, '掉落播报档位');
 add(C.drop.phoenixName, 'phoenixName');
 add(C.drop.synthesizeName, 'synthesizeName');

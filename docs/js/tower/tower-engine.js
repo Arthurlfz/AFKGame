@@ -234,8 +234,9 @@
       kind: isGuardian ? 'guardian' : 'mob'
     });
     state.layerLoot.push(loot);
-    if (loot.kind === 'material' && loot.name && window.Materials && window.Materials.gain) {
-      window.Materials.gain(loot.name, loot.qty);
+    if (loot.kind === 'material' && loot.name && window.TowerRewards && window.TowerRewards.gainMat) {
+      // 走 rewards 的统一发放：经验包自动绑定（不可交易），其余材料照常可交易
+      window.TowerRewards.gainMat(loot.name, loot.qty);
       log(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M20 11v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8"/><path d="M7.5 7a1 1 0 0 1 0-5A4.8 8 0 0 1 12 7a4.8 8 0 0 1 4.5-5 1 1 0 0 1 0 5"/></svg> 掉落 ${loot.name} ×${loot.qty}${isGuardian ? '（守卫掉落）' : ''}`);
       emit({ type: 'loot', loot, isGuardian: !!isGuardian });
     } else if (loot.kind === 'equipment' && loot.eq) {

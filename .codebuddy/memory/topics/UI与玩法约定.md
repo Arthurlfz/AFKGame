@@ -24,3 +24,17 @@
 - **最多 1 个强调色**；禁纯黑、禁霓虹外发光（用内边框 / 带色阴影）；禁硬编码颜色，一律用 `design-tokens.css` 的 token。
 - 改设计→代码：用**项目已有 token**、**更新现有组件而不是新建**、**不许破坏既有功能**。
 - 玩家文案**禁破折号**（`—`/`–`），守值 `vtest_codex.js` 会抓。
+
+## ⭐ 消息中心 / 富文本通道的 HTML 规矩（2026-09-17 用户实机抓 bug 后立）
+**通道口径**（`ui-common.js:99` 注释是权威）：`UI.consoleLog(cat, html)` / `UI.addLog(text)` /
+`UI.showToast(title, msg)` **全是富文本、内部不转义** —— 所以全项目 16 处调用直接把 `<svg class="eic">`
+当图标传进去，是**对的**。⛔ 别给这些函数加 escapeHtml（加了图标就整段变源码文本）。
+⇒ **调用方负责安全**：拼进来的玩家可控内容（昵称 / 宠物名 / 装备名）自己先 `escapeHtml`。
+
+🔴 **反过来的坑（塔踩过，2026-09-17）**：**自己再包一层 `esc(整串)` 会把图标一起转义**。
+`tower/ui-tower-battle.js` 的 `logEpic(text)` 就是 `${esc(text)}`，而 3 个调用方把 `<svg>` 拼进了 text
+⇒ 玩家在消息中心看到 `<svg class="eic" viewBox="0 0 24 24" …>` 一坨源码，**像游戏坏了**（用户实机发现）。
+✅ 正确写法：**图标与文案分开传，只有文案进 esc** ——
+`logEpic(icon, text)` → `'<span class="tw-epic">' + (icon||'') + esc(text) + '</span>'`（同 `logLootLoot`）。
+⚠️ 守值：`vtest_tower_ui.js` 第 ⑤ 节 —— 桩掉 consoleLog 收 html，断言**没有 `&lt;svg`** 且**真有 `<svg`**。
+（写新播报函数时照抄这个模式；凡是"图标 + 动态文字"的通道都适用。）

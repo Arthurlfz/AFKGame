@@ -176,12 +176,21 @@
     // 同名素材（若下一阶配了同名 extra）已在 rm.enough 里按合并总量判定；异名才单独看 ex.enough
     const matOk = rm ? (rm.enough && (!ex || ex.sameName || ex.enough)) : have >= 1;
     const itemOk = !selectedItem || Materials.getQuantity(selectedItem.name) >= 1;
-    const canEvolve = lvOk && matOk && itemOk;
+    // 挂机中：本地等级是"预演值"，可能比服务器真等级低。此时不禁用按钮——
+    // 点了之后 duringPetEdit 会先结算拿到真等级再判，够了就进化，不够再报错。
+    const isIdling = !!(window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive());
+    const canEvolve = isIdling ? (matOk && itemOk) : (lvOk && matOk && itemOk);
     const boostOptions = ['<option value="">不用强化道具</option>'].concat(boostItems.map(item =>
       `<option value="${item.id}"${selectedItem && selectedItem.id === item.id ? ' selected' : ''}>${item.icon} ${item.name}｜${item.effect}（持有 ${Materials.getQuantity(item.name)}）</option>`
     )).join('');
     let warnRow = '';
-    if (!lvOk) warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
+    if (!lvOk) {
+      if (isIdling) {
+        warnRow += `<div class="es-preview-row"> 挂机中：本地显示 Lv.${pet.level}，点确认后将先结算再核对真实等级（需 Lv.${route.minLevel}）</div>`;
+      } else {
+        warnRow += `<div class="es-preview-row warn"> 等级不足：需要 Lv.${route.minLevel}，当前 Lv.${pet.level}</div>`;
+      }
+    }
     if (rm && !rm.enough) warnRow += `<div class="es-preview-row warn"> 材料不足：需要 ${rm.total || matAmt} 个 ${matName}${ex && ex.sameName ? '（含终阶额外 ' + ex.amount + ' 个）' : ''}，当前持有 ${rm.have}</div>`;
     if (ex && !ex.sameName && !ex.enough) warnRow += `<div class="es-preview-row warn"> ${stageLabel}额外材料不足：需要 ${ex.amount} 个 ${ex.name}，当前持有 ${ex.have}</div>`;
     if (selectedItem && !itemOk) warnRow += `<div class="es-preview-row warn"> ${selectedItem.name}不足：需要 1 个，当前持有 ${Materials.getQuantity(selectedItem.name)}</div>`;
@@ -223,12 +232,17 @@
     const evoBtn = cb.querySelector('#evolve-ok');
     evoBtn.onclick = async () => {
       if (!canEvolve) {
-        showToast('无法进化', !lvOk ? '等级不够': '材料不足');
+        showToast('无法进化', (!matOk || !itemOk) ? '材料不足': '等级不够');
         return;
       }
       const origName = pet.name;
       const origGrowth = pet.growth;
-      const res = await UI.runWithLoading(evoBtn, '进化中…', () => Evolve.evolve(pet.id, i, evolvePreview.boost, evolvePreview.boostItemId)) || { error: '请稍候再试' };
+      // 融合过渡动画：不预弹，等 Evolve.evolve 通过所有检查（等级/材料/登录/在售）后才触发
+      let closeFusion = null;
+      const res = await UI.runWithLoading(evoBtn, '进化中…', () => Evolve.evolve(pet.id, i, evolvePreview.boost, evolvePreview.boostItemId, {
+        onFuseStart: () => { closeFusion = UI.showFusion ? UI.showFusion() : null; }
+      })) || { error: '请稍候再试' };
+      if (closeFusion) closeFusion(!res.error);
       if (res.error) { showToast('进化失败', res.error); return; }
       const changed = res.keepForm ? '（形态不变）': '';
       const itemText = res.boostItem ? `（消耗 ${res.boostItem.name}）` : '';
@@ -242,8 +256,11 @@
     };
   }
 
-  // 神宠培育（2026-09-11）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3），成长 100 封顶。
-  // 不占进化次数、不改形态；普通宠不适用（它们走正常进化）。
+  /* 神宠培育（2026-09-11）：神级宠吃玉露直接涨成长（天仙 0.5~0.8 / 琼浆 0.8~1.3）。
+   * ⚠️ 2026-09-17 用户拍板：**取消「成长 100 封顶」** —— 原来到 100 这里就把按钮置灰、
+   *   预览值也钳在 100（客户端三层叠加之一）。现在只受「本轮次数」限制
+   *   （godPets.cultivateMax，涅槃后重置），成长本身无上限。
+   * 不占进化次数、不改形态；普通宠不适用（它们走正常进化）。 */
   function renderGodCultivate(main) {
     const mb = $('evolve-main-box'), tb = $('evolve-target-box'), pb = $('evolve-preview'), cb = $('evolve-confirm');
     const items = (Config.itemsOf ? Config.itemsOf('evolve') : []).concat(Config.itemsOf ? Config.itemsOf('cultivate') : []).filter(i => i.godGrowth);
@@ -254,26 +271,25 @@
     const used = main.cultivateUsed || 0;
     const left = Math.max(0, maxCul - used);
     const outOfTurn = used >= maxCul;
-    const full = (main.growth || 0) >= 100;
-    const nextGrowth = item ? Math.min(100, Math.round((main.growth + (item.godGrowth[0] + item.godGrowth[1]) / 2) * 10) / 10) : main.growth;
+    const nextGrowth = item ? Math.round((main.growth + (item.godGrowth[0] + item.godGrowth[1]) / 2) * 10) / 10 : main.growth;
     mb.innerHTML = `<div class="evo-card">
       <div class="avatar">${iconHtml(main.name)}</div>
       <div class="pname">${main.name} · 神级</div>
-      <div class="pmeta">Lv.${main.level} · 成长 ${main.growth.toFixed(1)}${full ? ' · 已满' : ''}</div>
+      <div class="pmeta">Lv.${main.level} · 成长 ${main.growth.toFixed(1)}</div>
     </div>`;
     tb.innerHTML = `<div class="evo-card next">
       <div class="avatar">${iconHtml(main.name)}</div>
       <div class="pname">培育</div>
-      <div class="pmeta">神宠不走进化树 · 吃玉露直接涨成长（上限 100）</div>
+      <div class="pmeta">神宠不走进化树 · 吃玉露直接涨成长（无上限）</div>
     </div>`;
     const opts = items.map(i => '<option value="' + i.id + '"' + (i.id === godCulItemId ? ' selected' : '') + '>' + i.name + ' +' + i.godGrowth[0] + '~' + i.godGrowth[1] + '（持有 ' + (Materials.getQuantity ? Materials.getQuantity(i.name) : 0) + '）</option>').join('');
     pb.innerHTML = `<div class="preview-bar">
       <div class="pv"><div class="k">培育素材</div><div class="v"><select id="god-cul-item">${opts}</select></div></div>
       <div class="pv"><div class="k">成长</div><div class="v">${main.growth.toFixed(1)} → ${nextGrowth.toFixed(1)}<small>${item ? '期望 +' + item.godGrowth[0] + '~' + item.godGrowth[1] : ''}</small></div></div>
       <div class="pv"><div class="k">本轮次数</div><div class="v">${used}/${maxCul}<small>${outOfTurn ? '已用完 · 涅槃后重置' : '剩 ' + left + ' 次'}</small></div></div>
-      <div class="pv"><div class="k">说明</div><div class="v"><small>形态与等级不变 · 只涨成长 · 上限 100</small></div></div>
+      <div class="pv"><div class="k">说明</div><div class="v"><small>形态与等级不变 · 只涨成长（无上限）</small></div></div>
     </div>`;
-    cb.innerHTML = `<button class="confirm-btn" id="god-cul-go"${(!item || have < 1 || full || outOfTurn) ? ' disabled' : ''}>确认培育</button>`;
+    cb.innerHTML = `<button class="confirm-btn" id="god-cul-go"${(!item || have < 1 || outOfTurn) ? ' disabled' : ''}>确认培育</button>`;
     const sel = document.getElementById('god-cul-item');
     if (sel) sel.onchange = () => { godCulItemId = sel.value; renderGodCultivate(main); };
     const godCulBtn = document.getElementById('god-cul-go');
@@ -288,7 +304,7 @@
   function renderEvolveHint() {
     const el = $('evolve-hint-text');
     const E = Config.pet.evolution;
-    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成；神宠可在本页吃<b>天仙玉露 / 琼浆玉露</b>培育成长（上限 100）。`;
+    if (el && E) el.innerHTML = `进化：5 个阶段 = 初始 → <b>一阶 Lv10</b>（进化素材）→ <b>二阶 Lv25</b>（精粹）→ <b>三阶 Lv40</b> 淬体（传说，形态不变）→ <b>终阶 Lv60</b>（传说×1，解锁主动技能）。等级不变、成长提升；只有<b>终阶</b>宠才能参与<b>神级宠</b>合成；神宠可在本页吃<b>天仙玉露 / 琼浆玉露</b>培育成长（无上限）。`;
   }
 
 

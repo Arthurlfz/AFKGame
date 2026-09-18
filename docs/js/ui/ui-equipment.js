@@ -178,6 +178,8 @@
     // 玩家只能用「批量分解」或背包里的快捷键 —— 后者当时还没有确认框。
     const autoBtn = $('btn-salvage-auto');
     if (autoBtn) autoBtn.onclick = openSalvagePanel;
+    const whiteBtn = $('btn-salvage-white');
+    if (whiteBtn) whiteBtn.onclick = openWhiteSalvagePanel;
   }
 
   /* ---------- 背包（穿装备 / 多选批量分解） ---------- */
@@ -414,6 +416,61 @@
   }
   function closeSalvagePanel() {
     $('salvage-modal').style.display = 'none';
+  }
+
+  /* ---------- 一键处理白装（保留T1底材） ----------
+   * 白装T1底材是贵重打造材料（词缀上限高），不能误分解。
+   * 白装T2~T5底材=垃圾，一键清掉。已锁定/在售/穿着的自动跳过。 */
+  function openWhiteSalvagePanel() {
+    try {
+      const inv = getInventory();
+      if (!inv.length) { showToast('背包没有装备', '去战斗页刷点掉落吧'); return; }
+
+      const Salvage = window.Salvage;
+      const targets = inv.filter(eq => {
+        if (!Salvage.isSalvageable(eq)) return false;
+        const r = window.Equipment.rarityOf(eq);
+        if (r.id !== 'white') return false;
+        const mt = eq.materialTier != null ? eq.materialTier : (eq.tier != null ? eq.tier : 4);
+        if (mt === 1) return false;
+        return true;
+      });
+
+      if (!targets.length) {
+        showToast('没有可处理的白装', '白装T1底材会自动保留');
+        return;
+      }
+
+      const pv = Salvage.previewEquips(targets);
+      const gainLine = (gains) => Object.entries(gains || {}).map(([k, n]) =>
+        `<div>${Config.craft[k]?.icon || ''} ${Config.craft[k]?.name || k} ×<b>${n}</b></div>`
+      ).join('') || '<div class="hint">白装分解无产出（回收背包空间）</div>';
+
+      const body = $('salvage-body');
+      body.innerHTML = `
+        <div class="salvage-count">处理白装（保留T1底材）</div>
+        <div class="salvage-detail">
+          将分解 <b>${pv.count}</b> 件白装（T2~T5底材）
+          <div class="hint">已锁定 / 在售 / 穿着的装备自动跳过</div>
+          <div class="hint">T1底材白装已自动保留（贵重打造材料）</div>
+        </div>
+        <div class="salvage-gain">预计获得：</div>${gainLine(pv.gains)}
+        <div class="salvage-warn">⚠️ 分解不可撤销，T1底材白装不会被选中</div>`;
+
+      salvageConfirm({
+        title: '<img class="eic-img" src="assets/ui/ic_shred.png" alt=""> 处理白装',
+        okLabel: '确认分解',
+        fallbackText: '确认分解 ' + pv.count + ' 件白装？T1底材会保留。',
+        onOk: async () => {
+          const res = await Salvage.salvageList(targets);
+          if (res.error) { showToast('❌ 分解失败', res.error); return; }
+          showToast(`清理了 ${res.count} 件白装`, res.skipped ? `（${res.skipped}件被保护跳过）` : '背包空间释放');
+          UI.renderAll();
+        }
+      });
+    } catch (e) {
+      console.error('[white-salvage]', e);
+    }
   }
 
   /* ---------- 批量分解确认框（多选装备 → 预览 → 确认） ---------- */

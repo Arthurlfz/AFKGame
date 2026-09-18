@@ -47,13 +47,13 @@ function buildCtx() {
   return ctx;
 }
 /* 真造一套 12 件金装（图 10 档 / 底材 T5 / ilvl 100）——不用代理点数 */
-function rollGearSet(ctx) {
+function rollGearSet(ctx, rarityId, ilvl) {
   const E = ctx.Equipment;
-  const gold = (ctx.Config.equipment.rarities || []).find(r => r.id === 'gold') || (ctx.Config.equipment.rarities || [])[0];
+  const gold = (ctx.Config.equipment.rarities || []).find(r => r.id === (rarityId || 'gold')) || (ctx.Config.equipment.rarities || [])[0];
   const eq = {};
   let guard = 0;
   while (Object.keys(eq).length < 12 && guard++ < 4000) {
-    const it = E.generateEquipment(gold, 10, 5, 100);
+    const it = E.generateEquipment(gold, 10, 5, Number(ilvl) || 100);
     if (!it || !it.slot || eq[it.slot]) continue;
     eq[it.slot] = it;
   }
@@ -71,12 +71,31 @@ function buildProfiles(ctx) {
     { key: '中档·成长100+12金装', pet: { name: '腐烂之母', lineId: '腐噜兽', level: 60, growth: 100, baseHp: 110, baseAtk: 22, baseDef: 11, baseSpd: 80 }, gear: true },
     { key: '涅槃1', pet: { name: god.name, lineId: fake, level: 60, growth: 150, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true },
     { key: '涅槃3', pet: { name: god.name, lineId: fake, level: 60, growth: 250, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true },
-    { key: '涅槃5·满配', pet: { name: god.name, lineId: fake, level: 60, growth: 350, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true }
+    { key: '涅槃5·满配', pet: { name: god.name, lineId: fake, level: 60, growth: 350, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true },
+    /* 🔴 2026-09-18 加这两档：用户报「成长 200 + T3 装备（白图）只到十来层」，
+     * 而模型里「涅槃1(150) = 17 层 / 涅槃3(250) = 19 层」⇒ 成长 200 该有 ≈18 层、差 7 层。
+     * 同一只宠、同一成长，**只换装备** ⇒ 这两行之间的差就是「装备」这一项的贡献。
+     * （成长 200 = 神级宠涅槃 2 次：合成得 100，每次涅槃 +50。） */
+    { key: '涅槃2·成长200+12金装', pet: { name: god.name, lineId: fake, level: 60, growth: 200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true },
+    { key: '涅槃2·成长200+12蓝装', pet: { name: god.name, lineId: fake, level: 60, growth: 200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearRarity: 'blue' },
+    /* ilvl 档：塔怪的等级 = 当前层（Lv60→120）⇒ 塔里掉的装备 ilvl 跟着层走；
+     * 地图 图9/图10 的怪是 Lv49~60 ⇒ 地图装备 ilvl ≈ 60。这两档就是「你身上那套是地图货还是塔货」。 */
+    { key: '涅槃2·成长200+12件ilvl60', pet: { name: god.name, lineId: fake, level: 60, growth: 200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 60 },
+    { key: '涅槃2·成长200+12件ilvl40', pet: { name: god.name, lineId: fake, level: 60, growth: 200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 40 },
+    /* 🔴 2026-09-18 加这四档：用户问「现在第 30 层的门槛是什么样」。
+     * 现状：最强画像（涅槃5 成长350 + 12 件 ilvl100）只到 22~24 层、**通关率 0%** ⇒
+     *   "门槛"要么是个能算出来的数，要么就是一道数学上过不去的墙 —— 这四档就是用来区分的。
+     *   ilvl 120 = 塔怪最高等级（第 30 层 Lv120）⇒ 塔能掉到的最好装备。 */
+    { key: '涅槃5·成长350+12件ilvl120', pet: { name: god.name, lineId: fake, level: 60, growth: 350, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 120 },
+    { key: '成长500+12件ilvl120',  pet: { name: god.name, lineId: fake, level: 60, growth: 500,  baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 120 },
+    { key: '成长800+12件ilvl120',  pet: { name: god.name, lineId: fake, level: 60, growth: 800,  baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 120 },
+    { key: '成长1200+12件ilvl120', pet: { name: god.name, lineId: fake, level: 60, growth: 1200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: true, gearIlvl: 120 },
+    { key: '涅槃2·成长200裸装',   pet: { name: god.name, lineId: fake, level: 60, growth: 200, baseHp: god.baseHp, baseAtk: god.baseAtk, baseDef: god.baseDef, baseSpd: god.speed }, gear: false }
   ];
   return list;
 }
 function statsOf(SIM, ctx, profile) {
-  if (profile.gear && !profile._equip) profile._equip = rollGearSet(ctx);
+  if (profile.gear && !profile._equip) profile._equip = rollGearSet(ctx, profile.gearRarity, profile.gearIlvl);
   const pet = profile.gear ? Object.assign({}, profile.pet, { equipment: profile._equip }) : profile.pet;
   return Object.assign({}, SIM.petStats(pet, ctx.Config));
 }

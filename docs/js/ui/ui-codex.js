@@ -88,30 +88,57 @@
       shareOf(pool, 'equipment').toFixed(1) + '%',
       shareOf(pool, 'egg').toFixed(1) + '%'
     ];
-    // 高级物品归属：直接读 Config.towerDrops（掉落削减的另一半账本）
+    /* 高级物品归属（2026-09-17 修）：名单读 Config.towerDrops，但【塔内落点现算】——
+     * 从 Config.tower.materialBands（哪几层会掉）+ floorTiers（哪档固定给）派生，
+     * 塔的层级/档位一改，这里自动跟着变；towerDrops.backup 只用来补「塔外还有一条来源」。
+     * ⚠️ 旧版直接展示 towerDrops.backup 文案，而那份文案停在「塔接线前」（写着"绝版中"
+     *   "商店可购"），塔 09-10 上线后没跟着改 —— 百科等于告诉玩家"越龙之石绝版了"。 */
     const TW = Config.towerDrops || {};
+    const TWc = Config.tower || {};
+    const towerSourceOf = name => {
+      const bands = (TWc.materialBands || []).filter(b => b.weights && b.weights[name] > 0).map(b => [b.from, b.to]);
+      const bandTxt = bands.length
+        ? Math.min.apply(null, bands.map(b => b[0])) + '~' + Math.max.apply(null, bands.map(b => b[1])) + ' 层掉落'
+        : '';
+      const floors = (TWc.floorTiers || []).filter(t => (t.items || []).some(i => i.name === name)).map(t => t.floor);
+      const tierTxt = floors.length ? '第 ' + floors.join(' / ') + ' 层档位' : '';
+      return [bandTxt, tierTxt].filter(Boolean).join(' / ');
+    };
     const towerRows = (TW.items || []).map(i => [
       escapeHtml(i.name),
       escapeHtml(i.note || ''),
-      escapeHtml(i.backup || '')
+      escapeHtml([towerSourceOf(i.name), i.backup].filter(Boolean).join('；'))
     ]);
+    /* 「每档新解锁什么材料」现算（2026-09-17）：只列这档第一次出现的键（区域材料除外 ——
+     * 每张图都有自己的区域材料，写进来只是噪音）。旧版是手写「图8-10：合成之石 / 剥离石为主」，
+     * 腐印进图 8 那次没人回来改，百科就一直漏着 —— 改成派生，掉落表一改这里自动跟上。
+     * 该档没有新材料时并入上一组，避免出现「沿用上一档」这种凑数行。 */
+    const mw = D.materialWeightsByTier || {};
+    const tierKeys = Object.keys(mw).map(Number).sort((a, b) => a - b);
+    const newAtTier = t => Object.keys(mw[t] || {}).filter(k => k !== '区域材料' && !(k in (mw[t - 1] || {})));
+    const stageGroups = [];
+    tierKeys.forEach(t => {
+      const add = newAtTier(t);
+      if (!add.length) { if (stageGroups.length) stageGroups[stageGroups.length - 1].to = t; return; }
+      const last = stageGroups[stageGroups.length - 1];
+      if (last && last.items === add.join(' / ')) { last.to = t; return; }
+      stageGroups.push({ from: t, to: t, items: add.join(' / ') });
+    });
     return note('普通地图每场战斗只摇一次掉落，四选一：什么都没有 / 一件材料 / 一件装备（未鉴定）/ 一颗宠物蛋。')
       + table(['玩家阶段', '掉材料', '掉装备', '掉蛋'], [
         probRow('新手期（图1-3）', f1),
         probRow('毕业期（图8-10）', f3)
       ])
-      + note('掉什么材料由地图档次决定：')
-      + rules([
-        '图1-3：进化素材 + 重铸石为主',
-        '图4-7：增缀石 / 剥离石 / 合成之石',
-        '图8-10：合成之石 / 剥离石为主',
-        '每张图都掉自己的「区域材料」，交给地图委托换资源副本门票',
-        '宠物蛋孵出副宠，是合成与涅槃的素材来源'
-      ])
+      + note('掉什么材料由地图档次决定（下面只列每档新出现的那几种，打造通货各档都有）：')
+      + rules(stageGroups.map(g => (g.from === g.to ? '图' + g.from : '图' + g.from + '-' + g.to) + '：' + g.items)
+        .concat([
+          '每张图都掉自己的「区域材料」（每图一种），交给地图委托换资源副本门票',
+          '宠物蛋孵出副宠，是合成与涅槃的素材来源'
+        ]))
       + note('鉴定：掉落的装备全部是未鉴定状态，词缀封印，必须用鉴定石揭晓后才能穿戴、打造或上架。')
       + (towerRows.length
-          ? note('高级物品不从普通地图产出（归属通天塔，塔开放前无法获取，见下表）：')
-            + table(['物品', '用途', '当前来源'], towerRows)
+          ? note('高级物品不从普通地图产出，只在【通天塔】产出（越深的层数才给越好的货；塔的入口在世界地图右上角）：')
+            + table(['物品', '用途', '来源'], towerRows)
           : '');
   }
 
@@ -146,6 +173,19 @@
     const items = A.items || [];
     const tiers = (W.floorTiers || []).map(t => t.floor).join(' / ');
     const drops = ((Config.towerDrops || {}).items || []).map(i => escapeHtml(i.name)).join('、');
+    /* 产出（2026-09-17 现算）：塔的怪等级 = 掉落装备的装备等级，成色/底材档全由它决定。
+     * 旧文案写「高级装备（最高图档底材）」——那是 09-11 前的口径（当时底材按图档 roll）。 */
+    const lvStart = (W.curve && W.curve.levelStart) || 60;
+    const AC = ((Config.equipment || {}).affixCountByIlvl || []).filter(s => lvStart >= (Number(s.minIlvl) || 0))
+      .sort((a, b) => (Number(b.minIlvl) || 0) - (Number(a.minIlvl) || 0))[0] || { min: 3, max: 4 };
+    const gearTxt = `装备（未鉴定；塔怪 Lv${lvStart} 起 → 词缀 ${AC.min}~${AC.max} 条，${Number(AC.min) >= 3 ? '掉出来就是金装' : '成色随层数走'}）`;
+    /* 材料分层：从 Config.tower.materialBands 现算（旧文案写死「21 层起才出越龙之石」是错的，
+     * 越龙之石 11 层就进池 —— 合成 Lv40 解锁且它是默认合成道具，刻意提前）。 */
+    const bandTxt = (W.materialBands || []).map(b => b.from + '-' + b.to + ' 层 ' + Object.keys(b.weights || {}).join('/')).join('，');
+    /* 重置卡的「额外次数」来源名 —— 从 Config 那条兑换任务现取（**别手写第二份名字**，
+     * 改名/删条目时这里自动跟上；取不到就退化成不提名字）。 */
+    const rcCardQ = (((Config.drop || {}).quests) || []).find(q => q.id === 'ex_week_reset_card');
+    const rcCardHow = rcCardQ && rcCardQ.name ? `每周兑换「${rcCardQ.name}」限 1 张` : '每周兑换限 1 张';
     const ruleRows = [
       ['层数', `连续 ${W.floors || 0} 层，每 5 层换一名守卫（立绘与野怪同源）`],
       ['每层', `每层 ${W.mobsPerFloor || 5} 只怪（前 ${(W.mobsPerFloor || 5) - 1} 只杂兵 + 最后 1 只守卫），全部清完才进下一层`],
@@ -153,12 +193,12 @@
       ['档位', `${tiers} 层各一档，按【最高到达层数】给；不足第 5 层只给少量补偿`],
       ['血量', '整局只吃一管血：层与层之间、同一层 5 只之间都不回满（这是塔的张力来源）'],
       ['掉落', '奖励分三层：打死杂兵有小随机掉落；打死第 5 只守卫掉得明显更肥；每过 5 层再额外给一次固定档位奖励'],
-      ['白图', '不贴腐印也能打满全程；腐印是自愿的加码，不是通关门票'],
-      /* ⚠️ 2026-09-16：原文案写「魔石商店购买、每周限购 N 张」是**空承诺**（该商品从未上架）；
-       * 同日又拍板「只卖便利不卖数值」⇒ 它不该上架；任务侧的「塔券铸成」兑换也一并删掉了
-       * ⇒ 重置卡**当前没有获取途径**，文案如实写，别再编一个来源。 */
-      ['进入', `每日免费 ${W.freePerDay != null ? W.freePerDay : 1} 次（北京时间 12:00 刷新）；用尽后消耗 1 张${escapeHtml(W.resetCardName || '通天塔重置卡')}（额外次数的获取途径暂未开放）`],
-      ['产出', `高级装备（未鉴定，最高图档底材）${drops ? '、' + drops : ''}`]
+      ['白图', '不贴腐印也能进（腐印是自愿的加码，不是通关门票）；但塔怪 Lv60 起步，能爬多深只由实力决定'],
+      /* 🔄 2026-09-17 晚：来源**已加回** = 每周兑换限 1 张（名字走上面 rcCardHow，从 config 派生）。
+       * ⚠️ 历史（留着防再犯）：原文案写「魔石商店购买、每周限购 N 张」是**空承诺**（该商品从未上架）；
+       *   09-16 又把任务侧来源删了 ⇒ 卡一度无任何来源，文案只能如实写"暂未开放"。 */
+      ['进入', `每日免费 ${W.freePerDay != null ? W.freePerDay : 1} 次（北京时间 12:00 刷新）；用尽后消耗 1 张${escapeHtml(W.resetCardName || '通天塔重置卡')}（额外次数：${escapeHtml(rcCardHow)}）`],
+      ['产出', `${gearTxt}${drops ? '；材料另掉 ' + drops : ''}`]
     ];
     const affixRows = items.map(it => [
       escapeHtml(it.name),
@@ -176,7 +216,7 @@
         `带【禁忌】标记的腐印（共 ${unreadableN} 条）同一局最多贴 ${A.unreadableLimit != null ? A.unreadableLimit : 1} 条，因为它们本身已经很强，全贴上去会变成打不过的死局`,
         '腐印是消耗品：进入时扣掉。来源：地图 8~10 图掉落 + 副本·淬炼试炼 15 / 20 层档位',
         '进塔前会给「预估可达层数」与风险等级（用真实战斗模拟推演），加腐之前先看一眼',
-        '越深的层数才掉越好的材料：1~10 层只出基础打造石，21 层起才出越龙之石 / 天仙玉露',
+        '材料按深度分档（越深的层才给越好的货）：' + bandTxt,
         `成绩：按最高到达层数 + 本局腐蚀度记档，称号见塔内（${((W.titles || []).map(t => t.name).join(' / ')) || '暂无'}）`
       ]);
   }
@@ -190,28 +230,19 @@
     const slots = (Equipment && Equipment.SLOTS) || [];
     const pool = (Equipment && Equipment.AFFIX_POOL) || [];
     const rarities = E.rarities || [];
-    // 底材 T 阶概率（按图档权重现读，数值改 config 自动同步）
-    const matW = E.materialTierWeights || {};
-    const matT1Pct = (tier) => {
-      const w = matW[tier] || {};
-      const vals = Object.values(w).map(Number);
-      const sum = vals.reduce((a, b) => a + b, 0);
-      return sum ? Math.round((Number(w[1] || 0) / sum) * 100) : 0;
-    };
-    /* 词缀 T 阶概率：2026-09-15 起 T 阶只由【装备等级】决定（不再按稀有度加权），
-     * 且 T1 概率按装备等级分段上调（后期必须刷得到百分比词缀，否则满地死签）。
-     * 这里按「图档对应的装备等级」取分段权重现算，避免百科写死一个过时数字。 */
-    const segs = E.affixTierWeightsByIlvl || [];
-    const tierPctAtIlvl = (ilvl, tier) => {
-      let seg = null;
-      for (const s of segs) if (ilvl >= (Number(s.minIlvl) || 0) && (!seg || (Number(s.minIlvl) || 0) > (Number(seg.minIlvl) || 0))) seg = s;
-      const w = (seg && seg.weights) || E.affixTierWeights || {};
-      const sum = Object.values(w).map(Number).reduce((a, b) => a + b, 0);
-      return sum ? Math.round((Number(w[tier] || 0) / sum) * 100) : 0;
-    };
+    /* T 阶口径（2026-09-17 收敛到一处）：概率与最好档一律问 Equipment，百科**不再自己算**。
+     * 上一版百科自己复刻了一份算概率的代码、还读了一张已作废的表，结果算出「图 10 掉 T1 底材 42%」，
+     * 而同页下面写着「图 10 底材最高 T3」——自相矛盾挂了两周（复刻出的数字看着很正常，所以没人发现）。
+     * Equipment.tierOdds / bestTierAt 与掉落用的 rollAffixTier **共用同一份池子逻辑**，
+     * 所以「百科显示的概率」永远等于「真实概率」，改数值不可能再漂。 */
+    const gates = E.affixIlvlGates || {};
+    const tierPctAtIlvl = (ilvl, tier) => (Equipment.tierOdds ? (Equipment.tierOdds(ilvl)[tier] || 0) : 0);
     const t1PctAtIlvl = (ilvl) => tierPctAtIlvl(ilvl, 1);
     const t2PctAtIlvl = (ilvl) => tierPctAtIlvl(ilvl, 2);
-    const ilvlOfTier = (t) => (C.areaLevels || [])[t - 1] || 1;
+    const maxTierAtIlvl = (ilvl) => (Equipment.bestTierAt ? Equipment.bestTierAt(ilvl) : 5);
+    // 图档 → 装备等级也问 Equipment（旧写法读 Config 顶层不存在的 areaLevels，静默取兜底值 1 →
+    // 百科把「图 10 的装备等级」显示成 1，这种"怪数字"就是 bug 的指纹）
+    const ilvlOfTier = (t) => (Equipment.levelOfAreaTier ? Equipment.levelOfAreaTier(t) : 1);
     const rarityRows = rarities.map(r => [
       escapeHtml(r.label),
       r.affixMin === r.affixMax ? `${r.affixMin} 条` : `${r.affixMin} 到 ${r.affixMax} 条`
@@ -241,11 +272,10 @@
         t.tierShift ? 'T 阶 +' + t.tierShift : 'T 阶不变'
       ];
     });
-    const gates = E.affixIlvlGates || {};
     const gateLine = Object.keys(gates).sort((a, b) => a - b).map(t => `T${t} ≥ ${gates[t]}`).join('、');
     return note(`装备共 ${slots.length} 个部位：${slots.map(s => escapeHtml(s)).join('、')}。每件装备由【基底（部位固定值）】与【词缀（前缀≤3 + 后缀≤3，共≤6 条）】两部分组成。`)
       // 底材 / 基底数值
-      + note(`【底材 / 基底数值】掉落时随机一个部位，基底 = 该部位基准值 × 图档倍数（baseTierMultipliers，图 1=1 平滑到图 10=3.25）× 底材 T 阶倍数（materialTierMultipliers，T1=1.5 到 T5=0.6）。底材 T 阶由掉落图档的权重决定，且同样受装备等级门槛约束（见「等级判定」）。图 10 掉底材 T1 概率约 ${matT1Pct(10)}%，图 1 仅约 ${matT1Pct(1)}%。`)
+      + note(`【底材 / 基底数值】掉落时随机一个部位，基底 = 该部位基准值 × 图档倍数（baseTierMultipliers，图 1=1 平滑到图 10=3.25）× 底材 T 阶倍数（materialTierMultipliers，T1=1.5 到 T5=0.6）。底材 T 阶与词缀 T 阶是同一套规则：只看【装备等级】（门槛 + 分段权重，见「等级判定」），与掉落的图无关。图 10 的装备等级是 ${ilvlOfTier(10)}（图 1 是 ${ilvlOfTier(1)}）→ 底材只可能出到 T${maxTierAtIlvl(ilvlOfTier(10))}，T1 概率 ${t1PctAtIlvl(ilvlOfTier(10))}%。`)
       // 词缀池
       + note(`【词缀池】前缀（大方向属性）：${prefixList.join('、')}；后缀（机制 / 资源属性）：${suffixList.join('、')}。抽取按权重：攻击 / 生命 / 防御等核心战斗词缀常出，掉落数量 / 掉落稀有度 / 材料掉率等资源类词缀极稀有。词缀数值分 T1~T5 档，T1 最强（具体区间进打造页看装备详情）。`)
       // 等级判定（T 阶门槛）
@@ -253,13 +283,13 @@
       + rules([
         `T 阶只由【装备等级】决定，与颜色无关。⭐ T1 与 T2 都需要装备等级 ≥ ${gates[1] || 70}，也就是【通天塔的怪（Lv70 起，约第 6 层）才出】；普通地图装备等级最高到图 10 的 ${ilvlOfTier(10)}，所以【普通地图最高只出 T3】。`,
         `塔里高档词缀概率约 T1 ${t1PctAtIlvl(70)}% / T2 ${t2PctAtIlvl(70)}%（高层 ≥90 级约 ${t1PctAtIlvl(90)}% / ${t2PctAtIlvl(90)}%）：塔是后期主要玩法，高档词缀就放在那里作为专属产出。`,
-        `底材 T 阶同门槛：图 10 底材最高 T3（T1/T2 底材同样要装备等级 70 以上）。`,
+        `底材 T 阶同门槛：普通地图装备等级最高到图 10 的 ${ilvlOfTier(10)}，所以底材最高只出到 T${maxTierAtIlvl(ilvlOfTier(10))}；T1/T2 底材（和 T1/T2 词缀一样）只有塔能出。`,
         '⭐ 词缀统一规则：T1 = 百分比词缀（带 %），T2~T5 = 固定值词缀。看到「攻击 +15%」就是 T1 顶级词缀（塔产）；「攻击 +25」是固定值，前期顶用、后期被成长值越落越远。'
       ])
       // 颜色 / 品质分类
       + note('【品质颜色】由词缀条数唯一决定，与等级、底材无关：')
       + table(['品质', '词缀条数'], rarityRows)
-      + note('掉落时先按图档定稀有度再定条数，二者天然一致；重铸 / 增缀 / 剥离改变条数后，颜色实时同步为当前条数对应品质。')
+      + note('掉落时按装备等级 roll 词缀条数，颜色就是这条数的结果（不是先定颜色再定条数）；重铸 / 增缀 / 剥离改变条数后，颜色实时同步为当前条数对应品质。')
       // 鉴定与未鉴定限制
       + note('【鉴定与未鉴定】掉落的装备全部是未鉴定状态，词缀封印、不显示任何词缀信息。未鉴定装备不能穿戴、不能打造、不能上架，必须用鉴定石揭晓后才能进行这些操作。')
       // 属性公式
@@ -388,11 +418,11 @@
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>️ 合成', 'Lv.' + (SY.minLevel || 0) + '（两只都要到）',
         ((SY.material || {}).name || '合成之石') + ' ×' + ((SY.material || {}).amount || 1) + ' + 合成道具 ×1',
         `新宠成长 = 主宠成长 + 副宠成长 × ${SY.baseBoostRatio} ×（1 + 等级加成 + 道具加成）+ 随机 +${rb[0]} 到 +${rb[1]}，成长只涨不跌；${pct(mu.chance || 0)} 概率出「·异变」宠`,
-        `两只素材宠都消失，新宠等级回 1；普通宠成长软上限 ${SY.normalGrowthCap}；穿着装备的宠物不能合成；主宠词条全保留（20% 概率升档，不降不丢），副宠词条 40% 概率嫁接进来（至尊神石 100%）；神级宠不准参与合成`],
+        `两只素材宠都消失，新宠等级回 1；成长无上限（2026-09-17 取消原来的软上限 100）；穿着装备的宠物不能合成；主宠词条全保留（20% 概率升档，不降不丢），副宠词条 40% 概率嫁接进来（至尊神石 100%）；神级宠不准参与合成`],
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></svg> 神级宠', `终阶（第 ${(SY.god && SY.god.minStage) || 5} 阶）+ Lv.${godLv}`,
         '合成道具 ×1（决定出神概率）',
         synthItems.map(i => `${escapeHtml(i.name)} ${Math.round((i.godChance || 0) * 100)}%`).join(' / ') + ' 概率出神级宠',
-        `门槛：主宠与副宠都终阶且成长 ≥ ${godMin}；神宠可用天仙玉露 / 琼浆玉露培育成长（上限 100），血脉特质靠涅槃喂副宠慢慢烙（锁魂玉可定向）`],
+        `门槛：主宠与副宠都终阶且成长 ≥ ${godMin}；神宠可用天仙玉露 / 琼浆玉露培育成长（成长无上限），血脉特质靠涅槃喂副宠慢慢烙（锁魂玉可定向）`],
       ['<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/></svg> 孵化', '无', '宠物蛋 ×1',
         `孵出一只基础宠，成长 ${baby.min} 到 ${baby.max} 随机；孵化时按概率携带血脉特质（${hc[1]}% 一条 / ${hc[2]}% 两条 / ${hc[3]}% 三条，T 阶 T1 ${tr[1]}% / T2 ${tr[2]}% / T3 ${tr[3]}%）`,
         '孵出的是基础形态，高阶形态靠进化'],

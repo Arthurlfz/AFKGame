@@ -42,17 +42,24 @@ A(legendQuests.every(q => (q.reward['传说进化素材'] || 0) <= 2), 'a single
 // 单只宠走到终阶总共只要 5 个传说；任务只是「补充」（地图 6~8 才是主来源），
 // 但每条不超过 2 个就保证任务不会一次性把后续阶段的量提前发完。总量不再设硬上限——地图仍是大头。
 
-/* ---- 3. 地图掉落：进化素材不进图 9~10，普通图不产终局资源 ---- */
-const tiers = C('Config.drop.areaEvolutionTiers');
+/* ---- 3. 地图掉落：进化素材三档**全域**（梯度靠权重，不靠"有/无"） ---- */
+/* 🔴 2026-09-17「全域与区域掉落重设计 v1」有意推翻旧口径，替换说明：
+ *   旧口径（2026-09-10 立）：「图 9~10 只出传说档 + 权重 ≤ 图 8 的 1/4」——
+ *     那是为治「传说卡手」打的补丁，同时把入门两阶（普通/精粹）在图 9~10 关掉了。
+ *   用户 2026-09-17 原话：「**我发现有的时候被简单物资卡脚了，我很烦**」→
+ *     毕业玩家（挂图 9~10）孵了新宠，**一阶/二阶素材一件都刷不到**，必须手动退回图 1~5。
+ *   ⇒ 三档改成「全域 + 权重差」：每张图三档都能掉，但梯度必须还在。
+ *   现在守三条：① 10 张图三档齐全 ② 图 9~10 仍是该图权重最高的档 ③ 深处远比浅处高。 */
 const areaNames = C('Config.battle.areas.map(a => a.id)');
 A(areaNames.length === 10, 'ten maps are published');
-// 2026-09-10 用户报「传说卡手」：图 9~10 由「完全不掉」改成「只出传说 + 极低权重」。
-// 边界原文禁止的是「图 9~10 稳定刷取」，低权重不等于稳定刷取 → 断言改守「只出最高档 + 权重 ≤ 图 8 的 1/4」。
-A((tiers['soul-abyss'] || []).join() === '传说进化素材' && (tiers['blight-heart'] || []).join() === '传说进化素材',
-  'maps nine and ten only drop the top evolution tier');
-const ew9 = C('Config.drop.materialWeightsByTier');
-A(ew9[9]['进化素材'] * 4 <= ew9[8]['进化素材'] && ew9[10]['进化素材'] * 4 <= ew9[8]['进化素材'],
-  'maps nine and ten stay far below map eight (an unstable trickle, not a stable farm)');
+const mw10 = C('Config.drop.materialWeightsByTier');
+const EVO3 = ['进化素材', '精粹进化素材', '传说进化素材'];
+A([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].every(t => EVO3.every(n => (mw10[t][n] || 0) > 0)),
+  'evolution material of all three tiers drops on every one of the ten maps (full-map, 2026-09-17)');
+A(mw10[9]['传说进化素材'] > mw10[9]['进化素材'] && mw10[10]['传说进化素材'] > mw10[10]['进化素材'],
+  'maps nine and ten still favour the top tier most (the gradient survived the full-map change)');
+A(mw10[8]['传说进化素材'] > mw10[1]['传说进化素材'] * 100 && mw10[1]['传说进化素材'] < 1,
+  'the top tier is far rarer in shallow maps (map eight vs map one)');
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['锁定石'] || 0) > 0)`),
   'lock stones never drop from maps');
 A(!C(`Object.values(Config.drop.materialWeightsByTier).some(w => (w['涅槃丹'] || 0) > 0)`),
@@ -102,6 +109,16 @@ A(!C(`Object.values((Config.marketBot.botGoods || {}).materials || {}).some(g =>
   'no bot listing pays with soul crystals');
 A(!C(`'soulcrystal' in ((Config.marketBot.botGoods || {}).materialSellWeights || {})`),
   'bots do not resell soul crystals');
+/* ---- 6b. 交易白名单不许重复登记（2026-09-17 补） ----
+ * 起因：`锁魂玉` / `琼浆玉露` 各自被登记了两次（同 id 同 name 连着两行）——
+ *   玩家可见的后果：市集上架/收款的下拉里出现重复选项、交易记录页的净额 chips 重复渲染。
+ * 为什么必须用测试守：按 id 去重的消费方（market_bot 的 find(m=>m.id===...)）只取第一条，
+ *   所以**不报错、不崩**，只是"多一个选项"——靠肉眼永远发现不了，只能静态查重。 */
+const tradeIds = C('Config.trade.materials.map(m => m.id)');
+const dupIds = tradeIds.filter((v, i) => tradeIds.indexOf(v) !== i);
+A(dupIds.length === 0, `trade.materials 里没有重复登记（重复的：${dupIds.join('、') || '无'}）`);
+A(new Set(tradeNames).size === tradeNames.length,
+  `trade.materials 里没有重复的材料名（重复的：${tradeNames.filter((v, i) => tradeNames.indexOf(v) !== i).join('、') || '无'}）`);
 
 /* ---- 7. 分解不得把白装变成高级通货（矩阵 5.3 / 10.2） ---- */
 const salvage = C('Config.salvage');

@@ -134,8 +134,15 @@
     const s2 = getStats(sub);
     const sgbar = Math.max(4, Math.min(100, Math.round((sub.growth || 0))));
     const sstg = window.Pet && window.Pet.getEvolveStage ? window.Pet.getEvolveStage(sub) : 1;
-    sb.innerHTML = `<div class="pet-card2 sub-card">
-      <div class="pname">${sub.name}</div>
+    /* 神级副宠要【显式标出来】（2026-09-17 用户拍板：「之后肯定是神宠互相吃」）：
+     * 神级宠当副宠是正经玩法（把练起来的神宠喂给主宠换成长），所以：
+     *   ① 候选里【不许】过滤掉神级宠（合成页反过来 —— 那里神宠不能当素材，见 ui-pet-synth.js）；
+     *   ② 但它一旦被选中就【必须一眼看出是神级】—— 主宠卡片本来就标了"神级"，副宠卡片以前不标，
+     *      玩家会把一只神宠当普通肥料点掉。这里补上对称的标记。 */
+    const isGodOf = p => (window.Pet && window.Pet.isGodPet) ? window.Pet.isGodPet(p) : !!(p && p.isGodPet);
+    const subIsGod = isGodOf(sub);
+    sb.innerHTML = `<div class="pet-card2 sub-card${subIsGod ? ' god' : ''}">
+      <div class="pname">${sub.name}${subIsGod ? ' · 神级' : ''}</div>
       <div class="pmeta">副宠（将被吸收）· Lv.${sub.level} · ${sstg}/5阶</div>
       <div class="avatar">${iconHtml(sub.name)}</div>
       <div class="growline"><b>${sub.growth.toFixed(1)}</b><span class="gbar"><i style="width:${sgbar}%"></i></span></div>
@@ -143,7 +150,7 @@
     </div>
     <div class="sub-options">${subs.map(s => {
       const sel = s.id === mergeSubId ? ' on': '';
-      return `<div class="sub-opt${sel}" data-sub="${s.id}"><span class="ic">${iconHtml(s.name)}</span><span>${s.name}<small>Lv.${s.level} · 成长 ${s.growth.toFixed(1)}</small></span></div>`;
+      return `<div class="sub-opt${sel}" data-sub="${s.id}"><span class="ic">${iconHtml(s.name)}</span><span>${s.name}${isGodOf(s) ? ' · 神级' : ''}<small>Lv.${s.level} · 成长 ${s.growth.toFixed(1)}</small></span></div>`;
     }).join('')}</div>`;
     sb.querySelectorAll('.sub-opt').forEach(btn => {
       btn.onclick = () => {
@@ -203,7 +210,7 @@
         <div class="pv"><div class="k">锁魂玉</div><div class="v"><label><input type="checkbox" id="nir-lock-check" ${useLock ? 'checked' : ''} ${lockHave >= 1 && subTraitList.length ? '' : 'disabled'}> 定向植入</label>${useLock ? `<select id="nir-lock-trait">${lockOpts}</select>` : ''}（持有 ${lockHave}）</div></div>
       </div>
       <div class="preview-foot">
-        <b>${sub.name}</b>（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
+        <b>${sub.name}</b>${(window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(sub) : !!sub.isGodPet) ? ' <b>★ 神级</b>' : ''}（成长 ${sub.growth.toFixed(1)}）将消失${useNirvanaPill ? ` · 消耗 ${matName} ×1（持有 ${haveMat}）` : ''}${M.resetLevel ? ' · <span class="warn">涅槃后等级重置回 1 级，属性按 1 级 × 新成长重算</span>' : ''}
         ${traitInheritLine(main, sub, 'nirvana')}
         ${footWarns.join('')}
       </div>
