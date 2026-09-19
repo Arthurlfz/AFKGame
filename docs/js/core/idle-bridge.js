@@ -671,7 +671,29 @@
 
   // 切回前台立即结算：真账校准 + 重生成剧本（旧剧本作废，无缝衔接）
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && active) settleNow();
+    if (document.visibilityState === 'visible' && active) {
+      settleNow().then(function (r) {
+        if (r && window.UI && window.UI.showIdleSummary) window.UI.showIdleSummary(r);
+      }).catch(function () { /* 忽略 */ });
+    }
+  });
+
+  // 页面刷新/关闭时主动停服务端会话（2026-09-19 用户要求：刷新即停，不做离线挂机）。
+  // 用 keepalive fetch（浏览器保证页面卸载后仍发完）；切后台不关页面不停。
+  if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('pagehide', function () {
+    if (!active) return;
+    try {
+      const client = window.Supabase && window.Supabase.getClient && window.Supabase.getClient();
+      const sess = client && client.auth && client.auth.session;
+      const token = sess && sess.access_token;
+      if (!token) return;
+      fetch(FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'stop' }),
+        keepalive: true
+      });
+    } catch (e) { /* 忽略 */ }
   });
 
   function notifyChange() { if (onChange) { try { onChange(); } catch (e) { /* 忽略 */ } } }

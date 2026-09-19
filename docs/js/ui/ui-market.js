@@ -11,6 +11,24 @@
 (function () {
   'use strict';
 
+  /* ===== 低价提醒（纯 localStorage，不碰数据库） ===== */
+  const WATCH_KEY = 'market_watch_v1';
+  function getWatches() {
+    try { return JSON.parse(localStorage.getItem(WATCH_KEY) || '{}'); } catch(e) { return {}; }
+  }
+  function setWatch(key, maxPrice) {
+    const w = getWatches();
+    w[key] = maxPrice;
+    localStorage.setItem(WATCH_KEY, JSON.stringify(w));
+  }
+  function removeWatch(key) {
+    const w = getWatches();
+    delete w[key];
+    localStorage.setItem(WATCH_KEY, JSON.stringify(w));
+  }
+  function isWatched(key) { return key in getWatches(); }
+  function watchPrice(key) { return getWatches()[key] || 0; }
+
   const UI = window.UI;
   const { escapeHtml, $, showToast, addLog } = UI;
 
@@ -614,7 +632,7 @@
         <div class="mk-avatar mk-avatar--item">${(window.UI && window.UI.EQUIP_ICON ? window.UI.EQUIP_ICON[l.item_slot] : null) || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>'}️</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name" style="color:${color}">${escapeHtml(l.item_name || '未知装备')}</div>${mineTag}</div>
-          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
+          <div class="mk-meta">${escapeHtml(l.item_slot || '')} · T${l.item_tier || '?'} · ${RARITY_LABEL[l.item_rarity] || l.item_rarity}${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       <div class="mk-affix">${affixText ? escapeHtml(affixText) : '<span style="color:var(--text-faint)">无词缀</span>'}</div>
@@ -664,11 +682,13 @@
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg></div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
-          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
+          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       ${traitsHtml}
-      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${mine ? '取回' : legacy ? '不可购买' : '购买'}</button></div>`;
+      <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : legacy ? 'disabled' : 'buy'}" ${legacy && !mine ? 'disabled' : ''}>${mine ? '取回' : legacy ? '不可购买' : '购买'}</button></div>
+      <button class="mk-watch" title="关注低价" data-watch-key="pet_${l.pet_name}" data-watch-price="${l.material_qty || 0}">${isWatched('pet_' + l.pet_name) ? '★' : '☆'}</button>
+    `;
     // 宠物属性 tooltip：直接复用宠物共享 tooltip（PetUI.bindPetTip + petTipHtml，不重写）。
     // 挂单快照只有名字/等级/成长/特质，血统与基础三围按名字从配置解析（与 pet.js 同源口径：resolveLineId / godInfoOf / starters / speeds）。
     const pName = l.pet_name || '';
@@ -701,6 +721,22 @@
       if (!UI.isLoggedIn()) { showToast('❌ 需要登录', '登录后才能购买宠物'); return; }
       openBuyConfirm('pet', l);
     };
+    // ★ 关注低价按钮
+    const watchBtn = div.querySelector('.mk-watch');
+    if (watchBtn) watchBtn.onclick = (e) => {
+      e.stopPropagation();
+      const wkey = watchBtn.dataset.watchKey;
+      const wprice = parseInt(watchBtn.dataset.watchPrice, 10) || 0;
+      if (isWatched(wkey)) {
+        removeWatch(wkey);
+        watchBtn.textContent = '☆';
+        showToast('已取消关注', wkey);
+      } else {
+        setWatch(wkey, wprice);
+        watchBtn.textContent = '★';
+        showToast('已关注低价', '同类型商品低于 ' + wprice + ' 时会高亮');
+      }
+    };
     return div;
   }
 
@@ -720,7 +756,7 @@
         <div class="mk-egg-icon">${(window.UI && window.UI.MAT_ICONS ? window.UI.MAT_ICONS[window.Drop.makeEggName(l.egg_type)] : null) || '<img class="mat-img" src="assets/ui/ic_egg.png" alt="">'}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(window.Drop.makeEggName(l.egg_type))}</div>${mineTag}</div>
-          <div class="mk-meta">宠物蛋${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
+          <div class="mk-meta">宠物蛋${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
@@ -758,7 +794,7 @@
         <div class="mk-egg-icon">${goodIcon}</div>
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.good_name)}</div>${mineTag}</div>
-          <div class="mk-meta">材料 ×${goodQty}${l.seller ? ' · ' + escapeHtml(l.seller) : ''}${age ? ' · ' + age : ''}</div>
+          <div class="mk-meta">材料 ×${goodQty}${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       <div class="mk-card-foot">${priceHtml}<button class="mk-btn ${mine ? 'recall' : 'buy'}">${mine ? '取回' : '购买'}</button></div>`;
@@ -851,6 +887,7 @@
   }
 
   function renderMarket() {
+    if (window.Tips) Tips.show('market_watch', '★ 关注低价', '点商品卡片右下角☆可关注该宠名，降价时高亮');
     renderMarketFilterPanel();
     const box = $('market-list');
     if (!box) return;

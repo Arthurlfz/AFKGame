@@ -194,14 +194,15 @@
     }
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 720);
   }
-  /* 舞台横幅：cls 决定样式，lines = [{c:class, t:文本}]，播完自己删 */
+  /* 舞台横幅：cls 决定样式，lines = [{c:class, t:文本}]，播完自己删。返回元素供挂事件。 */
   function stageBanner(cls, lines, life) {
-    if (typeof document === 'undefined' || !document.body) return;
+    if (typeof document === 'undefined' || !document.body) return null;
     const el = document.createElement('div');
     el.className = cls;
     el.innerHTML = (lines || []).map(l => '<div class="' + l.c + '">' + escapeHtml(l.t || '') + '</div>').join('');
     document.body.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, life || 2300);
+    return el;
   }
   /* 材料名 → 用途配色 class：现读 Config.trade.materials（那里是材料名的唯一定义处），
    * **不在这里另抄一份名单** —— 抄了就是第二份事实源，改了材料表忘了改这儿就静默失效。
@@ -249,7 +250,24 @@
         r.id === 'gold' ? 3 : (r.id === 'blue' ? 2 : 1), 'loot-q ' + q);
       if (r.id === 'gold') {
         flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
-        stageBanner('loot-banner', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: reward.eq.name }, { c: 'lb-s', t: r.label }, { c: 'lb-line', t: '' }]);
+        screenGoldPulse(); // 金装：屏幕边缘金色脉冲
+        if (window.Tips) Tips.show('gold_pulse', '✨ 金装提醒', '出金装时屏幕边缘会闪金光');
+        const banner = stageBanner('loot-banner', [
+          { c: 'lb-k', t: '稀有掉落' },
+          { c: 'lb-n', t: reward.eq.name },
+          { c: 'lb-s', t: r.label },
+          { c: 'lb-action', t: '去背包鉴定 →' },
+          { c: 'lb-line', t: '' }
+        ], 5000);
+        if (banner) {
+          const act = banner.querySelector('.lb-action');
+          if (act) act.style.cursor = 'pointer';
+          banner.addEventListener('click', (e) => {
+            if (e.target === act || (act && act.contains(e.target))) {
+              if (UI.switchPage) UI.switchPage('bag');
+            }
+          });
+        }
       } else {
         flyToBag(`${r.label}·${reward.eq.name}`, r.id === 'blue' ? 'is-blue' : '');
       }
@@ -461,6 +479,12 @@
     if (!stage || !stage.classList) return;
     stage.classList.add(cls);
     setTimeout(() => stage.classList.remove(cls), ms);
+  }
+  // 金装掉落：屏幕四缘金色脉冲（玩家不在战斗页也能余光看到）
+  function screenGoldPulse() {
+    if (typeof document === 'undefined' || !document.body) return;
+    document.body.classList.add('gold-pulse-edge');
+    setTimeout(() => document.body.classList.remove('gold-pulse-edge'), 1200);
   }
   /* 冲到对方脸前所需的水平位移：量两个立绘的实际间距，冲掉 78%（留一点间隙，别糊在对方脸上）。
    * 视觉方向：我方在左向右冲（正值），敌方在右向左冲（负值）。
@@ -827,9 +851,115 @@
     setTimeout(() => avatar.classList.remove('defeated'), 650);
   }
 
+  /* ---------- 挂机结算汇总（切回前台时弹出） ----------
+   * 收到 settle 返回的 r，聚合 r.detail 里的掉落，弹一个结算窗。
+   * 太短（<3场 或 <15秒）不弹，避免频繁切标签页被烦。 */
+  function showIdleSummary(r) {
+    if (!r) return;
+    const fights = Number(r.fights) || 0;
+    const secs = Number(r.elapsedSec) || 0;
+    if (fights < 3 || secs < 15) return; // 太短不弹
+
+    const detail = Array.isArray(r.detail) ? r.detail : [];
+    let totalExp = 0;
+    const mats = {}; // name -> qty
+    let goldCount = 0, blueCount = 0, whiteCount = 0, eggCount = 0;
+
+    for (const row of detail) {
+      if (!row) continue;
+      totalExp += Number(row.exp) || 0;
+      const rw = row.reward;
+      if (!rw || !rw.type) continue;
+      if (rw.type === 'material' && rw.material) {
+        mats[rw.material] = (mats[rw.material] || 0) + (Number(rw.qty) || 1);
+      } else if (rw.type === 'equipment' && rw.eq) {
+        const rid = (rw.eq.rarity && rw.eq.rarity.id) || 'white';
+        if (rid === 'gold') goldCount++;
+        else if (rid === 'blue') blueCount++;
+        else whiteCount++;
+      } else if (rw.type === 'egg') {
+        eggCount++;
+      }
+    }
+
+    // 格式化时长
+    const mm = Math.floor(secs / 60);
+    const ss = secs % 60;
+    const durText = mm > 0 ? mm + '分' + ss + '秒' : ss + '秒';
+
+    // 材料列表
+    const matEntries = Object.entries(mats).sort((a, b) => b[1] - a[1]);
+    const matHtml = matEntries.length
+      ? matEntries.map(([n, q]) => '<div class="is-row"><span>' + escapeHtml(n) + '</span><b>×' + q + '</b></div>').join('')
+      : '<div class="is-empty">无新材料</div>';
+
+    // 装备列表
+    const eqRows = [];
+    if (goldCount) eqRows.push('<div class="is-row gold"><span>金装</span><b>×' + goldCount + '</b></div>');
+    if (blueCount) eqRows.push('<div class="is-row blue"><span>蓝装</span><b>×' + blueCount + '</b></div>');
+    if (whiteCount) eqRows.push('<div class="is-row"><span>白装</span><b>×' + whiteCount + '</b></div>');
+    if (eggCount) eqRows.push('<div class="is-row egg"><span>宠物蛋</span><b>×' + eggCount + '</b></div>');
+    const eqHtml = eqRows.length
+      ? eqRows.join('')
+      : '<div class="is-empty">无新装备</div>';
+
+    // 金装提示
+    const goldHint = goldCount
+      ? '<div class="is-gold-hint">' + goldCount + ' 件金装待鉴定 · <button class="is-go-bag">去背包鉴定 →</button></div>'
+      : '';
+
+    let modal = $('idle-summary-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'idle-summary-modal';
+      modal.className = 'equip-detail-modal';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = '<div class="ed-overlay" data-close="1"></div>' +
+      '<div class="ed-card is-card">' +
+        '<div class="ed-head" style="color:var(--gold,#e7d39a)">挂机结算</div>' +
+        '<div class="ed-base">离开了 ' + durText + ' · 打了 ' + fights + ' 场 · 经验 +<span class="is-exp-num">0</span></div>' +
+        '<div class="craft-affix-group">' +
+          '<div class="grp-title">掉落装备</div>' +
+          eqHtml +
+          '<hr class="craft-affix-divider">' +
+          '<div class="grp-title">材料</div>' +
+          matHtml +
+        '</div>' +
+        goldHint +
+        '<div class="ed-actions"><button class="btn-mini" data-close="1">继续挂机</button></div>' +
+      '</div>';
+
+    modal.querySelectorAll('[data-close]').forEach(el => el.onclick = () => {
+      modal.classList.remove('open');
+    });
+    const goBag = modal.querySelector('.is-go-bag');
+    if (goBag) goBag.onclick = () => {
+      modal.classList.remove('open');
+      if (UI.switchPage) UI.switchPage('bag');
+    };
+    modal.classList.add('open');
+    // 背包快满提醒
+    try {
+      const use = window.Supabase && window.Supabase.usageOf && window.Supabase.usageOf('bag');
+      if (use && use.cap - use.used <= 3 && !use.full) {
+        setTimeout(function(){ showToast('⚠️ 背包快满了', '剩余 ' + (use.cap - use.used) + ' 格 · 去分解一下'); }, 1000);
+      }
+    } catch(e) {}
+    // 数字滚动：经验从 0 滚到实际值。统一走动效层的 UI.setNum（全站唯一的滚动实现）
+    var expEl = modal.querySelector('.is-exp-num');
+    if (expEl && UI.setNum) UI.setNum(expEl, totalExp, { from: 0 });
+    // 装备/材料数量也滚动（错开 100ms，一件件蹦出来）
+    modal.querySelectorAll('.is-row b').forEach(function(b, i) {
+      var n = parseInt(b.textContent.replace(/[^0-9]/g, ''), 10);
+      if (n > 0 && UI.setNum) setTimeout(function(){ UI.setNum(b, n, { from: 0, fmt: function (v) { return '×' + Math.round(v); } }); }, i * 100);
+    });
+  }
+
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
   UI.showLoot = showLoot;
+  UI.showIdleSummary = showIdleSummary;
   // 档位对外：世界地图的「掉落预览」要用同一套（不另抄一份名单 → 不会出现第二份事实源）
   UI.lootTierOf = lootTierOf;
   UI.resetBattle = resetBattle;

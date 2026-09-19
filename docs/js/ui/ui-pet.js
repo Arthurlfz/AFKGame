@@ -237,18 +237,20 @@
     const hpText = `${Math.round(getCurHp(pet))}/${s.hp}`;
     if ($('pet-hp').textContent !== hpText) flashStat('pet-hp');
     $('pet-hp').textContent = hpText;
+    // 属性数字走滚动（2026-09-20）：升级/进化/换装时能看到数字"涨"上去，不是硬切。
+    // 滚动 + 弹一下由动效层 UI.setNum 统一提供；这里只管喂值（元素常驻 ⇒ 它有上次的值当起点）。
     ['atk', 'def', 'spd'].forEach(k => {
       const el = $('pet-' + k);
-      const txt = String(Math.round(s[k])); // 取整
-      if (el.textContent !== txt) flashStat('pet-' + k);
-      el.textContent = txt;
+      const v = Math.round(s[k]);
+      if (el.textContent !== String(v)) flashStat('pet-' + k);
+      UI.setNum(el, v);
     });
     // 暴击率/暴击伤害（真实属性，来自 getStats）
     const critEl = $('pet-crit');
     if (critEl) {
-      const txt = Math.round(s.critRate * 100) + '%';
-      if (critEl.textContent !== txt) flashStat('pet-crit');
-      critEl.textContent = txt;
+      const v = Math.round(s.critRate * 100);
+      if (critEl.textContent !== v + '%') flashStat('pet-crit');
+      UI.setNum(critEl, v, { fmt: x => Math.round(x) + '%' });
     }
     const cdEl = $('pet-critdmg');
     if (cdEl) {
@@ -340,12 +342,14 @@
     }
     const hp = $id('hp'); if (hp) hp.textContent = `${Math.round(getCurHp(pet))}/${Math.round(s.hp)}`;
     // 攻击/防御/速度：取整显示（基底经 materialTier 相乘为小数，取整更干净）
-    ['atk', 'def', 'spd'].forEach(k => { const el = $id(k); if (el) el.textContent = Math.round(s[k]); });
-    const crit = $id('crit'); if (crit) crit.textContent = Math.round(s.critRate * 100) + '%';
-    const cd = $id('critdmg'); if (cd) cd.textContent = Math.round(s.critDamage * 100) + '%';
+    // 数字滚动统一走动效层（2026-09-20）：面板 id 常驻 ⇒ setNum 拿得到上次的值当起点，会自己滚
+    const sn = (id, v, fmt) => { const el = $id(id); if (el) UI.setNum(el, v, fmt ? { fmt } : undefined); };
+    ['atk', 'def', 'spd'].forEach(k => sn(k, Math.round(s[k])));
+    sn('crit', Math.round(s.critRate * 100), x => Math.round(x) + '%');
+    sn('critdmg', Math.round(s.critDamage * 100), x => Math.round(x) + '%');
     // 命中/闪避是固定数值（非百分比），直接显示数值；吸血是百分比
-    const hitEl = $id('hit'); if (hitEl) hitEl.textContent = Math.round(s.hit);
-    const dgEl = $id('dodge'); if (dgEl) dgEl.textContent = Math.round(s.dodge);
+    sn('hit', Math.round(s.hit));
+    sn('dodge', Math.round(s.dodge));
     const lsEl = $id('ls'); if (lsEl) lsEl.textContent = Math.round(s.lifesteal * 100) + '%';
     const bn = $id('bonus'); if (bn) {
       const equip = getBonusText(pet);

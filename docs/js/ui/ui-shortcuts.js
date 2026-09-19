@@ -19,6 +19,9 @@
         if (UI.openQuestPanel) { e.preventDefault(); UI.openQuestPanel(); }
         return;
       }
+      // W/E/R 快速切页（战斗/宠物/市集）
+      const pageKeys = { 'w': 'worldmap', 'W': 'worldmap', 'e': 'pet', 'E': 'pet', 'r': 'market', 'R': 'market' };
+      if (pageKeys[e.key] && UI.switchPage) { e.preventDefault(); UI.switchPage(pageKeys[e.key]); return; }
       if (e.key === ' ') {
         if (document.body.classList.contains('battle-active') && UI.toggleIdle) { e.preventDefault(); UI.toggleIdle(); }
         return;

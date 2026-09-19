@@ -388,6 +388,7 @@ textarea:focus-visible {
 
 /* ---------- 22. 内联 SVG 图标（替换 emoji，融入水墨低饱和） ---------- */
 .topbar-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -442,7 +443,39 @@ textarea:focus-visible {
   stroke-linejoin: round;
 }
 
-/* ---------- 23. 设置面板：减少动效开关（body.rm-anim 全站动画清零，与 prefers-reduced-motion 同策略） ---------- */
+/* ---------- 22.5 顶栏美术图标（2026-09-19） ----------
+ * 背包/任务/反馈/魔石已换成手绘墨色枯金 PNG（ic_top_*.png）。
+ * 线稿时代用亮金 #f2b632 做半透明底；现在按钮上的是画出来的实物，
+ * 底色收回到项目枯金 token，并给图标一个极淡的墨色投影，让它像嵌在牌面上的小雕刻，
+ * 而不是浮在亮金方块上的贴纸。 */
+.topbar-btn {
+  background: var(--btn-bg);
+  border-color: var(--btn-border);
+  min-height: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+}
+.topbar-btn:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-border-hover);
+  color: var(--text-hi);
+}
+.topbar-btn .top-ico,
+.gem-chip .top-ico {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / .55));
+}
+/* 主城页眉那对大按钮（回城休整/回世界地图）的 44px 图标也给一刀墨色投影 */
+.fs-btn .top-ico {
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / .6));
+}
+.gem-chip .top-ico { margin-right: 2px; }
+
+/* ---------- 23. 设置面板
+：减少动效开关（body.rm-anim 全站动画清零，与 prefers-reduced-motion 同策略） ---------- */
 body.rm-anim *,
 body.rm-anim *::before,
 body.rm-anim *::after {

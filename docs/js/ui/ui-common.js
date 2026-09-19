@@ -224,7 +224,11 @@
     if (!el) return;
     opt = opt || {};
     const to = Number(value) || 0;
-    const from = (el.__num == null) ? to : Number(el.__num);
+    /* 起点三选一：显式 `opt.from`（弹窗/面板里**新建**的元素想"从 0 蹦出来"）> 上次记的 `__num`
+     * （常驻计数）> 没有记录就落值不滚（首次渲染不该滚）。2026-09-20 加 opt.from ——
+     * 不这么写的话，新建元素没法从 0 起滚，各处就会各自手写一份 rAF（就是那天多出来的 ui-countup.js）。 */
+    const from = (opt.from != null) ? Number(opt.from)
+      : (el.__num == null) ? to : Number(el.__num);
     el.__num = to;
     const put = (v) => { el.textContent = opt.fmt ? opt.fmt(v) : String(v); };
     // 变化太小不滚动（差 1~2 点还滚会显得神经质）；没有 rAF 的环境（测试桩）直接落值

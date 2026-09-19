@@ -136,6 +136,8 @@
   let bagGroup = 'all';         // 素材二级分区：all / materialInfoGroups 里 kind!=='consume' 的 id
   let bagConsumeGroup = 'all';  // 消耗品二级分区：all / materialInfoGroups 里 kind==='consume' 的 id（2026-09-16）
   let identifyMode = false;  // 手持鉴定模式：开启后点未鉴定装备即连续鉴定
+let lastIdStoneN = null;   // 上次渲染时手上的鉴定石数量（底部整块重建，滚动要靠它当起点，2026-09-20）
+  let revealQueue = [];      // 金装揭晓队列：modal已开时新金装排队，关一个自动弹下一个
 
   // 通用格子 tooltip 浮层（悬停显示完整信息，body 层 fixed 不被裁）
   function showBagTip(card, html) {
@@ -239,6 +241,7 @@
   }
 
   function renderBag() {
+    if (window.Tips) Tips.show('bag_shortcuts', '⌨️ 快捷键', '空格开始/停止挂机 · W世界地图 · E宠物 · R市集');
     const root = $('bag-root');
     if (!root) return;
     root.innerHTML = '';
@@ -338,6 +341,19 @@
     searchInput.value = bagSearch;
     searchInput.oninput = () => { bagSearch = searchInput.value.trim().toLowerCase(); renderBag(); };
     filterBar.appendChild(searchInput);
+
+    // 整理按钮：按稀有度→部位→名称重新排序（实际排序逻辑在装备渲染处）
+    const sortBtn = document.createElement('button');
+    sortBtn.className = 'bag-action-btn';
+    sortBtn.textContent = '整理';
+    sortBtn.title = '按品质从高到低重新排列';
+    sortBtn.onclick = () => {
+      // 触发重新渲染（排序已在 renderBag 内完成）
+      renderBag();
+      showToast('已整理', '按品质从高到低排列');
+    };
+    filterBar.appendChild(sortBtn);
+
     left.appendChild(filterBar);
 
     // 素材二级分区（2026-09-14）：只在「素材」页签里出现，选项来自唯一真源 Config.materialInfoGroups
@@ -397,7 +413,15 @@
     if (haveStoneN > 0) {
       const src = document.createElement('div');
       src.className = 'bag-idstone' + (identifyMode ? ' active' : '');
-      src.innerHTML = '<span class="bs-ico">' + SVG_IDSTONE + '</span> 鉴定石 ×' + haveStoneN;
+      src.innerHTML = '<span class="bs-ico">' + SVG_IDSTONE + '</span> 鉴定石 <b class="bs-num"></b>';
+      /* 数字滚动（2026-09-20）：背包底部每次 renderBag 都整块重建 ⇒ 元素是新的、没有 __num，
+       * 所以显式把「上次的数量」当起点传进去 —— 鉴定时能看到它一颗颗往下掉。 */
+      const bsNum = src.querySelector('.bs-num');
+      if (bsNum) UI.setNum(bsNum, haveStoneN, {
+        from: (lastIdStoneN == null) ? haveStoneN : lastIdStoneN,
+        fmt: v => '×' + Math.round(v)
+      });
+      lastIdStoneN = haveStoneN;
       src.draggable = true;
       src.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', 'identify'); e.dataTransfer.effectAllowed = 'move'; });
       src.addEventListener('click', () => {
@@ -407,6 +431,23 @@
       });
       footer.appendChild(src);
     }
+
+    // 批量分解按钮：当前背包全部可分解装备（白/蓝装，自动跳过锁定/在售/穿着的）
+    const bulkBtn = document.createElement('button');
+    bulkBtn.className = 'bag-action-btn bag-bulk-salvage';
+    bulkBtn.textContent = '批量分解白/蓝装';
+    bulkBtn.title = '分解所有未锁定、未在售、未穿着的白装和蓝装（金装保留）';
+    bulkBtn.onclick = () => {
+      const all = getInventory().filter(eq => {
+        if (!Salvage.isSalvageable(eq)) return false;
+        const rar = (eq.rarity && eq.rarity.id) || 'white';
+        return rar === 'white' || rar === 'blue'; // 只批量拆白蓝，金装不动
+      });
+      if (!all.length) { showToast('没有可分解的白/蓝装', '金装 / 锁定 / 在售 / 穿着的都会保留'); return; }
+      askThenSalvage(all, '批量分解白蓝装');
+    };
+    footer.appendChild(bulkBtn);
+
 
     // 右侧详情面板已移除（2026-09-07）：物品信息统一走悬停 tooltip；蛋详情仍是独立弹窗
 
@@ -623,9 +664,14 @@
   }
 
   // 装备详情面板：词缀区复用装备打造页的 .craft-affix-group（前缀绿/后缀蓝，同款样式）
-  // reveal=true → 走「鉴定揭晓」演出：卡片一道光扫过 + 词缀一条条亮起（只给金装用）
+  // reveal=true → 走「鉴定揭晓」演出：卡片一道光扫过 + 词缀从???逐条揭开（只给金装用）
   function showEquipDetail(eq, reveal) {
+    // 队列：modal已开着（上一个金装还在看）→ 排队，不覆盖
     let modal = $('equip-detail-modal');
+    if (reveal && modal && modal.classList.contains('open')) {
+      revealQueue.push({ eq, reveal });
+      return;
+    }
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'equip-detail-modal';
@@ -635,12 +681,20 @@
     const unid = eq.identified === false;
     const pfx = (eq.affixes && eq.affixes.prefix) || [];
     const sfx = (eq.affixes && eq.affixes.suffix) || [];
-    // 揭晓时给每条词缀排一个递增的延迟（写在行内 style 上，比 nth-child 稳）
+    // 揭晓模式：词缀先显示"???"，再逐条揭开。收集待揭开的条目用于setTimeout。
+    const pendingReveals = [];
     let revealIdx = 0;
     const affix = (arr, cls) => arr.length
       ? arr.map(a => {
-          const d = reveal ? ' style="animation-delay:' + (0.28 + revealIdx++ * 0.13).toFixed(2) + 's"' : '';
-          return `<div class="grp-line ${cls}"${d}>${Craft.affixText ? Craft.affixText(a) : (Equipment.formatAffix ? Equipment.formatAffix(a) : a.label + '+' + a.value + '%')}</div>`;
+          const realHtml = Craft.affixText ? Craft.affixText(a) : (Equipment.formatAffix ? Equipment.formatAffix(a) : a.label + '+' + a.value + '%');
+          const tier = a.tier || 5;
+          if (reveal) {
+            const delay = 0.35 + revealIdx++ * 0.16;
+            pendingReveals.push({ delay, realHtml, tier });
+            const tCls = tier <= 2 ? ' t' + tier : '';
+            return `<div class="grp-line ${cls} affix-swap${tCls}"><span class="sealed-q">???</span></div>`;
+          }
+          return `<div class="grp-line ${cls}">${realHtml}</div>`;
         }).join('')
       : '<span class="hint">无</span>';
     modal.innerHTML = `
@@ -670,8 +724,16 @@
     const wear = modal.querySelector('[data-wear]');
     if (wear) wear.onclick = () => {
       const pet = getActivePet();
+      const oldEq = pet.equipment[eq.slot];
+      const oldScore = (window.Equipment && Equipment.scoreOf) ? Equipment.scoreOf(oldEq) : 0;
       const res = equipItem(pet, eq.id);
-      if (res) { addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ ${pet.name} 装备了 ${res.equipped.name}`); UI.renderAll(); }
+      if (res) {
+        const newScore = (window.Equipment && Equipment.scoreOf) ? Equipment.scoreOf(res.equipped) : 0;
+        const diff = newScore - oldScore;
+        const sign = diff >= 0 ? '+' : '';
+        const diffColor = diff >= 0 ? 'var(--hp-hi,#7dd87d)' : 'var(--danger-hi,#d98080)';
+        showToast('装备已穿戴', '评分 ' + oldScore + ' → ' + newScore + ' (' + sign + diff + ')');
+        addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️ ${pet.name} 装备了 ${res.equipped.name}`); UI.renderAll(); }
       closeEquipDetail();
     };
     const lockBtn = modal.querySelector('[data-lock]');
@@ -682,9 +744,26 @@
       UI.renderAll();
     });
     modal.classList.add('open');
+    // 揭晓演出：词缀从???逐条揭开（setTimeout按延迟换内容，T1/T2有跳变高亮）
+    if (reveal && pendingReveals) {
+      const lines = modal.querySelectorAll('.affix-swap');
+      pendingReveals.forEach((item, i) => {
+        setTimeout(() => {
+          const el = lines[i];
+          if (!el || !el.parentNode) return;
+          el.classList.add('revealed');
+          el.innerHTML = item.realHtml;
+        }, item.delay * 1000);
+      });
+    }
   }
   function closeEquipDetail() {
     const m = $('equip-detail-modal'); if (m) m.classList.remove('open');
+    // 队列：关了当前金装，自动弹下一个排队的
+    if (revealQueue.length) {
+      const next = revealQueue.shift();
+      setTimeout(() => showEquipDetail(next.eq, next.reveal), 200);
+    }
   }
   // 宠物蛋详情/孵化弹窗（复用装备详情 modal 样式）
   function closeEggDetail() {

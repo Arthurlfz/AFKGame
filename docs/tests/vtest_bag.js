@@ -22,5 +22,19 @@ A(!!els['bag-root'],'背包页容器存在');
 A(typeof C('UI.renderBag')==='function','renderBag 函数存在');
 A(els['bag-root'].children.length>0,'背包页已渲染内容');
 A(C('document.getElementById("tab-bag")')!==null,'背包页 tab 存在');
+
+/* 数字滚动工具（2026-09-20，任务单 03）：全站唯一的滚动实现 = 动效层 UI.setNum。
+ * 本环境没有 requestAnimationFrame ⇒ 走"直接落值"分支（这正是测试环境该有的行为，不是缺陷）。
+ * 守两件：① 落值 + fmt 正确（fmt 坏掉会让"×12"变成裸数字）② opt.from 生效
+ *        （弹窗/背包底部这些元素是**新建**的，没有 opt.from 就永远滚不起来）。 */
+A(typeof C('UI.setNum')==='function','动效层导出 UI.setNum（全站唯一的数字滚动入口）');
+{
+  const r1=C('(function(){const b=document.createElement("b");UI.setNum(b,7,{fmt:function(v){return "×"+Math.round(v)}});return b.textContent})()');
+  A(r1==='×7','UI.setNum 落值并套用 fmt（实际 '+r1+'）');
+  const r2=C('(function(){const b=document.createElement("b");b.__num=3;UI.setNum(b,9);return b.textContent})()');
+  A(r2==='9','UI.setNum 对常驻元素也落值（实际 '+r2+'）');
+  const r3=C('(function(){const b=document.createElement("b");UI.setNum(b,5,{from:0});return b.__num})()');
+  A(r3===5,'UI.setNum 接受 opt.from（新建元素从 0 起步，实际 __num='+r3+'）');
+}
 console.log('ALL BAG TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

@@ -21,10 +21,10 @@
 <link rel="stylesheet" href="css/fonts-lxgw.css?v=20260917font1">
 <link rel="stylesheet" href="css/design-tokens.css?v=20260917font2">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
-<link rel="stylesheet" href="css/app.css?v=20260917fix4">
-<link rel="stylesheet" href="css/game.css?v=20260916bind3">
+<link rel="stylesheet" href="css/app.css?v=20260919dot3">
+<link rel="stylesheet" href="css/game.css?v=20260919dot">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260917fix1">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260920help">
 <!-- 全局动效基线层（按下/悬浮/浮层/列表入场；各系统专属演出仍在各自 css） -->
 <link rel="stylesheet" href="css/motion.css?v=20260916m3">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260917fix1">
@@ -34,7 +34,7 @@
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
-<link rel="stylesheet" href="css/ui-fixes.css?v=20260918ux1">
+<link rel="stylesheet" href="css/ui-fixes.css?v=20260919dot2">
 <!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
 <link rel="stylesheet" href="css/session-guard.css?v=20260910sess1">
 <style id="boot-style">
@@ -195,13 +195,13 @@
   <header class="topbar app-topbar">
     <div class="title">永夜灵市<span class="title-en">EVERNIGHT BAZAAR</span></div>
     <div class="spacer"></div>
-    <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><img class="top-ico" src="assets/ui/nav/ic_top_bag.png" alt="">背包</button>
-    <button class="topbar-btn" id="topbar-quest" data-page="quest" title="任务（快捷键 Q）"><img class="top-ico" src="assets/ui/nav/ic_top_quest.png" alt="">任务</button>
-    <button class="topbar-btn" id="topbar-feedback" title="反馈 / 提意见（会自动带上当前页面和最近的错误记录）"><svg class="eic fb-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v4"/><path d="M12 14h.01"/></svg>反馈</button>
+    <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><img class="top-ico" src="assets/ui/nav/ic_top_bag.png?v=20260919top1" alt="">背包</button>
+    <button class="topbar-btn" id="topbar-quest" data-page="quest" title="任务（快捷键 Q）"><img class="top-ico" src="assets/ui/nav/ic_top_quest.png?v=20260919top1" alt="">任务</button>
+    <button class="topbar-btn" id="topbar-feedback" title="反馈 / 提意见（会自动带上当前页面和最近的错误记录）"><img class="top-ico" src="assets/ui/nav/ic_top_feedback.png?v=20260919top1" alt="">反馈</button>
     <!-- 挂机状态：由 ui-battle.updateStatus 同步，点一下回世界地图 -->
     <div class="idle-chip" id="topbar-idle" title="挂机状态 · 点击回到世界地图">空闲</div>
     <!-- 魔石余额（ui-shop 渲染；商店 SQL 没跑时自动隐藏） -->
-    <div class="gem-chip" id="gem-balance" title="魔石余额"><img class="top-ico" src="assets/ui/nav/ic_top_gem.png" alt="">0 魔石</div>
+    <div class="gem-chip" id="gem-balance" title="魔石余额"><img class="top-ico" src="assets/ui/nav/ic_top_gem.png?v=20260919top1" alt="">0 魔石</div>
     <div id="auth-box"></div>
   </header>
 
@@ -216,6 +216,8 @@
       <div class="sb-divider-label">其他</div>
       <button class="sb-btn" id="btn-chat-sidebar" title="聊天"><span class="sb-icon"><img src="assets/ui/nav/chat.png" alt=""></span><span class="sb-label">聊天</span></button>
       <button class="sb-btn" data-page="codex"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">百科</span></button>
+      <button class="sb-btn" data-page="leaderboard"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">排行榜</span></button>
+      <button class="sb-btn" data-page="friends"><span class="sb-icon"><img src="assets/ui/nav/codex.png" alt=""></span><span class="sb-label">好友</span><span class="sb-dot" hidden></span></button>
       <button class="sb-btn" id="btn-settings-sidebar" title="设置"><span class="sb-icon"><img src="assets/ui/nav/settings.png" alt=""></span><span class="sb-label">设置</span></button>
       <!-- 开发者面板入口：默认隐藏，仅管理员账号登录后由 ui-dev.js 显示 -->
       <button class="sb-btn" id="btn-dev-sidebar" style="display:none" title="开发者"><span class="sb-icon"><img src="assets/ui/nav/dev.png" alt=""></span><span class="sb-label">开发者</span></button>
@@ -274,8 +276,8 @@
             <span class="worldmap-title"><img class="top-ico" src="assets/ui/nav/ic_top_capital.png" alt="">不归城</span>
             <span class="worldmap-hint">旅者的据点 · 点击城寨中的建筑进入</span>
             <span class="spacer"></span>
-            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-rest"><img class="top-ico" src="assets/ui/nav/ic_top_rest.png" alt="">回城休整</button>
-            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-return-map"><img class="top-ico" src="assets/ui/nav/ic_top_returnmap.png" alt="">回世界地图</button>
+            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-rest"><img class="top-ico" src="assets/ui/nav/ic_top_rest.png?v=20260919top4" alt="">回城休整</button>
+            <button type="button" class="fs-btn fs-btn--ghost" id="btn-capital-return-map"><img class="top-ico" src="assets/ui/nav/ic_top_returnmap.png?v=20260919top2" alt="">回世界地图</button>
           </div>
           <!-- 主城全景舞台：底图 + 动效层 + 建筑热区（ui-capital.js 渲染热区，DOM 常驻） -->
           <div class="capital-stage" id="capital-stage">
@@ -734,6 +736,30 @@
         </div>
       </section>
 
+
+      <section class="tab-page" id="tab-leaderboard">
+        <div class="lb-page">
+          <div class="lb-head">
+            <span class="lb-title fs-title">成长榜</span>
+            <span class="lb-sub">本周全服宠物成长值排行</span>
+          </div>
+          <div class="lb-body" id="leaderboard-body">
+            <div class="lb-loading">加载中…</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tab-page" id="tab-friends">
+        <div class="fr-page">
+          <div class="fr-head">
+            <span class="fr-title fs-title">好友</span>
+            <span class="fr-sub">加好友 · 私聊</span>
+          </div>
+          <div class="fr-body" id="friends-body">
+            <div class="fr-empty">加载中…</div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1053,17 +1079,17 @@ window.PetSprites = {
      config(数值) → affix(纯函数) → access(资格) → rewards(掉落/结算) → preview(预估) → engine(推进) -->
 <script src="js/tower/tower-config.js?v=20260918exppack1"></script>
 <script src="js/tower/tower-affix.js?v=20260914affix2"></script>
-<script src="js/tower/tower-access.js?v=20260916reset1"></script>
+<script src="js/tower/tower-access.js?v=20260920tower1"></script>
 <script src="js/tower/tower-rewards.js?v=20260918exppack1"></script>
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
 <script src="js/tower/tower-engine.js?v=20260917exppack1"></script>
 <script src="js/core/battle-sim.global.js?v=20260915mech6"></script>
-<script src="js/core/idle-bridge.js?v=20260915dmg1"></script>
+<script src="js/core/idle-bridge.js?v=20260919pagehide"></script>
 <script src="js/ui/ui-boot.js?v=20260917b3"></script>
-<script src="js/ui/ui-common.js?v=20260918fusion1"></script>
+<script src="js/ui/ui-common.js?v=20260920countup1"></script>
 <script src="js/ui/ui-console.js?v=20260914reveal1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
-<script src="js/ui/ui-shell.js?v=20260916name1"></script>
+<script src="js/ui/ui-shell.js?v=20260920tails1"></script>
 <script src="js/ui/ui-worldmap.js?v=20260918questidle1"></script>
 <script src="js/ui/ui-capital.js?v=20260910egg7"></script>
 
@@ -1074,7 +1100,7 @@ window.PetSprites = {
 <script src="js/ui/ui-quest.js?v=20260918questidle1"></script>
 <!-- 红点指路：哪里有任务做，就在哪个入口亮红点（数据来自任务系统，本文件只管亮灯） -->
 <script src="js/ui/ui-guide-dots.js?v=20260918dot1"></script>
-<script src="js/ui/ui-shortcuts.js?v=20260918sc1"></script>
+<script src="js/ui/ui-shortcuts.js?v=20260920all"></script>
 <script src="js/trial/ui-trial-entry.js?v=20260910trial1"></script>
 <script src="js/trial/ui-trial-battle.js?v=20260913console1"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
@@ -1082,24 +1108,29 @@ window.PetSprites = {
 <script src="js/tower/ui-tower-entry.js?v=20260917resetcard1"></script>
 <script src="js/tower/ui-tower-battle.js?v=20260917esc1"></script>
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
-<script src="js/ui/ui-battle.js?v=20260918ux2"></script>
+
+<script src="js/ui/ui-tips.js?v=20260920tips"></script>
+<script src="js/ui/ui-leaderboard.js?v=20260920towerlb1"></script>
+<script src="js/ui/ui-friends.js?v=20260920tails1"></script>
+<script src="js/ui/ui-battle.js?v=20260920countup1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260918ux1"></script>
+<script src="js/ui/ui-pet.js?v=20260920countup1"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260918fusion2"></script>
 <script src="js/ui/ui-pet-merge.js?v=20260917fix3"></script>
 <script src="js/ui/ui-pet-synth.js?v=20260916mo1"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
-<script src="js/ui/ui-bag.js?v=20260917fix1"></script>
+<script src="js/ui/ui-bag.js?v=20260920nosell1"></script>
 <script src="js/ui/ui-mat-entry.js?v=20260916mat14"></script>
 <script src="js/ui/ui-equipment.js?v=20260918eq1"></script>
 <script src="js/ui/ui-craft.js?v=20260916soul1"></script>
-<script src="js/ui/ui-market.js?v=20260917qicon1"></script>
+<script src="js/ui/ui-market.js?v=20260920social1"></script>
+<script src="js/ui/ui-social.js?v=20260920tails1"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=20260917fix1"></script>
 <script src="js/ui/ui-market-notify.js?v=20260917fix1"></script>
 <script src="js/ui/ui-market-pulse.js?v=20260917fix1"></script>
 <script src="js/ui/ui-feedback.js?v=20260917fix1"></script>
-<script src="js/ui/ui-codex.js?v=20260917resetcard1"></script>
+<script src="js/ui/ui-codex.js?v=20260920help?v=20260917resetcard1"></script>
 <script src="js/ui/ui-shop.js?v=20260917fix1"></script>
 <script src="js/ui/ui-dev.js?v=20260917growth1"></script>
 <!-- 宠物数值总表页（注册到开发者面板，必须排在 ui-dev.js 之后） -->

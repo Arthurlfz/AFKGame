@@ -69,6 +69,9 @@
     }
     // 百科页内容懒渲染（幂等）：走 hash 变化时不触发 hashchange 的路径（如登录后 hash 残留）也能渲染
     if (page === 'codex' && UI.renderCodex) UI.renderCodex();
+    if (page === 'leaderboard' && UI.renderLeaderboard) UI.renderLeaderboard();
+    if (page === 'friends' && UI.renderFriends) UI.renderFriends();
+    if (page === 'market' && UI.ensureFollowEntry) UI.ensureFollowEntry();
     const btns = document.querySelectorAll('.sb-btn');
     btns.forEach(b => {
       // 战斗页（page='battle'）从世界地图进入，侧边栏让「世界地图」保持高亮，避免空指示
@@ -145,6 +148,12 @@
         <div class="set-row">
           <div class="set-row-label">减少动效<small>关闭界面动画，长时间挂机更省眼</small></div>
           <button type="button" class="set-toggle ${rmOn ? 'on' : ''}" id="pop-rm-toggle">${rmOn ? '已开启' : '已关闭'}</button>
+        </div>
+        <div class="set-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+          <div class="set-row-label">快捷键</div>
+          <div style="font-size:0.82rem;color:var(--text-faint);line-height:1.8">
+            空格 = 开始/停止挂机 · W = 世界地图 · E = 宠物 · R = 市集 · Q = 任务
+          </div>
         </div>
         <button class="btn-mini danger" id="pop-logout">登出账号</button>`,
       onClick: async (e) => {

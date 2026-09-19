@@ -469,6 +469,31 @@
   }
 
   /* ---------- 页签清单（8 个板块） ---------- */
+  function buildHelp() {
+    return '<div class="codex-help-grid">'
+      + '<div class="codex-help-block"><h4>快捷键</h4>'
+      + '<div class="codex-help-row"><kbd>空格</kbd><span>开始 / 停止挂机</span></div>'
+      + '<div class="codex-help-row"><kbd>W</kbd><span>世界地图</span></div>'
+      + '<div class="codex-help-row"><kbd>E</kbd><span>宠物页</span></div>'
+      + '<div class="codex-help-row"><kbd>R</kbd><span>市集</span></div>'
+      + '<div class="codex-help-row"><kbd>Q</kbd><span>任务面板</span></div>'
+      + '<div class="codex-help-row"><kbd>1-5</kbd><span>宠物页切tab</span></div>'
+      + '</div>'
+      + '<div class="codex-help-block"><h4>背包</h4>'
+      + '<div class="codex-help-row"><b>整理</b><span>按品质从高到低排列</span></div>'
+      + '<div class="codex-help-row"><b>批量分解</b><span>一键分解白/蓝装</span></div>'
+      + '<div class="codex-help-row"><b>Ctrl+点击</b><span>快速分解单件</span></div>'
+      + '</div>'
+      + '<div class="codex-help-block"><h4>挂机</h4>'
+      + '<div class="codex-help-row"><b>切回前台</b><span>自动结算弹汇总</span></div>'
+      + '<div class="codex-help-row"><b>金装闪光</b><span>出金装屏幕边缘闪金光</span></div>'
+      + '</div>'
+      + '<div class="codex-help-block"><h4>市集</h4>'
+      + '<div class="codex-help-row"><b>关注</b><span>点商品右下角星标关注</span></div>'
+      + '</div>'
+      + '</div>';
+  }
+
   const ENTRIES = [
     { id: 'battle', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg>️', title: '战斗', intro: '战斗全自动，出手快慢由速度决定，命中、暴击、吸血各自独立结算。', build: buildBattle },
     { id: 'drop', icon: '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>', title: '掉落与鉴定', intro: '每场战斗摇一次掉落；掉落的装备需要鉴定后才能使用。', build: buildDrop },

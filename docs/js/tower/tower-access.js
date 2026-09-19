@@ -130,8 +130,25 @@
     let changed = false;
     if ((Number(maxFloor) || 0) > (usage.bestFloor || 0)) { usage.bestFloor = Number(maxFloor) || 0; changed = true; }
     if (corr > (usage.bestCorrosion || 0)) { usage.bestCorrosion = corr; changed = true; }
-    if (changed) saveUsage();
+    if (changed) { saveUsage(); syncBestToCloud(); }
     return changed;
+  }
+
+  /* ---------- 破纪录 → 成绩上云（任务单 08）：profiles.tower_best_floor / tower_best_corrosion（2026-09-20 建的两列）。
+   * ⚠️ 只在**破纪录时**写，不是每局写。
+   * ⚠️ 失败不挡流程：本地那份还在，下次破纪录会再试。这只是"成绩上云"，**不是结算上云** —— 塔的服务端权威那条仍然暂停（见 未决与待办）。 */
+  async function syncBestToCloud() {
+    try {
+      const Sup = window.Supabase;
+      const client = Sup && Sup.getClient ? Sup.getClient() : null;
+      const user = Sup && Sup.getCurrentUser ? await Sup.getCurrentUser() : null;
+      if (!client || !user) return;
+      await client.from('profiles').update({
+        tower_best_floor: Number(usage.bestFloor || 0),
+        tower_best_corrosion: Number(usage.bestCorrosion || 0)
+      }).eq('id', user.id);
+    } catch (e) { /* 成绩同步失败不影响本局 */ }
+
   }
 
   window.TowerAccess = { dayKeyOf, getDailyInfo, entryInfo, consumeEntry, recordResult, freePerDay, cardName, cardQty };

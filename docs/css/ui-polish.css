@@ -461,3 +461,159 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .ts-item { padding: 4px 12px; border: 1px solid rgb(var(--action-gold-rgb) / .45); border-radius: 999px; color: var(--r-gold); background: rgb(var(--action-gold-rgb) / .08); font-size: var(--fs-sm); font-family: var(--font-num); }
 .ts-note { font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 1px; }
 .ts-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+/* ===== 词缀从???揭开（2026-09-19）=====
+ * 主流开盲盒演出：先显示???，再逐条翻开实际词缀。
+ * T1/T2 好词缀翻开时多一个小跳变+金光，T3-T5 正常揭开。 */
+.grp-line.affix-swap .sealed-q { color: var(--text-dim, #8a8068); letter-spacing: 3px; font-weight: 400; }
+.grp-line.affix-swap.revealed { animation: affixUnseal .35s ease-out; }
+@keyframes affixUnseal {
+  0%   { filter: brightness(2.8); }
+  100% { filter: brightness(1); }
+}
+/* T1：翻开时放大跳一下+金光 */
+.grp-line.affix-swap.t1.revealed { animation: t1Pop .5s cubic-bezier(.34,1.56,.64,1); }
+@keyframes t1Pop {
+  0%   { transform: scale(.92); filter: brightness(3); }
+  55%  { transform: scale(1.07); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+/* T2：轻微放大 */
+.grp-line.affix-swap.t2.revealed { animation: t2Pop .4s ease-out; }
+@keyframes t2Pop {
+  0%   { transform: scale(.96); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* ===== 战斗页金装横幅：可点击跳背包鉴定 ===== */
+.loot-banner .lb-action {
+  margin-top: 6px; padding: 4px 14px; display: inline-block;
+  border: 1px solid var(--gold, #b89b59); border-radius: 3px;
+  color: var(--gold, #e7d39a); font-size: 0.85rem; cursor: pointer;
+  transition: background .15s;
+}
+.loot-banner .lb-action:hover { background: rgba(231,211,154,.15); }
+
+/* ===== 挂机结算汇总弹窗（2026-09-19） ===== */
+.idle-summary-modal .is-card { width: min(420px, 92vw); }
+.idle-summary-modal .is-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 0.95rem; }
+.idle-summary-modal .is-row.gold { color: var(--gold, #e7d39a); font-weight: 700; }
+.idle-summary-modal .is-row.blue { color: #7fb3e0; }
+.idle-summary-modal .is-row.egg { color: #9fd0ff; }
+.idle-summary-modal .is-empty { color: var(--text-faint, #666); font-size: 0.85rem; padding: 2px 0; }
+.idle-summary-modal .is-gold-hint {
+  margin-top: 10px; padding: 8px 12px; border: 1px solid var(--gold, #b89b59);
+  border-radius: 4px; color: var(--gold, #e7d39a); font-size: 0.9rem; text-align: center;
+}
+.idle-summary-modal .is-go-bag {
+  margin-left: 8px; background: transparent; border: 1px solid var(--gold, #b89b59);
+  color: var(--gold, #e7d39a); padding: 2px 10px; border-radius: 3px; cursor: pointer; font-size: 0.85rem;
+}
+.idle-summary-modal .is-go-bag:hover { background: rgba(231,211,154,.15); }
+
+/* 背包整理/批量分解按钮 */
+.bag-action-btn {
+  background: rgba(242,182,50,.1); border: 1px solid rgba(242,182,50,.3);
+  color: var(--text); padding: 4px 12px; border-radius: 4px;
+  cursor: pointer; font-size: 0.85rem; white-space: nowrap; transition: all .15s;
+}
+.bag-action-btn:hover { background: rgba(242,182,50,.2); border-color: rgba(242,182,50,.6); }
+.bag-bulk-salvage { border-color: rgba(200,80,80,.4); color: #d98080; }
+.bag-bulk-salvage:hover { background: rgba(200,80,80,.12); border-color: rgba(200,80,80,.6); }
+
+/* ===== 成长排行榜 ===== */
+.lb-page { padding: 20px; max-width: 600px; margin: 0 auto; }
+.lb-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.lb-title { font-size: 1.3rem; font-weight: 700; color: var(--accent-hi); }
+.lb-sub { font-size: 0.85rem; color: var(--text-faint); }
+.lb-loading, .lb-error, .lb-empty { text-align: center; padding: 40px; color: var(--text-faint); }
+.lb-error { color: var(--danger-hi); }
+.lb-list { display: flex; flex-direction: column; gap: 4px; }
+.lb-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; border-radius: 4px;
+  background: var(--inset, rgba(255,255,255,.03));
+}
+.lb-row.me { background: rgba(242,182,50,.12); border: 1px solid rgba(242,182,50,.3); }
+.lb-rank { width: 40px; text-align: center; font-weight: 700; flex: none; }
+.lb-num { display: inline-block; min-width: 20px; color: var(--text-faint); font-size: 0.9rem; }
+.lb-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-pet { color: var(--text-faint); font-size: 0.85rem; flex: none; }
+.lb-growth { font-weight: 700; color: var(--accent-hi); font-family: var(--font-num); flex: none; }
+.lb-my-rank { margin-top: 12px; text-align: center; color: var(--accent-hi); font-weight: 600; }
+/* 金装掉落：屏幕边缘金色脉冲 */
+.gold-pulse-edge::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+  box-shadow: inset 0 0 80px 20px rgba(242,182,50,.6);
+  animation: goldEdgePulse 1.2s ease-out;
+}
+@keyframes goldEdgePulse {
+  0% { opacity:0; } 20% { opacity:1; } 100% { opacity:0; }
+}
+
+/* 市场关注低价按钮 */
+.mk-watch { background:none; border:none; cursor:pointer; font-size:1.1rem; padding:2px 6px; color:var(--text-faint); }
+.mk-watch:hover { color:var(--gold,#f2b632); }
+.mk-card:has(.mk-watch) { position:relative; }
+
+/* 百科操作说明页 */
+.codex-help-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.codex-help-block { background:var(--inset,rgba(255,255,255,.03)); padding:12px; border-radius:6px; }
+.codex-help-block h4 { margin:0 0 8px; color:var(--accent-hi); }
+.codex-help-row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:0.88rem; }
+.codex-help-row kbd { background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:1px 6px; font-size:0.82rem; font-family:monospace; }
+.codex-help-row b { min-width:60px; }
+.codex-help-row span { color:var(--text-faint); }
+
+/* ===== 市集轻社交：关注卖家 + 留言板（任务单 05，2026-09-20） ===== */
+.soc-wrap { position: fixed; inset: 0; z-index: 320; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / .55); }
+.soc-panel { padding: var(--gap-md); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--inset, rgb(20 20 20 / .96)); box-shadow: var(--shadow-panel); }
+.soc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line-weak); }
+.soc-title { font: 700 var(--fs-sm) var(--font-title); color: var(--accent); }
+.soc-sub { margin: 10px 0 4px; font-size: var(--fs-2xs); letter-spacing: .5px; color: var(--text-faint); }
+.soc-row { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .12); font-size: var(--fs-sm); }
+.soc-tag { color: var(--text-faint); }
+.soc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.soc-price { color: var(--accent-hi); font-family: var(--font-num); }
+.soc-msgs { max-height: 180px; overflow-y: auto; margin-bottom: 8px; }
+.soc-msg { padding: 4px 0; font-size: var(--fs-sm); color: var(--text-dim); }
+.soc-msg b { margin-right: 6px; font-weight: 600; color: var(--accent); }
+.soc-input { display: flex; gap: 8px; }
+.soc-text { flex: 1; min-width: 0; padding: 6px 8px; color: var(--text); background-color: rgb(0 0 0 / .25); border: 1px solid var(--line); border-radius: var(--radius-xs); }
+.soc-btn { padding: 5px 12px; border: 1px solid var(--line-hi); border-radius: var(--radius-xs); color: var(--text-dim); background-color: transparent; cursor: pointer; }
+.soc-btn.primary { color: var(--accent-hi); border-color: rgb(var(--action-gold-rgb) / .5); }
+.soc-empty { padding: 10px 0; text-align: center; font-size: var(--fs-2xs); color: var(--text-faint); }
+.mk-seller-link { cursor: pointer; color: var(--accent-hi); border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .4); }
+
+/* ===== 好友 + 私聊（任务单 07，2026-09-20） ===== */
+.fr-page { padding: var(--gap-md); }
+.fr-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.fr-title { font: 700 var(--fs-lg) var(--font-title); color: var(--accent); }
+.fr-sub { margin: 10px 0 4px; font-size: var(--fs-2xs); letter-spacing: .5px; color: var(--text-faint); }
+.fr-search { display: flex; gap: 8px; margin: 10px 0; }
+.fr-input { flex: 1; min-width: 0; padding: 6px 8px; color: var(--text); background-color: rgb(0 0 0 / .25); border: 1px solid var(--line); border-radius: var(--radius-xs); }
+.fr-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px dashed rgb(var(--action-gold-rgb) / .12); font-size: var(--fs-sm); }
+.fr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.fr-state { font-size: var(--fs-2xs); color: var(--text-faint); }
+.fr-state.on { color: var(--accent-hi); }
+.fr-btn { padding: 4px 10px; border: 1px solid var(--line-hi); border-radius: var(--radius-xs); color: var(--text-dim); background-color: transparent; cursor: pointer; }
+.fr-btn.primary { color: var(--accent-hi); border-color: rgb(var(--action-gold-rgb) / .5); }
+.fr-empty { padding: 10px 0; text-align: center; font-size: var(--fs-2xs); color: var(--text-faint); }
+.fr-dot { display: inline-block; min-width: 16px; padding: 0 4px; border-radius: 8px; background-color: var(--danger); color: #1a1a1a; font-size: var(--fs-2xs); text-align: center; }
+.sb-dot { margin-left: auto; min-width: 16px; padding: 0 4px; border-radius: 8px; background-color: var(--danger); color: #1a1a1a; font-size: var(--fs-2xs); text-align: center; }
+.fr-wrap { position: fixed; inset: 0; z-index: 330; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / .55); }
+.fr-chat { width: min(420px, 92vw); padding: var(--gap-md); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--inset, rgb(20 20 20 / .96)); box-shadow: var(--shadow-panel); }
+.fr-chat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line-weak); }
+.fr-chat-title { font: 700 var(--fs-sm) var(--font-title); color: var(--accent); }
+.fr-msgs { height: 240px; overflow-y: auto; margin: 8px 0; }
+.fr-msg { margin: 4px 0; padding: 5px 8px; border-radius: var(--radius-xs); background-color: rgb(255 255 255 / .05); font-size: var(--fs-sm); color: var(--text); }
+.fr-msg.mine { text-align: right; background-color: rgb(var(--action-gold-rgb) / .14); color: var(--text-hi); }
+.fr-send { display: flex; gap: 8px; }
+
+/* 排行榜两个 tab（2026-09-20） */
+.lb-tabs { display: flex; gap: 8px; margin: 10px 0; }
+.lb-tab { padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--radius-xs); color: var(--text-dim); background-color: transparent; cursor: pointer; }
+.lb-tab.active { color: var(--accent-hi); border-color: rgb(var(--action-gold-rgb) / .5); }
+
+/* 市集页「我的关注」入口条（2026-09-20） */
+.soc-entry { display: flex; justify-content: flex-end; padding: 6px 0; }
