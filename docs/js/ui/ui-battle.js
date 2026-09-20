@@ -18,6 +18,9 @@
   const Config = window.Config;
   const { getActivePet, getPets, getStats, setActive, getBonusText } = window.Pet;
   const PetSprites = window.PetSprites;
+  // 敌方悬浮提示（渲染/定位/悬停绑定）已迁出 → js/ui/ui-battle-tip.js（2026-09-21）。
+  // ⚠️ 必须**用时取**，不能在这里存成 const：测试 harness 的清单里 tip 模块可能排在 ui-battle.js 之后。
+  const BattleTip = () => window.BattleTip;
 
   // 从战斗标签（"血狐 等级：9级"）里提取纯名字，用于匹配立绘；Boss 带「霸主·」前缀也要剥掉
   function pureName(name) {
@@ -279,125 +282,16 @@
   }
 
 
-  /* ---------- 敌方怪物悬浮提示 ---------- */
-  const ENEMY_TYPE = {
-    normal: { label: '普通', className: 'normal' },
-    evolved: { label: '进化', className: 'evolved' },
-    mutant: { label: '变异', className: 'mutant' }
-  };
-  function getBattleEnemy() {
-    // 服务器托管挂机：本地 battle.js 从不开场（state.enemy 恒 null），
-    // 画面上的怪由 idle-bridge 的演出循环持有 → 回退读它，
-    // 否则敌方 tooltip / 名字 / 血量同步全是空的（或本地模式的残留怪）。
-    if (window.IdleBridge && window.IdleBridge.isActive && window.IdleBridge.isActive()) {
-      return (window.IdleBridge.getShowEnemy && window.IdleBridge.getShowEnemy()) || null;
-    }
-    return window.Battle?.state?.enemy || null;
-  }
-  function enemyStat(value) {
-    return Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0;
-  }
-  function renderEnemyTip(enemy) {
-    const tip = $('enemy-tip');
-    if (!tip) return;
-    if (!enemy) {
-      tip.hidden = true;
-      return;
-    }
-    const type = ENEMY_TYPE[enemy.enemyType] || ENEMY_TYPE.normal;
-    const weights = enemy.rarityWeights || {};
-    // 经验：显示Pet.expRange 的区间，与实际发放（main.js 调 Pet.expFromBattle）同一个函数算出来
-    // 经验预览与实发同源（Pet.expRange），UI 不许再自己写一套公式
-    const er = window.Pet.expRange(enemy, window.Battle && window.Battle.getCurrentArea());
-    const experience = er.min === er.max ? String(er.min) : `${er.min}~${er.max}`;
-    // 战斗属性：显示完整（生命/攻击/防御/速度 + 暴击/暴伤/命中/闪避/吸血）
-    const pct = (v) => Math.round((Number(v) || 0) * 100) + '%';
-    const num = (v) => enemyStat(v);
-    tip.innerHTML = `
-      <div class="enemy-tip-title">
-        <strong>${escapeHtml(enemy.name || '未知怪物')}</strong>
-        <span>Lv.${num(enemy.level)}</span>
-        <b class="enemy-type ${type.className}">${type.label}</b>
-      </div>
-      <div class="enemy-tip-group">
-        <div class="enemy-tip-heading">基础属性</div>
-        <div class="enemy-tip-rows">
-          <div class="enemy-tip-row" data-enemy-hp>生命<b>${num(enemy.hp)} / ${num(enemy.maxHp)}</b></div>
-          <div class="enemy-tip-row">攻击<b>${num(enemy.atk)}</b></div>
-          <div class="enemy-tip-row">防御<b>${num(enemy.def)}</b></div>
-          <div class="enemy-tip-row">速度<b>${num(enemy.spd)}</b></div>
-        </div>
-      </div>
-      <div class="enemy-tip-group">
-        <div class="enemy-tip-heading">战斗属性</div>
-        <div class="enemy-tip-rows">
-          <div class="enemy-tip-row">暴击<b>${pct(enemy.critRate)}</b></div>
-          <div class="enemy-tip-row">暴伤<b>${pct(enemy.critDamage)}</b></div>
-          <div class="enemy-tip-row">命中<b>${num(enemy.hit)}</b></div>
-          <div class="enemy-tip-row">闪避<b>${num(enemy.dodge)}</b></div>
-          <div class="enemy-tip-row">吸血<b>${pct(enemy.lifesteal)}</b></div>
-        </div>
-      </div>
-      <div class="enemy-tip-group enemy-tip-drop">
-        <div class="enemy-tip-heading">掉落信息</div>
-        <div class="enemy-tip-rows">
-          <div class="enemy-tip-row">难度<b>×${Number(enemy._diff || 0).toFixed(2)}</b></div>
-          <div class="enemy-tip-row">经验<b>+${escapeHtml(experience)}</b></div>
-          <div class="enemy-tip-row" style="grid-column:1/-1">掉落品质：<span class="rarity-white">白 ${Number(weights.white || 0)}%</span> · <span class="rarity-blue">蓝 ${Number(weights.blue || 0)}%</span> · <span class="rarity-gold">金 ${Number(weights.gold || 0)}%</span></div>
-        </div>
-      </div>`;
-  }
-  function updateEnemyTipHp(enemy) {
-    const row = $('enemy-tip')?.querySelector('[data-enemy-hp]');
-    if (row && enemy) row.textContent = `生命：${groupNum(enemyStat(enemy.hp))} / ${groupNum(enemyStat(enemy.maxHp))}`;
-  }
-  function positionEnemyTip() {
-    const tip = $('enemy-tip');
-    const icon = $('enemy-icon');
-    if (!tip || !icon) return;
-    const GAP = 14; // tip 与立绘的间距
-    const ar = icon.getBoundingClientRect();
-    const tw = tip.offsetWidth || 280, th = tip.offsetHeight;
-    // 优先放在立绘的**左侧偏上**（怪物在舞台右下 → tip 在立绘左边且不挡画面）
-    let left = ar.left - tw - GAP;
-    let top = ar.top - th + ar.height * 0.4; // 立绘中部偏上对齐
-    // 超左缘 → 翻到立绘右侧
-    if (left < 8) left = ar.right + GAP;
-    // 超右缘 → 贴右缘
-    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
-    // 上下夹边
-    if (top < 8) top = 8;
-    if (top + th > window.innerHeight - 8) top = window.innerHeight - th - 8;
-    tip.style.left = left + 'px';
-    tip.style.top = top + 'px';
-  }
-  function bindEnemyTip() {
-    const icon = $('enemy-icon');
-    const name = $('enemy-icon-name');
-    const tip = $('enemy-tip');
-    if (!icon || !name || !tip || tip.dataset.bound) return;
-    tip.dataset.bound = '1';
-    const show = () => {
-      const enemy = getBattleEnemy();
-      if (!enemy) return;
-      renderEnemyTip(enemy);
-      tip.hidden = false;
-      positionEnemyTip();
-    };
-    const hide = () => { tip.hidden = true; };
-    icon.addEventListener('mouseenter', show);
-    name.addEventListener('mouseenter', show);
-    icon.addEventListener('mouseleave', hide);
-    name.addEventListener('mouseleave', hide);
-    window.addEventListener('resize', positionEnemyTip);
-  }
+  /* ---------- 敌方怪物悬浮提示 → 已迁出到 `js/ui/ui-battle-tip.js`（2026-09-21） ----------
+   * 内容渲染 / 定位 / 悬停绑定都在那个模块（`window.BattleTip`）；本文件只负责"什么时候刷"：
+   * resetBattle 里 bind + render，updateBars 里 updateHp。改浮层内容请去那个文件。 */
 
   /* ---------- 战斗视觉（battle.js 调用） ---------- */
   function resetBattle(petName, enemyName, petMaxHp, enemyMaxHp) {
     const enemyFighter = document.getElementById('enemy-fighter');
     if (enemyFighter) enemyFighter.style.display = '';
-    bindEnemyTip();
-    renderEnemyTip(getBattleEnemy());
+    BattleTip().bind();
+    BattleTip().render(BattleTip().getEnemy());
     mountIcon($('pet-icon'), petName);
     $('pet-icon-name').textContent = petName;
     mountIcon($('enemy-icon'), enemyName);
@@ -406,7 +300,7 @@
     $('pet-hp-bar').style.width = '100%';
     $('pet-hp-text').textContent = `${groupNum(petMaxHp)}/${groupNum(petMaxHp)}`;
     $('enemy-hp-text').textContent = `${groupNum(enemyMaxHp)}/${groupNum(enemyMaxHp)}`;
-    updateEnemyTipHp(getBattleEnemy());
+    BattleTip().updateHp(BattleTip().getEnemy());
     // 行动条小头像同步本场图标（用头像版，小尺寸更清晰）
     mountIconAvatar($('at-racer-pet'), petName);
     mountIconAvatar($('at-racer-enemy'), enemyName);
@@ -415,7 +309,7 @@
     if (stage && stage.querySelector) {
       const enemyBox = stage.querySelector('.fighter-enemy');
       if (enemyBox && enemyBox.classList) {
-        const enemy = getBattleEnemy();
+        const enemy = BattleTip().getEnemy();
         enemyBox.classList.toggle('is-mutant', !!(enemy && enemy.enemyType === 'mutant'));
         const avatar = enemyBox.querySelector('.stage-avatar');
         if (avatar && avatar.classList) avatar.classList.remove('defeated');
@@ -440,9 +334,9 @@
     $('enemy-hp-bar').style.width = Math.max(0, (enemyHp / enemyMaxHp) * 100) + '%';
     $('pet-hp-text').textContent = `${groupNum(petHp)}/${groupNum(petMaxHp)}`;
     $('enemy-hp-text').textContent = `${groupNum(enemyHp)}/${groupNum(enemyMaxHp)}`;
-    const enemy = getBattleEnemy();
+    const enemy = BattleTip().getEnemy();
     if (enemy) enemy.hp = Math.max(0, enemyHp);
-    updateEnemyTipHp(enemy);
+    BattleTip().updateHp(enemy);
     // 低血量告警（≤25% 亮红，视觉反馈，不影响战斗数据；测试桩元素可能无 classList，防御处理）
     const petBar = $('pet-hp-bar');
     if (petBar && petBar.classList && typeof petBar.classList.toggle === 'function') {
@@ -988,6 +882,8 @@
 
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
+  // 千分位格式化对外：ui-battle-tip.js 复用同一份（不另写一套，避免两个事实源）
+  UI.groupNum = groupNum;
   UI.showLoot = showLoot;
   UI.showIdleSummary = showIdleSummary;
   // 档位对外：世界地图的「掉落预览」要用同一套（不另抄一份名单 → 不会出现第二份事实源）

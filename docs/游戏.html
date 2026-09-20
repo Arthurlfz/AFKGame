@@ -1122,7 +1122,9 @@ window.PetSprites = {
 <script src="js/ui/ui-friends.js?v=20260920nametag"></script>
 <!-- 命中特效播放器：js/fx/ 一个文件一套特效；必须在 ui-battle.js 之前加载 -->
 <script src="js/fx/hit-fx.js?v=20260921fx1"></script>
-<script src="js/ui/ui-battle.js?v=20260921fx5"></script>
+<!-- 敌方悬浮提示：独立模块（2026-09-21 从 ui-battle.js 迁出，一个文件一个职责）；ui-battle.js 依赖它 -->
+<script src="js/ui/ui-battle-tip.js?v=20260921split1"></script>
+<script src="js/ui/ui-battle.js?v=20260921fx6"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260921avatar1"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260920godsub3"></script>

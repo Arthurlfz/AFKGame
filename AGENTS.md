@@ -178,9 +178,16 @@
 ### 9.3 加文件 / 搬迁时**必付的三笔账**（漏一笔就报红）
 
 1. **`docs/游戏.html`**：加载顺序（被依赖的先加载）+ **`?v=` 必须升**（不升 = 改了等于没改，见红线 4）。
-2. **测试 harness 的加载清单**：约 30 个 `vtest_*.js` 用**显式清单**加载 js 文件。
-   - 新模块若是**可选**的 → 调用方写成 `if (window.Xxx) window.Xxx.play(...)`（项目既有写法：`idle-bridge.js` 调 `UI.animateHit`），清单**不用动**。
-   - 若是**必需**的 → 那些清单要逐个加，否则一片 `Xxx is not defined`。
+2. **测试 harness 的加载清单**（⚠️ 有**两套机制**，别只改一套）：
+   - ① **显式清单**：约 30 个 `vtest_*.js` 里写死一串 `'../js/...'`。必需模块要**逐个加**，漏一个就是 `Xxx is not defined`。
+   - ② **自动清单**：`tests/vtest_files.js` 的 `readGameScripts()` **直接解析 `docs/游戏.html`** 取脚本表（`vtest_ui` 等走这条）
+     ⇒ 只要把加载标签加进 `游戏.html` 就自动生效。
+   - 新模块若是**可选**的 → 调用方写成 `if (window.Xxx)`（项目既有写法：`idle-bridge.js` 调 `UI.animateHit`），**两套清单都不用动**。
+   - ⚠️ **加载顺序陷阱**：显式清单里新模块常被批量插在"使用它的文件"**之后**（2026-09-21 踩过，`BattleTip` 拿到 undefined）。
+     所以消费者一律**用时取**：`const Tip = () => window.BattleTip;` 然后 `Tip().bind()`；
+     ⛔ 不要 `const Tip = window.BattleTip;`（那样在加载顺序不利时永远是 undefined）。
+   - ⚠️ 批量改清单时先看清**两种写法**：清单式（`'a.js','b.js',` 逗号分隔）和**逐行式**（`readFileSync('a.js','utf8')` 每行一个）。
+     用同一条替换规则套两种写法会把行拼坏（本次就是这么把 `vtest_drop_tier` 弄红的）。
 3. **按文件路径断言的守值**：例如 `vtest_pet_anim.js` 第 10 节原先断言 `ui-battle.js` 里的 `playFx`；
    迁移后必须把断言**改指新文件**，并顺手加一条"**不许回流**"的断言（防止下次又被塞回去）。
 4. 新增**素材**文件后：`git add`（否则 `vtest_assets_tracked.js` 报红"引用的资源没入库"）。

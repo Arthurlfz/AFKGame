@@ -453,15 +453,17 @@ const pngOk = pngHead.length === 33
 A(pngOk,
   `命中墨爆 PNG IHDR 为 2304×256、bitDepth=8、colorType=6（RGBA，真透明通道）`);
 // ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
-//   game.css     → fx4（fx3 之后又移走了命中特效的样式）
-//   fx.css       → fx1（新文件：素材特效样式）
-//   ui-battle.js → fx5（命中特效迁出此文件）
-//   hit-fx.js    → fx1（新文件：命中特效播放器）
+//   game.css      → fx4（fx3 之后又移走了命中特效的样式）
+//   fx.css        → fx1（新文件：素材特效样式）
+//   ui-battle.js  → fx6（fx5 = 命中特效迁出；fx6 = 敌方悬浮提示迁出）
+//   hit-fx.js     → fx1（新文件：命中特效播放器）
+//   ui-battle-tip.js → split1（新文件：敌方悬浮提示）
 A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
   && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
-  && /js\/ui\/ui-battle\.js\?v=20260921fx5/.test(srcHtml)
-  && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml),
-  '游戏.html 里 game.css(fx4)/fx.css(fx1)/ui-battle.js(fx5)/hit-fx.js(fx1) 的缓存版本都要对（改了 JS/CSS 不升号=改了等于没改）');
+  && /js\/ui\/ui-battle\.js\?v=20260921fx6/.test(srcHtml)
+  && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml)
+  && /js\/ui\/ui-battle-tip\.js\?v=20260921split1/.test(srcHtml),
+  '游戏.html 里 game.css(fx4)/fx.css(fx1)/ui-battle.js(fx6)/hit-fx.js(fx1)/ui-battle-tip.js(split1) 的版本号都要对（改了 JS/CSS 不升号=改了等于没改）');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条
