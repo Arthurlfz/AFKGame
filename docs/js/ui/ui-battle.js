@@ -603,50 +603,9 @@
     icon.__hitT = setTimeout(() => icon.classList.remove('hit', 'crit-hit'), isCrit ? 440 : 320);
   }
 
-  /* ---------- 命中特效：脚底墨爆（2026-09-21 新增） ----------
-   * 素材 assets/effects/hit-ink/命中墨爆.png = 9 帧 × 256 的横向帧条（透明底）。
-   * 🔴 必须用 JS 定时器逐帧写 background-position-x（**像素**值）：不能走 CSS animation ——
-   *    design-tokens.css / market-cascade.css 有
-   *    `@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important; iteration-count:1!important}}`，
-   *    开了「减少动态效果」的机器上动画会被压成静帧（逐帧立绘 2026-09-21 就是这么翻车的，且那是 *{} + !important，盖不住）。
-   * 🔴 图片 URL 必须由 JS 写内联 background-image：CSS 自定义属性里的相对 url() 会按样式表所在目录 css/ 解析 → 404 全白。
-   * 位置/裁框见 game.css 的 .hit-fx；连击时先清旧元素与旧定时器，避免叠成一坨。 */
-  const FX_SRC = 'assets/effects/hit-ink/命中墨爆.png'; // 相对 docs/
-  const FX_FRAMES = 9;
-  /* 节奏 = 出手者攻击素材自己的时长（不写死），换素材 / 改 attack.dur 自动跟着走：
-   * 9 帧里第 5~6 帧（≈2/3 处）炸开，正对攻击素材后 3 格的下劈。
-   * ⚠️ 兜底 800ms：静态立绘的宠与怪都没有逐帧攻击素材（45ms/帧 = 405ms 太短，用户反馈看不清）。 */
-  const FX_DEFAULT_MS = 800;
-  function fxDurationMs(attacker) {
-    const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
-    const node = icon && icon.querySelector ? icon.querySelector('.pet-anim') : null;
-    const anim = (node && window.PetSprites && PetSprites.animOf) ? PetSprites.animOf(node.dataset.petName) : null;
-    const d = anim && anim.attack && parseFloat(anim.attack.dur);
-    return d > 0 ? Math.round(d * 1000) : FX_DEFAULT_MS;
-  }
-  function playFx(target) {
-    const host = target === 'pet' ? $('pet-icon') : $('enemy-icon');
-    if (!host) return;
-    clearInterval(host.__fxT);
-    if (host.__fxEl) { host.__fxEl.remove(); host.__fxEl = null; }
-    const el = document.createElement('div');
-    el.className = 'hit-fx';
-    el.style.backgroundImage = 'url("' + FX_SRC + '")';
-    el.style.backgroundSize = (FX_FRAMES * 100) + '% 100%';
-    host.appendChild(el);
-    host.__fxEl = el;
-    // 出手者是"被打中者的对面"：打中敌人 ⇒ 我方出手；打中我方 ⇒ 敌方出手
-    const frameMs = Math.max(30, Math.round(fxDurationMs(target === 'pet' ? 'enemy' : 'pet') / FX_FRAMES));
-    let k = 0;
-    const step = () => {
-      if (!el.isConnected) { clearInterval(host.__fxT); host.__fxEl = null; return; } // 怪下场/切页兜底
-      if (k >= FX_FRAMES) { clearInterval(host.__fxT); el.remove(); host.__fxEl = null; return; }
-      el.style.backgroundPositionX = (-k * el.clientWidth) + 'px'; // 必须像素：百分比是按整张 9 格帧条算的
-      k++;
-    };
-    step();
-    host.__fxT = setInterval(step, frameMs);
-  }
+  /* 命中特效（脚底墨爆）已迁出本文件 → `js/fx/hit-fx.js`（一个文件一个职责）。
+   * 本文件只负责"什么时机播"：见下面 showDamage 里那一行；
+   * 播放器、时长（跟出手素材对齐）、素材路径、连击清理都在那个模块里，样式在 `css/fx.css`。 */
   // 战斗飘字：在目标头像上方弹带类型标签的数字（攻击：-X / 暴击：-X / 吸血：+X）
   // 普通白 / 暴击亮红大20% / 吸血暗绿侧边；同一目标同时最多 3 个，超出延迟 120ms 排队；
   // 淡入 → 上飘 → 淡出 0.8s 后自动移除。只做表现，不参与任何战斗计算。
@@ -679,7 +638,8 @@
       flashStage('crit-impact', 400); // 暴击：屏幕边缘红脉冲
     }
     // 命中才有痕迹：闪避（miss）与吸血回血（lifesteal，飘在出手者身上）都不播
-    if (type !== 'miss' && type !== 'lifesteal') playFx(target);
+    // ⚠️ 判存在是必须的：约 30 个测试 harness 只加载 ui-battle.js、没加载 js/fx/hit-fx.js（可选模块写法）
+    if (type !== 'miss' && type !== 'lifesteal' && window.HitFx) window.HitFx.play(target);
     // label：自定义飘字标签（如主动技能名"腐蚀喷吐：-1500"）；吸血固定右侧错位
     showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : (label ? { label: label } : null));
   }

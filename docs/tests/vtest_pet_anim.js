@@ -388,39 +388,46 @@ A(backLines.some(l => /atkDurMs/.test(l)),
   `归位时长/行动条冻结必须把滞空算进去（现在的写法：${backLine.trim()}）—— 漏了会出现"人还贴在怪脸上，下一手已经在原地蓄力"`);
 
 /* ---------- 10. 命中特效（脚底墨爆） ----------
- * 这组守值钉住命中特效的播放驱动、触发口径、层级、素材 IHDR 与缓存版本。
+ * 2026-09-21 按"一个文件一个职责"迁出：播放器 = js/fx/hit-fx.js、样式 = css/fx.css。
+ * 这组守值钉住：播放驱动、触发口径、层级、素材 IHDR、缓存版本，以及【模块边界】（实现不许回流 ui-battle.js）。
  * 特别注意：不能只断言字符串存在；每条都要在实现被改坏时真实报红。 */
-const fxStart = srcBattle.indexOf('function playFx');
-const fxEnd = srcBattle.indexOf('// 战斗飘字', fxStart);
-const fxBody = fxStart >= 0 && fxEnd > fxStart ? srcBattle.slice(fxStart, fxEnd) : '';
+const srcFx = fs.readFileSync(path.join(ROOT, 'js', 'fx', 'hit-fx.js'), 'utf8');
+const srcFxCss = fs.readFileSync(path.join(ROOT, 'css', 'fx.css'), 'utf8');
+const fxStart = srcFx.indexOf('function play(');
+const fxEnd = srcFx.indexOf('window.HitFx', fxStart);
+const fxBody = fxStart >= 0 && fxEnd > fxStart ? srcFx.slice(fxStart, fxEnd) : '';
 A(fxStart >= 0 && /setInterval/.test(fxBody) && /backgroundPositionX/.test(fxBody),
-  '命中特效播放器存在，且由 JS setInterval + backgroundPositionX 驱动');
+  '命中特效播放器在 js/fx/hit-fx.js 里，且由 JS setInterval + backgroundPositionX 驱动');
+A(!/function playFx/.test(srcBattle) && !/FX_FRAMES/.test(srcBattle) && !/FX_DEFAULT_MS/.test(srcBattle),
+  '命中特效实现不许回流 ui-battle.js（播放器要待在 js/fx/hit-fx.js —— 一个文件一个职责）');
+A(/js\/fx\/hit-fx\.js\?v=/.test(srcHtml) && /css\/fx\.css\?v=/.test(srcHtml),
+  '游戏.html 必须同时加载 fx 模块（js/fx/hit-fx.js）与它的样式（css/fx.css）');
 const fxPosAssign = (fxBody.match(/backgroundPositionX\s*=\s*[^;\n]*/) || [''])[0];
 A(/backgroundPositionX\s*=\s*[^;\n]*['"]px['"]/.test(fxPosAssign) && !/%/.test(fxPosAssign),
   `命中特效每帧位移使用像素单位（当前赋值：${fxPosAssign || '缺失'}），不使用百分比量程`);
 /* ⭐ 特效节奏必须**跟出手动作对齐**（用户 2026-09-21：「你这个不应该和攻击对齐吗」）：
  * 帧间隔要从出手者的【攻击素材时长】算出来，不许硬编码一个拍脑袋的数
  * （曾经写成 45ms/帧 = 全程 405ms，被用户判为"播放的太快了"）。 */
-const fxDurStart = srcBattle.indexOf('function fxDurationMs');
-const fxDurBlock = fxDurStart >= 0 ? srcBattle.slice(fxDurStart, fxDurStart + 600) : '';
+const fxDurStart = srcFx.indexOf('function durationMs');
+const fxDurBlock = fxDurStart >= 0 ? srcFx.slice(fxDurStart, fxDurStart + 600) : '';
 A(!!fxDurBlock && /anim\.attack/.test(fxDurBlock) && /\.dur/.test(fxDurBlock),
   '特效时长由出手者攻击素材的 attack.dur 推导（与出手动作同一拍；换素材/改时长会自动跟着走）');
-const fxFallback = /const FX_DEFAULT_MS\s*=\s*(\d+)/.exec(srcBattle);
+const fxFallback = /var DEFAULT_MS\s*=\s*(\d+)/.exec(srcFx);
 A(!!fxFallback && Number(fxFallback[1]) >= 700,
   `没有逐帧攻击素材时的兜底时长 = ${fxFallback ? fxFallback[1] : '缺失'}ms，必须 ≥700（405ms 那版被用户判为"太快、看不清"）`);
 
 const damageStart = srcBattle.indexOf('function showDamage');
 const damageEnd = srcBattle.indexOf('/* ---------- 挂机状态徽章', damageStart);
 const damageBlock = damageStart >= 0 && damageEnd > damageStart ? srcBattle.slice(damageStart, damageEnd) : '';
-const fxTriggerLine = damageBlock.split(/\r?\n/).find(line => /playFx/.test(line)) || '';
-A(/playFx/.test(fxTriggerLine) && /miss/.test(fxTriggerLine) && /lifesteal/.test(fxTriggerLine),
-  `showDamage 的 playFx 触发口径同时排除 miss 与 lifesteal（当前行：${fxTriggerLine.trim() || '缺失'}）`);
+const fxTriggerLine = damageBlock.split(/\r?\n/).find(line => /HitFx\.play/.test(line)) || '';
+A(/HitFx\.play/.test(fxTriggerLine) && /miss/.test(fxTriggerLine) && /lifesteal/.test(fxTriggerLine),
+  `showDamage 里 HitFx.play 的触发口径同时排除 miss 与 lifesteal（当前行：${fxTriggerLine.trim() || '缺失'}）`);
 const hitStart = srcBattle.indexOf('function animateHit');
-const hitEnd = srcBattle.indexOf('/* ---------- 命中特效', hitStart);
+const hitEnd = srcBattle.indexOf('/* 命中特效（脚底墨爆）已迁出本文件', hitStart);
 const hitBlock = hitStart >= 0 && hitEnd > hitStart ? srcBattle.slice(hitStart, hitEnd) : '';
-A(!/playFx/.test(hitBlock), 'animateHit 不调用 playFx（避免 isMiss 判定前把闪避播成命中）');
+A(!/HitFx/.test(hitBlock), 'animateHit 不调用命中特效（避免 isMiss 判定前把闪避播成命中）');
 
-const fxCss = srcCss.match(/#tab-battle \.stage-avatar \.hit-fx\s*\{[^}]*\}/);
+const fxCss = srcFxCss.match(/#tab-battle \.stage-avatar \.hit-fx\s*\{[^}]*\}/);
 A(!!fxCss && /position\s*:\s*absolute/.test(fxCss[0]) && /bottom\s*:/.test(fxCss[0])
   && /width\s*:\s*120%/.test(fxCss[0]) && /height\s*:\s*120%/.test(fxCss[0])
   && /pointer-events\s*:\s*none/.test(fxCss[0]) && /z-index\s*:\s*5/.test(fxCss[0]),
@@ -445,12 +452,16 @@ const pngOk = pngHead.length === 33
   && pngHead[24] === 8 && pngHead[25] === 6;
 A(pngOk,
   `命中墨爆 PNG IHDR 为 2304×256、bitDepth=8、colorType=6（RGBA，真透明通道）`);
-// ⚠️ 两个版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
-//   game.css  → fx3（移除原 CSS 命中特效那版；fx2 = 立绘放大）
-//   ui-battle.js → fx4（同批清掉 --sprite 死代码；fx3 = 特效节奏与出手动作对齐）
-A(/css\/game\.css\?v=20260921fx3/.test(srcHtml)
-  && /js\/ui\/ui-battle\.js\?v=20260921fx4/.test(srcHtml),
-  '游戏.html 中 game.css(?v=fx3) 与 ui-battle.js(?v=fx4) 的缓存版本正确（改了 JS/CSS 不升号=改了等于没改）');
+// ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
+//   game.css     → fx4（fx3 之后又移走了命中特效的样式）
+//   fx.css       → fx1（新文件：素材特效样式）
+//   ui-battle.js → fx5（命中特效迁出此文件）
+//   hit-fx.js    → fx1（新文件：命中特效播放器）
+A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
+  && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
+  && /js\/ui\/ui-battle\.js\?v=20260921fx5/.test(srcHtml)
+  && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml),
+  '游戏.html 里 game.css(fx4)/fx.css(fx1)/ui-battle.js(fx5)/hit-fx.js(fx1) 的缓存版本都要对（改了 JS/CSS 不升号=改了等于没改）');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条

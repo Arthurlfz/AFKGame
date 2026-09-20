@@ -22,9 +22,11 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260917font2">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260919dot3">
-<link rel="stylesheet" href="css/game.css?v=20260921fx3">
+<link rel="stylesheet" href="css/game.css?v=20260921fx4">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
 <link rel="stylesheet" href="css/ui-polish.css?v=20260921corn1">
+<!-- 素材特效样式（与 js/fx/ 里的模块配套；2026-09-21 命中墨爆从 game.css 迁到这里） -->
+<link rel="stylesheet" href="css/fx.css?v=20260921fx1">
 <!-- 全局动效基线层（按下/悬浮/浮层/列表入场；各系统专属演出仍在各自 css） -->
 <link rel="stylesheet" href="css/motion.css?v=20260916m3">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260917fix1">
@@ -1118,7 +1120,9 @@ window.PetSprites = {
 <script src="js/ui/ui-tips.js?v=20260920tips"></script>
 <script src="js/ui/ui-leaderboard.js?v=20260920nametag"></script>
 <script src="js/ui/ui-friends.js?v=20260920nametag"></script>
-<script src="js/ui/ui-battle.js?v=20260921fx4"></script>
+<!-- 命中特效播放器：js/fx/ 一个文件一套特效；必须在 ui-battle.js 之前加载 -->
+<script src="js/fx/hit-fx.js?v=20260921fx1"></script>
+<script src="js/ui/ui-battle.js?v=20260921fx5"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260921avatar1"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260920godsub3"></script>

@@ -1468,26 +1468,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  *   · 受击/暴击的【动作】：`pet-hit` / `pet-hit-crit` 形变 + 容器 `shake` + 命中**顿帧**（那是打击感，不是特效）；
  *   · 暴击的【全屏反馈】：`stage-shake` 舞台震屏 + `crit-impact` 屏幕边缘红脉冲
  *     —— 现在暴击与普通命中共用同一套墨爆（用户选的"一套通用不分档"），**这两条是暴击唯一的区分度**。 */
-/* ---------- 命中墨爆：被打中者在【脚底】炸开一记水墨冲击（2026-09-21 新增） ----------
- * 素材 assets/effects/hit-ink/命中墨爆.png（9 帧 × 256 横向帧条、透明底）；
- * 播放由 ui-battle.js 的 playFx 用 JS 定时器推 background-position-x，这里只管位置与裁框。
- * 🔴 这一层【绝对不要】写 animation/transition：design-tokens.css 与 market-cascade.css 有
- *    `@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}`，
- *    设置项 body.rm-anim 同策略 ⇒ 动画会被压成静帧（与逐帧立绘翻车同一个坑）。
- * 三个数字是量出来的：
- *   · 帧条每格内容包围盒 y 24..231（格 256）⇒ 墨爆"地面线"在格底上方 9.8%；
- *   · 元素取 120% 容器 ⇒ 地面线落在元素底边上方 9.8%×1.2 ≈ 11.7% 容器高；
- *   · 立绘脚底 ≈ 容器底上方 8%（神狐立绘内容盒底 470/512、普通宠 monster-04 = 239/256）
- *     ⇒ bottom ≈ 8% − 11.7% = −4%，墨爆正好从脚底地面炸起。
- * z-index 取 5：要盖在立绘之上，但必须**低于**飘字（.fs-float = 6）与信息块（7），不许糊住伤害数字。
- * 允许溢出立绘框：.stage-avatar 没有 overflow:hidden，墨点溅到框外是对的。 */
-#tab-battle .stage-avatar .hit-fx {
-  position:absolute; left:50%; bottom:-4%;
-  width:120%; height:120%;
-  transform:translateX(-50%);
-  background-repeat:no-repeat;
-  pointer-events:none; z-index:5;
-}
+/* 命中特效（脚底墨爆）的样式已迁到 `css/fx.css`（2026-09-21，一个文件一个职责）。
+ * 素材特效（外层 div + 逐帧播放）统一归 `js/fx/` 模块 + `css/fx.css`，别再往本文件加新的特效。
+ * ⛔ 本文件也不要长回 `.hit-fx`：守值 `vtest_pet_anim.js` 第 10 节会盯着（它在 fx.css 里找）。 */
 /* 受击：后仰挤压 + 侧倾（容器 shake 的抖动与之叠加）。放在 attack 之后，同时命中时以受击为准。
  * rotate 放在 var(--flip) 之前，我方与敌方才会各自朝【远离对手】的方向倒。 */
 #tab-battle .stage-avatar.hit img.pet-breathe,

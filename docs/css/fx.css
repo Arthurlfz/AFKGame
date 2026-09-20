@@ -1,0 +1,29 @@
+/* ============================================================
+ * fx.css —— 纯表现层「素材特效」样式（一套特效一节）
+ *
+ * 与 game.css 的分工：game.css 管战斗舞台 / 角色位置 / 动作动画（立绘本身怎么动）；
+ * 本文件只放【用素材播的特效】：外层 div 由 `js/fx/` 里对应的模块创建（一个模块一套特效）。
+ * 新增特效的规矩：js 放 `js/fx/<名字>.js`、样式放本文件加一节、素材放 `assets/effects/<名字>/`。
+ *
+ * ⛔ 本文件【绝对不要】用 animation / transition 去播逐帧素材：
+ *    design-tokens.css 与 market-cascade.css 有
+ *    `@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}`，
+ *    设置项 body.rm-anim 同策略 ⇒ 动画会被压成静帧（与逐帧立绘翻车是同一个坑）。逐帧一律由 js/fx 里的模块用定时器推。
+ * ============================================================ */
+
+/* ---------- 命中墨爆（由 js/fx/hit-fx.js 播；2026-09-21 从 game.css 迁出） ----------
+ * 素材 assets/effects/hit-ink/命中墨爆.png（9 帧 × 256 横向帧条、透明底）。
+ * 三个数字是量出来的，别随手改：
+ *   · 帧条每格内容包围盒 y 24..231（格 256）⇒ 墨爆"地面线"在格底上方 9.8%；
+ *   · 元素取 120% 容器 ⇒ 地面线落在元素底边上方 9.8%×1.2 ≈ 11.7% 容器高；
+ *   · 立绘脚底 ≈ 容器底上方 8%（神狐立绘内容盒底 470/512、普通宠 monster-04 = 239/256）
+ *     ⇒ bottom ≈ 8% − 11.7% = −4%，墨爆正好从脚底地面炸起。
+ * z-index 取 5：要盖在立绘之上，但必须**低于**飘字（.fs-float = 6）与信息块（7），不许糊住伤害数字。
+ * 允许溢出立绘框：.stage-avatar 没有 overflow:hidden，墨点溅到框外是对的。 */
+#tab-battle .stage-avatar .hit-fx {
+  position:absolute; left:50%; bottom:-4%;
+  width:120%; height:120%;
+  transform:translateX(-50%);
+  background-repeat:no-repeat;
+  pointer-events:none; z-index:5;
+}
