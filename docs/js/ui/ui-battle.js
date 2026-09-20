@@ -18,9 +18,12 @@
   const Config = window.Config;
   const { getActivePet, getPets, getStats, setActive, getBonusText } = window.Pet;
   const PetSprites = window.PetSprites;
-  // 敌方悬浮提示（渲染/定位/悬停绑定）已迁出 → js/ui/ui-battle-tip.js（2026-09-21）。
-  // ⚠️ 必须**用时取**，不能在这里存成 const：测试 harness 的清单里 tip 模块可能排在 ui-battle.js 之后。
+  // 已迁出的模块一律**用时取**（不能在这里存成 const）：测试 harness 的清单里它们可能排在 ui-battle.js 之后。
+  //   BattleTip   → js/ui/ui-battle-tip.js（敌方悬浮提示）
+  //   StageFx     → js/ui/ui-stage-fx.js（横幅 / 舞台闪光 / 屏幕脉冲）
+  //   （掉落演出整体在 js/ui/ui-battle-loot.js，它自己往 UI 上挂 showLoot / lootTierOf）
   const BattleTip = () => window.BattleTip;
+  const StageFx = () => window.StageFx;
 
   // 从战斗标签（"血狐 等级：9级"）里提取纯名字，用于匹配立绘；Boss 带「霸主·」前缀也要剥掉
   function pureName(name) {
@@ -114,172 +117,14 @@
     $('stat-equips').textContent = String(totalEquipDrops);
   }
 
-  /* ---------- 掉落播报（main.js 编排后调用；只显示掉落物品，不显示战斗过程） ----------
-   * 挂机没有「地上的东西」可以踩（不像别的游戏能走过去捡），所以掉宝的信息只能落在消息控制台里——
-   * 于是靠【字号 + 字重 + 辉光】把三档拉开，档位表在 config.js 的 `drop.lootTiers`。
-   * 判据：越难出 / 越关键，字越大越亮；**日常材料不套档位 class = 不提亮**（提亮一切等于没提亮）。
-   * 颜色不在这里定：装备沿用白/蓝/金三档稀有度色，宠物蛋走 .loot-egg 幽蓝。 */
-  function lootTierOf(name) {
-    const t = (Config && Config.drop && Config.drop.lootTiers) ? Config.drop.lootTiers[name] : 0;
-    return Number(t) || 1;
-  }
+  /* ---------- 掉落播报 + 掉落演出 → 已整体迁出到 `js/ui/ui-battle-loot.js`（2026-09-21） ----------
+   * 那边自己往 UI 上挂 `showLoot` / `lootTierOf`，调用方（main.js / 世界地图掉落预览）不用改；
+   * 舞台横幅等原语在 `js/ui/ui-stage-fx.js`。本文件不再管掉落，改它请去那两个文件。 */
 
-  /* ---------- 掉落演出（2026-09-16）----------
-   * 挂机没有"地上的东西"可捡，掉落的反馈原本只有聊天框里一行字 —— 玩家挂机一小时，
-   * 最容易错过的恰恰是"刚掉了好东西"。所以补两层：
-   *   ① 飞入：东西从怪身上飞进顶栏背包（眼睛会跟着走，知道它进包了）
-   *   ② 横幅：只有稀有档（tier3 / 金装 / 蛋）才出。普通材料不打扰 —— 天天出就等于没出。
-   * ⚠️ 纯表现：拿不到坐标 / 不在战斗页时一律静默跳过，绝不影响结算。
-   *
-   * 🔴 起点必须【逐个候选验 rect】（2026-09-16 首次上线后用户反馈"没看到飞"的真因）：
-   *   掉落播报发生在每场结算之后，而那一刻 `#enemy-fighter` 正好被 idle-bridge
-   *   收成 display:none（它要等飘字播完再收起，下一只怪上台才恢复）。
-   *   display:none 的元素 **querySelector 照样能取到**，只是 rect 全 0 ——
-   *   所以"取到元素就用"会让每一次掉落都拿不到起点，飞入永远不出现。
-   *   这里的规矩：取到 → 验 rect → 不行就换下一个候选；全都不行才当作"战斗页不在前台"。 */
-  function rectOf(sel) {
-    const el = document.querySelector(sel);
-    if (!el || !el.getBoundingClientRect) return null;
-    const r = el.getBoundingClientRect();
-    return (r.width && r.height) ? r : null;
-  }
-  function lootOrigin() {
-    // ① 怪身上（东西是从它身上掉的）
-    const av = rectOf('#tab-battle .fighter-enemy .stage-avatar');
-    if (av) return { x: av.left + av.width / 2, y: av.top + av.height * 0.42 };
-    // ② 怪被收起 / 换场空档 → 退回舞台右侧：那本来就是怪站的位置
-    const stage = rectOf('#tab-battle .battle-stage');
-    if (stage) return { x: stage.left + stage.width * 0.72, y: stage.top + stage.height * 0.52 };
-    return null; // 战斗页不在前台：不飞（免得别的页面莫名飘东西）
-  }
-  function flyToBag(text, kind) {
-    if (typeof document === 'undefined' || !document.body) return;
-    // 玩家自己在设置里关了动画 → 尊重，不飞
-    if (document.body.classList && document.body.classList.contains('rm-anim')) return;
-    const bag = $('topbar-bag');
-    const from = lootOrigin();
-    if (!bag || !from || !bag.getBoundingClientRect) return;
-    const to = bag.getBoundingClientRect();
-    if (!to.width) return;
-    // 兜底信号：背包图标自己亮一下（飞行物万一没被注意到，"进包了"这件事也不会丢）
-    if (bag.classList) {
-      bag.classList.remove('bag-pulse');
-      void bag.offsetWidth;
-      bag.classList.add('bag-pulse');
-      setTimeout(() => bag.classList.remove('bag-pulse'), 480);
-    }
-    const el = document.createElement('div');
-    el.className = 'loot-fly' + (kind ? ' ' + kind : '');
-    el.textContent = text;
-    el.style.left = from.x + 'px';
-    el.style.top = from.y + 'px';
-    document.body.appendChild(el);
-    const dx = (to.left + to.width / 2) - from.x;
-    const dy = (to.top + to.height / 2) - from.y;
-    /* 用 Web Animations 而不是 transition：元素刚插进 DOM 就改 transform 时，
-     * 浏览器可能还没算过初始样式 → transition 不生效，东西直接闪到终点（看着就像"没飞"）。
-     * WAAPI 由 JS 直接给时长，不受这个时序影响。老浏览器退回 transition。 */
-    if (el.animate) {
-      el.animate(
-        [{ transform: 'translate(0,0) scale(1)', opacity: 1 },
-         { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(.72)', opacity: .15 }],
-        { duration: 620, easing: 'cubic-bezier(.35,0,.25,1)', fill: 'forwards' }
-      );
-    } else {
-      const go = () => {
-        el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.72)';
-        el.style.opacity = '.15';
-      };
-      if (window.requestAnimationFrame) window.requestAnimationFrame(go); else setTimeout(go, 16);
-    }
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 720);
-  }
-  /* 舞台横幅：cls 决定样式，lines = [{c:class, t:文本}]，播完自己删。返回元素供挂事件。 */
-  function stageBanner(cls, lines, life) {
-    if (typeof document === 'undefined' || !document.body) return null;
-    const el = document.createElement('div');
-    el.className = cls;
-    el.innerHTML = (lines || []).map(l => '<div class="' + l.c + '">' + escapeHtml(l.t || '') + '</div>').join('');
-    document.body.appendChild(el);
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, life || 2300);
-    return el;
-  }
-  /* 材料名 → 用途配色 class：现读 Config.trade.materials（那里是材料名的唯一定义处），
-   * **不在这里另抄一份名单** —— 抄了就是第二份事实源，改了材料表忘了改这儿就静默失效。
-   * 分工：**字号 = 稀有度（lootTiers），颜色 = 用途（这里）**，两者不重叠。
-   * 区域材料（枯荣种荚等）不进 trade.materials → 拿不到类别 → 不上色（用户 2026-09-13：无所谓）。 */
-  let matCatMap = null;
-  function matClassOf(name) {
-    if (!matCatMap) {
-      matCatMap = Object.create(null);
-      const list = (Config && Config.trade && Config.trade.materials) || [];
-      for (const m of list) if (m && m.name && m.category) matCatMap[m.name] = m.category;
-    }
-    const c = matCatMap[name];
-    if (c === 'evo') return 'loot-c-evo';     // 进化系 · 病绿
-    if (c === 'stone') return 'loot-c-stone'; // 打造 / 功能石 · 暗紫
-    return '';                                 // 腐印、区域材料等：不上色（靠档位字号区分）
-  }
-  /* 🔴 档位 class 与颜色 class **必须在同一个 span 上**：顶档的流光靠 `currentColor` 取色，
-   * 拆成两层（外层档位、内层颜色）的话，外层取到的是继承色而不是装备/材料的颜色 → 金装会变成默认色。 */
-  function addLootEntry(html, tier, colorCls) {
-    if (!UI.consoleLog) return;
-    const t = Math.max(1, Math.min(3, Number(tier) || 1));
-    // 档位 class 用通用的 hi2 / hi3（不是 loot-t*）：鉴定揭晓、打造出 T1、地图掉落预览都要复用同一套
-    const cls = [colorCls || '', t > 1 ? 'hi' + t : ''].filter(Boolean).join(' ');
-    // 掉落消息统一进消息控制台（loot 分类）；时间戳与滚动由控制台负责
-    UI.consoleLog('loot', cls ? '<span class="' + cls + '">' + html + '</span>' : html);
-  }
-  function showLoot(reward) {
-    // 改法一·单池：reward.type ∈ none/material/equipment/egg，一场最多一件。
-    // 仍只保留掉落日志记录（不引入 toast / 中间弹窗）；金装/蛋保留全屏光效。
-    if (!reward || reward.type === 'none') return;
-    if (reward.type === 'material') {
-      const name = reward.material, qty = reward.qty || 1;
-      addLootEntry(`${escapeHtml(name)} ×${qty}`, lootTierOf(name), matClassOf(name));
-      flyToBag(`${name} ×${qty}`, matClassOf(name) === 'loot-c-evo' ? 'is-evo' : '');
-      if (lootTierOf(name) >= 3) {
-        stageBanner('loot-banner', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: name }, { c: 'lb-s', t: '×' + qty }, { c: 'lb-line', t: '' }]);
-      }
-      return;
-    }
-    if (reward.type === 'equipment') {
-      const r = reward.eq.rarity;
-      const q = r.id === 'gold' ? 'fs-q--gold' : (r.id === 'blue' ? 'fs-q--blue' : 'fs-q--white');
-      addLootEntry(`${r.label}·${escapeHtml(reward.eq.name)}`,
-        r.id === 'gold' ? 3 : (r.id === 'blue' ? 2 : 1), 'loot-q ' + q);
-      if (r.id === 'gold') {
-        flashStage('loot-flash-gold', 900); // 金装：全屏金光扫过
-        screenGoldPulse(); // 金装：屏幕边缘金色脉冲
-        if (window.Tips) Tips.show('gold_pulse', '✨ 金装提醒', '出金装时屏幕边缘会闪金光');
-        const banner = stageBanner('loot-banner', [
-          { c: 'lb-k', t: '稀有掉落' },
-          { c: 'lb-n', t: reward.eq.name },
-          { c: 'lb-s', t: r.label },
-          { c: 'lb-action', t: '去背包鉴定 →' },
-          { c: 'lb-line', t: '' }
-        ], 5000);
-        if (banner) {
-          const act = banner.querySelector('.lb-action');
-          if (act) act.style.cursor = 'pointer';
-          banner.addEventListener('click', (e) => {
-            if (e.target === act || (act && act.contains(e.target))) {
-              if (UI.switchPage) UI.switchPage('bag');
-            }
-          });
-        }
-      } else {
-        flyToBag(`${r.label}·${reward.eq.name}`, r.id === 'blue' ? 'is-blue' : '');
-      }
-      return;
-    }
-    if (reward.type === 'egg') {
-      addLootEntry('宠物蛋 ×1（孵化去「背包 → 宠物蛋」）', 3, 'loot-egg');
-      flashStage('loot-flash-blue', 900); // 宠物蛋：幽蓝光扫过
-      stageBanner('loot-banner is-blue', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: '宠物蛋' }, { c: 'lb-s', t: '孵化去「背包 → 宠物蛋」' }, { c: 'lb-line', t: '' }]);
-      return;
-    }
-  }
+  /* 掉落起点 / 飞入演出：已迁出 → `js/ui/ui-battle-loot.js`（`rectOf` / `lootOrigin` / `flyToBag`，2026-09-21） */
+  /* 舞台横幅：已迁出 → `js/ui/ui-stage-fx.js` 的 `StageFx().banner(...)`（2026-09-21） */
+  /* 材料配色 / 掉落播报：已迁出 → `js/ui/ui-battle-loot.js`（2026-09-21） */
+  /* showLoot（掉落播报 + 演出）已迁出 → `js/ui/ui-battle-loot.js`（2026-09-21） */
 
 
   /* ---------- 敌方怪物悬浮提示 → 已迁出到 `js/ui/ui-battle-tip.js`（2026-09-21） ----------
@@ -319,7 +164,7 @@
     /* Boss 出场：名字带「霸主·」前缀（服务端与本地都是这个口径，比 isBoss 字段更可靠）。
      * Boss 是稀有事件（1/1600，保底 2400 场），玩家可能几百场才见一次，不能悄无声息地出现。 */
     if (enemyName && String(enemyName).indexOf('霸主·') === 0) {
-      stageBanner('boss-banner', [
+      StageFx().banner('boss-banner', [
         { c: 'bb-k', t: '霸主降临' },
         { c: 'bb-n', t: String(enemyName).replace(/^霸主·/, '') }
       ], 2300);
@@ -364,19 +209,7 @@
     if (action >= other && pct > 0) el.classList.add('leading');
     else el.classList.remove('leading');
   }
-  // 舞台高光：给 .battle-stage 挂一个短命 class 触发 CSS 动画（震屏/扫光），播完自动摘除
-  function flashStage(cls, ms) {
-    const stage = document.querySelector('#tab-battle .battle-stage');
-    if (!stage || !stage.classList) return;
-    stage.classList.add(cls);
-    setTimeout(() => stage.classList.remove(cls), ms);
-  }
-  // 金装掉落：屏幕四缘金色脉冲（玩家不在战斗页也能余光看到）
-  function screenGoldPulse() {
-    if (typeof document === 'undefined' || !document.body) return;
-    document.body.classList.add('gold-pulse-edge');
-    setTimeout(() => document.body.classList.remove('gold-pulse-edge'), 1200);
-  }
+  // 舞台高光 / 屏幕脉冲：已迁出 → `js/ui/ui-stage-fx.js`（`StageFx().flash` / `StageFx().goldPulse`，2026-09-21）
   /* 冲到对方脸前所需的水平位移：量两个立绘的实际间距，冲掉 78%（留一点间隙，别糊在对方脸上）。
    * 视觉方向：我方在左向右冲（正值），敌方在右向左冲（负值）。
    * ⚠️ 位移量必须这么量：舞台是响应式布局，两个立绘的间距随视口宽度变，写死数值必然对不上。 */
@@ -528,8 +361,8 @@
   // battle.js 结算时调用（伤害/暴击/吸血实际生效那一刻）→ 转飘字；业务计算零改动
   function showDamage(target, damage, type, label) {
     if (type === 'crit') {
-      flashStage('stage-shake', 300); // 暴击：舞台震屏
-      flashStage('crit-impact', 400); // 暴击：屏幕边缘红脉冲
+      StageFx().flash('stage-shake', 300); // 暴击：舞台震屏
+      StageFx().flash('crit-impact', 400); // 暴击：屏幕边缘红脉冲
     }
     // 命中才有痕迹：闪避（miss）与吸血回血（lifesteal，飘在出手者身上）都不播
     // ⚠️ 判存在是必须的：约 30 个测试 harness 只加载 ui-battle.js、没加载 js/fx/hit-fx.js（可选模块写法）
@@ -884,10 +717,8 @@
   UI.renderStats = renderStats;
   // 千分位格式化对外：ui-battle-tip.js 复用同一份（不另写一套，避免两个事实源）
   UI.groupNum = groupNum;
-  UI.showLoot = showLoot;
+  // UI.showLoot / UI.lootTierOf 由 js/ui/ui-battle-loot.js 自己挂（掉落演出已迁出，2026-09-21）
   UI.showIdleSummary = showIdleSummary;
-  // 档位对外：世界地图的「掉落预览」要用同一套（不另抄一份名单 → 不会出现第二份事实源）
-  UI.lootTierOf = lootTierOf;
   UI.resetBattle = resetBattle;
   UI.updateBars = updateBars;
   UI.updateAction = updateAction;
@@ -908,7 +739,7 @@
       icon.classList.add('level-up');
       setTimeout(() => icon.classList.remove('level-up'), 1600);
     }
-    stageBanner('levelup-banner', [
+    StageFx().banner('levelup-banner', [
       { c: 'lu-k', t: 'LEVEL UP' },
       { c: 'lu-n', t: newLevel ? ('Lv.' + newLevel) : '' }
     ], 1900);

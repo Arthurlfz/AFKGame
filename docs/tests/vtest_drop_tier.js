@@ -21,6 +21,8 @@ vm.runInContext(fs.readFileSync('../js/pet/pet.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/ui/ui-common.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/ui/ui-battle.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/ui/ui-battle-tip.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/ui-stage-fx.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/ui-battle-loot.js', 'utf8'), ctx);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 
