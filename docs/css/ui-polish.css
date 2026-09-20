@@ -16,6 +16,22 @@ body { background: var(--bg-deep); color: var(--text); font-family: var(--font-b
   background-color: var(--panel); background-image: var(--ui-paper-texture);
   border-color: var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel);
 }
+/* 面板装饰：四角云纹角饰（2026-09-21，素材 assets/ui/panel/ 由画布出图 → 抠黑底 → 四角镜像）。
+ * 为什么不用 ::after + border-image：那要给这批选择器加 position:relative，
+ * 面板内依赖"未定位祖先"的绝对定位子元素会改以面板为包含块（会跑位）。
+ * 用 background 多层则【零布局改动】，代价是必须把 --ui-paper-texture 一起写回来（整组替换）。
+ * ⚠️ 属性列表条数必须等于图层数（4 角 + --ui-paper-texture 自带的渐变/噪点 2 层 = 6），
+ *    少写会按 CSS 规则循环取值，纸纹层会错位。
+ * ⚠️ 只给"容器类"面板加，不给 .card / .market-item 这类小行——56px 高的角饰压在小卡片上会喧宾夺主。 */
+.panel, .market-group, .dialog-box, .modal-content, .login-panel, .map-select-panel {
+  background-image:
+    url("../assets/ui/panel/角-左上.png"), url("../assets/ui/panel/角-右上.png"),
+    url("../assets/ui/panel/角-左下.png"), url("../assets/ui/panel/角-右下.png"),
+    var(--ui-paper-texture);
+  background-position: left top, right top, left bottom, right bottom, 0 0, 0 0;
+  background-size: 84px 56px, 84px 56px, 84px 56px, 84px 56px, auto, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
 .panel-title, .market-sub-title { color: var(--accent-hi); border-bottom-color: rgb(var(--action-gold-rgb) / .22); font-family: var(--font-title); }
 
 .btn, .btn-sm, .btn-mini, .top-btn, .sb-btn, button {
@@ -292,9 +308,42 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .capital-bg {
   position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;            /* 铺满舞台，消除左右黑边（图 16:9，舞台比例随窗口变，contain 会左右留白露底色） */
-  object-position: center;
+  background: url('../assets/City/frame1.png') no-repeat center center;
+  background-size: cover;
+}
+
+.capital-fire {
+  position: absolute;
+  width: 95px; height: 95px;
+  left: 84.5%; top: 54%;
+  transform: translate(-50%, -50%);
+  background-image: url('../assets/City/fire_sprite.png');
+  background-size: 400% 400%;
+  background-position: 0% 0%;
+  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 2;
+  animation: fire-sprite 1.6s steps(1) infinite;
+}
+@keyframes fire-sprite {
+  0%    { background-position: 0%    0%; }
+  6.25% { background-position: 33.33% 0%; }
+  12.5% { background-position: 66.66% 0%; }
+  18.75%{ background-position: 100%  0%; }
+  25%   { background-position: 0%    33.33%; }
+  31.25%{ background-position: 33.33% 33.33%; }
+  37.5% { background-position: 66.66% 33.33%; }
+  43.75%{ background-position: 100%  33.33%; }
+  50%   { background-position: 0%    66.66%; }
+  56.25%{ background-position: 33.33% 66.66%; }
+  62.5% { background-position: 66.66% 66.66%; }
+  68.75%{ background-position: 100%  66.66%; }
+  75%   { background-position: 0%    100%; }
+  81.25%{ background-position: 33.33% 100%; }
+  87.5% { background-position: 66.66% 100%; }
+  93.75%{ background-position: 100%  100%; }
+  100%  { background-position: 0%    0%; }
 }
 
 /* 建筑热区：名字标签浮在建筑上（点击进入对应功能）

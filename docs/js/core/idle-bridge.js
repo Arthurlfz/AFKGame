@@ -846,13 +846,15 @@
     const hitAt = UI.animateAttack(side) || 320;
     const backMs = UI.attackRecoverMs ? (UI.attackRecoverMs(side) || 0) : 0;
     lastHitAt = hitAt; lastBackMs = backMs;
-    freezeUntil[side] = now + hitAt + backMs;
-    // Pause both visible gauges only until the hit lands. The attacker's own
-    // recovery remains frozen separately, so the other side does not inherit
-    // the extra recovery delay. This is presentation-only.
-    const freezeBothUntil = now + hitAt;
-    freezeUntil.pet = Math.max(freezeUntil.pet, freezeBothUntil);
-    freezeUntil.enemy = Math.max(freezeUntil.enemy, freezeBothUntil);
+    /* 🔴 2026-09-21 用户要求：一次出手的【整段演出】期间，双方行动条都停住
+     *（原话："宠物-过去-挺住-播放出手动画-（同时进度条怪物宠物的都停止）出手清晰可见-
+     *   宠物回到自己的战斗位置，再继续下一轮"）。
+     * ⚠️ 原来只冻到"命中为止"（对方不承担出手方的收招时间），那是为挂机场次做的取舍；
+     *    现在整段冻结，出刀数不受影响 —— 下面的 costOf 已同步改成"双方刀数一起算冻结成本"，
+     *    行动条定速会把这段扣掉后重排（脚本刀数才是权威，画面只是把刀铺满时间轴）。 */
+    const perfUntil = now + hitAt + backMs;
+    freezeUntil.pet = Math.max(freezeUntil.pet, perfUntil);
+    freezeUntil.enemy = Math.max(freezeUntil.enemy, perfUntil);
     const run = function () {
       if (!active || waitingHeal) return;
       // 怪已下场（本场已切走/换怪/停演）→ 这刀作废。
@@ -1221,14 +1223,15 @@
      * 本场剧本时间轴上 —— 条满 → 出刀 → 掉血，不再出现「行动条还没跑满怪就死了」。
      * 老剧本没有刀数时退回速度公式。 */
     const remainMs = Math.max(1, (scriptT0 + f.t1) - now);
-    /* ⚠️ 定速必须扣掉冻结开销：出手期间行动条是冻住的（己方 hitAt+backMs，
-     * 对方出手还要再冻 hitAt）。用「本场总时长」当预算会算出过慢的速度，
+    /* ⚠️ 定速必须扣掉冻结开销：出手期间【双方】行动条都冻住整段演出（hitAt + backMs）。用「本场总时长」当预算会算出过慢的速度，
      * 结果刀还没出完时间就耗尽 → 怪还剩一截血、刀在半空，被 t1 强杀。
      * 这里按「剩余刀数各自的冻结成本」倒推真正能涨条的时间。
      * ×0.85 安全余量（2026-09-09 日志实证）：冻结成本用 stale 的 lastHitAt 估算，
      * 实际 hitAt 随屏宽浮动，估满不减就会"永远差最后一刀"被 t1 兜底 ——
      * 预算打 85 折让每刀略早出，宁可打完站着等 0.x 秒，也不让刀被计时器掐掉。 */
-    const costOf = (mine, other) => mine * (lastHitAt + lastBackMs) + other * lastHitAt;
+    /* 每次出手（无论谁出的）都会把【双方】行动条一起冻住整段演出 ⇒ 成本 = 双方剩余刀数之和 × 单段演出时长。
+     * （2026-09-21 改成"整段冻结"后同步改的：原来只冻到命中，所以对方只承担 hitAt。） */
+    const costOf = (mine, other) => (mine + other) * (lastHitAt + lastBackMs);
     if (now >= freezeUntil.pet) {
       gauge.pet += (showPlan && showPlan.petHits > 0)
         ? dt * 100 * Math.max(1, showPlan.petLeft) /

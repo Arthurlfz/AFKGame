@@ -34,16 +34,13 @@
     if (!el) return false;
     const n = pureName(name);
     el.dataset.pet = n;
+    // ⚠️ 2026-09-21：这里原来要给「受击轮廓闪光层」写 `--sprite`（用它当 mask-image 的遮罩）。
+    // 命中特效改用素材版（脚底墨爆 `.hit-fx`）之后那层已删 ⇒ `--sprite` 整条链路
+    // （CSS 的 mask-image + 这里的写入）一起清掉，**别留死代码**（守值会盯着）。
     if (PetSprites && PetSprites.mountAnimated(el, n)) return true;
     if (PetSprites && PetSprites.mount(el, n)) {
       const img = el.firstElementChild;
-      if (img) {
-        img.classList.add('pet-breathe'); // 静态立绘走 CSS 待机呼吸
-        // 立绘 URL 存到容器上，受击闪光层用它做遮罩（闪光形状 = 角色轮廓，不是糊一个方框）。
-        // 用 img.src 而不是相对路径：img.src 是浏览器解析后的绝对 URL，
-        // 自定义属性里的相对 url() 会被按样式表目录解析（踩过 /css/assets/... 404 的坑）。
-        el.style.setProperty('--sprite', 'url("' + img.src + '")');
-      }
+      if (img) img.classList.add('pet-breathe'); // 静态立绘走 CSS 待机呼吸
       return true;
     }
     el.textContent = '';
@@ -541,11 +538,24 @@
     const foe = attacker === 'pet' ? $('enemy-icon') : $('pet-icon');
     if (!icon) { lastBackMs = 0; return 0; }
     const pace = paceOf(attacker);
-    holdMs = holdMs || 0; lastBackMs = Math.round(pace.back * 1000) + holdMs;
+    holdMs = holdMs || 0;
+    /* 「滞空挥爪」时长 = 逐帧攻击素材自己的时长：冲到脸上后**停住挥完再退**。
+     * 静态立绘没有"挥爪"这个过程 ⇒ 滞空 0，行为与以前完全一致（不影响到没有动画的宠/怪）。 */
+    const node = icon.querySelector ? icon.querySelector('.pet-anim') : null;
+    const anim = (node && window.PetSprites && PetSprites.animOf) ? PetSprites.animOf(node.dataset.petName) : null;
+    const atkDurMs = (anim && anim.attack && parseFloat(anim.attack.dur))
+      ? Math.round(parseFloat(anim.attack.dur) * 1000) : 0;
+    /* 归位时长必须把【滞空】算进去：battle.js / idle-bridge 拿它冻结行动条。
+     * 漏掉的话会出现注释里警告过的错位——"人还贴在怪脸上，下一手已经在原地蓄力"。
+     * ⚠️ 托管挂机的行动条定速会「扣掉冻结开销」（idle-bridge 的 costOf），所以挂机模式下
+     *    这笔滞空不影响出刀数，只是把每刀重新铺在时间轴上。 */
+    lastBackMs = Math.round(pace.back * 1000) + holdMs + atkDurMs;
     const dashMs = setDashDistance(icon, foe, attacker, pace.speed);
     icon.style.setProperty('--dash-charge', (pace.charge / 1000).toFixed(3) + 's');
     icon.style.setProperty('--dash-back', pace.back.toFixed(3) + 's');
-    /* 前摇（蓄力压扁）→ 扑击（冲到对方脸上）→ 后摇（收招回位）。
+    // 滞空：CSS 把"回退"动画往后推这么久 ⇒ 冲到脸上先停住挥完，再退回来
+    icon.style.setProperty('--dash-hold', (atkDurMs / 1000).toFixed(3) + 's');
+    /* 前摇（蓄力压扁）→ 扑击（冲到对方脸上）→ 滞空挥爪 → 后摇（收招回位）。
      * 连击时必须先摘掉旧 class 并强制重排：同名 class 的 CSS 动画不会自己重播，
      * 不重排的话第二次出手会丢掉前摇动作，只剩一段位移。 */
     clearTimeout(icon.__chargeT);
@@ -556,13 +566,26 @@
     icon.__chargeT = setTimeout(() => {
       icon.classList.remove('charging');
       icon.classList.add('attacking');
-      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'), dashMs + holdMs + pace.back * 1000);
+      icon.__attackT = setTimeout(() => icon.classList.remove('attacking'),
+        dashMs + holdMs + atkDurMs + pace.back * 1000);
     }, pace.charge);
-    // 逐帧动画立绘：有攻击帧则切换播一遍（无则维持现有 CSS 突进+刀光）
-    const node = icon && icon.querySelector('.pet-anim');
-    if (node && PetSprites && PetSprites.setAnim) {
-      PetSprites.setAnim(node, 'attack');
-      setTimeout(() => { if (node.isConnected) PetSprites.setAnim(node, 'idle'); }, 850);
+    /* 逐帧动画立绘：攻击帧必须等【冲到对方脸上】才播。
+     * 🔴 2026-09-21 用户要求："跑到怪物脸上之后才播放出手动作"、"停在怪脸上挥完再退" ——
+     *    起手就播的话，玩家看到的是"在原地挥爪子、爪子打在空气里"，冲刺位移成了白演。
+     * 时刻 = 前摇 + 冲刺（就是本函数最后 return 的"命中时刻"，与伤害结算同一刻度，不另算一份）；
+     * "退回原位"由上面的 --dash-hold 推到挥完之后 ⇒ 观感 = 冲过去 → 在脸上挥完 → 再退。 */
+    if (node && window.PetSprites && PetSprites.setAnim && atkDurMs) {
+      const contactMs = pace.charge + dashMs;
+      clearTimeout(icon.__animAtkT);
+      clearTimeout(icon.__animBackT);
+      icon.__animAtkT = setTimeout(() => {
+        if (!node.isConnected) return;
+        PetSprites.setAnim(node, 'attack');
+        // 挥完（+一点停留）再切回待机；时长同样取素材自己的 dur，不写死
+        icon.__animBackT = setTimeout(() => {
+          if (node.isConnected) PetSprites.setAnim(node, 'idle');
+        }, atkDurMs + 120);
+      }, contactMs);
     }
     // 命中时刻（前摇结束 + 冲到对方脸上）：伤害结算与受击特效都对齐这一刻，
     // 由调用方决定怎么用，表现层不写死——前摇按类型、冲刺按距离，都是变的。
@@ -578,6 +601,51 @@
     const cls = isCrit ? 'crit-hit' : 'hit';
     icon.classList.add(cls);
     icon.__hitT = setTimeout(() => icon.classList.remove('hit', 'crit-hit'), isCrit ? 440 : 320);
+  }
+
+  /* ---------- 命中特效：脚底墨爆（2026-09-21 新增） ----------
+   * 素材 assets/effects/hit-ink/命中墨爆.png = 9 帧 × 256 的横向帧条（透明底）。
+   * 🔴 必须用 JS 定时器逐帧写 background-position-x（**像素**值）：不能走 CSS animation ——
+   *    design-tokens.css / market-cascade.css 有
+   *    `@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important; iteration-count:1!important}}`，
+   *    开了「减少动态效果」的机器上动画会被压成静帧（逐帧立绘 2026-09-21 就是这么翻车的，且那是 *{} + !important，盖不住）。
+   * 🔴 图片 URL 必须由 JS 写内联 background-image：CSS 自定义属性里的相对 url() 会按样式表所在目录 css/ 解析 → 404 全白。
+   * 位置/裁框见 game.css 的 .hit-fx；连击时先清旧元素与旧定时器，避免叠成一坨。 */
+  const FX_SRC = 'assets/effects/hit-ink/命中墨爆.png'; // 相对 docs/
+  const FX_FRAMES = 9;
+  /* 节奏 = 出手者攻击素材自己的时长（不写死），换素材 / 改 attack.dur 自动跟着走：
+   * 9 帧里第 5~6 帧（≈2/3 处）炸开，正对攻击素材后 3 格的下劈。
+   * ⚠️ 兜底 800ms：静态立绘的宠与怪都没有逐帧攻击素材（45ms/帧 = 405ms 太短，用户反馈看不清）。 */
+  const FX_DEFAULT_MS = 800;
+  function fxDurationMs(attacker) {
+    const icon = attacker === 'pet' ? $('pet-icon') : $('enemy-icon');
+    const node = icon && icon.querySelector ? icon.querySelector('.pet-anim') : null;
+    const anim = (node && window.PetSprites && PetSprites.animOf) ? PetSprites.animOf(node.dataset.petName) : null;
+    const d = anim && anim.attack && parseFloat(anim.attack.dur);
+    return d > 0 ? Math.round(d * 1000) : FX_DEFAULT_MS;
+  }
+  function playFx(target) {
+    const host = target === 'pet' ? $('pet-icon') : $('enemy-icon');
+    if (!host) return;
+    clearInterval(host.__fxT);
+    if (host.__fxEl) { host.__fxEl.remove(); host.__fxEl = null; }
+    const el = document.createElement('div');
+    el.className = 'hit-fx';
+    el.style.backgroundImage = 'url("' + FX_SRC + '")';
+    el.style.backgroundSize = (FX_FRAMES * 100) + '% 100%';
+    host.appendChild(el);
+    host.__fxEl = el;
+    // 出手者是"被打中者的对面"：打中敌人 ⇒ 我方出手；打中我方 ⇒ 敌方出手
+    const frameMs = Math.max(30, Math.round(fxDurationMs(target === 'pet' ? 'enemy' : 'pet') / FX_FRAMES));
+    let k = 0;
+    const step = () => {
+      if (!el.isConnected) { clearInterval(host.__fxT); host.__fxEl = null; return; } // 怪下场/切页兜底
+      if (k >= FX_FRAMES) { clearInterval(host.__fxT); el.remove(); host.__fxEl = null; return; }
+      el.style.backgroundPositionX = (-k * el.clientWidth) + 'px'; // 必须像素：百分比是按整张 9 格帧条算的
+      k++;
+    };
+    step();
+    host.__fxT = setInterval(step, frameMs);
   }
   // 战斗飘字：在目标头像上方弹带类型标签的数字（攻击：-X / 暴击：-X / 吸血：+X）
   // 普通白 / 暴击亮红大20% / 吸血暗绿侧边；同一目标同时最多 3 个，超出延迟 120ms 排队；
@@ -610,6 +678,8 @@
       flashStage('stage-shake', 300); // 暴击：舞台震屏
       flashStage('crit-impact', 400); // 暴击：屏幕边缘红脉冲
     }
+    // 命中才有痕迹：闪避（miss）与吸血回血（lifesteal，飘在出手者身上）都不播
+    if (type !== 'miss' && type !== 'lifesteal') playFx(target);
     // label：自定义飘字标签（如主动技能名"腐蚀喷吐：-1500"）；吸血固定右侧错位
     showFloatingText(target, damage, type || 'normal', type === 'lifesteal' ? { side: 'right' } : (label ? { label: label } : null));
   }

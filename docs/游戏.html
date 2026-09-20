@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -22,15 +22,15 @@
 <link rel="stylesheet" href="css/design-tokens.css?v=20260917font2">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260919dot3">
-<link rel="stylesheet" href="css/game.css?v=20260919dot">
+<link rel="stylesheet" href="css/game.css?v=20260921fx3">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260920help">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260921corn1">
 <!-- 全局动效基线层（按下/悬浮/浮层/列表入场；各系统专属演出仍在各自 css） -->
 <link rel="stylesheet" href="css/motion.css?v=20260916m3">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260917fix1">
 <link rel="stylesheet" href="css/market-refresh.css?v=20260912gem3">
 <link rel="stylesheet" href="css/market-cascade.css?v=20260910mt2">
-<link rel="stylesheet" href="css/shop.css?v=20260912gem3">
+<link rel="stylesheet" href="css/shop.css?v=20260920shelf">
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
@@ -281,7 +281,8 @@
           </div>
           <!-- 主城全景舞台：底图 + 动效层 + 建筑热区（ui-capital.js 渲染热区，DOM 常驻） -->
           <div class="capital-stage" id="capital-stage">
-            <img class="capital-bg" id="capital-bg" src="assets/City/City.png" alt="不归城">
+            <div class="capital-bg" id="capital-bg"></div>
+            <div class="capital-fire" id="capital-fire"></div>
             <!-- 建筑热区容器（渲染坐标由 ui-capital.js 决定） -->
             <div class="capital-buildings" id="capital-buildings"></div>
             <!-- 悬停信息卡（跟随建筑显示） -->
@@ -1019,32 +1020,37 @@
 <!-- 模块加载顺序 = 依赖方向：SDK → config → supabase → equipment → pet → items → materials → drop → market → equipment_craft → salvage → pet_merge → skill → battle → ui(common→shell→login→dialog→各页面) → main -->
 <!-- UI 已按页面/组件拆分到 js/ui/：common(通用+renderAll枢纽) → shell(外壳/导航) → login(登录页) → dialog(气泡) → battle / pet / equipment / craft / market -->
 <script src="js/vendor/supabase.min.js?v=cf529fe8"></script>
-<script src="js/core/config.js?v=20260918damp1"></script>
+<script src="js/core/config.js?v=20260920godsub3"></script>
 <!-- PetSprites 内联（绕过单独 js 加载/缓存问题：之前 pet-sprites.js 浏览器拉不到导致头像回退 emoji） -->
 <script>/* PetSprites 内联 (从 pet-sprites.js 自动生成) */
 window.PetSprites = {
-  V: "20260915n",
+  V: "20260921-godfox3",
   pathOf: function (n) { if (!n) return null; var p = this.map[n] || (n.indexOf("·异变") > 0 ? this.map[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
   avatarOf: function (n) { if (!n) return null; var p = this.avatarMap[n] || (n.indexOf("·异变") > 0 ? this.avatarMap[n.replace("·异变", "")] : null); return p ? p + "?v=" + this.V : null; },
   elm: function (n) { var p = this.pathOf(n); if (!p) return null; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-sprite"; return img; },
   mount: function (el, n) { if (!el) return false; var img = this.elm(n); if (!img) return false; el.textContent = ""; el.appendChild(img); return true; },
   mountAvatar: function (el, n) { if (!el) return false; var p = this.avatarOf(n); if (!p) return false; el.textContent = ""; var img = document.createElement("img"); img.src = p; img.alt = n || ""; img.className = "pet-avatar-sprite"; el.appendChild(img); return true; },
   animOf: function (n) { if (!n) return null; return this.animMap[n] || (n.indexOf("·异变") > 0 ? this.animMap[n.replace("·异变", "")] : null); },
-  paintAnim: function (d, x) { d.style.backgroundImage = "url('" + x.sheet + "?v=" + this.V + "')"; d.style.setProperty("--af", x.frames); d.style.setProperty("--steps", x.frames); d.style.setProperty("--dur", x.dur || "1.6s"); },
-  restartAnim: function (d) { d.style.animation = "none"; void d.offsetWidth; d.style.animation = ""; },
-  makeAnimNode: function (a, act) { var x = a[act] || a.idle; if (!x || !x.sheet) return null; var d = document.createElement("div"); d.className = "pet-anim"; d.dataset.anim = act; this.paintAnim(d, x); return d; },
-  ANIM_ENABLED: false,
-  mountAnimated: function (el, n) { if (!el || !this.ANIM_ENABLED) return false; var a = this.animOf(n); if (!a || !a.idle) return false; var node = this.makeAnimNode(a, "idle"); if (!node) return false; node.dataset.petName = n; el.textContent = ""; el.appendChild(node); return true; },
-  setAnim: function (node, act) { if (!node || !act || node.dataset.anim === act) return; var a = node.dataset.petName && this.animOf(node.dataset.petName); if (!a || !a[act]) return; node.dataset.anim = act; this.paintAnim(node, a[act]); this.restartAnim(node); },
-  map: {"墨灵":"assets/pets/pack9-moyuan/墨灵.png","墨影":"assets/pets/pack9-moyuan/墨影.png","墨煞":"assets/pets/pack9-moyuan/墨煞.png","墨渊魔君":"assets/pets/pack9-moyuan/墨渊魔君.png","腐噜兽":"assets/pets/pack0-base/monster-00.png","血狐":"assets/pets/pack0-base/monster-01.png","瘟熊":"assets/pets/pack0-base/monster-02.png","疫毛兽":"assets/pets/pack0-base/monster-03.png","骨狼":"assets/pets/pack0-base/monster-04.png","毒沼蛙":"assets/pets/pack0-base/monster-05.png","尸犬":"assets/pets/pack0-base/monster-06.png","幽影兔":"assets/pets/pack0-base/monster-07.png","血牙狐":"assets/pets/pack1-bloodfox/monster-00.png","幽火狐":"assets/pets/pack1-bloodfox/monster-01.png","血灾领主":"assets/pets/pack1-bloodfox/monster-02.png","幽火王":"assets/pets/pack1-bloodfox/monster-03.png","血月魔狐":"assets/pets/pack1-bloodfox/monster-04.png","幽火魔狐":"assets/pets/pack1-bloodfox/monster-05.png","血狐·异变":"assets/pets/pack1-bloodfox/monster-06.png","骨刃狼":"assets/pets/pack2-bonewolf/monster-00.png","冥霜狼":"assets/pets/pack2-bonewolf/monster-01.png","骨刃王":"assets/pets/pack2-bonewolf/monster-02.png","霜狼祭司":"assets/pets/pack2-bonewolf/monster-03.png","骸骨君主":"assets/pets/pack2-bonewolf/monster-04.png","霜寒领主":"assets/pets/pack2-bonewolf/monster-05.png","骨狼·异变":"assets/pets/pack2-bonewolf/monster-06.png","影刃兔":"assets/pets/pack3-shadowrabbit/monster-00.png","霜影兔":"assets/pets/pack3-shadowrabbit/monster-01.png","影舞者":"assets/pets/pack3-shadowrabbit/monster-02.png","霜影魔兔":"assets/pets/pack3-shadowrabbit/monster-03.png","影蚀魔君":"assets/pets/pack3-shadowrabbit/monster-04.png","霜魂兔皇":"assets/pets/pack3-shadowrabbit/monster-05.png","幽影兔·异变":"assets/pets/pack3-shadowrabbit/monster-06.png","瘟甲熊":"assets/pets/pack4-plaguebear/monster-00.png","血瘟熊":"assets/pets/pack4-plaguebear/monster-01.png","瘟神巨熊":"assets/pets/pack4-plaguebear/monster-02.png","血疫暴君":"assets/pets/pack4-plaguebear/monster-03.png","瘟疫之主":"assets/pets/pack4-plaguebear/monster-04.png","血瘟暴君":"assets/pets/pack4-plaguebear/monster-05.png","瘟熊·异变":"assets/pets/pack4-plaguebear/monster-06.png","腐沼兽":"assets/pets/pack5-rotten/monster-00.png","毒噜兽":"assets/pets/pack5-rotten/monster-01.png","腐沼王":"assets/pets/pack5-rotten/monster-02.png","毒沼霸主":"assets/pets/pack5-rotten/monster-03.png","腐烂之母":"assets/pets/pack5-rotten/monster-04.png","剧毒魔君":"assets/pets/pack5-rotten/monster-05.png","疫刺兽":"assets/pets/pack6-plaguecat/monster-00.png","冥毛兽":"assets/pets/pack6-plaguecat/monster-01.png","疫魔刺龙":"assets/pets/pack6-plaguecat/monster-02.png","冥幽兽":"assets/pets/pack6-plaguecat/monster-03.png","刺骨魔兽":"assets/pets/pack6-plaguecat/monster-04.png","幽冥疫君":"assets/pets/pack6-plaguecat/monster-05.png","毒沼王":"assets/pets/pack7-bogfrog/monster-00.png","咒沼蛙":"assets/pets/pack7-bogfrog/monster-01.png","毒沼魔君":"assets/pets/pack7-bogfrog/monster-02.png","咒毒蛙王":"assets/pets/pack7-bogfrog/monster-03.png","剧毒魔神":"assets/pets/pack7-bogfrog/monster-04.png","深渊蛙帝":"assets/pets/pack7-bogfrog/monster-05.png","尸牙犬":"assets/pets/pack8-corpsehound/monster-00.png","幽灵犬":"assets/pets/pack8-corpsehound/monster-01.png","尸魔犬王":"assets/pets/pack8-corpsehound/monster-02.png","幽冥猎犬":"assets/pets/pack8-corpsehound/monster-03.png","尸界狱主":"assets/pets/pack8-corpsehound/monster-04.png","幽魂犬皇":"assets/pets/pack8-corpsehound/monster-05.png","腐噜兽·异变":"assets/pets/mut1-rotten/mut-00.png","腐沼兽·异变":"assets/pets/mut1-rotten/mut-01.png","毒噜兽·异变":"assets/pets/mut1-rotten/mut-02.png","腐沼王·异变":"assets/pets/mut1-rotten/mut-03.png","毒沼霸主·异变":"assets/pets/mut1-rotten/mut-04.png","腐烂之母·异变":"assets/pets/mut1-rotten/mut-05.png","剧毒魔君·异变":"assets/pets/mut1-rotten/mut-06.png","腐界母神":"assets/pets/pack5-rotten/monster-04.png","血月神狐":"assets/pets/pack1-bloodfox/monster-04.png","疫神巨像":"assets/pets/pack4-plaguebear/monster-04.png","万刺冥神":"assets/pets/pack6-plaguecat/monster-04.png","骸骨神狼":"assets/pets/pack2-bonewolf/monster-04.png","毒渊神蟾":"assets/pets/pack7-bogfrog/monster-04.png","狱门神犬":"assets/pets/pack8-corpsehound/monster-04.png","霜月神兔":"assets/pets/pack3-shadowrabbit/monster-04.png"},
-  animMap: {"影刃兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-attack.png",frames:6,dur:"0.7s"}},"霜影兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-attack.png",frames:6,dur:"0.7s"}}},
-  avatarMap: {"墨灵":"assets/pets/avatars/pack9-moyuan/墨灵.png","墨影":"assets/pets/avatars/pack9-moyuan/墨影.png","墨煞":"assets/pets/avatars/pack9-moyuan/墨煞.png","墨渊魔君":"assets/pets/avatars/pack9-moyuan/墨渊魔君.png","腐噜兽":"assets/pets/avatars/pack0-base/腐噜兽.png","血狐":"assets/pets/avatars/pack0-base/血狐.png","瘟熊":"assets/pets/avatars/pack0-base/瘟熊.png","疫毛兽":"assets/pets/avatars/pack0-base/疫毛兽.png","骨狼":"assets/pets/avatars/pack0-base/骨狼.png","毒沼蛙":"assets/pets/avatars/pack0-base/毒沼蛙.png","尸犬":"assets/pets/avatars/pack0-base/尸犬.png","幽影兔":"assets/pets/avatars/pack0-base/幽影兔.png","血牙狐":"assets/pets/avatars/pack1-bloodfox/血牙狐.png","幽火狐":"assets/pets/avatars/pack1-bloodfox/幽火狐.png","血灾领主":"assets/pets/avatars/pack1-bloodfox/血灾领主.png","幽火王":"assets/pets/avatars/pack1-bloodfox/幽火王.png","血月魔狐":"assets/pets/avatars/pack1-bloodfox/血月魔狐.png","幽火魔狐":"assets/pets/avatars/pack1-bloodfox/幽火魔狐.png","血狐·异变":"assets/pets/avatars/pack1-bloodfox/血狐·异变.png","骨刃狼":"assets/pets/avatars/pack2-bonewolf/骨刃狼.png","冥霜狼":"assets/pets/avatars/pack2-bonewolf/冥霜狼.png","骨刃王":"assets/pets/avatars/pack2-bonewolf/骨刃王.png","霜狼祭司":"assets/pets/avatars/pack2-bonewolf/霜狼祭司.png","骸骨君主":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","霜寒领主":"assets/pets/avatars/pack2-bonewolf/霜寒领主.png","骨狼·异变":"assets/pets/avatars/pack2-bonewolf/骨狼·异变.png","影刃兔":"assets/pets/avatars/pack3-shadowrabbit/影刃兔.png","霜影兔":"assets/pets/avatars/pack3-shadowrabbit/霜影兔.png","影舞者":"assets/pets/avatars/pack3-shadowrabbit/影舞者.png","霜影魔兔":"assets/pets/avatars/pack3-shadowrabbit/霜影魔兔.png","影蚀魔君":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png","霜魂兔皇":"assets/pets/avatars/pack3-shadowrabbit/霜魂兔皇.png","幽影兔·异变":"assets/pets/avatars/pack3-shadowrabbit/幽影兔·异变.png","瘟甲熊":"assets/pets/avatars/pack4-plaguebear/瘟甲熊.png","血瘟熊":"assets/pets/avatars/pack4-plaguebear/血瘟熊.png","瘟神巨熊":"assets/pets/avatars/pack4-plaguebear/瘟神巨熊.png","血疫暴君":"assets/pets/avatars/pack4-plaguebear/血疫暴君.png","瘟疫之主":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","血瘟暴君":"assets/pets/avatars/pack4-plaguebear/血瘟暴君.png","瘟熊·异变":"assets/pets/avatars/pack4-plaguebear/瘟熊·异变.png","腐沼兽":"assets/pets/avatars/pack5-rotten/腐沼兽.png","毒噜兽":"assets/pets/avatars/pack5-rotten/毒噜兽.png","腐沼王":"assets/pets/avatars/pack5-rotten/腐沼王.png","毒沼霸主":"assets/pets/avatars/pack5-rotten/毒沼霸主.png","腐烂之母":"assets/pets/avatars/pack5-rotten/腐烂之母.png","剧毒魔君":"assets/pets/avatars/pack5-rotten/剧毒魔君.png","疫刺兽":"assets/pets/avatars/pack6-plaguecat/疫刺兽.png","冥毛兽":"assets/pets/avatars/pack6-plaguecat/冥毛兽.png","疫魔刺龙":"assets/pets/avatars/pack6-plaguecat/疫魔刺龙.png","冥幽兽":"assets/pets/avatars/pack6-plaguecat/冥幽兽.png","刺骨魔兽":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","幽冥疫君":"assets/pets/avatars/pack6-plaguecat/幽冥疫君.png","毒沼王":"assets/pets/avatars/pack7-bogfrog/毒沼王.png","咒沼蛙":"assets/pets/avatars/pack7-bogfrog/咒沼蛙.png","毒沼魔君":"assets/pets/avatars/pack7-bogfrog/毒沼魔君.png","咒毒蛙王":"assets/pets/avatars/pack7-bogfrog/咒毒蛙王.png","剧毒魔神":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","深渊蛙帝":"assets/pets/avatars/pack7-bogfrog/深渊蛙帝.png","尸牙犬":"assets/pets/avatars/pack8-corpsehound/尸牙犬.png","幽灵犬":"assets/pets/avatars/pack8-corpsehound/幽灵犬.png","尸魔犬王":"assets/pets/avatars/pack8-corpsehound/尸魔犬王.png","幽冥猎犬":"assets/pets/avatars/pack8-corpsehound/幽冥猎犬.png","尸界狱主":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","幽魂犬皇":"assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png","腐噜兽·异变":"assets/pets/avatars/mut1-rotten/腐噜兽·异变.png","腐沼兽·异变":"assets/pets/avatars/mut1-rotten/腐沼兽·异变.png","毒噜兽·异变":"assets/pets/avatars/mut1-rotten/毒噜兽·异变.png","腐沼王·异变":"assets/pets/avatars/mut1-rotten/腐沼王·异变.png","毒沼霸主·异变":"assets/pets/avatars/mut1-rotten/毒沼霸主·异变.png","腐烂之母·异变":"assets/pets/avatars/mut1-rotten/腐烂之母·异变.png","剧毒魔君·异变":"assets/pets/avatars/mut1-rotten/剧毒魔君·异变.png","腐界母神":"assets/pets/avatars/pack5-rotten/腐烂之母.png","血月神狐":"assets/pets/avatars/pack1-bloodfox/血月魔狐.png","疫神巨像":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","万刺冥神":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","骸骨神狼":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","毒渊神蟾":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","狱门神犬":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","霜月神兔":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png"}
+  stripOf: function (d) { if (!d) return null; var s = d.firstElementChild; if (s && s.className === "pet-anim-strip") return s; s = document.createElement("div"); s.className = "pet-anim-strip"; d.appendChild(s); return s; },
+  playFrames: function (s, f, dur, once) { this.stopFrames(s); var ms = ((parseFloat(dur) || 1.6) * 1000) / f, i = 0; s.__frameTimer = setInterval(function () { if (!s.isConnected) { clearInterval(s.__frameTimer); s.__frameTimer = null; return; } var box = s.parentNode, w = box ? (box.clientWidth || box.getBoundingClientRect().width) : 0; if (!w) return; var k = once ? Math.min(i, f - 1) : (i % f); s.style.transform = "translateX(" + (-k * w) + "px)"; i++; if (once && i >= f) { clearInterval(s.__frameTimer); s.__frameTimer = null; } }, ms); },
+  stopFrames: function (s) { if (s && s.__frameTimer) { clearInterval(s.__frameTimer); s.__frameTimer = null; } },
+  paintAnim: function (d, x, act) { var s = this.stripOf(d); if (!s) return; var u = "url('" + x.sheet + "?v=" + this.V + "')"; var same = (s.style.backgroundImage === u); s.style.backgroundImage = u; s.style.width = (x.frames * 100) + "%"; if (same && s.__frameTimer && act !== "attack") return; this.playFrames(s, x.frames, x.dur || "1.6s", act === "attack"); },
+  restartAnim: function (d) { var s = d && d.firstElementChild; if (!s) return; s.style.transform = "translateX(0)"; void d.offsetWidth; },
+  makeAnimNode: function (a, act) { var x = a[act] || a.idle; if (!x || !x.sheet) return null; var d = document.createElement("div"); d.className = "pet-anim"; d.dataset.anim = act; this.paintAnim(d, x, act); return d; },
+  ANIM_ENABLED: true,
+  mountAnimated: function (el, n) { if (!el) return false; if (!this.ANIM_ENABLED) return false; var a = this.animOf(n); if (!a || !a.idle) return false; var cur = el.querySelector ? el.querySelector(".pet-anim") : null; if (cur && cur.dataset.petName === n) { var old = cur.firstElementChild; if (old && old.__frameTimer) return true; } var node = this.makeAnimNode(a, "idle"); if (!node) return false; node.dataset.petName = n; el.textContent = ""; el.appendChild(node); return true; },
+  setAnim: function (node, act) { if (!node || !act || node.dataset.anim === act) return; var a = node.dataset.petName && this.animOf(node.dataset.petName); if (!a || !a[act]) return; node.dataset.anim = act; this.paintAnim(node, a[act], act); this.restartAnim(node); },
+  map: {"墨灵":"assets/pets/pack9-moyuan/墨灵.png","墨影":"assets/pets/pack9-moyuan/墨影.png","墨煞":"assets/pets/pack9-moyuan/墨煞.png","墨渊魔君":"assets/pets/pack9-moyuan/墨渊魔君.png","腐噜兽":"assets/pets/pack0-base/monster-00.png","血狐":"assets/pets/pack0-base/monster-01.png","瘟熊":"assets/pets/pack0-base/monster-02.png","疫毛兽":"assets/pets/pack0-base/monster-03.png","骨狼":"assets/pets/pack0-base/monster-04.png","毒沼蛙":"assets/pets/pack0-base/monster-05.png","尸犬":"assets/pets/pack0-base/monster-06.png","幽影兔":"assets/pets/pack0-base/monster-07.png","血牙狐":"assets/pets/pack1-bloodfox/monster-00.png","幽火狐":"assets/pets/pack1-bloodfox/monster-01.png","血灾领主":"assets/pets/pack1-bloodfox/monster-02.png","幽火王":"assets/pets/pack1-bloodfox/monster-03.png","血月魔狐":"assets/pets/pack1-bloodfox/monster-04.png","幽火魔狐":"assets/pets/pack1-bloodfox/monster-05.png","血狐·异变":"assets/pets/pack1-bloodfox/monster-06.png","骨刃狼":"assets/pets/pack2-bonewolf/monster-00.png","冥霜狼":"assets/pets/pack2-bonewolf/monster-01.png","骨刃王":"assets/pets/pack2-bonewolf/monster-02.png","霜狼祭司":"assets/pets/pack2-bonewolf/monster-03.png","骸骨君主":"assets/pets/pack2-bonewolf/monster-04.png","霜寒领主":"assets/pets/pack2-bonewolf/monster-05.png","骨狼·异变":"assets/pets/pack2-bonewolf/monster-06.png","影刃兔":"assets/pets/pack3-shadowrabbit/monster-00.png","霜影兔":"assets/pets/pack3-shadowrabbit/monster-01.png","影舞者":"assets/pets/pack3-shadowrabbit/monster-02.png","霜影魔兔":"assets/pets/pack3-shadowrabbit/monster-03.png","影蚀魔君":"assets/pets/pack3-shadowrabbit/monster-04.png","霜魂兔皇":"assets/pets/pack3-shadowrabbit/monster-05.png","幽影兔·异变":"assets/pets/pack3-shadowrabbit/monster-06.png","瘟甲熊":"assets/pets/pack4-plaguebear/monster-00.png","血瘟熊":"assets/pets/pack4-plaguebear/monster-01.png","瘟神巨熊":"assets/pets/pack4-plaguebear/monster-02.png","血疫暴君":"assets/pets/pack4-plaguebear/monster-03.png","瘟疫之主":"assets/pets/pack4-plaguebear/monster-04.png","血瘟暴君":"assets/pets/pack4-plaguebear/monster-05.png","瘟熊·异变":"assets/pets/pack4-plaguebear/monster-06.png","腐沼兽":"assets/pets/pack5-rotten/monster-00.png","毒噜兽":"assets/pets/pack5-rotten/monster-01.png","腐沼王":"assets/pets/pack5-rotten/monster-02.png","毒沼霸主":"assets/pets/pack5-rotten/monster-03.png","腐烂之母":"assets/pets/pack5-rotten/monster-04.png","剧毒魔君":"assets/pets/pack5-rotten/monster-05.png","疫刺兽":"assets/pets/pack6-plaguecat/monster-00.png","冥毛兽":"assets/pets/pack6-plaguecat/monster-01.png","疫魔刺龙":"assets/pets/pack6-plaguecat/monster-02.png","冥幽兽":"assets/pets/pack6-plaguecat/monster-03.png","刺骨魔兽":"assets/pets/pack6-plaguecat/monster-04.png","幽冥疫君":"assets/pets/pack6-plaguecat/monster-05.png","毒沼王":"assets/pets/pack7-bogfrog/monster-00.png","咒沼蛙":"assets/pets/pack7-bogfrog/monster-01.png","毒沼魔君":"assets/pets/pack7-bogfrog/monster-02.png","咒毒蛙王":"assets/pets/pack7-bogfrog/monster-03.png","剧毒魔神":"assets/pets/pack7-bogfrog/monster-04.png","深渊蛙帝":"assets/pets/pack7-bogfrog/monster-05.png","尸牙犬":"assets/pets/pack8-corpsehound/monster-00.png","幽灵犬":"assets/pets/pack8-corpsehound/monster-01.png","尸魔犬王":"assets/pets/pack8-corpsehound/monster-02.png","幽冥猎犬":"assets/pets/pack8-corpsehound/monster-03.png","尸界狱主":"assets/pets/pack8-corpsehound/monster-04.png","幽魂犬皇":"assets/pets/pack8-corpsehound/monster-05.png","腐噜兽·异变":"assets/pets/mut1-rotten/mut-00.png","腐沼兽·异变":"assets/pets/mut1-rotten/mut-01.png","毒噜兽·异变":"assets/pets/mut1-rotten/mut-02.png","腐沼王·异变":"assets/pets/mut1-rotten/mut-03.png","毒沼霸主·异变":"assets/pets/mut1-rotten/mut-04.png","腐烂之母·异变":"assets/pets/mut1-rotten/mut-05.png","剧毒魔君·异变":"assets/pets/mut1-rotten/mut-06.png","腐界母神":"assets/pets/pack5-rotten/monster-04.png","血月神狐":"assets/pets/god/bloodmoonfox/血月神狐.png","疫神巨像":"assets/pets/pack4-plaguebear/monster-04.png","万刺冥神":"assets/pets/pack6-plaguecat/monster-04.png","骸骨神狼":"assets/pets/pack2-bonewolf/monster-04.png","毒渊神蟾":"assets/pets/pack7-bogfrog/monster-04.png","狱门神犬":"assets/pets/pack8-corpsehound/monster-04.png","霜月神兔":"assets/pets/pack3-shadowrabbit/monster-04.png"},
+  animMap: {"影刃兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-00-attack.png",frames:6,dur:"0.7s"}},"霜影兔":{idle:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-idle.png",frames:6,dur:"1.8s"},attack:{sheet:"assets/pets/anim/pack3-shadowrabbit/monster-01-attack.png",frames:6,dur:"0.7s"}},"血月神狐":{idle:{sheet:"assets/pets/god/bloodmoonfox/血月神狐-idle.png",frames:3,dur:"2.4s"},attack:{sheet:"assets/pets/god/bloodmoonfox/血月神狐-attack.png",frames:6,dur:"0.8s"}}},
+  /* ⛔ 血月神狐（24 帧）2026-09-21 已撤掉：素材生成时角色就出画了，尾巴被画面边缘切平，
+     留白/缩放都救不回；重做规格见 docs/任务单/11-神级宠逐帧动画素材重做.md */
+  avatarMap: {"墨灵":"assets/pets/avatars/pack9-moyuan/墨灵.png","墨影":"assets/pets/avatars/pack9-moyuan/墨影.png","墨煞":"assets/pets/avatars/pack9-moyuan/墨煞.png","墨渊魔君":"assets/pets/avatars/pack9-moyuan/墨渊魔君.png","腐噜兽":"assets/pets/avatars/pack0-base/腐噜兽.png","血狐":"assets/pets/avatars/pack0-base/血狐.png","瘟熊":"assets/pets/avatars/pack0-base/瘟熊.png","疫毛兽":"assets/pets/avatars/pack0-base/疫毛兽.png","骨狼":"assets/pets/avatars/pack0-base/骨狼.png","毒沼蛙":"assets/pets/avatars/pack0-base/毒沼蛙.png","尸犬":"assets/pets/avatars/pack0-base/尸犬.png","幽影兔":"assets/pets/avatars/pack0-base/幽影兔.png","血牙狐":"assets/pets/avatars/pack1-bloodfox/血牙狐.png","幽火狐":"assets/pets/avatars/pack1-bloodfox/幽火狐.png","血灾领主":"assets/pets/avatars/pack1-bloodfox/血灾领主.png","幽火王":"assets/pets/avatars/pack1-bloodfox/幽火王.png","血月魔狐":"assets/pets/avatars/pack1-bloodfox/血月魔狐.png","幽火魔狐":"assets/pets/avatars/pack1-bloodfox/幽火魔狐.png","血狐·异变":"assets/pets/avatars/pack1-bloodfox/血狐·异变.png","骨刃狼":"assets/pets/avatars/pack2-bonewolf/骨刃狼.png","冥霜狼":"assets/pets/avatars/pack2-bonewolf/冥霜狼.png","骨刃王":"assets/pets/avatars/pack2-bonewolf/骨刃王.png","霜狼祭司":"assets/pets/avatars/pack2-bonewolf/霜狼祭司.png","骸骨君主":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","霜寒领主":"assets/pets/avatars/pack2-bonewolf/霜寒领主.png","骨狼·异变":"assets/pets/avatars/pack2-bonewolf/骨狼·异变.png","影刃兔":"assets/pets/avatars/pack3-shadowrabbit/影刃兔.png","霜影兔":"assets/pets/avatars/pack3-shadowrabbit/霜影兔.png","影舞者":"assets/pets/avatars/pack3-shadowrabbit/影舞者.png","霜影魔兔":"assets/pets/avatars/pack3-shadowrabbit/霜影魔兔.png","影蚀魔君":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png","霜魂兔皇":"assets/pets/avatars/pack3-shadowrabbit/霜魂兔皇.png","幽影兔·异变":"assets/pets/avatars/pack3-shadowrabbit/幽影兔·异变.png","瘟甲熊":"assets/pets/avatars/pack4-plaguebear/瘟甲熊.png","血瘟熊":"assets/pets/avatars/pack4-plaguebear/血瘟熊.png","瘟神巨熊":"assets/pets/avatars/pack4-plaguebear/瘟神巨熊.png","血疫暴君":"assets/pets/avatars/pack4-plaguebear/血疫暴君.png","瘟疫之主":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","血瘟暴君":"assets/pets/avatars/pack4-plaguebear/血瘟暴君.png","瘟熊·异变":"assets/pets/avatars/pack4-plaguebear/瘟熊·异变.png","腐沼兽":"assets/pets/avatars/pack5-rotten/腐沼兽.png","毒噜兽":"assets/pets/avatars/pack5-rotten/毒噜兽.png","腐沼王":"assets/pets/avatars/pack5-rotten/腐沼王.png","毒沼霸主":"assets/pets/avatars/pack5-rotten/毒沼霸主.png","腐烂之母":"assets/pets/avatars/pack5-rotten/腐烂之母.png","剧毒魔君":"assets/pets/avatars/pack5-rotten/剧毒魔君.png","疫刺兽":"assets/pets/avatars/pack6-plaguecat/疫刺兽.png","冥毛兽":"assets/pets/avatars/pack6-plaguecat/冥毛兽.png","疫魔刺龙":"assets/pets/avatars/pack6-plaguecat/疫魔刺龙.png","冥幽兽":"assets/pets/avatars/pack6-plaguecat/冥幽兽.png","刺骨魔兽":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","幽冥疫君":"assets/pets/avatars/pack6-plaguecat/幽冥疫君.png","毒沼王":"assets/pets/avatars/pack7-bogfrog/毒沼王.png","咒沼蛙":"assets/pets/avatars/pack7-bogfrog/咒沼蛙.png","毒沼魔君":"assets/pets/avatars/pack7-bogfrog/毒沼魔君.png","咒毒蛙王":"assets/pets/avatars/pack7-bogfrog/咒毒蛙王.png","剧毒魔神":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","深渊蛙帝":"assets/pets/avatars/pack7-bogfrog/深渊蛙帝.png","尸牙犬":"assets/pets/avatars/pack8-corpsehound/尸牙犬.png","幽灵犬":"assets/pets/avatars/pack8-corpsehound/幽灵犬.png","尸魔犬王":"assets/pets/avatars/pack8-corpsehound/尸魔犬王.png","幽冥猎犬":"assets/pets/avatars/pack8-corpsehound/幽冥猎犬.png","尸界狱主":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","幽魂犬皇":"assets/pets/avatars/pack8-corpsehound/幽魂犬皇.png","腐噜兽·异变":"assets/pets/avatars/mut1-rotten/腐噜兽·异变.png","腐沼兽·异变":"assets/pets/avatars/mut1-rotten/腐沼兽·异变.png","毒噜兽·异变":"assets/pets/avatars/mut1-rotten/毒噜兽·异变.png","腐沼王·异变":"assets/pets/avatars/mut1-rotten/腐沼王·异变.png","毒沼霸主·异变":"assets/pets/avatars/mut1-rotten/毒沼霸主·异变.png","腐烂之母·异变":"assets/pets/avatars/mut1-rotten/腐烂之母·异变.png","剧毒魔君·异变":"assets/pets/avatars/mut1-rotten/剧毒魔君·异变.png","腐界母神":"assets/pets/avatars/pack5-rotten/腐烂之母.png","血月神狐":"assets/pets/god/bloodmoonfox/血月神狐-头像.png","疫神巨像":"assets/pets/avatars/pack4-plaguebear/瘟疫之主.png","万刺冥神":"assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png","骸骨神狼":"assets/pets/avatars/pack2-bonewolf/骸骨君主.png","毒渊神蟾":"assets/pets/avatars/pack7-bogfrog/剧毒魔神.png","狱门神犬":"assets/pets/avatars/pack8-corpsehound/尸界狱主.png","霜月神兔":"assets/pets/avatars/pack3-shadowrabbit/影蚀魔君.png"}
 };
 </script>
 <script src="js/pet/enemy-data.js?v=20260910sprite1"></script>
 <!-- 世界地图配置（世界地图页 二级选图：依赖 config / enemy-data） -->
 <script src="js/core/worldmap.js?v=20260917full1"></script>
-<script src="js/core/supabase.js?v=20260917fix1"></script>
+<script src="js/core/supabase.js?v=20260920perks2"></script>
 <!-- 跨标签页会话互斥（登录/登出/被顶下线的广播）；必须在 main.js 之前加载 -->
 <script src="js/core/auth-session.js?v=20260910sess1"></script>
 <!-- 服务端会话（跨设备互踢：登记/心跳/Realtime）；依赖 supabase.js，必须在 main.js 之前 -->
@@ -1060,14 +1066,14 @@ window.PetSprites = {
 <script src="js/core/server-config.js?v=20260916cloudnote1"></script>
 <script src="js/equipment/equipment_craft.js?v=20260916soul1"></script>
 <script src="js/equipment/salvage.js?v=20260914equip1"></script>
-<script src="js/pet/pet_merge.js?v=20260917growth1"></script>
+<script src="js/pet/pet_merge.js?v=20260920godsub3"></script>
 <script src="js/pet/pet_evolve.js?v=20260918fusion2"></script>
 <script src="js/core/quest.js?v=20260916pack2"></script>
 <script src="js/core/tutorial_mode.js?v=20260916soul1"></script>
 <!-- 战斗页占用权（2026-09-10）：战斗页同一时刻只能有一个战斗实例（野图挂机/副本/塔）。
      必须在所有战斗模块之前加载（无依赖），battle.js / idle-bridge.js / 副本 / 塔向它 claim。 -->
 <script src="js/core/battle-session.js?v=20260910session1"></script>
-<script src="js/core/battle.js?v=20260917enemy1"></script>
+<script src="js/core/battle.js?v=20260921freeze1"></script>
 <script src="js/trial/trial-config.js?v=20260916reset3"></script>
 <!-- 任务表结构规范化层（2026-09-10）：给任务补 kind(一级分类) / group(二级分组) / chapter / reset。
      放在 config 与 trial-config 之后（它们才是任务表的写入方），quest.js 读表是懒加载所以顺序安全。 -->
@@ -1084,14 +1090,14 @@ window.PetSprites = {
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
 <script src="js/tower/tower-engine.js?v=20260917exppack1"></script>
 <script src="js/core/battle-sim.global.js?v=20260915mech6"></script>
-<script src="js/core/idle-bridge.js?v=20260919pagehide"></script>
+<script src="js/core/idle-bridge.js?v=20260921freeze1"></script>
 <script src="js/ui/ui-boot.js?v=20260917b3"></script>
-<script src="js/ui/ui-common.js?v=20260920countup1"></script>
-<script src="js/ui/ui-console.js?v=20260914reveal1"></script>
+<script src="js/ui/ui-common.js?v=20260920nametag"></script>
+<script src="js/ui/ui-console.js?v=20260920namelist1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260920tails1"></script>
 <script src="js/ui/ui-worldmap.js?v=20260918questidle1"></script>
-<script src="js/ui/ui-capital.js?v=20260910egg7"></script>
+<script src="js/ui/ui-capital.js?v=20260920fix2"></script>
 
 <script src="js/ui/ui-login.js?v=20260917p1"></script>
 <script src="js/ui/ui-dialog.js?v=20260916mo1"></script>
@@ -1110,31 +1116,31 @@ window.PetSprites = {
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
 
 <script src="js/ui/ui-tips.js?v=20260920tips"></script>
-<script src="js/ui/ui-leaderboard.js?v=20260920towerlb1"></script>
-<script src="js/ui/ui-friends.js?v=20260920tails1"></script>
-<script src="js/ui/ui-battle.js?v=20260920countup1"></script>
+<script src="js/ui/ui-leaderboard.js?v=20260920nametag"></script>
+<script src="js/ui/ui-friends.js?v=20260920nametag"></script>
+<script src="js/ui/ui-battle.js?v=20260921fx4"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
-<script src="js/ui/ui-pet.js?v=20260920countup1"></script>
-<script src="js/ui/ui-pet-evolve.js?v=20260918fusion2"></script>
-<script src="js/ui/ui-pet-merge.js?v=20260917fix3"></script>
-<script src="js/ui/ui-pet-synth.js?v=20260916mo1"></script>
+<script src="js/ui/ui-pet.js?v=20260921avatar1"></script>
+<script src="js/ui/ui-pet-evolve.js?v=20260920godsub3"></script>
+<script src="js/ui/ui-pet-merge.js?v=20260920godsub3"></script>
+<script src="js/ui/ui-pet-synth.js?v=20260920godsub3"></script>
 <script src="js/ui/ui-pet-awaken.js?v=20260910awaken2"></script>
 <script src="js/ui/ui-bag.js?v=20260920nosell1"></script>
 <script src="js/ui/ui-mat-entry.js?v=20260916mat14"></script>
 <script src="js/ui/ui-equipment.js?v=20260918eq1"></script>
 <script src="js/ui/ui-craft.js?v=20260916soul1"></script>
-<script src="js/ui/ui-market.js?v=20260920social1"></script>
-<script src="js/ui/ui-social.js?v=20260920tails1"></script>
+<script src="js/ui/ui-market.js?v=20260920nametag"></script>
+<script src="js/ui/ui-social.js?v=20260920nametag"></script>
 <script src="js/ui/ui-market-records.js?v=36619e38"></script>
 <script src="js/ui/ui-market-sell.js?v=20260917fix1"></script>
 <script src="js/ui/ui-market-notify.js?v=20260917fix1"></script>
 <script src="js/ui/ui-market-pulse.js?v=20260917fix1"></script>
 <script src="js/ui/ui-feedback.js?v=20260917fix1"></script>
-<script src="js/ui/ui-codex.js?v=20260920help?v=20260917resetcard1"></script>
-<script src="js/ui/ui-shop.js?v=20260917fix1"></script>
-<script src="js/ui/ui-dev.js?v=20260917growth1"></script>
+<script src="js/ui/ui-codex.js?v=20260920godsub3"></script>
+<script src="js/ui/ui-shop.js?v=20260920repaint1"></script>
+<script src="js/ui/ui-dev.js?v=20260920godsub3"></script>
 <!-- 宠物数值总表页（注册到开发者面板，必须排在 ui-dev.js 之后） -->
-<script src="js/ui/ui-dev-pets.js?v=20260916pets1"></script>
+<script src="js/ui/ui-dev-pets.js?v=20260920godsub3"></script>
 <script src="js/ui/ui-dev-feedback.js?v=20260917fix2"></script>
 <script src="js/ui/ui-dev-ops.js?v=20260917fix2"></script>
 <!-- 片头（Remotion 产物）：放在 main 之前，登录页可见时才有动作 -->

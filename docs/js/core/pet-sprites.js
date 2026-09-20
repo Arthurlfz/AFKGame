@@ -1,7 +1,7 @@
 /* 宠物形态名 -> 立绘/头像路径（由 meowa 生成素材，勿手改） */
 window.PetSprites = {
   // 素材版本号：每次替换素材图片后递增，防止浏览器缓存旧图
-  V: '20260915n',
+  V: '20260921-godfox3',
   // 立绘（全身透明图）路径：查不到时自动去掉「·异变」后缀回退到基础形态
   pathOf: function (name) {
     if (!name) return null;
@@ -44,22 +44,83 @@ window.PetSprites = {
     if (!name) return null;
     return this.animMap[name] || (name.indexOf('·异变') > 0 ? this.animMap[name.replace('·异变', '')] : null);
   },
-  // 把一段动作素材画到节点上。
+  // 取（必要时创建）.pet-anim 里的帧条子节点。
+  // 结构：.pet-anim（裁切层，＝目标容器大小） > .pet-anim-strip（帧条，宽 = 帧数×容器宽）
+  stripOf: function (node) {
+    if (!node) return null;
+    var s = node.firstElementChild;
+    if (s && s.className === 'pet-anim-strip') return s;
+    s = document.createElement('div');
+    s.className = 'pet-anim-strip';
+    node.appendChild(s);
+    return s;
+  },
+  // 🔴🔴 逐帧播放【不走 CSS animation】，由 JS 定时器直接写 transform。三条血泪教训：
+  //   ① background-position 的百分比相对【容器宽−图宽】而不是图宽 ⇒ 位移必算错，
+  //      整张图被推出容器（症状：只在每轮开头闪一帧）。
+  //   ② 动画里放 CSS 变量（var(--steps) 等），一旦解析不出来症状是"立绘静帧"，
+  //      不报任何错，肉眼分不出是动画坏了还是素材只有一帧。
+  //   ③ 项目有两处系统级降压规则 design-tokens.css / market-cascade.css：
+  //      @media (prefers-reduced-motion: reduce) { * { animation-duration:.01ms !important;
+  //                                                    animation-iteration-count:1 !important } }
+  //      开了「减少动态效果」的机器上，CSS 动画会被压成一瞬间播完 ⇒ 永远定格在第 1 帧；
+  //      它带 !important，普通规则盖不动它（2026-09-21 血月神狐"完全不播放"的真凶）。
+  //   JS 直驱 transform 不受以上任何一条影响，而且"有没有在动"能直接被读出来（好排查）。
+  //   位移用【像素】：每格宽 = 容器 clientWidth，第 k 帧 = translateX(-k × 容器宽)，无百分比歧义。
+  playFrames: function (strip, frames, durStr, once) {
+    this.stopFrames(strip);
+    var ms = ((parseFloat(durStr) || 1.6) * 1000) / frames;
+    var i = 0;
+    strip.__frameTimer = setInterval(function () {
+      if (!strip.isConnected) {                       // 节点已被 renderAll 换掉：停表，不留悬挂定时器
+        clearInterval(strip.__frameTimer);
+        strip.__frameTimer = null;
+        return;
+      }
+      // 宽每次现取：立绘尺寸是响应式的（min(280px,46cqh)），窗口一变化就跟上。
+      // 拿到 0 时再退一步用 getBoundingClientRect：容器若不是块级布局，clientWidth 可能报 0
+      // 而 rect 仍能给出真实宽度（宽度真为 0 就说明还没上屏，下个 tick 再试）。
+      var box = strip.parentNode;
+      var w = box ? (box.clientWidth || box.getBoundingClientRect().width) : 0;
+      if (!w) return;
+      var k = once ? Math.min(i, frames - 1) : (i % frames);
+      strip.style.transform = 'translateX(' + (-k * w) + 'px)';
+      i++;
+      if (once && i >= frames) {                      // attack：播一遍就停，收招
+        clearInterval(strip.__frameTimer);
+        strip.__frameTimer = null;
+      }
+    }, ms);
+  },
+  stopFrames: function (strip) {
+    if (strip && strip.__frameTimer) { clearInterval(strip.__frameTimer); strip.__frameTimer = null; }
+  },
+  // 把一段动作素材画到帧条上。
   // ⚠️ 图片 URL 必须写进 background-image 内联样式，不能塞进自定义属性：
   // 自定义属性里的相对 url() 由浏览器按【样式表所在目录】解析（会得到 /css/assets/... → 404），
   // 而内联样式的相对 url() 按【文档】解析，与 img.src 一致。
-  paintAnim: function (node, a) {
-    node.style.backgroundImage = "url('" + a.sheet + '?v=' + this.V + "')";
-    // steps 取帧数本身：steps(N) end 模式呈现前 N 个采样点，配合 -N×100% 位移正好播满 N 帧
-    node.style.setProperty('--af', a.frames);
-    node.style.setProperty('--steps', a.frames);
-    node.style.setProperty('--dur', a.dur || '1.6s');
+  paintAnim: function (node, a, act) {
+    var strip = this.stripOf(node);
+    if (!strip) return;
+    var url = "url('" + a.sheet + '?v=' + this.V + "')";
+    var sameSheet = (strip.style.backgroundImage === url);
+    strip.style.backgroundImage = url;
+    // 帧条撑成 帧数 倍容器宽 + background-size:100% 100% 铺满整条 ⇒ 每格正好是一帧宽
+    strip.style.width = (a.frames * 100) + '%';
+    /* 🔴 同一张图且已经在播时【绝不重新开始】。
+     * 播放器的帧号是它自己数的，一旦被重新调用就从第 0 帧重来 ——
+     * 战斗页每场 resetBattle、每次 renderAll 都可能重挂一次，
+     * 重开频率只要快过一轮时长，动作就永远停在开头几帧，看起来就是"完全不动"
+     * （2026-09-21 实测：诊断显示 transform 恒为 translateX(0px)）。 */
+    if (sameSheet && strip.__frameTimer && act !== 'attack') return;
+    this.playFrames(strip, a.frames, a.dur || '1.6s', act === 'attack');
   },
-  // 换图/换动作后让 CSS 动画从头播：改 background-image 或 iteration-count 都不会重置已在运行的动画计时
+  // 换图/换动作后立刻回到第 1 帧（避免切换时还定在上一张图的某一格）
   restartAnim: function (node) {
-    node.style.animation = 'none';
+    var strip = node && node.firstElementChild;
+    if (!strip) return;
+    strip.style.transform = 'translateX(0)';
     void node.offsetWidth;
-    node.style.animation = '';
   },
   makeAnimNode: function (anim, act) {
     var a = anim[act] || anim.idle;
@@ -67,20 +128,34 @@ window.PetSprites = {
     var d = document.createElement('div');
     d.className = 'pet-anim';
     d.dataset.anim = act;
-    this.paintAnim(d, a);
+    this.paintAnim(d, a, act);
     return d;
   },
-  // 逐帧动画总开关。当前这批素材（pack3-shadowrabbit）实测不可用：
-  // 6 帧的角色质心几乎不动（idle <0.3px、attack <1.2px），但相邻帧像素差异 37%~77%，
-  // 高斯降噪后仍有 29%~73% —— 即角色没做动作，只是被 AI 重绘了 6 遍（毛发/光影每帧都变）。
-  // 播放效果是闪烁而不是动作。关掉后全部形态走静态立绘 + CSS 变换动作（连贯）。
-  // 数据保留在 animMap，以后拿到真正连贯的 spritesheet 把这里改回 true 即可。
-  ANIM_ENABLED: false,
+  // 逐帧动画【总开关】：关着 = 全站一律回退静态立绘（+ CSS 变换动作）。
+  // ✅ 2026-09-21 已启用（血月神狐重做上线：每格左右 8px 条带不透明 0%，守值达标）。
+  // 历史教训（留着，别再犯）：
+  //   ① pack3-shadowrabbit（影刃兔/霜影兔 6 帧）：角色质心几乎不动，但相邻帧像素差 37%~77%
+  //      —— 是"被 AI 重绘了 6 遍"而不是动作，播起来是闪烁（那两条登记还留着，质量未复核）。
+  //   ② 血月神狐旧 24 帧：生成时镜头贴着狐，尾巴一摆动就出画被切平；三种源都一样，救不回来。
+  //   ⇒ 现在这条路：**先出"留白合格"的源图（用工具量，不靠肉眼）→ 再做动**；
+  //      且**一次 3×3 九格生图** → 切格 → repack-sheet 统一取景（同一缩放同一位置）压掉抖动。
+  ANIM_ENABLED: true,
   // 挂动画立绘：成功 true；无动画素材（或逐帧关停）返回 false（调用方回退静态立绘）
   mountAnimated: function (el, name) {
-    if (!el || !this.ANIM_ENABLED) return false;
+    if (!el) return false;
+    if (!this.ANIM_ENABLED) return false;   // 总开关关着：一律回退静态立绘
     var anim = this.animOf(name);
     if (!anim || !anim.idle) return false;
+    /* 已经是同一只宠的同一段动画 → 原样返回，绝不重建。
+     * 战斗页每场 resetBattle / 每次 renderAll 都会走到这里，重建一个新节点
+     * 会把播放进度拉回第 1 帧 ⇒ 一轮 2.4 秒的动作永远播不完，玩家看到的就是"一直不动"。
+     * ⚠️ 用 querySelector 找而不是 firstElementChild：#pet-icon 里还会被塞进飘字等别的子节点，
+     * 谁先谁后不确定，靠"第一个子节点"判断会漏。 */
+    var cur = el.querySelector ? el.querySelector('.pet-anim') : null;
+    if (cur && cur.dataset.petName === name) {
+      var s = cur.firstElementChild;
+      if (s && s.__frameTimer) return true;
+    }
     var node = this.makeAnimNode(anim, 'idle');
     if (!node) return false;
     node.dataset.petName = name;
@@ -94,7 +169,7 @@ window.PetSprites = {
     var anim = node.dataset.petName && this.animOf(node.dataset.petName);
     if (!anim || !anim[act]) return;
     node.dataset.anim = act;
-    this.paintAnim(node, anim[act]);
+    this.paintAnim(node, anim[act], act);
     this.restartAnim(node);
   },
   map:
@@ -174,7 +249,9 @@ window.PetSprites = {
   /* 神级宠（外观复用该线终形态立绘，config.godPets.sprite 同源；接进映射表让战斗页/地图页等
    * 所有按名字取图的路径统一解析，不必每处单独写 godInfoOf 兜底） */
   "腐界母神": "assets/pets/pack5-rotten/monster-04.png",
-  "血月神狐": "assets/pets/pack1-bloodfox/monster-04.png",
+  /* 2026-09-21：血月神狐换成【水墨站立拟人】专属立绘（512×512，源图 1024×1536 → 工具面积平均降采样）。
+   * 不再复用血月魔狐的图；config.godPets.sprite 保持 "血月魔狐" 不动（它只用于查技能，与图片无关）。 */
+  "血月神狐": "assets/pets/god/bloodmoonfox/血月神狐.png",
   "疫神巨像": "assets/pets/pack4-plaguebear/monster-04.png",
   "万刺冥神": "assets/pets/pack6-plaguecat/monster-04.png",
   "骸骨神狼": "assets/pets/pack2-bonewolf/monster-04.png",
@@ -192,6 +269,14 @@ window.PetSprites = {
   "霜影兔": {
     idle:   { sheet: "assets/pets/anim/pack3-shadowrabbit/monster-01-idle.png",   frames: 6, dur: "1.8s" },
     attack: { sheet: "assets/pets/anim/pack3-shadowrabbit/monster-01-attack.png", frames: 6, dur: "0.7s" }
+  },
+  /* 血月神狐（2026-09-21 重做上线）：水墨站立拟人。**一次生图出 3×3 九格**（画布只有生图模型、
+   * 没有视频模型）→ 切格 → 拼成单行 → repack-sheet 统一取景（同一缩放同一位置，压掉抖动）。
+   * 1~3 格站立 = 待机；4~9 格 = 抬手蓄力 → 猫腰下劈 → 收招。源图留在
+   * docs/assets/pets/god/bloodmoonfox/_源-9格动作图.png（要重切时从它来）。 */
+  "血月神狐": {
+    idle:   { sheet: "assets/pets/god/bloodmoonfox/血月神狐-idle.png",   frames: 3, dur: "2.4s" },
+    attack: { sheet: "assets/pets/god/bloodmoonfox/血月神狐-attack.png", frames: 6, dur: "0.8s" }
   }
 },
   avatarMap: {
@@ -269,7 +354,8 @@ window.PetSprites = {
   "剧毒魔君·异变": "assets/pets/avatars/mut1-rotten/剧毒魔君·异变.png",
   /* 神级宠头像（同上：复用该线终形态） */
   "腐界母神": "assets/pets/avatars/pack5-rotten/腐烂之母.png",
-  "血月神狐": "assets/pets/avatars/pack1-bloodfox/血月魔狐.png",
+  /* 2026-09-21：神狐专属头肩像（从同一张定稿裁出，256×256），不再复用血月魔狐头像 */
+  "血月神狐": "assets/pets/god/bloodmoonfox/血月神狐-头像.png",
   "疫神巨像": "assets/pets/avatars/pack4-plaguebear/瘟疫之主.png",
   "万刺冥神": "assets/pets/avatars/pack6-plaguecat/刺骨魔兽.png",
   "骸骨神狼": "assets/pets/avatars/pack2-bonewolf/骸骨君主.png",

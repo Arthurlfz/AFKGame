@@ -1368,14 +1368,18 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   position:absolute; right:clamp(48px, 6%, 96px); bottom:clamp(76px, 15cqh, 108px);
   align-items:flex-end; pointer-events:auto;
 }
-/* 立绘容器（我方 280 / 敌方 260），保留原 attacking/hit 动效（撞/受击闪红抖） */
+/* 立绘容器（我方 350 / 敌方 320），保留原 attacking/hit 动效（撞/受击闪红抖）。
+ * ⭐ 2026-09-21 用户反馈「宠物素材有点小，能变大一些吗」⇒ 整体放大 ~25%（原 280/260）。
+ * 🔴 改这两个数时**必须同时改三处**，否则某些窗口尺寸下"改了等于没改"：
+ *   ① 这里（基准尺寸） ② `@media (max-height:880px)` 里那三条（矮视口写死了像素） ③ 变异怪那条（286px 写死）。
+ * ⚠️ 只放大最小尺寸就好，别写死 big 数字：`cqh` 是跟着舞台高度走的，写死会在高窗口上顶到信息块。 */
 #tab-battle .fighter-pet .stage-avatar {
-  width:min(280px, 46cqh); height:min(280px, 46cqh); font-size:min(9rem, 15cqh); line-height:1; text-align:center;
+  width:min(350px, 58cqh); height:min(350px, 58cqh); font-size:min(11rem, 18cqh); line-height:1; text-align:center;
   background:transparent; border:none; border-radius:0;
   filter:drop-shadow(0 12px 30px rgba(0,0,0,.75));
 }
 #tab-battle .fighter-enemy .stage-avatar {
-  width:min(260px, 43cqh); height:min(260px, 43cqh); font-size:min(8rem, 13cqh); line-height:1; text-align:center;
+  width:min(320px, 53cqh); height:min(320px, 53cqh); font-size:min(10rem, 16cqh); line-height:1; text-align:center;
   background:transparent; border:none; border-radius:0;
   filter:drop-shadow(0 12px 30px rgba(0,0,0,.75));
 }
@@ -1409,7 +1413,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 /* 施法前摇：后撤蓄力 + 压扁，给"要出手了"的预备感（0.16s）。
  * 末帧与 pet-dash 首帧完全一致，两段动作无缝接上。 */
-#tab-battle .stage-avatar.charging img.pet-breathe {
+/* ⚠️ 逐帧路径（`.pet-anim`）必须一起列上：那套立绘里没有 <img class="pet-breathe">，
+ *    只写 img 的话逐帧立绘就【不会蓄力/冲锋/受击形变】——
+ *    2026-09-21 用户实测："先宠物要跑到怪脸上那个动作没了"。 */
+#tab-battle .stage-avatar.charging img.pet-breathe,
+#tab-battle .stage-avatar.charging .pet-anim {
   animation:pet-charge var(--dash-charge, .16s) ease-out;
 }
 @keyframes pet-charge {
@@ -1423,10 +1431,20 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 三个时长全部由 ui-battle.js 按角色类型注入（前摇/后摇见 PACE 表，冲刺按距离算），
  * CSS 里的 .16s / .42s / .3s 只是兜底默认值。
  * ⚠️ translate 必须写在 var(--flip) 之前：写在后面会被 scaleX(-1) 翻转成冲向反方向。 */
-#tab-battle .stage-avatar.attacking img.pet-breathe {
+#tab-battle .stage-avatar.attacking img.pet-breathe,
+#tab-battle .stage-avatar.attacking .pet-anim {
   animation:
-    pet-dash-out var(--dash-out, .42s) cubic-bezier(.22,.72,.3,1),
-    pet-dash-back var(--dash-back, .3s) ease-in var(--dash-out, .42s);
+    /* 🔴 两段都必须带 `forwards`（把最后关键帧留住）。
+     * 原因：两段之间有一段【滞空】（delay = --dash-hold），空档里若没有 forwards，
+     *   元素身上就没有任何动画在写 transform ⇒ 立刻回到原位 ——
+     *   2026-09-21 实测症状："冲到怪面前完全没有前停"（宠物弹回家里再来一次），
+     *   而不是"停在怪脸上挥完再退"。forwards 让 dash-out 结束时**停在对方脸上**，
+     *   dash-back 结束时**停在自己家**（后者也很重要：不留的话 dash-out 的 forwards 会赢，人永远留在对面）。 */
+    pet-dash-out var(--dash-out, .42s) cubic-bezier(.22,.72,.3,1) forwards,
+    /* 「回退」要等【滞空】结束才开始：--dash-hold = 逐帧攻击素材的时长（由 ui-battle.js 注入）
+     * ⇒ 观感是【冲到怪脸上 → 停住挥完 → 再退回原位】（2026-09-21 用户要求）。
+     * 静态立绘没有这个过程 ⇒ 变量缺省 0s，行为与以前完全一致。 */
+    pet-dash-back var(--dash-back, .3s) ease-in calc(var(--dash-out, .42s) + var(--dash-hold, 0s)) forwards;
 }
 @keyframes pet-dash-out {
   0%   { transform:translate(calc(var(--dash-x, 0px) * -0.08), 2%) var(--flip, scaleX(1)) scale(1.07,0.94); }
@@ -1438,38 +1456,42 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   38%  { transform:translate(calc(var(--dash-x, 0px) * 0.78), -1%) var(--flip, scaleX(1)) scale(1.05,0.96); }
   100% { transform:translate(0,0) var(--flip, scaleX(1)) scale(1,1); }
 }
-/* ---------- 命中特效三件套（纯 CSS，零素材零粒子） ----------
- * 1) 冲击环：以立绘中心扩散的环（::before）
- * 2) 闪白：受击瞬间 brightness 拉高（pet-hit 的 filter）
- * 3) 顿帧：命中后 10%~26% 两段关键帧几乎不动，制造"卡一下"的打击停顿
- * 暴击走 .crit-hit 变体：环更大更红、立绘弹起、闪白更狠。 */
-#tab-battle .stage-avatar.hit::before,
-#tab-battle .stage-avatar.crit-hit::before {
-  content:''; position:absolute; left:50%; top:44%; width:52%; height:52%; margin:-26% 0 0 -26%;
-  border-radius:50%; border:3px solid rgb(var(--action-gold-rgb) / .9);
-  box-shadow:0 0 16px rgb(var(--action-gold-rgb) / .5), inset 0 0 20px rgb(var(--action-gold-rgb) / .3);
-  opacity:0; pointer-events:none; z-index:8;
-  animation:hit-ring .32s ease-out;
-}
-#tab-battle .stage-avatar.crit-hit::before {
-  width:76%; height:76%; margin:-38% 0 0 -38%; border-width:4px;
-  border-color:rgb(var(--hp-hi-rgb) / .95);
-  box-shadow:0 0 28px rgb(var(--hp-hi-rgb) / .6), inset 0 0 32px rgb(var(--hp-hi-rgb) / .4);
-  animation:hit-ring-crit .44s cubic-bezier(.2,.9,.3,1);
-}
-@keyframes hit-ring {
-  0%   { opacity:0; transform:scale(.3); }
-  20%  { opacity:1; }
-  100% { opacity:0; transform:scale(1.45); }
-}
-@keyframes hit-ring-crit {
-  0%   { opacity:0; transform:scale(.25) rotate(0deg); }
-  18%  { opacity:1; }
-  100% { opacity:0; transform:scale(1.85) rotate(25deg); }
+/* ---------- 命中特效：已改为【素材版·脚底墨爆】（2026-09-21 用户要求移除原来纯 CSS 那套） ----------
+ * 删掉的是原「命中特效三件套」里的两件**视觉**层：
+ *   ① 冲击环：`.stage-avatar.hit::before` / `.crit-hit::before`（`@keyframes hit-ring` / `hit-ring-crit`）
+ *   ② 立绘轮廓闪光：`.stage-avatar.hit::after` / `.crit-hit::after`
+ *      （`--sprite` 当 mask-image + `@keyframes hit-flash` / `hit-flash-crit`；`--sprite` 的写入端
+ *       在 `ui-battle.js` 里也一并清了，不留死代码）
+ * 原因：它们和新的墨爆（下图 `.hit-fx`）是**同一件事的两套做法**，同时播会糊成一团。
+ * ⛔ 别再长回来：守值 `vtest_pet_anim.js` 第 7 节已从"断言存在"翻成"**断言不存在**"。
+ * ✅ 保留的（都在，改这块别误删）：
+ *   · 受击/暴击的【动作】：`pet-hit` / `pet-hit-crit` 形变 + 容器 `shake` + 命中**顿帧**（那是打击感，不是特效）；
+ *   · 暴击的【全屏反馈】：`stage-shake` 舞台震屏 + `crit-impact` 屏幕边缘红脉冲
+ *     —— 现在暴击与普通命中共用同一套墨爆（用户选的"一套通用不分档"），**这两条是暴击唯一的区分度**。 */
+/* ---------- 命中墨爆：被打中者在【脚底】炸开一记水墨冲击（2026-09-21 新增） ----------
+ * 素材 assets/effects/hit-ink/命中墨爆.png（9 帧 × 256 横向帧条、透明底）；
+ * 播放由 ui-battle.js 的 playFx 用 JS 定时器推 background-position-x，这里只管位置与裁框。
+ * 🔴 这一层【绝对不要】写 animation/transition：design-tokens.css 与 market-cascade.css 有
+ *    `@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}`，
+ *    设置项 body.rm-anim 同策略 ⇒ 动画会被压成静帧（与逐帧立绘翻车同一个坑）。
+ * 三个数字是量出来的：
+ *   · 帧条每格内容包围盒 y 24..231（格 256）⇒ 墨爆"地面线"在格底上方 9.8%；
+ *   · 元素取 120% 容器 ⇒ 地面线落在元素底边上方 9.8%×1.2 ≈ 11.7% 容器高；
+ *   · 立绘脚底 ≈ 容器底上方 8%（神狐立绘内容盒底 470/512、普通宠 monster-04 = 239/256）
+ *     ⇒ bottom ≈ 8% − 11.7% = −4%，墨爆正好从脚底地面炸起。
+ * z-index 取 5：要盖在立绘之上，但必须**低于**飘字（.fs-float = 6）与信息块（7），不许糊住伤害数字。
+ * 允许溢出立绘框：.stage-avatar 没有 overflow:hidden，墨点溅到框外是对的。 */
+#tab-battle .stage-avatar .hit-fx {
+  position:absolute; left:50%; bottom:-4%;
+  width:120%; height:120%;
+  transform:translateX(-50%);
+  background-repeat:no-repeat;
+  pointer-events:none; z-index:5;
 }
 /* 受击：后仰挤压 + 侧倾（容器 shake 的抖动与之叠加）。放在 attack 之后，同时命中时以受击为准。
  * rotate 放在 var(--flip) 之前，我方与敌方才会各自朝【远离对手】的方向倒。 */
-#tab-battle .stage-avatar.hit img.pet-breathe {
+#tab-battle .stage-avatar.hit img.pet-breathe,
+#tab-battle .stage-avatar.hit .pet-anim {
   animation:pet-hit .32s ease-out;
 }
 @keyframes pet-hit {
@@ -1480,7 +1502,8 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   100% { transform:translate(0,0) rotate(0deg) var(--flip, scaleX(1)) scale(1,1); }
 }
 /* 暴击受击：弹起 + 大角度翻转 */
-#tab-battle .stage-avatar.crit-hit img.pet-breathe {
+#tab-battle .stage-avatar.crit-hit img.pet-breathe,
+#tab-battle .stage-avatar.crit-hit .pet-anim {
   animation:pet-hit-crit .44s ease-out;
 }
 @keyframes pet-hit-crit {
@@ -1490,60 +1513,59 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   66%  { transform:translate(0,0) rotate(-3deg) var(--flip, scaleX(1)) scale(0.94,1.06); }
   100% { transform:translate(0,0) rotate(0deg) var(--flip, scaleX(1)) scale(1,1); }
 }
-/* 受击闪光：以立绘自己的 alpha 做遮罩，白色只盖在角色身上（不是糊一个方框）。
- * --sprite 由 ui-battle.js 写入（img.src，绝对 URL）。
- * ⚠️ 不用 filter:brightness 做闪白：filter 动画跑在合成器线程，主线程读不到插值、
- *   不同机器表现不一致，能不能看见全靠运气。opacity 遮罩层是可预期的。 */
-#tab-battle .stage-avatar.hit::after,
-#tab-battle .stage-avatar.crit-hit::after {
-  content:''; position:absolute; inset:0; z-index:7; pointer-events:none;
-  -webkit-mask-image:var(--sprite); mask-image:var(--sprite);
-  -webkit-mask-size:contain; mask-size:contain;
-  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
-  -webkit-mask-position:center; mask-position:center;
-  background:var(--hit-flash, #fff);
-  opacity:0; animation:hit-flash .18s ease-out;
-}
-#tab-battle .stage-avatar.crit-hit::after {
-  --hit-flash:#ff7359;
-  animation:hit-flash-crit .26s ease-out;
-}
-@keyframes hit-flash {
-  0%{opacity:0} 22%{opacity:.92} 100%{opacity:0}
-}
-@keyframes hit-flash-crit {
-  0%{opacity:0} 18%{opacity:1} 100%{opacity:0}
-}
-/* ---------- 逐帧动画立绘（spritesheet，CSS steps 播放） ----------
- * 变量由 pet-sprites.js 挂载时注入：--af=帧数  --steps=步数(帧数-1)  --dur=单轮时长
- * ⚠️ 图片本身由 JS 直接写 background-image 内联样式（不走自定义属性）：
- *    自定义属性里的相对 url() 会按【本样式表所在目录 css/】解析，得到 /css/assets/... → 404 全白。
- * ⚠️ 雪碧图必须是【单行】帧排列（CSS steps() 无法在 2D 网格上逐帧定位）：
- * 6 帧单行 → background-size=600% 100%，background-position 从 0 走到 -600%，steps(6) 每步正好一帧。
- * ⚠️ steps 必须等于【帧数】而不是帧数-1，位移总量必须是【帧数×100%】而不是(帧数-1)×100%：
- * steps(N) 默认 end 模式只呈现前 N 个采样点，写 steps(5)+(-500%) 会永远丢掉最后一帧。 */
+/* ⛔ 原「受击闪光层」（`.stage-avatar.hit::after` / `.crit-hit::after`：以立绘轮廓做遮罩糊一层白/红）
+ * 已随命中特效改用素材版一并移除（2026-09-21，完整说明见上方「命中特效：已改为素材版·脚底墨爆」）。
+ * 连带清掉它依赖的 `--sprite` 写入端（`ui-battle.js` 里两处 setProperty）—— 整条链路不留死代码。
+ * ✅ 但**保留**上面 `pet-hit` / `pet-hit-crit` 的【形变】（后仰 + 挤压 + 顿帧）：那才是挨打的打击感，
+ *    不是"特效"，别连带删掉（删了受击会变成"站着不动挨打"）。 */
+/* ---------- 逐帧动画立绘（spritesheet，JS 定时器逐帧推动） ----------
+ * 结构：.pet-anim（裁切层，撑满父容器）> .pet-anim-strip（帧条，宽 = 帧数倍容器宽）
+ * CSS 这里只管【布局与裁切】；换帧由 pet-sprites.js 的 setInterval 直接写 transform（单位 px）。
+ *
+ * 🔴 三条血泪规矩（2026-09-20 / 09-21 血月神狐 24 帧三轮实测）：
+ * 1. 播放【不能靠 CSS animation】：design-tokens.css / market-cascade.css 有系统级降压规则
+ *    `@media (prefers-reduced-motion:reduce) { * { animation-duration:.01ms !important;
+ *                                                  animation-iteration-count:1 !important } }`
+ *    —— 开了「减少动态效果」的机器上，动画被压成一瞬间播完 ⇒ **永远定格在第 1 帧**，
+ *    而它是 `* {}` + !important，针对性规则盖不动（09-21 "完全不播放"的真凶）。
+ * 2. 位移【绝不能用 background-position 的百分比】：那个百分比相对「容器宽 − 图宽」而不是图宽，
+ *    图宽 = 帧数×容器宽 ⇒ 100% 量程只等于「帧数−1 帧」，写 −帧数×100% 会把整张图推出容器
+ *    （症状：第 1 步之后全白，只在每轮开头闪一帧）。现在由 JS 用【像素】算：第 k 帧 = -k × 容器宽。
+ * 3. 图片 URL 必须由 JS 写进 background-image 内联样式（不走自定义属性）：
+ *    自定义属性里的相对 url() 按【本样式表所在目录 css/】解析 → /css/assets/... 404 全白。
+ * 另：雪碧图必须是【单行】帧排列。 */
 .pet-anim {
+  /* 形变支点与静态立绘 img 对齐（50% 88% ≈ 脚底）：冲锋/受击的 scale 都绕这里缩放，
+   * 不设的话默认绕容器中心缩 ⇒ 逐帧立绘的"压扁/弹起"看着像在飘。 */
+  transform-origin:50% 88%;
   /* 占位式撑满父容器（不用 absolute/inset:0）：
      那样会依赖父容器恰好是定位上下文——战斗页 .stage-avatar 有 position:relative 没事，
      但 #equip-orbit-art 没有，会一路找到 .equip-orbit，把立绘铺满整个 440px 装备轨道。 */
-  display:block; width:100%; height:100%;
-  background-repeat:no-repeat;
-  background-position:0 0;
-  background-size:calc(var(--af) * 100%) 100%;
-  animation:pet-anim-play var(--dur,1.6s) steps(var(--steps,5)) infinite;
+  position:relative; display:block; width:100%; height:100%;
+  overflow:hidden;      /* 只裁这一层：帧条比容器宽 N 倍，溢出的部分必须在这里裁掉 */
   pointer-events:none;
 }
-/* 攻击动作：播一遍后停在末帧（JS 切回 idle） */
-.pet-anim[data-anim="attack"] {
-  animation-iteration-count:1;
-  animation-fill-mode:forwards;
+/* 帧条：宽度由 JS 写成 帧数×100%；背景铺满整条 ⇒ 每格正好是一帧 */
+.pet-anim-strip {
+  position:absolute; left:0; top:0; height:100%;
+  background-repeat:no-repeat;
+  background-size:100% 100%;
+  will-change:transform;
 }
-@keyframes pet-anim-play {
-  from { background-position:0 0; }
-  to   { background-position:calc(var(--af) * -100%) 0; }
-}
-/* 我方动画立绘同样水平翻转朝向右侧敌人 */
-#tab-battle .fighter-pet .stage-avatar .pet-anim { transform:scaleX(-1); }
+/* ⚠️ 这里【不要】加 @keyframes：播放由 pet-sprites.js 的定时器直驱 transform。
+ * CSS animation 在本项目里过不了关：design-tokens.css / market-cascade.css 有系统级降压规则
+ * `@media (prefers-reduced-motion:reduce) { * { animation-duration:.01ms!important; iteration-count:1!important } }`
+ * —— 开了「减少动态效果」的机器上，动画会被压成一瞬间播完 ⇒ 永远定格在第 1 帧，
+ * 而它是 `* {}` 加 !important，任何针对性规则都盖不动（2026-09-21 血月神狐"完全不播放"的真凶）。 */
+/* 动画立绘的朝向：**看素材本身朝哪边，每次换素材都必须重新确认一遍**（血泪：这条改过两次）。
+ * 现行素材（血月神狐 3×3 九格，2026-09-21 重做版）里**角色朝左**，与静态立绘约定一致
+ * ⇒ 我方（站左侧）翻成朝右、敌方（站右侧）不翻。
+ * ⚠️ 上一批素材（meowa 那批 idle 帧）是朝【右】的，当时结论是"我方不翻"；换素材时没重看这条
+ *    ⇒ 2026-09-21 用户实测"宠物朝向反了"。**下面的结论只对本批素材成立。**
+ * ⚠️ 必须写成 `--flip` 而不是直接写 transform：冲锋/受击的 keyframes 会整体覆盖 transform，
+ *    只有走 --flip 才能让"翻转"在动作播放期间也保住（与静态立绘 img 同款处理）。 */
+#tab-battle .fighter-pet .stage-avatar .pet-anim { --flip: scaleX(-1); transform: var(--flip, scaleX(1)); }
+#tab-battle .fighter-enemy .stage-avatar .pet-anim { transform: none; }
 #tab-battle .at-racer img.pet-sprite {
   width:100%; height:100%; object-fit:cover; display:block; border-radius:50%;
 }
@@ -1916,13 +1938,16 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 敌人差异化：变异怪名字血红 + 体型稍大（表现层） */
 #tab-battle .fighter-enemy.is-mutant .combat-name { color:var(--hp-hi); text-shadow:0 0 8px rgb(var(--hp-hi-rgb) / .5); }
 #tab-battle .fighter-enemy.is-mutant .stage-avatar {
-  width:286px; height:286px; font-size:8.8rem; line-height:286px;
+  width:352px; height:352px; font-size:11rem; line-height:352px;   /* 2026-09-21 随普通怪一起放大（原 286，保持"比普通怪大一圈"） */
 }
 /* 矮视口适配：立绘缩小，保证「血量上放」的信息块（名字/血条/经验）完整落在舞台内 */
 @media (max-height: 880px) {
-  #tab-battle .fighter-pet .stage-avatar { width:200px; height:200px; font-size:6.5rem; line-height:200px; }
-  #tab-battle .fighter-enemy .stage-avatar { width:190px; height:190px; font-size:6rem; line-height:190px; }
-  #tab-battle .fighter-enemy.is-mutant .stage-avatar { width:208px; height:208px; font-size:6.6rem; line-height:208px; }
+  /* ⭐ 2026-09-21：这一档原来把立绘【写死】在 200/190/208 ⇒ 可视高度 ≤880px 的窗口里
+   * 上面那条 min(350px,58cqh) 完全不起作用（用户"宠物太小"的感受多半就来自这里）。
+   * 现在同步放大 ~27%（255/240/262），仍然保证立绘头顶不压到信息块（名字/血条/经验）。 */
+  #tab-battle .fighter-pet .stage-avatar { width:255px; height:255px; font-size:8.2rem; line-height:255px; }
+  #tab-battle .fighter-enemy .stage-avatar { width:240px; height:240px; font-size:7.6rem; line-height:240px; }
+  #tab-battle .fighter-enemy.is-mutant .stage-avatar { width:262px; height:262px; font-size:8.3rem; line-height:262px; }
   #tab-battle .fighter-info { padding:7px 9px; }
   #tab-battle .fighter-info .combat-name { font-size:1.05rem; }
   #tab-battle .fighter-enemy .fighter-info .combat-name { font-size:.95rem; }
@@ -2321,6 +2346,66 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .chat-msg .ann { display:flex; align-items:center; gap:6px; }
 .chat-msg .ann-pet { width:1.6em; height:1.6em; object-fit:contain; border-radius:2px; flex:none; }
 .chat-msg .ann-txt { min-width:0; }
+}
+/* ===== 流光名牌（2026-09-20）=====
+ * 名字的颜色与流光。服务端权威决定「戴哪一档」（user_perks.name_tag），
+ * 前端只按 key 挂 .name-tag--<key>（见 ui-common.js 的 UI.nameTag）。
+ *
+ * 流光手法照抄上面掉落播报的 .chat-msg .hi3（background-clip:text 的渐变扫光 + loot-shimmer），
+ * **不另造第二套**：底色一律取 currentColor（就是这一档自己的颜色），只叠一层高光。
+ * ⚠️ 扫光档**绝不能加 text-shadow** —— 与 -webkit-text-fill-color:transparent 冲突，会显示成色块。
+ *
+ * 🔴 只有顶两档带扫光（这是拍过的边界，别改成四档都扫）：
+ *    本作第一爽点是掉宝/鉴定，控制台里掉落那一条本身就在扫光；聊天/市集/榜单里
+ *    一屏几十个名字全在扫的话，掉落播报就失去唯一性，页面也很花。
+ *    低两档只做静态色 + 极淡辉光，也避免了「列表全屏动效」的性能开销。
+ * 颜色全部取 design-tokens 里已有的稀有度色，不新造主色。 */
+.name-tag--jade    { color:var(--r-blue);   font-weight:700; text-shadow:0 0 6px rgb(var(--r-blue-rgb) / .35); }
+.name-tag--violet  { color:var(--r-purple); font-weight:700; text-shadow:0 0 7px rgb(var(--r-purple-rgb) / .45); }
+/* 顶两档 = **掉落播报顶档的完整规格**：放大 + 加粗 + 流光 + 入场闪白。
+ * 用户 2026-09-20 三次追问的原话是「我要的是高级稀有物品/宠物蛋这些掉落的那种效果」——
+ * 那种效果 = 字号档位（1.16em）+ 加粗 + 一道白光横扫 + 出现时过曝闪一下，四件套缺一不可。
+ * ⚠️ 字号只在顶两档放大：低档也放大会让聊天每一行都变大，反而分不出高低。 */
+.name-tag--gilded    { --tag-glow: 208 173 97; color:var(--r-gold); font-weight:700; font-size:1.16em; }
+.name-tag--bloodmoon { --tag-glow: 199 101 89; color:var(--danger-hi); font-weight:700; font-size:1.16em; }
+@supports ((background-clip:text) or (-webkit-background-clip:text)) {
+  .name-tag--gilded {
+    background-image:linear-gradient(100deg, currentColor 0 30%, #fff 42% 58%, currentColor 70% 100%);
+    background-size:210% 100%; background-repeat:no-repeat;
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    /* text-shadow 是**可继承**属性：名字外面套的容器（聊天/榜单/挂单）万一有阴影，
+     * 会继承到这里的透明文字上 → 直接渲染成一块色块。这里显式关掉，辉光交给 filter。 */
+    text-shadow:none;
+    /* 三段动画：光带横扫 + 常驻呼吸辉光 + **入场闪白**（loot-drop-in，掉落播报用的那条）。
+     * ⚠️ 后两段都碰 filter，入场那 0.75 秒由入场动画接管、之后回落给呼吸辉光 ——
+     *    观感恰好是"闪一下 → 稳定发光"，正是捡到东西的节奏。 */
+    animation:loot-shimmer 2s linear infinite, name-tag-glow 2.6s ease-in-out infinite,
+              loot-drop-in .75s cubic-bezier(.2,.8,.3,1) 1;
+  }
+  /* 顶档：光带更宽、扫得更慢，辨识度最高 */
+  .name-tag--bloodmoon {
+    background-image:linear-gradient(100deg, currentColor 0 28%, #ffd9d2 40% 60%, currentColor 72% 100%);
+    background-size:240% 100%; background-repeat:no-repeat;
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    text-shadow:none;
+    animation:loot-shimmer 3s linear infinite, name-tag-glow 3.2s ease-in-out infinite,
+              loot-drop-in .75s cubic-bezier(.2,.8,.3,1) 1;
+  }
+}
+/* 呼吸辉光：用 filter 的 drop-shadow，**不能用 text-shadow** ——
+ * 顶两档的文字是 transparent + 背景裁切，text-shadow 会把字整个盖成色块。
+ * filter 作用在渲染之后，所以跟 background-clip:text 能共存（这是唯一能给小字加外发光的写法）。
+ * ⚠️ 小字上"扫光"天生不明显（掉落播报那条之所以抓眼，是因为它被放大加粗了），
+ *    所以恒定辉光比扫光更重要：不扫的那两秒里，名字也得看得出是"亮的"。 */
+@keyframes name-tag-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgb(var(--tag-glow) / .55)); }
+  50%      { filter: drop-shadow(0 0 6px rgb(var(--tag-glow) / .95)); }
+}
+/* 尊重系统「减少动态效果」：扫光和呼吸都关掉，但颜色保留（名牌仍看得见） */
+@media (prefers-reduced-motion: reduce) {
+  .name-tag--gilded, .name-tag--bloodmoon {
+    animation:none; background-image:none; -webkit-text-fill-color:currentColor; filter:none;
+  }
 }
 /* 材料用途配色：进化系（进化素材 / 精粹 / 传说）病绿；打造与功能石（重铸 / 增缀 / 剥离 / 合成 / 鉴定）暗紫 */
 .chat-msg.loot .loot-c-evo { color:var(--exp); }
@@ -4391,15 +4476,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
   20% { opacity: 1; }
   100% { opacity: 0; }
 }
-/* 受击时角色闪白更亮 */
-#tab-battle .stage-avatar.hit::after {
-  --hit-flash: #ffffff;
-  opacity: 0.95;
-}
-#tab-battle .stage-avatar.crit-hit::after {
-  --hit-flash: #ff6b4a;
-  opacity: 1;
-}
+/* ⛔ 原「受击时角色闪白更亮」（`.stage-avatar.hit::after` / `.crit-hit::after`）已随命中特效改用
+ * 素材版一并移除（2026-09-21，说明见文件上方「命中特效：已改为素材版·脚底墨爆」）。
+ * ⚠️ 上面那条 `crit-impact` 暴击红脉冲**保留**，别连带删掉。 */
 
 /* ---------- 5. 变异怪/Boss视觉强化 ---------- */
 #tab-battle .fighter-enemy.is-mutant .stage-avatar::before {
