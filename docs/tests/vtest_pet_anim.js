@@ -455,19 +455,22 @@ A(pngOk,
 // ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
 //   game.css         → fx4（fx3 之后又移走了命中特效的样式）
 //   fx.css           → fx1（新文件：素材特效样式）
-//   ui-battle.js     → fx7（fx5/6/7 = 命中特效 / 悬浮提示 / 掉落+舞台原语 相继迁出）
+//   ui-battle.js     → fx8（fx5~8 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 相继迁出）
 //   hit-fx.js        → fx1（新文件：命中特效播放器）
 //   ui-battle-tip.js → split1（新文件：敌方悬浮提示）
 //   ui-stage-fx.js   → split2（新文件：舞台横幅/闪光/屏幕脉冲）
 //   ui-battle-loot.js→ split2（新文件：掉落播报 + 掉落演出）
+//   ui-battle-roster.js / ui-battle-summary.js → split3（新文件：出战名册 / 挂机结算窗）
 A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
   && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
-  && /js\/ui\/ui-battle\.js\?v=20260921fx7/.test(srcHtml)
+  && /js\/ui\/ui-battle\.js\?v=20260921fx8/.test(srcHtml)
   && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml)
   && /js\/ui\/ui-battle-tip\.js\?v=20260921split1/.test(srcHtml)
   && /js\/ui\/ui-stage-fx\.js\?v=20260921split2/.test(srcHtml)
-  && /js\/ui\/ui-battle-loot\.js\?v=20260921split2/.test(srcHtml),
-  '游戏.html 里 game.css(fx4)/fx.css(fx1)/ui-battle.js(fx7)/hit-fx.js(fx1)/ui-battle-tip.js(split1)/ui-stage-fx.js(split2)/ui-battle-loot.js(split2) 的版本号都要对（改了 JS/CSS 不升号=改了等于没改）');
+  && /js\/ui\/ui-battle-loot\.js\?v=20260921split2/.test(srcHtml)
+  && /js\/ui\/ui-battle-roster\.js\?v=20260921split3/.test(srcHtml)
+  && /js\/ui\/ui-battle-summary\.js\?v=20260921split3/.test(srcHtml),
+  '游戏.html 里 9 个文件的版本号都要对（game.css fx4 / fx.css fx1 / ui-battle.js fx8 / hit-fx.js fx1 / tip split1 / stage-fx split2 / loot split2 / roster+summary split3）—— 改了 JS/CSS 不升号=改了等于没改');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条

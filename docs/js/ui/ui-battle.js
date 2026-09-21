@@ -481,124 +481,7 @@
   }
 
   /* ---------- 左侧出战宠物竖列：悬停看属性 / 点击切换出战（下一场生效） ---------- */
-  function renderRoster() {
-    const box = $('pet-roster');
-    if (!box) return;
-    box.innerHTML = '';
-    const active = getActivePet();
-    const tipBox = $('roster-tooltip');
-    for (const pet of getPets()) {
-      const s = getStats(pet);
-      const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length;
-      const bonusText = getBonusText ? getBonusText(pet) : '';
-      const btn = document.createElement('div');
-      btn.className = 'roster-pet' + (active && pet.id === active.id ? ' active' : '');
-      btn.dataset.id = pet.id;
-      // 出战竖列用头像版（小尺寸更清晰）
-      const avatarSrc = PetSprites && PetSprites.avatarOf(pet.name);
-      const iconHtml = avatarSrc ? '<img class="pet-avatar-sprite" src="' + avatarSrc + '" alt="">' : '';
-      btn.innerHTML = `<span class="roster-pet-icon">${iconHtml}</span><span class="rp-lv">${pet.level}</span>`;
-      btn.onclick = () => {
-        if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {
-          UI.showToast('⚠️ 已上架的宠物不能出战', '请先在市场取回');
-          return;
-        }
-        setActive(pet.id);
-        if (UI.addLog) UI.addLog(` ${pet.name} 出战！`, 'battle');
-        syncCombatantSnapshot(); // 战斗页被占用时它自己会让位（见函数内说明）
-        renderRoster();
-        if (UI.renderAll) UI.renderAll();
-      };
-      box.appendChild(btn);
-    }
-    // 事件委托到竖列容器（容器不随 renderAll 重建，悬停状态稳定）：hover 头像 → 共享 tooltip
-    if (tipBox && !box.__rosterBound) {
-      box.__rosterBound = true;
-      const showTipFor = (pet, anchor) => {
-        const s = getStats(pet);
-        const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length;
-        const bonusText = getBonusText ? getBonusText(pet) : '';
-        const active = getActivePet();
-        // 复用怪物悬浮框同款结构（.enemy-tip-*），只保留宠物该有的信息，不照搬怪物"掉落信息"
-        tipBox.className = 'roster-tooltip enemy-tip';
-        tipBox.innerHTML = `<div class="enemy-tip-title">
-            <strong>${escapeHtml(pet.name)}</strong>
-            <span>Lv.${pet.level}</span>
-            ${active && pet.id === active.id ? '<b class="enemy-type evolved">出战</b>' : ''}
-          </div>
-          <div class="enemy-tip-group">
-            <div class="enemy-tip-heading">成长</div>
-            <div class="enemy-tip-rows">
-              <div class="enemy-tip-row">成长值<b>${pet.growth.toFixed(1)}</b></div>
-              <div class="enemy-tip-row">经验<b>${pet.exp || 0}</b></div>
-            </div>
-          </div>
-          <div class="enemy-tip-group">
-            <div class="enemy-tip-heading">基础属性</div>
-            <div class="enemy-tip-rows">
-              <div class="enemy-tip-row" data-enemy-hp>生命<b>${s.hp}</b></div>
-              <div class="enemy-tip-row">攻击<b>${s.atk}</b></div>
-              <div class="enemy-tip-row">防御<b>${s.def}</b></div>
-              <div class="enemy-tip-row">速度<b>${s.spd}</b></div>
-            </div>
-          </div>
-          <div class="enemy-tip-group">
-            <div class="enemy-tip-heading">战斗属性</div>
-            <div class="enemy-tip-rows">
-              <div class="enemy-tip-row">暴击<b>${Math.round(s.critRate * 100)}%</b></div>
-              <div class="enemy-tip-row">暴伤<b>${Math.round(s.critDamage * 100)}%</b></div>
-              <div class="enemy-tip-row">命中<b>${Math.round(s.hit)}</b></div>
-              <div class="enemy-tip-row">闪避<b>${Math.round(s.dodge)}</b></div>
-              <div class="enemy-tip-row">吸血<b>${Math.round(s.lifesteal * 100)}%</b></div>
-            </div>
-          </div>
-          <div class="enemy-tip-group">
-            <div class="enemy-tip-heading">装备</div>
-            <div class="enemy-tip-rows">
-              <div class="enemy-tip-row" style="grid-column:1/-1">已装备<b>${equipCount}/12${bonusText && bonusText !== '无' ? '（' + escapeHtml(bonusText) + '）' : ''}</b></div>
-            </div>
-          </div>
-          <div class="roster-quick-actions">
-            <button class="rqa-btn" data-rqa="evolve">进化</button>
-            <button class="rqa-btn" data-rqa="synth">合成</button>
-            <button class="rqa-btn" data-rqa="equip">装备</button>
-          </div>`;
-        const r = anchor.getBoundingClientRect();
-        tipBox.style.left = (r.right + 8) + 'px';
-        tipBox.style.top = Math.max(6, r.top) + 'px';
-        tipBox.classList.add('show');
-      };
-      let hoverTarget = null; // 记录当前 hover 的宠物，供按钮点击用
-      const hideTip = () => tipBox.classList.remove('show');
-      box.addEventListener('mouseover', (e) => {
-        const el = e.target.closest ? e.target.closest('.roster-pet') : null;
-        if (!el) return;
-        hoverTarget = getPets().find(p => p.id === Number(el.dataset.id));
-        if (hoverTarget) showTipFor(hoverTarget, el);
-      });
-      box.addEventListener('mouseout', (e) => {
-        if (e.target.closest && e.target.closest('.roster-pet')) hideTip();
-      });
-      // 鼠标移到 tooltip 上不消失；点快捷按钮跳转
-      tipBox.addEventListener('mouseenter', () => { tipBox.classList.add('show'); });
-      tipBox.addEventListener('mouseleave', hideTip);
-      tipBox.addEventListener('click', (e) => {
-        const btn = e.target.closest ? e.target.closest('.rqa-btn') : null;
-        if (!btn || !hoverTarget) return;
-        const action = btn.dataset.rqa;
-        if (action === 'equip') {
-          if (window.UI && UI.switchPage) UI.switchPage('equip');
-        } else {
-          if (window.UI && UI.switchPage) UI.switchPage('pet');
-          setTimeout(() => {
-            const tab = document.querySelector('.pet-tab[data-pet-tab="' + action + '"]');
-            if (tab) tab.click();
-          }, 100);
-        }
-        hideTip();
-      });
-    }
-  }
+  /* 出战宠物竖列（头像 + 悬停详情 + 快捷入口）：已迁出 → `js/ui/ui-battle-roster.js`（2026-09-21） */
 
   // 胜利演出：敌人立绘淡出下沉（battle.js endFight 胜利时防御式调用）
   function animateVictory() {
@@ -608,117 +491,14 @@
     setTimeout(() => avatar.classList.remove('defeated'), 650);
   }
 
-  /* ---------- 挂机结算汇总（切回前台时弹出） ----------
-   * 收到 settle 返回的 r，聚合 r.detail 里的掉落，弹一个结算窗。
-   * 太短（<3场 或 <15秒）不弹，避免频繁切标签页被烦。 */
-  function showIdleSummary(r) {
-    if (!r) return;
-    const fights = Number(r.fights) || 0;
-    const secs = Number(r.elapsedSec) || 0;
-    if (fights < 3 || secs < 15) return; // 太短不弹
-
-    const detail = Array.isArray(r.detail) ? r.detail : [];
-    let totalExp = 0;
-    const mats = {}; // name -> qty
-    let goldCount = 0, blueCount = 0, whiteCount = 0, eggCount = 0;
-
-    for (const row of detail) {
-      if (!row) continue;
-      totalExp += Number(row.exp) || 0;
-      const rw = row.reward;
-      if (!rw || !rw.type) continue;
-      if (rw.type === 'material' && rw.material) {
-        mats[rw.material] = (mats[rw.material] || 0) + (Number(rw.qty) || 1);
-      } else if (rw.type === 'equipment' && rw.eq) {
-        const rid = (rw.eq.rarity && rw.eq.rarity.id) || 'white';
-        if (rid === 'gold') goldCount++;
-        else if (rid === 'blue') blueCount++;
-        else whiteCount++;
-      } else if (rw.type === 'egg') {
-        eggCount++;
-      }
-    }
-
-    // 格式化时长
-    const mm = Math.floor(secs / 60);
-    const ss = secs % 60;
-    const durText = mm > 0 ? mm + '分' + ss + '秒' : ss + '秒';
-
-    // 材料列表
-    const matEntries = Object.entries(mats).sort((a, b) => b[1] - a[1]);
-    const matHtml = matEntries.length
-      ? matEntries.map(([n, q]) => '<div class="is-row"><span>' + escapeHtml(n) + '</span><b>×' + q + '</b></div>').join('')
-      : '<div class="is-empty">无新材料</div>';
-
-    // 装备列表
-    const eqRows = [];
-    if (goldCount) eqRows.push('<div class="is-row gold"><span>金装</span><b>×' + goldCount + '</b></div>');
-    if (blueCount) eqRows.push('<div class="is-row blue"><span>蓝装</span><b>×' + blueCount + '</b></div>');
-    if (whiteCount) eqRows.push('<div class="is-row"><span>白装</span><b>×' + whiteCount + '</b></div>');
-    if (eggCount) eqRows.push('<div class="is-row egg"><span>宠物蛋</span><b>×' + eggCount + '</b></div>');
-    const eqHtml = eqRows.length
-      ? eqRows.join('')
-      : '<div class="is-empty">无新装备</div>';
-
-    // 金装提示
-    const goldHint = goldCount
-      ? '<div class="is-gold-hint">' + goldCount + ' 件金装待鉴定 · <button class="is-go-bag">去背包鉴定 →</button></div>'
-      : '';
-
-    let modal = $('idle-summary-modal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'idle-summary-modal';
-      modal.className = 'equip-detail-modal';
-      document.body.appendChild(modal);
-    }
-    modal.innerHTML = '<div class="ed-overlay" data-close="1"></div>' +
-      '<div class="ed-card is-card">' +
-        '<div class="ed-head" style="color:var(--gold,#e7d39a)">挂机结算</div>' +
-        '<div class="ed-base">离开了 ' + durText + ' · 打了 ' + fights + ' 场 · 经验 +<span class="is-exp-num">0</span></div>' +
-        '<div class="craft-affix-group">' +
-          '<div class="grp-title">掉落装备</div>' +
-          eqHtml +
-          '<hr class="craft-affix-divider">' +
-          '<div class="grp-title">材料</div>' +
-          matHtml +
-        '</div>' +
-        goldHint +
-        '<div class="ed-actions"><button class="btn-mini" data-close="1">继续挂机</button></div>' +
-      '</div>';
-
-    modal.querySelectorAll('[data-close]').forEach(el => el.onclick = () => {
-      modal.classList.remove('open');
-    });
-    const goBag = modal.querySelector('.is-go-bag');
-    if (goBag) goBag.onclick = () => {
-      modal.classList.remove('open');
-      if (UI.switchPage) UI.switchPage('bag');
-    };
-    modal.classList.add('open');
-    // 背包快满提醒
-    try {
-      const use = window.Supabase && window.Supabase.usageOf && window.Supabase.usageOf('bag');
-      if (use && use.cap - use.used <= 3 && !use.full) {
-        setTimeout(function(){ showToast('⚠️ 背包快满了', '剩余 ' + (use.cap - use.used) + ' 格 · 去分解一下'); }, 1000);
-      }
-    } catch(e) {}
-    // 数字滚动：经验从 0 滚到实际值。统一走动效层的 UI.setNum（全站唯一的滚动实现）
-    var expEl = modal.querySelector('.is-exp-num');
-    if (expEl && UI.setNum) UI.setNum(expEl, totalExp, { from: 0 });
-    // 装备/材料数量也滚动（错开 100ms，一件件蹦出来）
-    modal.querySelectorAll('.is-row b').forEach(function(b, i) {
-      var n = parseInt(b.textContent.replace(/[^0-9]/g, ''), 10);
-      if (n > 0 && UI.setNum) setTimeout(function(){ UI.setNum(b, n, { from: 0, fmt: function (v) { return '×' + Math.round(v); } }); }, i * 100);
-    });
-  }
+  /* 挂机结算汇总弹窗：已迁出 → `js/ui/ui-battle-summary.js`（`UI.showIdleSummary`，2026-09-21） */
 
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
   // 千分位格式化对外：ui-battle-tip.js 复用同一份（不另写一套，避免两个事实源）
   UI.groupNum = groupNum;
-  // UI.showLoot / UI.lootTierOf 由 js/ui/ui-battle-loot.js 自己挂（掉落演出已迁出，2026-09-21）
-  UI.showIdleSummary = showIdleSummary;
+  // UI.showLoot / UI.lootTierOf / UI.showIdleSummary / UI.renderRoster 由各自模块自己挂
+  //   （ui-battle-loot.js / ui-battle-summary.js / ui-battle-roster.js，2026-09-21）
   UI.resetBattle = resetBattle;
   UI.updateBars = updateBars;
   UI.updateAction = updateAction;
@@ -753,7 +533,7 @@
   UI.updateBattleArea = updateBattleArea;
   UI.renderCombatantData = renderCombatantData;
   UI.syncCombatantSnapshot = syncCombatantSnapshot;
-  UI.renderRoster = renderRoster;
+  // UI.renderRoster 由 js/ui/ui-battle-roster.js 自己挂（2026-09-21）
 })();
 
   /* ========== 战斗页快捷进化入口 ========== */

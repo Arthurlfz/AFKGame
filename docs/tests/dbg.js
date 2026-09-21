@@ -26,7 +26,7 @@ rpc:async(fn,args)=>{
   return{data:null,error:{message:'unknown'}}
 }}}`;
 vm.runInContext(STUB,ctx);
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/pet/pet_merge.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-battle-tip.js','../js/ui/ui-stage-fx.js','../js/ui/ui-battle-loot.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/pet/pet_merge.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-battle.js','../js/ui/ui-battle-tip.js','../js/ui/ui-stage-fx.js','../js/ui/ui-battle-loot.js','../js/ui/ui-battle-roster.js','../js/ui/ui-battle-summary.js','../js/ui/ui-pet.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/main.js'])vm.runInContext(fs.readFileSync(f,'utf8'),ctx);
 const S=ms=>new Promise(r=>setTimeout(r,ms));
 const C=code=>vm.runInContext(code,ctx);
 (async()=>{
