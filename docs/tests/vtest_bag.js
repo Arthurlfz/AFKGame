@@ -36,5 +36,19 @@ A(typeof C('UI.setNum')==='function','动效层导出 UI.setNum（全站唯一�
   const r3=C('(function(){const b=document.createElement("b");UI.setNum(b,5,{from:0});return b.__num})()');
   A(r3===5,'UI.setNum 接受 opt.from（新建元素从 0 起步，实际 __num='+r3+'）');
 }
+/* ---------- 悬停提示残留（2026-09-22 用户实测：主城画面上飘着「徽记坠饰」） ----------
+ * 这类 tooltip 挂在 body 层（不随页面/浮窗隐藏），靠锚点的 mouseleave 收起。
+ * 而玩家常常是「鼠标停在装备格上就把背包关掉 / 就切页」—— 那个 mouseleave 永远等不到
+ * ⇒ 提示带 .show 留在屏幕上，跟着飘到任何一个页面。
+ * 守两个必经入口：① 关闭背包浮窗 ② 切页。 */
+{
+  const srcBag = fs.readFileSync('../js/ui/ui-bag.js', 'utf8');
+  const srcShell = fs.readFileSync('../js/ui/ui-shell.js', 'utf8');
+  A(/function closeBagWindow[\s\S]{0,600}?hideBagTip\(\)/.test(srcBag),
+    '关闭背包浮窗时必须清掉悬停提示（否则提示会飘到别的页面）');
+  A(/function renderPage[\s\S]{0,2500}?UI\.hideBagTip/.test(srcShell),
+    '切页时必须清掉悬停提示（同上）');
+  A(/UI\.hideBagTip\s*=/.test(srcBag), 'ui-bag 对外暴露 UI.hideBagTip（切页清理靠它）');
+}
 console.log('ALL BAG TESTS PASSED');process.exit(0);
 })().catch(e=>{console.error('EXC',e&&(e.stack||e.message));process.exit(1)});

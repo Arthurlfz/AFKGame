@@ -67,6 +67,10 @@
       target.classList.add('page-enter');
       setTimeout(() => target.classList.remove('page-enter'), 300);
     }
+    /* 切页后清掉可能残留的悬停提示（2026-09-22 用户实测：主城画面上飘着「徽记坠饰」）。
+     * 这类 tooltip 挂在 body 层、靠锚点的 mouseleave 隐藏；锚点随页面 display:none 之后
+     * 那个 mouseleave 永远等不到 ⇒ 提示会一路飘到新页面上（关背包那条路已在 ui-bag 里堵了）。 */
+    if (UI.hideBagTip) UI.hideBagTip();
     // 百科页内容懒渲染（幂等）：走 hash 变化时不触发 hashchange 的路径（如登录后 hash 残留）也能渲染
     if (page === 'codex' && UI.renderCodex) UI.renderCodex();
     if (page === 'leaderboard' && UI.renderLeaderboard) UI.renderLeaderboard();
@@ -85,6 +89,18 @@
     // 世界地图页首次切换时渲染地图点位（幂等：内部判空）
     if (page === 'worldmap' && window.WorldMap && window.UI && window.UI.renderWorldMapPage) {
       window.UI.renderWorldMapPage();
+    }
+    /* 宠物页：切过去**立刻**渲染（2026-09-22 内测 🟠9「点宠物资料，等两秒才出来，中间一片黑」）。
+     * 根因：以前这里只切 active 类，内容要等下一次 renderAll 才填进去 ⇒ 中间是一整块空面板。
+     * 与百科/市集/地图页同一套写法：切页 = 骨架落地 + 内容当场渲染。
+     * ⚠️ 渲染失败不能连累切页（血肉坏了要看得见，骨架必须照常落地 —— 见本文件上面的同一条规矩）。 */
+    if (page === 'pet') {
+      try {
+        if (UI.renderPetPanel) UI.renderPetPanel();
+        if (UI.renderPetList) UI.renderPetList();
+      } catch (e) {
+        console.error('[shell] 宠物页首次渲染失败，已跳过（页面仍会切过去）：', e);
+      }
     }
     // 主城页：切到该页就重渲染（拉最新数据：任务/市场/材料/宠物）
     if (page === 'capital' && window.UI && window.UI.renderCapitalPage) {

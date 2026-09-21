@@ -885,6 +885,12 @@ let lastIdStoneN = null;   // 上次渲染时手上的鉴定石数量（底部�
   function closeBagWindow() {
     const host = document.getElementById('bag-window');
     if (!host) return;
+    /* 🔴 关窗前必须清掉悬停提示（2026-09-22 用户实测：主城画面上飘着「徽记坠饰」）。
+     * 根因：tooltip 挂在 body 层（不随浮窗消失），靠 card 的 mouseleave 隐藏 ——
+     *   而玩家是**鼠标停在装备格上**把背包关掉的，那个 mouseleave 永远等不到
+     *   ⇒ 提示带 .show 留在屏幕上，切到任何一个页面都跟着飘。
+     * 只修这一处即可：所有关闭入口（取消按钮 / 遮罩 / B 键）都走这个函数。 */
+    hideBagTip();
     host.classList.remove('is-open');
     window.setTimeout(() => { if (!host.classList.contains('is-open')) host.style.display = 'none'; }, 300);
   }

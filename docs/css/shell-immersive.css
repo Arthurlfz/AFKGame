@@ -1,0 +1,365 @@
+/* ============================================================
+ * css/shell-immersive.css —— 「沉浸式外壳」（2026-09-22）
+ *
+ * 一件事：把「顶栏 + 侧栏 + 内容区」这个网页后台骨架，改成「画面铺满 + 件浮在边上」。
+ *
+ * 为什么做：游戏默认进的就是主城页，玩家第一眼看到的是三块盒子 ——
+ *   那是网页的样子，不是游戏。
+ *
+ * 分三批（都在本文件）：
+ *   一、全站：顶栏浮在画面上；面板页内容区让位，三个画面页不让位（画面顶到窗口边）
+ *   二、主城页 / 世界地图页：画面铺满 + 页眉浮起 + 消息窗移到右下角
+ *       战斗页：舞台本来就铺满，只吃顶栏让出来的高度
+ *   三、侧栏从"后台菜单"改成"游戏图标条"；顶栏去网页化
+ *
+ * ⚠️ 画面页的规则全部包在 #app:has(#tab-xxx.active) 之下，互不干扰；
+ *    侧栏宽度与顶栏那两条【故意全站生效】—— 它们必须各页一致，否则切页时界面会跳。
+ *    ⛔ 面板页（市集 / 宠物 / 背包）不要套"画面铺满"那一套：
+ *      它们没有画面，排版靠内边距撑，铺满只会让卡片贴到窗口边。
+ *
+ * 🔴 侧栏保持实色占位（不浮起）：主城 / 世界地图的热区是绝对定位坐标，
+ *    侧栏一浮起来就盖住画面左侧、那一片点不到。收窄到 76px 后占位已经很小，够用。
+ * ============================================================ */
+
+/* ---- 两条侧边的宽度：都按【黄金分割】定，不拍像素 ----
+ *
+ * 黄金分割把整体依次切下去是一串数：
+ *   61.8% → 38.2% → 23.6% → 14.6% → 9.0% → 5.6% → 3.4%
+ *   （每项 = 前一项 ÷ 1.618，即 1/φ、1/φ²、1/φ³ …）
+ *
+ * ① 右侧消息栏（主城 / 世界地图 / 战斗 / 宠物 四页共用；grid 列、flex 基准、
+ *    页眉右缘偏移都读它）—— 画面是绝对主体、消息栏是从属的第二层 ⇒ 取 **1/φ³ = 23.6%**。
+ *    画面 : 消息栏 = 76.4 : 23.6 ≈ 3.24 : 1。
+ * ② 左侧功能条（纯图标条，宽度只由"图标 + 呼吸"决定）⇒ 取靠后的 **1/φ⁶ = 5.6%**。
+ *
+ * 🔴 必须用百分比 + clamp，不能写死像素：固定 px 在 4K 屏上会缩成一条细缝、
+ *    在小笔记本上又太占地方。两头夹住的理由：
+ *    右栏 260px = 功能下限（再窄频道 tab 换行）、480px = 上限（超过就不叫"画面 + 辅助栏"了）；
+ *    左栏 72px = 图标 32px + 左右呼吸的下限、100px = 上限（再宽就是一条空栏）。
+ * ⭐ 以后要调这两条边的宽度，改这两个数即可，四页一起变。 */
+:root {
+  --side-console-w: clamp(260px, 23.6%, 480px);
+  --side-rail-w: clamp(72px, 5.6%, 100px);
+}
+
+/* ------------------------------------------------------------
+ * 一、全站：顶栏浮在画面上（2026-09-22 第三批）
+ * 顶栏一旦脱离文档流，每个页面都"多出 48px 高度"，但内容区顶上会被它盖住
+ * ⇒ 必须让位（见下面的 .page-container）。
+ * 三个【画面页】（主城 / 世界地图 / 战斗）不让位 —— 它们要画面顶到窗口边。
+ * ------------------------------------------------------------ */
+.app-topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 90;
+  background-color: rgb(8 11 12 / .62);
+  backdrop-filter: blur(6px);
+  border-bottom-color: rgb(var(--action-gold-rgb) / .2);
+  box-shadow: 0 3px 14px rgb(0 0 0 / .45);
+}
+/* 侧栏顶部的让位在下面「三、侧栏图标条」那一条里写（它用了 padding 简写，
+   写在这里会被覆盖 —— 别在这儿重复设 padding-top）。 */
+
+/* 面板页（市集 / 宠物 / 背包 / 商店 / 百科…）：内容区顶上让出浮起的顶栏 */
+.page-container { padding-top: calc(var(--gap-md) + var(--topbar-h)); }
+
+/* 画面页：画面要顶到窗口边 ⇒ 不让位、也不要内边距 */
+#app:has(#tab-capital.active) .page-container,
+#app:has(#tab-worldmap.active) .page-container,
+#app:has(#tab-battle.active) .page-container { padding: 0; }
+
+
+/* 主城页本体：显式撑满 —— .tab-page.active 是 display:block，
+   不写高度的话 .capital-page 的 flex:1 不生效、画面撑不开 */
+#app:has(#tab-capital.active) #tab-capital { height: 100%; }
+#app:has(#tab-capital.active) .capital-page {
+  position: relative; height: 100%; padding: 0; gap: 8px;
+  flex-direction: row;          /* 画面 | 右侧消息栏 并排 */
+}
+
+/* 画面：吃掉除消息栏以外的全部宽度（不再 absolute 铺满整页） */
+#app:has(#tab-capital.active) .capital-stage {
+  position: relative; flex: 1 1 0; min-width: 0; min-height: 0;
+  border: 0; border-radius: 0;
+  /* inset 那圈暗角留着：它让浮在上面的页眉看得清 */
+  box-shadow: inset 0 0 80px rgb(0 0 0 / .55);
+}
+
+/* 页眉浮在画面顶上（像 HUD 顶条），下缘渐隐，不切一条硬边。
+ * 🔴 pointer-events 必须这样分：页眉那层渐变盖在画面顶部，
+ *    不关掉的话它下面的建筑热区全点不到（只剩页眉自己能点）。
+ * top 从顶栏下缘起算 —— 顶栏浮在画面上，页眉别钻到它底下被盖住。 */
+/* 页眉贴【画面底部】而不是顶部（2026-09-22 用户实测：标题压在亮天空上又糊又挡景，
+ * 而画面下方那一大片暗区（雾 / 地面）本来就空着）。
+ * ⇒ 整条页眉搬到底部：标题在左下、两个按钮在右下，渐变方向也跟着翻过来（暗区在下、往上渐隐）。
+ * ⚠️ 建筑热区最低在 y=80%（距底 20% ≈ 180px）⇒ 底部这条约 60px 压不到它们。 */
+#app:has(#tab-capital.active) .capital-head {
+  position: absolute; left: 0; right: calc(var(--side-console-w) + 8px);
+  top: auto; bottom: 0; z-index: 8;
+  padding: 24px 16px 12px;
+  background: linear-gradient(0deg, rgb(8 11 12 / .8), rgb(8 11 12 / 0));
+  pointer-events: none;
+}
+#app:has(#tab-capital.active) .capital-head > * { pointer-events: auto; }
+
+/* 消息区：不是浮窗，是【与画面并排的右侧固定栏】（用户 2026-09-22 要求）。
+ * 栏高 = 整屏 ⇒ 能同时看到很多条历史消息（市集成交 / 聊天 / 掉落都在这四个频道里）。 */
+#app:has(#tab-capital.active) #tab-capital .console-splitter { display: none; }
+#app:has(#tab-capital.active) #tab-capital .inline-console {
+  position: relative; flex: 0 0 var(--side-console-w);
+  width: auto; height: auto; min-height: 0;
+  background-color: rgb(8 11 12 / .82);
+  border: 1px solid rgb(var(--action-gold-rgb) / .22);
+  border-radius: var(--radius-xs);
+  backdrop-filter: blur(6px);
+}
+
+/* ============================================================
+ * 侧栏：从「后台菜单」改成「游戏图标条」（2026-09-22 第二批）
+ *
+ * 原来 276px 宽、图标带文字竖排、选中态是左边一条边框 —— 那是后台管理系统的菜单。
+ * 现在 76px 纯图标，文字改成 hover 浮出：信息一个不丢，占位只剩零头，
+ * 每个页面凭空多出 200px 宽度给内容。
+ *
+ * ⚠️ 这一段【故意全站生效、不加 :has 限定】：侧栏宽度必须各页一致，
+ *    否则玩家切页时画面宽度会跳一下。
+ * ⚠️ 项目本来就有 @media (max-width:1024px) 的窄栏版本（64px + 隐藏文字），
+ *    这里等于把它推广到所有尺寸，并补上"hover 出名字"。
+ * ============================================================ */
+.sidebar {
+  width: var(--side-rail-w);       /* 黄金分割 1/φ⁶ = 5.6%（见文件顶部） */
+  padding: 12px 6px;
+  /* 🔴 padding-top 必须写在【这一条里】：这条是简写属性，写在别处（本文件靠前的位置）
+     会被这里的 `padding: 12px 6px` 覆盖回去 ⇒ 侧栏第一项的图标钻到浮起的顶栏底下，
+     玩家只看到文字、看不到图标（2026-09-22 用户实测截图报的就是这个）。 */
+  padding-top: calc(12px + var(--topbar-h));
+}
+/* 图标在上、名字在下：
+ * 🔴 第一版做成"纯图标 + hover 才出名字"，用户实测反馈 ——
+ *    「现在新手更加不知道那几个 tab 是什么了」。游戏里图标再好，新手也不是靠图标认路的。
+ *    ⇒ 名字必须常显。但主角仍是图标（32px），名字压到 10px 弱化、居中，
+ *      这样它是一条「游戏功能条」，而不是原来那条横排左对齐的后台菜单。 */
+/* 每项高度要压住：1366×768 这种矮窗口下 11 项 × 65px 会溢出 99px（侧栏被迫滚动，
+   下面的「设置/百科」就被藏起来了）。压到 54px 后连"+开发者"共 11 项也放得下。 */
+.sb-btn { flex-direction: column; justify-content: center; gap: 2px; padding: 4px 0; }
+.sb-btn .sb-icon { width: 32px; height: 32px; }
+.sb-btn .sb-icon img { width: 32px; height: 32px; }
+.sb-btn .sb-label {
+  position: static; display: block;
+  font-size: 10px; letter-spacing: 0; line-height: 1.2; font-weight: 400;
+  color: var(--text-dim); background: none; border: 0; padding: 0;
+  opacity: 1; transform: none; transition: color .12s ease;
+}
+.sb-btn:hover .sb-label { color: var(--text); }
+.sb-btn.active .sb-label { color: var(--accent-hi); }
+/* "其他"分隔：文字收掉，只留一条细金线 */
+.sb-divider-label {
+  font-size: 0; height: 1px; padding: 0; margin: 8px 4px;
+  background: rgb(var(--action-gold-rgb) / .18);
+}
+
+/* 顶栏去网页化：英文副标是"网站 logo"才会有的东西；圆角胶囊是网页组件的形状。
+   两处都是全站生效，纯样式，不动布局。 */
+.app-topbar .title-en { display: none; }
+.idle-chip, .gem-chip { border-radius: var(--radius-xs); }
+
+/* ============================================================
+ * 四、世界地图页：与主城页同一套
+ * 两页结构几乎一样（页眉 + 画面 + 分隔条 + 消息区），所以规则也照抄一份。
+ * ⚠️ 保留各自 :has 限定 —— 别图省事把两页合并成一条，将来任一处调整会互相牵连。
+ * ============================================================ */
+#app:has(#tab-worldmap.active) #tab-worldmap { height: 100%; }
+#app:has(#tab-worldmap.active) .worldmap-page {
+  position: relative; height: 100%; padding: 0; gap: 8px;
+  flex-direction: row;          /* 地图 | 右侧消息栏 并排 */
+}
+/* 舞台与画布吃掉除消息栏以外的全部宽度 */
+#app:has(#tab-worldmap.active) .worldmap-stage { position: relative; flex: 1 1 0; min-width: 0; min-height: 0; }
+#app:has(#tab-worldmap.active) .worldmap-canvas-wrap {
+  position: absolute; inset: 0;
+  border: 0; border-radius: 0;
+  box-shadow: inset 0 0 80px rgb(0 0 0 / .55);
+}
+/* 页眉浮在画面顶上（同主城页：pointer-events 必须分开，否则点位点不到） */
+/* 同主城页：页眉搬到底部暗区 */
+#app:has(#tab-worldmap.active) .worldmap-head {
+  position: absolute; left: 0; right: calc(var(--side-console-w) + 8px);
+  top: auto; bottom: 0; z-index: 8;
+  padding: 24px 16px 12px;
+  background: linear-gradient(0deg, rgb(8 11 12 / .8), rgb(8 11 12 / 0));
+  pointer-events: none;
+}
+#app:has(#tab-worldmap.active) .worldmap-head > * { pointer-events: auto; }
+/* 消息区：与画面并排的右侧固定栏（同主城页） */
+#app:has(#tab-worldmap.active) #tab-worldmap .console-splitter { display: none; }
+#app:has(#tab-worldmap.active) #tab-worldmap .inline-console {
+  position: relative; flex: 0 0 var(--side-console-w);
+  width: auto; height: auto; min-height: 0;
+  background-color: rgb(8 11 12 / .82);
+  border: 1px solid rgb(var(--action-gold-rgb) / .22);
+  border-radius: var(--radius-xs);
+  backdrop-filter: blur(6px);
+}
+
+/* ============================================================
+ * 五、战斗页：舞台本来就铺满，这里只做两件事
+ * ============================================================ */
+/* ① 撑满（.tab-page.active 是 display:block，不写高度 .battle-page 的 flex 撑不开） */
+#app:has(#tab-battle.active) .battle-page { height: 100%; }
+/* ② 战斗页自己的顶部 HUD 条（地图名 / 返回地图）要避开浮起的顶栏，
+     否则会被压在它底下 —— 那里有「返回地图」按钮，被盖住就点不到了。 */
+#app:has(#tab-battle.active) .bp-topbar { top: calc(12px + var(--topbar-h)); }
+
+/* ============================================================
+ * 六、画面页：顶栏与页眉在画面上【不要"栏"的形状】
+ * 🔴 用户实测反馈：「主城被挡住了，被顶部的标题页」。
+ *    根因是两条带底色的横条叠在画面顶上：顶栏（0~44px，半透明底 + 底边线 + 阴影）
+ *    + 页眉（48~124px，从 84% 黑渐到透明）—— 加起来顶部 124px 被压暗一大片。
+ *    它们各自都是"一条栏"，两条摞起来就像给画面盖了块黑布。
+ * ⇒ 画面页上两者都去掉底色/边线/阴影，只留「浮在画面上的字与按钮」，
+ *    可读性改由文字阴影兜底（阴影不会挡住画面）。
+ * ⚠️ 只对三个画面页生效（主城 / 世界地图）；面板页的顶栏是实打实的导航栏，保持原样。
+ * ============================================================ */
+#app:has(#tab-capital.active) .app-topbar,
+#app:has(#tab-worldmap.active) .app-topbar {
+  background-color: transparent;
+  background-image: none;
+  border-bottom-color: transparent;
+  box-shadow: none;
+  text-shadow: 0 1px 3px rgb(0 0 0 / .9), 0 0 10px rgb(0 0 0 / .8);
+}
+/* 页眉同理：去掉那条深色渐变，改用文字阴影保证在亮画面上也看得清 */
+/* 页眉搬到画面底部（暗区）之后，那套"为亮天空准备"的重描边可以收回普通阴影。
+ * ⛔ 这里不能再写 background —— 它会盖掉上面各自定义的那条底部渐变（同文件后写者胜）。 */
+#app:has(#tab-capital.active) .capital-head,
+#app:has(#tab-worldmap.active) .worldmap-head {
+  text-shadow: 0 1px 2px rgb(0 0 0 / .85);
+}
+/* 🔴 右栏顶部必须让开浮起的顶栏（三条栏都整屏高，起点是 y=0）：
+ *    不让的话频道 tab（世界/掉落/战斗/系统）正好落在顶栏（0~44px）底下 ——
+ *    看得见消息、点不到频道。padding 而不是 margin：栏的背景仍然连续到顶。 */
+#app:has(#tab-capital.active) #tab-capital .inline-console,
+#app:has(#tab-worldmap.active) #tab-worldmap .inline-console,
+#app:has(#tab-battle.active) #tab-battle .inline-console {
+  padding-top: var(--topbar-h);
+}
+
+/* 页眉的说明小字：跟着页眉一起搬到暗区后，恢复成原来的弱化色（不必再提亮 + 描边） */
+#app:has(#tab-capital.active) .capital-head .worldmap-hint,
+#app:has(#tab-worldmap.active) .worldmap-head .worldmap-hint {
+  color: var(--text-dim);
+  text-shadow: 0 1px 2px rgb(0 0 0 / .85);
+}
+
+/* ============================================================
+ * 七、战斗页：画面 | 右侧消息栏（与主城/世界地图同一套）
+ * 用户 2026-09-22 定：战斗页也走"右侧固定栏"，不再用底部消息条。
+ * 栏里放的就是 console 的四个频道 —— 市集成交（系统）/ 聊天（世界）/ 掉落（掉落）/ 战斗，
+ * 这三样本来就有，不用新做；栏高=整屏 ⇒ 消息能看到很多条（底部 170px 时代只能看 2 条）。
+ *
+ * 🔴 画面里"居中"的东西必须改成按【画面宽】居中，不能按整页居中：
+ *    .bp-topbar（地图名/返回地图）与 .fight-action（开始挂机按钮）原本靠 left:50%，
+ *    右栏一出现它们就会偏到画面与栏的交界处。
+ * ⚠️ 立绘不再需要抬高（底部没有东西压着了），所以这一节不覆盖 bottom。
+ * ⚠️ 左下角的战报浮片 .fight-status 保持原位不动（它的内容将来可以搬进右栏）。
+ * ============================================================ */
+#app:has(#tab-battle.active) .battle-page { flex-direction: row; }
+#app:has(#tab-battle.active) #tab-battle .inline-console {
+  position: relative; flex: 0 0 var(--side-console-w);
+  width: auto; height: auto; min-height: 0;
+  background-color: rgb(8 11 12 / .82);
+  border: 1px solid rgb(var(--action-gold-rgb) / .22);
+  border-radius: var(--radius-xs);
+  backdrop-filter: blur(6px);
+}
+/* 🔴 .bp-topbar（顶部 HUD 条）与 .fight-action（底部操作按钮）这两样【不要改定位】：
+ *    它们的包含块是 .bp-arena —— 而 .bp-arena 就是"画面那一块"，本身不含右侧消息栏
+ *    ⇒ 原来的 left:50% 已经是画面中心。
+ *     我第一版画蛇添足又减了一次栏宽，中心被算到 450（实测应为 604）。
+ *     （.fight-action 虽在 .bp-bottombar 里，但那层是 display:contents，等于不存在。） */
+
+/* 画面窄了 300px 之后，顶部三块（我方状态 / 中间 HUD / 敌方状态）挤不下：
+ * 居中的 HUD 条右端会压到右上角的敌怪血条上（实测重叠约 60px）。
+ * ⇒ HUD 条只留「地图名 + 成长标签 + 返回地图」，收掉页名与那句说明
+ *   （"选好地图即自动挂机打怪"是看一次就够的重复说明；页名在左侧栏已有高亮）。 */
+#app:has(#tab-battle.active) .bp-topbar .bp-title,
+#app:has(#tab-battle.active) .bp-topbar .bp-hint { display: none; }
+
+/* 右栏顶部的「挂机账」：原来是浮在画面左下角的浮片（absolute / 半透明底 / 金竖条），
+ * 搬进右栏后改成静态块 —— 上面是账目、下面是消息，页面底部从此只剩两个操作按钮。 */
+#app:has(#tab-battle.active) #tab-battle .inline-console .fight-status {
+  position: static; left: auto; bottom: auto;
+  flex: none; width: 100%; margin: 0; padding: 10px 12px;
+  gap: 6px 10px;
+  background: none; background-image: none;
+  border: 0; border-bottom: 1px solid rgb(var(--action-gold-rgb) / .16);
+  border-radius: 0; box-shadow: none; backdrop-filter: none;
+}
+/* 那条金竖条是"浮片"的装饰件，进栏后不需要（已有底部分隔线） */
+#app:has(#tab-battle.active) #tab-battle .inline-console .fight-status::before { display: none; }
+
+/* ============================================================
+ * 八、宠物页：与三个画面页**统一**成「内容一列 + 消息一列（右栏整屏高）」
+ * 原来 #tab-pet 自己带 border + 20/22px 内边距 + 不透明底 —— 观感是"网页里的一张卡"。
+ * 现在去掉外框，并用 **grid** 把消息排到右侧（DOM 一行不动）：
+ *   左列 = 页眉 / 页签 / 内容面板（自上而下三行），右列 = 消息栏（跨三行 = 整屏高）。
+ *
+ * 🔴 选择器必须写 `#tab-pet.active`：绝不能写 `.tab-page { display:... }` 那类全局 display 规则
+ *    —— 项目红线，ID 选择器会碾压 `.tab-page{display:none}` 导致切页失效。
+ *    这里带上 `.active` ⇒ 未激活时规则根本不匹配，安全。
+ * ⚠️ 内容区让出 300px 后，装备页那套三连屏（属性 / 12 槽 / 换装背包）会更挤 —— 需实机看一眼。
+ * ============================================================ */
+#app:has(#tab-pet.active) .page-container { padding: 0; }
+#app:has(#tab-pet.active) #tab-pet {
+  padding: 0;                       /* 见下：内边距挪到左列各元素，右栏才能顶到屏幕顶 */
+  border: 0;
+  background-color: transparent;
+  background-image: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--side-console-w);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 8px;
+}
+#app:has(#tab-pet.active) #tab-pet .pet-page-head {
+  grid-column: 1; grid-row: 1;
+  padding: calc(var(--topbar-h) + 10px) 18px 0;   /* 顶部让开浮起的顶栏 */
+}
+#app:has(#tab-pet.active) #tab-pet .pet-tabs { grid-column: 1; grid-row: 2; margin: 0 18px; }
+#app:has(#tab-pet.active) #tab-pet .pet-tab-pane.active { grid-column: 1; grid-row: 3; padding: 0 18px 14px; }
+#app:has(#tab-pet.active) #tab-pet .console-splitter { display: none; }
+#app:has(#tab-pet.active) #tab-pet .inline-console {
+  grid-column: 2; grid-row: 1 / 4;
+  position: relative; flex: none; width: auto; height: auto; min-height: 0;
+  padding-top: var(--topbar-h);
+  background-color: rgb(8 11 12 / .82);
+  border: 1px solid rgb(var(--action-gold-rgb) / .22);
+  border-radius: var(--radius-xs);
+  backdrop-filter: blur(6px);
+}
+
+/* ============================================================
+ * 九、窄屏回退：浮层在窄屏会互相压成一团 ⇒ 退回原来的流式排布
+ * （战斗页自身的 @media (max-width:520px) 已有类似处理，这里是把它没覆盖到的
+ *   760px 档补齐，并保证本文件后写的浮层规则不会在窄屏上赢）
+ * ============================================================ */
+@media (max-width: 900px) {
+  /* 窄屏放不下 300px 的右栏 ⇒ 三个画面页统一退回"画面在上、消息在下"的上下分栏 */
+  #app:has(#tab-capital.active) .capital-page,
+  #app:has(#tab-worldmap.active) .worldmap-page,
+  #app:has(#tab-battle.active) .battle-page { flex-direction: column; }
+  #app:has(#tab-capital.active) #tab-capital .inline-console,
+  #app:has(#tab-worldmap.active) #tab-worldmap .inline-console,
+  #app:has(#tab-battle.active) #tab-battle .inline-console {
+    flex: 0 0 150px; width: auto; height: auto;
+  }
+  /* 页眉恢复整宽 */
+  #app:has(#tab-capital.active) .capital-head,
+  #app:has(#tab-worldmap.active) .worldmap-head { right: 0; }
+  /* 宠物页：两列回退成"内容在上、消息在下"的单列四行 */
+  #app:has(#tab-pet.active) #tab-pet {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) 150px;
+  }
+  #app:has(#tab-pet.active) #tab-pet .inline-console {
+    grid-column: 1; grid-row: 4;
+    padding-top: 0;
+  }
+}
