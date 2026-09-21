@@ -19,9 +19,9 @@
   const { getActivePet, getPets, getStats, setActive, getBonusText } = window.Pet;
   const PetSprites = window.PetSprites;
   // 已迁出的模块一律**用时取**（不能在这里存成 const）：测试 harness 的清单里它们可能排在 ui-battle.js 之后。
-  //   BattleTip   → js/ui/ui-battle-tip.js（敌方悬浮提示）
-  //   StageFx     → js/ui/ui-stage-fx.js（横幅 / 舞台闪光 / 屏幕脉冲）
-  //   （掉落演出整体在 js/ui/ui-battle-loot.js，它自己往 UI 上挂 showLoot / lootTierOf）
+  //   BattleTip   → js/ui/battle/tip.js（敌方悬浮提示）
+  //   StageFx     → js/ui/battle/stage-fx.js（横幅 / 舞台闪光 / 屏幕脉冲）
+  //   （掉落演出整体在 js/ui/battle/loot.js，它自己往 UI 上挂 showLoot / lootTierOf）
   const BattleTip = () => window.BattleTip;
   const StageFx = () => window.StageFx;
 
@@ -117,17 +117,17 @@
     $('stat-equips').textContent = String(totalEquipDrops);
   }
 
-  /* ---------- 掉落播报 + 掉落演出 → 已整体迁出到 `js/ui/ui-battle-loot.js`（2026-09-21） ----------
+  /* ---------- 掉落播报 + 掉落演出 → 已整体迁出到 `js/ui/battle/loot.js`（2026-09-21） ----------
    * 那边自己往 UI 上挂 `showLoot` / `lootTierOf`，调用方（main.js / 世界地图掉落预览）不用改；
-   * 舞台横幅等原语在 `js/ui/ui-stage-fx.js`。本文件不再管掉落，改它请去那两个文件。 */
+   * 舞台横幅等原语在 `js/ui/battle/stage-fx.js`。本文件不再管掉落，改它请去那两个文件。 */
 
-  /* 掉落起点 / 飞入演出：已迁出 → `js/ui/ui-battle-loot.js`（`rectOf` / `lootOrigin` / `flyToBag`，2026-09-21） */
-  /* 舞台横幅：已迁出 → `js/ui/ui-stage-fx.js` 的 `StageFx().banner(...)`（2026-09-21） */
-  /* 材料配色 / 掉落播报：已迁出 → `js/ui/ui-battle-loot.js`（2026-09-21） */
-  /* showLoot（掉落播报 + 演出）已迁出 → `js/ui/ui-battle-loot.js`（2026-09-21） */
+  /* 掉落起点 / 飞入演出：已迁出 → `js/ui/battle/loot.js`（`rectOf` / `lootOrigin` / `flyToBag`，2026-09-21） */
+  /* 舞台横幅：已迁出 → `js/ui/battle/stage-fx.js` 的 `StageFx().banner(...)`（2026-09-21） */
+  /* 材料配色 / 掉落播报：已迁出 → `js/ui/battle/loot.js`（2026-09-21） */
+  /* showLoot（掉落播报 + 演出）已迁出 → `js/ui/battle/loot.js`（2026-09-21） */
 
 
-  /* ---------- 敌方怪物悬浮提示 → 已迁出到 `js/ui/ui-battle-tip.js`（2026-09-21） ----------
+  /* ---------- 敌方怪物悬浮提示 → 已迁出到 `js/ui/battle/tip.js`（2026-09-21） ----------
    * 内容渲染 / 定位 / 悬停绑定都在那个模块（`window.BattleTip`）；本文件只负责"什么时候刷"：
    * resetBattle 里 bind + render，updateBars 里 updateHp。改浮层内容请去那个文件。 */
 
@@ -209,7 +209,7 @@
     if (action >= other && pct > 0) el.classList.add('leading');
     else el.classList.remove('leading');
   }
-  // 舞台高光 / 屏幕脉冲：已迁出 → `js/ui/ui-stage-fx.js`（`StageFx().flash` / `StageFx().goldPulse`，2026-09-21）
+  // 舞台高光 / 屏幕脉冲：已迁出 → `js/ui/battle/stage-fx.js`（`StageFx().flash` / `StageFx().goldPulse`，2026-09-21）
   /* 冲到对方脸前所需的水平位移：量两个立绘的实际间距，冲掉 78%（留一点间隙，别糊在对方脸上）。
    * 视觉方向：我方在左向右冲（正值），敌方在右向左冲（负值）。
    * ⚠️ 位移量必须这么量：舞台是响应式布局，两个立绘的间距随视口宽度变，写死数值必然对不上。 */
@@ -217,7 +217,7 @@
    * 而不是距离翻倍速度也翻倍——后者在宽屏上等于瞬移，晃眼。
    * 1700~2000 是"看得出在冲、又不刺眼"的区间，调快调慢改这一个数。 */
   /* ---------- 出手与命中演出（节奏 / 冲刺 / 受击形变 / 飘字 / 命中特效触发）----------
-   * 已整体迁出 → `js/ui/ui-battle-act.js`（2026-09-21，一个文件一个职责）。
+   * 已整体迁出 → `js/ui/battle/act.js`（2026-09-21，一个文件一个职责）。
    * 那边自己往 UI 上挂 `animateAttack` / `attackRecoverMs` / `animateHit` / `showDamage` / `showFloatingText`，
    * 调用方（battle.js / idle-bridge.js）不用改。守值盯着那几个时序契约，改东前先读那边的注释。 */
 
@@ -334,7 +334,7 @@
   }
 
   /* ---------- 左侧出战宠物竖列：悬停看属性 / 点击切换出战（下一场生效） ---------- */
-  /* 出战宠物竖列（头像 + 悬停详情 + 快捷入口）：已迁出 → `js/ui/ui-battle-roster.js`（2026-09-21） */
+  /* 出战宠物竖列（头像 + 悬停详情 + 快捷入口）：已迁出 → `js/ui/battle/roster.js`（2026-09-21） */
 
   // 胜利演出：敌人立绘淡出下沉（battle.js endFight 胜利时防御式调用）
   function animateVictory() {
@@ -344,7 +344,7 @@
     setTimeout(() => avatar.classList.remove('defeated'), 650);
   }
 
-  /* 挂机结算汇总弹窗：已迁出 → `js/ui/ui-battle-summary.js`（`UI.showIdleSummary`，2026-09-21） */
+  /* 挂机结算汇总弹窗：已迁出 → `js/ui/battle/summary.js`（`UI.showIdleSummary`，2026-09-21） */
 
   /* ---------- 对外 API（战斗页） ---------- */
   UI.renderStats = renderStats;
@@ -355,7 +355,7 @@
   UI.resetBattle = resetBattle;
   UI.updateBars = updateBars;
   UI.updateAction = updateAction;
-  // UI.animateAttack / UI.attackRecoverMs / UI.animateHit 由 js/ui/ui-battle-act.js 自己挂（2026-09-21）
+  // UI.animateAttack / UI.attackRecoverMs / UI.animateHit 由 js/ui/battle/act.js 自己挂（2026-09-21）
   UI.animateVictory = animateVictory;
 
   /* 升级演出：立绘脚下金环 + "LEVEL UP" 横幅
@@ -375,7 +375,7 @@
       { c: 'lu-n', t: newLevel ? ('Lv.' + newLevel) : '' }
     ], 1900);
   }
-  // UI.showDamage / UI.showFloatingText 由 js/ui/ui-battle-act.js 自己挂（2026-09-21）
+  // UI.showDamage / UI.showFloatingText 由 js/ui/battle/act.js 自己挂（2026-09-21）
   UI.showLevelUp = showLevelUp;
   UI.updateStatus = updateStatus;
   UI.renderBattleButton = renderBattleButton;
@@ -383,7 +383,7 @@
   UI.updateBattleArea = updateBattleArea;
   UI.renderCombatantData = renderCombatantData;
   UI.syncCombatantSnapshot = syncCombatantSnapshot;
-  // UI.renderRoster 由 js/ui/ui-battle-roster.js 自己挂（2026-09-21）
+  // UI.renderRoster 由 js/ui/battle/roster.js 自己挂（2026-09-21）
 })();
 
   /* ========== 战斗页快捷进化入口 ========== */

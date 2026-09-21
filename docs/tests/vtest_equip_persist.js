@@ -26,7 +26,7 @@ vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
 for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/pet/enemy-data.js', '../js/equipment/equipment.js', '../js/pet/pet.js',
   '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js',
   '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js',
-  '../js/ui/ui-console.js', '../js/ui/ui-battle.js','../js/ui/ui-battle-tip.js','../js/ui/ui-stage-fx.js','../js/ui/ui-battle-loot.js','../js/ui/ui-battle-act.js','../js/ui/ui-battle-roster.js','../js/ui/ui-battle-summary.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js',
+  '../js/ui/ui-console.js', '../js/ui/battle/index.js','../js/ui/battle/tip.js','../js/ui/battle/stage-fx.js','../js/ui/battle/loot.js','../js/ui/battle/act.js','../js/ui/battle/roster.js','../js/ui/battle/summary.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js',
   '../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js', '../js/main.js']) VTF.load(ctx, f);
 vm.runInContext('UI.initChat=function(){}', ctx); // 桩不支持 chat 查询链
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };

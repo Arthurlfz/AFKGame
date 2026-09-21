@@ -279,9 +279,9 @@ A(plays.length === 2 && plays[1].once === false, '切回 idle 恢复无限循环
 PS.restartAnim = orig; PS.playFrames = origPlay;
 
 /* ---------- 5. 静态立绘的 CSS 动作（逐帧关停时的表现层，必须连贯不闪） ---------- */
-const srcBattle = fs.readFileSync(path.join(ROOT, 'js/ui/ui-battle.js'), 'utf8');
+const srcBattle = fs.readFileSync(path.join(ROOT, 'js/ui/battle/index.js'), 'utf8');
 // ⚠️ 出手 / 受击 / 飘字演出已迁出（2026-09-21）→ 出手时序契约（§9）改读这个文件
-const srcAct = fs.readFileSync(path.join(ROOT, 'js/ui/ui-battle-act.js'), 'utf8');
+const srcAct = fs.readFileSync(path.join(ROOT, 'js/ui/battle/act.js'), 'utf8');
 A(srcCss.includes('@keyframes pet-breathe'), 'game.css 有静态立绘的待机呼吸动画');
 A(/--flip/.test(srcCss) && /transform:var\(--flip/.test(srcCss.replace(/\s/g, '')),
   '我方翻转走 --flip 变量并拼进 keyframes（否则会被呼吸动画的 transform 覆盖）');
@@ -455,25 +455,21 @@ const pngOk = pngHead.length === 33
 A(pngOk,
   `命中墨爆 PNG IHDR 为 2304×256、bitDepth=8、colorType=6（RGBA，真透明通道）`);
 // ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
-//   game.css         → fx4（fx3 之后又移走了命中特效的样式）
-//   fx.css           → fx1（新文件：素材特效样式）
-//   ui-battle.js     → fx9（fx5~9 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 / 出手演出 相继迁出）
-//   hit-fx.js        → fx1（新文件：命中特效播放器）
-//   ui-battle-tip.js → split1（新文件：敌方悬浮提示）
-//   ui-stage-fx.js   → split2（新文件：舞台横幅/闪光/屏幕脉冲）
-//   ui-battle-loot.js→ split2（新文件：掉落播报 + 掉落演出）
-//   ui-battle-roster.js / ui-battle-summary.js → split3（新文件：出战名册 / 挂机结算窗）
+//   game.css → fx4（fx3 之后又移走了命中特效的样式）｜fx.css → fx1｜hit-fx.js → fx1
+//   战斗页一族（js/ui/battle/）→ mv1：归档进目录后统一升号
+//   （迁移史：fx5~9 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 / 出手演出 相继从 ui-battle.js 迁出）
 A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
   && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
-  && /js\/ui\/ui-battle\.js\?v=20260921fx9/.test(srcHtml)
-  && /js\/ui\/ui-battle-act\.js\?v=20260921split4/.test(srcHtml)
   && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml)
-  && /js\/ui\/ui-battle-tip\.js\?v=20260921split1/.test(srcHtml)
-  && /js\/ui\/ui-stage-fx\.js\?v=20260921split2/.test(srcHtml)
-  && /js\/ui\/ui-battle-loot\.js\?v=20260921split2/.test(srcHtml)
-  && /js\/ui\/ui-battle-roster\.js\?v=20260921split3/.test(srcHtml)
-  && /js\/ui\/ui-battle-summary\.js\?v=20260921split3/.test(srcHtml),
-  '游戏.html 里 10 个文件的版本号都要对（game.css fx4 / fx.css fx1 / ui-battle.js fx9 / act split4 / hit-fx fx1 / tip split1 / stage-fx split2 / loot split2 / roster+summary split3）—— 改了 JS/CSS 不升号=改了等于没改');
+  // 战斗页一族（2026-09-21 从 js/ui/ 归档到 js/ui/battle/，版本号统一升到 mv1）
+  && /js\/ui\/battle\/index\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/act\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/loot\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/tip\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/roster\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/summary\.js\?v=20260921mv1/.test(srcHtml)
+  && /js\/ui\/battle\/stage-fx\.js\?v=20260921mv1/.test(srcHtml),
+  '游戏.html 里 CSS 与战斗页一族的版本号都要对（game.css fx4 / fx.css fx1 / hit-fx fx1 / js/ui/battle/* mv1）—— 改了 JS/CSS 不升号=改了等于没改');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条

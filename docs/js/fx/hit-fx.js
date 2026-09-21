@@ -1,7 +1,7 @@
 /* ============================================================
  * js/fx/hit-fx.js —— 唯一职责：播「命中·脚底墨爆」这一件表现。
  *
- * 谁调它：`js/ui/ui-battle.js` 的 `showDamage()`（伤害/暴击实际生效那一刻）。
+ * 谁调它：`js/ui/battle/index.js` 的 `showDamage()`（伤害/暴击实际生效那一刻）。
  *   HitFx.play(target)   target = 'pet'（我方宠物被打中）| 'enemy'（敌方怪被打中）
  * 素材：`assets/effects/hit-ink/命中墨爆.png` = 9 帧 × 256 横向帧条（透明底）。
  * 样式（位置/尺寸/层级）在 `css/fx.css` 的 `.hit-fx`——本文件只管"怎么播"。

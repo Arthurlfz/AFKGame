@@ -1120,19 +1120,22 @@ window.PetSprites = {
 <script src="js/ui/ui-tips.js?v=20260920tips"></script>
 <script src="js/ui/ui-leaderboard.js?v=20260920nametag"></script>
 <script src="js/ui/ui-friends.js?v=20260920nametag"></script>
-<!-- 命中特效播放器：js/fx/ 一个文件一套特效；必须在 ui-battle.js 之前加载 -->
+<!-- 命中特效播放器：js/fx/ 一个文件一套特效；必须在战斗页各模块之前加载 -->
 <script src="js/fx/hit-fx.js?v=20260921fx1"></script>
-<!-- 2026-09-21 从 ui-battle.js 迁出的三个模块（一个文件一件事；消费者一律用时取，顺序不敏感）：
-     ui-stage-fx   = 舞台横幅 / 舞台闪光 / 屏幕脉冲（原语）
-     ui-battle-loot= 掉落播报 + 掉落演出（自己往 UI 挂 showLoot / lootTierOf）
-     ui-battle-tip = 敌方悬浮提示 -->
-<script src="js/ui/ui-stage-fx.js?v=20260921split2"></script>
-<script src="js/ui/ui-battle-loot.js?v=20260921split2"></script>
-<script src="js/ui/ui-battle-act.js?v=20260921split4"></script>
-<script src="js/ui/ui-battle-roster.js?v=20260921split3"></script>
-<script src="js/ui/ui-battle-summary.js?v=20260921split3"></script>
-<script src="js/ui/ui-battle-tip.js?v=20260921split1"></script>
-<script src="js/ui/ui-battle.js?v=20260921fx9"></script>
+<!-- 战斗页一族已归入 js/ui/battle/（2026-09-21 分类归档；一文件一件事，消费者一律用时取，顺序不敏感）：
+       index.js    = 战斗页主入口（血条 / 行动条 / 结算 / 快照 / 状态徽章）
+       act.js      = 出手与命中演出（节奏 / 冲刺 / 受击 / 飘字）
+       loot.js     = 掉落播报 + 掉落演出（自己往 UI 挂 showLoot / lootTierOf）
+       tip.js      = 敌方悬浮提示      roster.js  = 出战竖列      summary.js = 挂机结算窗
+       stage-fx.js = 舞台原语（横幅 / 舞台闪光 / 屏幕脉冲）
+     目录说明书见 js/ui/battle/README.md -->
+<script src="js/ui/battle/stage-fx.js?v=20260921mv1"></script>
+<script src="js/ui/battle/loot.js?v=20260921mv1"></script>
+<script src="js/ui/battle/act.js?v=20260921mv1"></script>
+<script src="js/ui/battle/roster.js?v=20260921mv1"></script>
+<script src="js/ui/battle/summary.js?v=20260921mv1"></script>
+<script src="js/ui/battle/tip.js?v=20260921mv1"></script>
+<script src="js/ui/battle/index.js?v=20260921mv1"></script>
 <!-- ui-pet.js 只提供共享工具（PetUI）；下面三个后加载，会覆盖同名的 UI.renderEvolveTab / renderMergeTab / renderSynthTab 等 API，顺序不能调换 -->
 <script src="js/ui/ui-pet.js?v=20260921avatar1"></script>
 <script src="js/ui/ui-pet-evolve.js?v=20260920godsub3"></script>

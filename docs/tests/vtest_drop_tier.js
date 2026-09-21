@@ -19,13 +19,13 @@ vm.runInContext(fs.readFileSync('../js/equipment/equipment.js', 'utf8'), ctx);
 // 第 7 段要直接调 UI.showLoot 验「播报档位真的生效」，需要 UI / Pet 两个命名空间先存在
 vm.runInContext(fs.readFileSync('../js/pet/pet.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('../js/ui/ui-common.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle-tip.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-stage-fx.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle-loot.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle-act.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle-roster.js', 'utf8'), ctx);
-vm.runInContext(fs.readFileSync('../js/ui/ui-battle-summary.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/index.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/tip.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/stage-fx.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/loot.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/act.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/roster.js', 'utf8'), ctx);
+vm.runInContext(fs.readFileSync('../js/ui/battle/summary.js', 'utf8'), ctx);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const C = code => vm.runInContext(code, ctx);
 

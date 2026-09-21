@@ -95,7 +95,7 @@ for (const [file, needles] of Object.entries(modules)) {
 }
 // 反向守卫：不许再有第二套"现在谁在打"的判断散落在别处
 const scanned = ['../js/core/battle.js', '../js/core/idle-bridge.js', '../js/trial/trial-engine.js',
-  '../js/tower/tower-engine.js', '../js/main.js', '../js/ui/ui-battle.js'];
+  '../js/tower/tower-engine.js', '../js/main.js', '../js/ui/battle/index.js'];
 const offenders = scanned.filter(f => /isRunMode|isRunBusy|inDungeon/.test(fs.readFileSync(path.join(__dirname, f), 'utf8')));
 A(offenders.length === 0, 'E2. 没有第二套占用判定残留（isRunMode/isRunBusy/inDungeon 已全部收敛到占用权）' + (offenders.length ? '：' + offenders.join(',') : ''));
 

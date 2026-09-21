@@ -163,7 +163,8 @@
 | 目录 | 放什么 | 已有例子 |
 |---|---|---|
 | `js/core/` | 领域逻辑（不画界面）：数值、战斗、掉落、市场、会话 | `config.js`(数值唯一源) / `battle.js` / `idle-bridge.js` |
-| `js/ui/` | 页面与组件 UI，一个文件一页/一组件（`ui-<页面>.js`） | `ui-battle.js` / `ui-market.js` / `ui-console.js` |
+| `js/ui/` | 页面与组件 UI，一个文件一页/一组件；**同族 ≥4 个文件就建子目录**（见 9.6） | `ui-market.js` / `ui-console.js` / `ui-common.js` |
+| `js/ui/battle/` | **战斗页一族**（已归档）：主入口 `index.js` + `act` / `loot` / `tip` / `roster` / `summary` / `stage-fx`，说明书在该目录 `README.md` | `js/ui/battle/index.js` |
 | **`js/fx/`** | **纯表现"素材特效"，一套特效一个文件**（样式进 `css/fx.css` 一节、素材进 `assets/effects/<名字>/`） | `hit-fx.js`（命中脚底墨爆） |
 | `js/pet/` | 宠物领域：养成 / 合成 / 进化 / 敌人数据 | `pet.js` / `pet_merge.js` / `enemy-data.js` |
 | `js/equipment/` | 装备：词缀 / 打造 / 分解 | `equipment_craft.js` / `salvage.js` |
@@ -222,3 +223,20 @@
 **共同约定**：① 自己往 `UI` 上挂对外 API（调用方零改动）② 跨模块只走公开 API，不私接内部函数
 ③ 被依赖的模块一律**用时取**（`const X = () => window.X`），不假设加载顺序
 ④ 迁代码时**血泪注释一起搬**——注释比代码更不能丢。
+
+### 9.6 目录分类规矩（2026-09-21 用户点名「这些文件不分好细致的类吗」后立）
+
+> 只拆文件、不归目录 ⇒ `js/ui/` 会重新长成一坨（当天实测：**47 个文件平铺、0 个子目录**）。
+
+- **同族 ≥4 个文件 → 建子目录**：`js/ui/<族>/`（族 = 页面/玩法名，如 `battle/`）。
+- **进目录后去掉冗余前缀**：`ui-battle-act.js` → `js/ui/battle/act.js`；页面主入口叫 **`index.js`**。
+- **每个子目录放一个 `README.md`**：一句话一文件 + 本目录的改法规矩 —— **人和 AI 都要能一眼读懂**。
+- **单页文件不进子目录**（`ui-shop.js` / `ui-quest.js` 这种一屏一个的，留在 `js/ui/` 平铺）。
+- ⚠️ **搬迁的固定代价（一次付清，别漏项）**：
+  1. `git mv`（保留历史）；
+  2. `docs/游戏.html`：7 处 `src` 路径 + **`?v=` 升号**；
+  3. **30 个测试清单里的路径** —— 用"只替换带 `js/ui/` 前缀的完整路径"的脚本，改完**复核残留 = 0**；
+  4. 🔴 **守值里转义过的正则路径**（`/js\/ui\/ui-battle\.js/` 这种）**不会被普通字符串替换命中**，必须手改；
+  5. 代码注释里提到旧路径的地方（`core/battle.js` / `core/idle-bridge.js` / `tower/ui-tower-battle.js` / `trial/ui-trial-battle.js` / `fx/hit-fx.js`）；
+  6. 历史文档（`docs/档案/` / `docs/任务单/`）**不要改** —— 它们记录的是当时的状态。
+- ✅ 复核三件套：`残留旧路径 = 0` + 两个模块名的文件计数相等 + `npm run check` 零新红。
