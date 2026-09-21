@@ -280,6 +280,8 @@ PS.restartAnim = orig; PS.playFrames = origPlay;
 
 /* ---------- 5. 静态立绘的 CSS 动作（逐帧关停时的表现层，必须连贯不闪） ---------- */
 const srcBattle = fs.readFileSync(path.join(ROOT, 'js/ui/ui-battle.js'), 'utf8');
+// ⚠️ 出手 / 受击 / 飘字演出已迁出（2026-09-21）→ 出手时序契约（§9）改读这个文件
+const srcAct = fs.readFileSync(path.join(ROOT, 'js/ui/ui-battle-act.js'), 'utf8');
 A(srcCss.includes('@keyframes pet-breathe'), 'game.css 有静态立绘的待机呼吸动画');
 A(/--flip/.test(srcCss) && /transform:var\(--flip/.test(srcCss.replace(/\s/g, '')),
   '我方翻转走 --flip 变量并拼进 keyframes（否则会被呼吸动画的 transform 覆盖）');
@@ -295,21 +297,21 @@ A(srcCss.includes('@keyframes pet-charge') && srcCss.includes('@keyframes pet-da
   && srcCss.includes('@keyframes pet-dash-back'),
   '出手拆成前摇 + 冲出去 + 回位三段');
 // 冲刺时长必须随距离自适应：写死时长的话，舞台越宽两只宠离得越远，速度就越快（宽屏上等于瞬移，晃眼）
-A(/Math\.abs\(dist\) \/ speed/.test(srcBattle) && /--dash-out/.test(srcBattle) && /--dash-x/.test(srcBattle),
+A(/Math\.abs\(dist\) \/ speed/.test(srcAct) && /--dash-out/.test(srcAct) && /--dash-x/.test(srcAct),
   '冲刺时长按恒定速度随距离自适应（不是写死时长，否则舞台越宽冲得越快）');
-A(/PACE\s*=/.test(srcBattle) && /--dash-charge/.test(srcBattle) && /--dash-back/.test(srcBattle),
+A(/PACE\s*=/.test(srcAct) && /--dash-charge/.test(srcAct) && /--dash-back/.test(srcAct),
   '前摇 / 后摇按角色类型注入 CSS 变量（我方 / 普通 / 进化 / 变异各有节奏）');
 A(/pet-charge var\(--dash-charge/.test(srcCss) && /pet-dash-back var\(--dash-back/.test(srcCss),
   'CSS 的前摇与回位时长走变量（写死就会和 JS 的节奏表对不上）');
-A(/mutant/.test(srcBattle) && /charge:\s*300/.test(srcBattle),
+A(/mutant/.test(srcAct) && /charge:\s*300/.test(srcAct),
   '变异体的前摇明显更长（抬手慢、收招沉，类型辨识度靠这个建立）');
-A(/return pace\.charge \+ dashMs/.test(srcBattle),
+A(/return pace\.charge \+ dashMs/.test(srcAct),
   '命中时刻由表现层返回（前摇按类型、冲刺按距离，写死必然对不上）');
-A(/classList\.remove\('charging', 'attacking'\)/.test(srcBattle) && /offsetWidth/.test(srcBattle),
+A(/classList\.remove\('charging', 'attacking'\)/.test(srcAct) && /offsetWidth/.test(srcAct),
   '连击时先摘旧 class 再强制重排（同名 class 的动画不会自己重播，否则第二次出手丢前摇）');
 A(/var\(--dash-x/.test(srcCss), '扑击位移走 --dash-x 变量（由 JS 按两个立绘的实际间距算出）');
-A(/OVERLAP/.test(srcBattle) && /getBoundingClientRect/.test(srcBattle),
-  'ui-battle.js 按两个立绘的实际间距计算冲刺距离（布局是响应式的，写死必然对不上）');
+A(/OVERLAP/.test(srcAct) && /getBoundingClientRect/.test(srcAct),
+  'ui-battle-act.js 按两个立绘的实际间距计算冲刺距离（布局是响应式的，写死必然对不上）');
 // translate/rotate 必须排在 var(--flip) 之前：写在后面会被 scaleX(-1) 一起翻成反方向。
 // 必须精确截取这几个 @keyframes 块本身——按起点一刀切到文件尾会把舞台动画(rotate 开头的 slash-arc 等)也算进来
 function keyframesBlock(css, name) {
@@ -337,14 +339,14 @@ A(/#tab-battle \.stage-avatar\.attacking\s*\{\s*z-index/.test(srcCss),
 const cssCode = srcCss.replace(/\/\*[\s\S]*?\*\//g, '');
 A(!cssCode.includes('@keyframes hit-ring') && !cssCode.includes('@keyframes hit-flash'),
   '原来的 CSS 命中特效（冲击环 hit-ring / 轮廓闪光 hit-flash）必须已经移除，不许长回来');
-A(!/--sprite/.test(cssCode) && !/setProperty\('--sprite'/.test(srcBattle),
+A(!/--sprite/.test(cssCode) && !/setProperty\('--sprite'/.test(srcBattle) && !/setProperty\('--sprite'/.test(srcAct),
   '闪光层删掉后 --sprite 整条链路（CSS 的 mask-image 遮罩 + JS 两处写入）也要一并清掉，不许留死代码');
 // filter 动画跑在合成器线程，主线程读不到插值、跨机器表现不一致，别再用回它做受击闪白
 const hitKf = keyframesBlock(srcCss, 'pet-hit') + keyframesBlock(srcCss, 'pet-hit-crit');
 A(!/filter:/.test(hitKf), '受击动作不用 filter 做闪白（合成器动画不可预期）');
 // ⚠️ 暴击现在与普通命中共用同一套墨爆（用户选的"一套通用不分档"）⇒ 全屏反馈是暴击唯一的区分度，必须还在
 A(srcCss.includes('@keyframes stage-shake') && /\.battle-stage\.crit-impact::after/.test(srcCss)
-  && /StageFx\(\)\.flash\('stage-shake'/.test(srcBattle) && /StageFx\(\)\.flash\('crit-impact'/.test(srcBattle),
+  && /StageFx\(\)\.flash\('stage-shake'/.test(srcAct) && /StageFx\(\)\.flash\('crit-impact'/.test(srcAct),
   '暴击的全屏区分度（舞台震屏 + 屏幕边缘红脉冲）必须保留 —— 它是暴击与普通命中唯一的差别（2026-09-21 舞台原语已迁到 ui-stage-fx.js）');
 
 /* ---------- 8. 逐帧立绘的 CSS 契约（2026-09-21 用户实测两个 bug 后补的守值）
@@ -376,13 +378,13 @@ A(/--dash-hold/.test(srcCss) && /calc\(var\(--dash-out[^)]*\)\s*\+\s*var\(--dash
 // ⚠️ 用 [^;]* 而不是 [^,;]*：`var(--dash-out, .42s)` 里就带逗号，按逗号截断会永远匹配不上
 A(/pet-dash-out[^;]*forwards/.test(srcCss) && /pet-dash-back[^;]*forwards/.test(srcCss),
   '冲刺与回退两段都带 forwards（否则"滞空"期间宠物会弹回原位，看起来根本没有停）');
-A(/setProperty\('--dash-hold'/.test(srcBattle), 'ui-battle.js 注入 --dash-hold（滞空时长来自逐帧攻击素材）');
-const attackAnimIdx = srcBattle.indexOf("PetSprites.setAnim(node, 'attack')");
-const contactIdx = srcBattle.indexOf('const contactMs = pace.charge + dashMs');
+A(/setProperty\('--dash-hold'/.test(srcAct), 'ui-battle-act.js 注入 --dash-hold（滞空时长来自逐帧攻击素材）');
+const attackAnimIdx = srcAct.indexOf("setAnim(node, 'attack')");
+const contactIdx = srcAct.indexOf('const contactMs = pace.charge + dashMs');
 A(contactIdx > 0 && attackAnimIdx > contactIdx,
   '攻击帧是【冲到脸上才播】的（setAnim attack 必须写在 contactMs 定时器里，不能在函数开头就播）');
 // ⚠️ 别只看第一处 `lastBackMs =`：文件里还有 `let lastBackMs = 0;` 的声明（那是初值，不含滞空）
-const backLines = (srcBattle.match(/lastBackMs\s*=[^\n;]*/g) || []);
+const backLines = (srcAct.match(/lastBackMs\s*=[^\n;]*/g) || []);
 const backLine = backLines.find(l => /atkDurMs/.test(l)) || (backLines[0] || '');
 A(backLines.some(l => /atkDurMs/.test(l)),
   `归位时长/行动条冻结必须把滞空算进去（现在的写法：${backLine.trim()}）—— 漏了会出现"人还贴在怪脸上，下一手已经在原地蓄力"`);
@@ -416,15 +418,15 @@ const fxFallback = /var DEFAULT_MS\s*=\s*(\d+)/.exec(srcFx);
 A(!!fxFallback && Number(fxFallback[1]) >= 700,
   `没有逐帧攻击素材时的兜底时长 = ${fxFallback ? fxFallback[1] : '缺失'}ms，必须 ≥700（405ms 那版被用户判为"太快、看不清"）`);
 
-const damageStart = srcBattle.indexOf('function showDamage');
-const damageEnd = srcBattle.indexOf('/* ---------- 挂机状态徽章', damageStart);
-const damageBlock = damageStart >= 0 && damageEnd > damageStart ? srcBattle.slice(damageStart, damageEnd) : '';
+const damageStart = srcAct.indexOf('function showDamage');
+const damageEnd = srcAct.indexOf('UI.animateAttack =', damageStart);
+const damageBlock = damageStart >= 0 && damageEnd > damageStart ? srcAct.slice(damageStart, damageEnd) : '';
 const fxTriggerLine = damageBlock.split(/\r?\n/).find(line => /HitFx\.play/.test(line)) || '';
 A(/HitFx\.play/.test(fxTriggerLine) && /miss/.test(fxTriggerLine) && /lifesteal/.test(fxTriggerLine),
   `showDamage 里 HitFx.play 的触发口径同时排除 miss 与 lifesteal（当前行：${fxTriggerLine.trim() || '缺失'}）`);
-const hitStart = srcBattle.indexOf('function animateHit');
-const hitEnd = srcBattle.indexOf('/* 命中特效（脚底墨爆）已迁出本文件', hitStart);
-const hitBlock = hitStart >= 0 && hitEnd > hitStart ? srcBattle.slice(hitStart, hitEnd) : '';
+const hitStart = srcAct.indexOf('function animateHit');
+const hitEnd = srcAct.indexOf('// 战斗飘字', hitStart);
+const hitBlock = hitStart >= 0 && hitEnd > hitStart ? srcAct.slice(hitStart, hitEnd) : '';
 A(!/HitFx/.test(hitBlock), 'animateHit 不调用命中特效（避免 isMiss 判定前把闪避播成命中）');
 
 const fxCss = srcFxCss.match(/#tab-battle \.stage-avatar \.hit-fx\s*\{[^}]*\}/);
@@ -455,7 +457,7 @@ A(pngOk,
 // ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
 //   game.css         → fx4（fx3 之后又移走了命中特效的样式）
 //   fx.css           → fx1（新文件：素材特效样式）
-//   ui-battle.js     → fx8（fx5~8 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 相继迁出）
+//   ui-battle.js     → fx9（fx5~9 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 / 出手演出 相继迁出）
 //   hit-fx.js        → fx1（新文件：命中特效播放器）
 //   ui-battle-tip.js → split1（新文件：敌方悬浮提示）
 //   ui-stage-fx.js   → split2（新文件：舞台横幅/闪光/屏幕脉冲）
@@ -463,14 +465,15 @@ A(pngOk,
 //   ui-battle-roster.js / ui-battle-summary.js → split3（新文件：出战名册 / 挂机结算窗）
 A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
   && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
-  && /js\/ui\/ui-battle\.js\?v=20260921fx8/.test(srcHtml)
+  && /js\/ui\/ui-battle\.js\?v=20260921fx9/.test(srcHtml)
+  && /js\/ui\/ui-battle-act\.js\?v=20260921split4/.test(srcHtml)
   && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml)
   && /js\/ui\/ui-battle-tip\.js\?v=20260921split1/.test(srcHtml)
   && /js\/ui\/ui-stage-fx\.js\?v=20260921split2/.test(srcHtml)
   && /js\/ui\/ui-battle-loot\.js\?v=20260921split2/.test(srcHtml)
   && /js\/ui\/ui-battle-roster\.js\?v=20260921split3/.test(srcHtml)
   && /js\/ui\/ui-battle-summary\.js\?v=20260921split3/.test(srcHtml),
-  '游戏.html 里 9 个文件的版本号都要对（game.css fx4 / fx.css fx1 / ui-battle.js fx8 / hit-fx.js fx1 / tip split1 / stage-fx split2 / loot split2 / roster+summary split3）—— 改了 JS/CSS 不升号=改了等于没改');
+  '游戏.html 里 10 个文件的版本号都要对（game.css fx4 / fx.css fx1 / ui-battle.js fx9 / act split4 / hit-fx fx1 / tip split1 / stage-fx split2 / loot split2 / roster+summary split3）—— 改了 JS/CSS 不升号=改了等于没改');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条

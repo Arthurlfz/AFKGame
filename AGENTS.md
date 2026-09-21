@@ -206,3 +206,19 @@
 素材       assets/effects/hit-ink/命中墨爆.png  → 9 帧 × 256 横向帧条（RGBA）
 守值       tests/vtest_pet_anim.js 第 10 节     → 驱动方式 / 触发口径 / 层级 / 素材 IHDR / 版本号 / 不许回流
 ```
+
+### 9.5 已拆出来的模块（`ui-battle.js` 1115 行 → 432 行的成果，照着它们的开头注释学写法）
+
+| 模块 | 一件事 |
+|---|---|
+| `js/fx/hit-fx.js` | 播命中墨爆（唯一一套素材特效的样板） |
+| `js/ui/ui-stage-fx.js` | 舞台横幅 / 舞台闪光 / 屏幕脉冲 三个原语 |
+| `js/ui/ui-battle-loot.js` | 掉落播报 + 掉落演出（自己挂 `UI.showLoot` / `UI.lootTierOf`） |
+| `js/ui/ui-battle-tip.js` | 敌方悬浮提示（`window.BattleTip`） |
+| `js/ui/ui-battle-act.js` | 出手与命中演出：节奏 / 冲刺 / 受击形变 / 飘字 / 命中特效触发 |
+| `js/ui/ui-battle-roster.js` | 出战宠物竖列（头像 + 悬停详情 + 快捷入口） |
+| `js/ui/ui-battle-summary.js` | 挂机结算汇总弹窗 |
+
+**共同约定**：① 自己往 `UI` 上挂对外 API（调用方零改动）② 跨模块只走公开 API，不私接内部函数
+③ 被依赖的模块一律**用时取**（`const X = () => window.X`），不假设加载顺序
+④ 迁代码时**血泪注释一起搬**——注释比代码更不能丢。
