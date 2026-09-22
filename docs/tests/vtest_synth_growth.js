@@ -128,6 +128,30 @@ async function mkPet(name, growth, tag, stage, level) {
   A(C(`Pet.getStatCoeff(Pet.getPets().find(p=>p.id===${gsyn.baby.id})).atk`) > C('Config.pet.godPets.byName("血月神狐").statCoeff.atk') || gsyn.godStatCoeffBonus === 0,
     'statCoeff 含折算加成（或成长未超上限）');
 
+  /* ============ 7. 文档守值：活文档里不许再出现「成长有上限」这类过期说法 ============
+   * 2026-09-23 教训：成长上限 09-17 就取消了，但副本/塔的难度注释还按旧口径写「成长封顶 100」，
+   * 于是又有人拿它当尺子。历史档案（docs/档案/**、_bak）记录当时的状态，不在此列。
+   * ⚠️ 本文件自己也含这些字样（就是这份守值），扫描时跳过自己。 */
+  const path = require('path');
+  const root = path.join(__dirname, '..');
+  const walk = (dir, out = []) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === '_bak_20260917' || e.name === 'node_modules' || e.name === '档案') continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p, out);
+      else if (/\.(md|js)$/.test(e.name) && e.name !== 'vtest_synth_growth.js') out.push(p);
+    }
+    return out;
+  };
+  const stale = [];
+  for (const p of walk(root)) {
+    const src = fs.readFileSync(p, 'utf8');
+    if (/满成长/.test(src) || /封顶\s*100/.test(src) || /成长上限\s*100/.test(src)) stale.push(path.relative(root, p));
+  }
+  A(stale.length === 0, stale.length === 0
+    ? '活文档里没有「成长有上限」这类过期说法（成长无上限，2026-09-17 起）'
+    : '这些文件还在用过期的成长上限说法 → ' + stale.join(' / '));
+
   console.log(failures ? 'SYNTH GROWTH TESTS FAILED: ' + failures : 'ALL SYNTH GROWTH TESTS PASSED');
   process.exit(failures ? 1 : 0);
 })().catch(e => { console.error('EXC', e && (e.stack || e.message)); process.exit(1) });

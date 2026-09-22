@@ -59,7 +59,11 @@ const hpBefore = ctx.Battle.state.enemy.hp;
 // 2026-09-09 递减对抗：普攻 = atk²/(atk+def)；技能 = 普攻 + floor(普攻 × (倍率−1))，此处 1.5 倍 ≡ floor(普攻 × 1.5)
 const _pa = ctx.Battle.state.pet.atk, _ed = ctx.Battle.state.enemy.def;
 const expectedDamage = Math.floor(Math.round(_pa * _pa / (_pa + _ed)) * 1.5);
-const advancePetTurn = () => { for (let i = 0; i < 13; i++) fightTick(); };
+/* ⚠️ 2026-09-23 修：原来写死 13 个 tick（按旧 speedScale=12 算），speedScale 调到 18 后
+ * 13 个 tick 只填到 72% 行动条 ⇒ 我方根本没出手，本测试长期存量红。
+ * 正确算法：每 tick 累加 spd/speedScale，spd=100 时满条需要 **speedScale** 个 tick。 */
+const TICKS_FULL = Math.ceil(ctx.Config.battle.speedScale || 1);
+const advancePetTurn = () => { for (let i = 0; i < TICKS_FULL; i++) fightTick(); };
 advancePetTurn();
 A(ctx.Battle.state.skillQueued === false && ctx.Battle.state.skillCooldown === 3, '下一次我方行动释放技能并进入 3 回合冷却');
 A(ctx.Battle.state.enemy.hp === hpBefore - expectedDamage, '腐蚀喷吐按 150% 普攻伤害结算');

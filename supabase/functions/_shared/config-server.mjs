@@ -1,5 +1,5 @@
 // 由 gen_server_config.js 自动生成（勿手改）—— 与 docs/js/core/config.js 战斗数值同源
-// 生成时间：2026-09-17T09:15:09.537Z
+// 生成时间：2026-09-22T17:52:17.541Z
 const serverConfig = {
   "pet": {
     "starters": [
@@ -2185,6 +2185,7 @@ const serverConfig = {
   "awakenSkillDamage": 0.2,
   "resourceTrials": {
     "enabled": true,
+    "serverAuthority": true,
     "ticketName": "资源试炼门票",
     "freeEntriesPerDay": 1,
     "ticketSources": "完成地图委托（每轮交 200 个该图材料 → 1 张）",

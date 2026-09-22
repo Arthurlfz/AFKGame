@@ -16,6 +16,14 @@
  * 随机源可注入（mulberry32，同种子 diff 测试）；时间单位毫秒。
  * ============================================================ */
 
+/* 出手到命中要多久（毫秒）—— **唯一事实源**。
+ * 前端演出层（`js/ui/battle/show.js` 的 HIT_DELAY_MS）也读它，不许再手抄一份
+ * （2026-09-23 教训：手抄之后"战核改了、播放器不知道"，伤害比动作先出来）。
+ * ⚠️ 服务端副本/塔的演出数据也是按这个刻度生成的。改它必须两边一起改（`vtest_sim_sync` 守全等）。 */
+const SIM_HIT_AT = 320;
+// 收招回位的基准时长（毫秒）；前端真实后摇由表现层 `UI.attackRecoverMs()` 给，这里是模拟器口径
+const SIM_BACK_MS = 300;
+
 // ---------- 纯函数工具 ----------
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 function pickWeighted(items, weightFn, rnd) {
@@ -368,12 +376,18 @@ function calcDamage(att, defStats, config, rnd) {
 function simulateFight(input) {
   const { pet, stats, area, enemyData, config, rnd } = input;
   const B = config.battle;
+  /* 显式敌人数值入口（2026-09-23，副本 / 通天塔服务端权威用）：
+   * 副本与塔的怪是**直接给数值**的（客户端 Battle.beginTrialFloor({ enemy }) 同口径），
+   * 不走「按图表 areaEnemyStats 缩放」那条路 —— 传 enemyData.explicit = { level,hp,atk,def,spd,hit,dodge,… }。
+   * ⚠️ 改这里必须同步改 supabase/functions/_shared/battle-sim.mjs（vtest_sim_sync.js 逐函数守全等）。 */
+  const EX = (enemyData && enemyData.explicit) || null;
   const lv = Number(pet.level) || 1;
   const range = (area && area.levelRange) || [1, 6];
   const lo = Math.min(range[0], range[1]), hi = Math.max(range[0], range[1]);
   // 守关 Boss（2026-09-05）：等级=图段上限（不受宠物等级钳制），血×5、攻×1.5
   const isBoss = !!(enemyData && enemyData.isBoss);
-  const enemyLevel = isBoss ? hi : Math.min(hi, Math.max(lo, Math.max(1, lv)));
+  const enemyLevel = EX ? (Number(EX.level) || Number(enemyData.level) || 1)
+    : (isBoss ? hi : Math.min(hi, Math.max(lo, Math.max(1, lv))));
   const enemy = { ...enemyData, level: enemyLevel };
   // 怪数值 = 图中点基准 × clamp(怪等级/图中点) × typeMult × diff（battle.js scaleEnemyStats）
   const diff = (area && area.difficulty) || 1.0;
@@ -383,26 +397,28 @@ function simulateFight(input) {
   const mid = (arLo + arHi) / 2;
   const clampCfg = B.levelScaleClamp || [0.25, 1.6];
   const ratio = Math.max(clampCfg[0], Math.min(clampCfg[1], (enemy.level || 1) / mid));
-  const hp = Math.round(base.hp * ratio * tm * diff * (isBoss ? 5 : 1));
-  const def = Math.round(base.def * ratio * tm * diff);
-  const atk = Math.round(base.atk * ratio * tm * diff * (isBoss ? 1.5 : 1));
+  const hp = EX ? Math.max(1, Math.round(EX.hp)) : Math.round(base.hp * ratio * tm * diff * (isBoss ? 5 : 1));
+  const def = EX ? Math.max(0, Math.round(EX.def)) : Math.round(base.def * ratio * tm * diff);
+  const atk = EX ? Math.max(1, Math.round(EX.atk)) : Math.round(base.atk * ratio * tm * diff * (isBoss ? 1.5 : 1));
   // 怪物机制属性（2026-09-15 命中/闪避升格）：怪也有命中/闪避，跟怪等级走（config.battle.enemyMech，
   // 与 battle.js applyEnemyDefaults 同源）。塔怪由 mobEnemyStats 显式给值，不走这里。
   const EM = B.enemyMech || {};
   const emType = enemy.enemyType || 'normal';
+  // 取值优先级：explicit > enemyData 自带 > 按等级推导（副本 / 塔走前两档）
+  const pick = (a, b, c) => (a != null ? a : (b != null ? b : c));
   const E = {
     name: (isBoss ? '霸主·' : '') + enemy.name, icon: enemy.icon, level: enemyLevel,
     hp, maxHp: hp, atk, def,
-    spd: enemy.spd, // 与前端一致：enemy-data 必配 spd；缺省则 NaN（前端同样行为）
-    critRate: enemy.critRate != null ? enemy.critRate : B.critRate,
-    critDamage: enemy.critDamage != null ? enemy.critDamage : B.critMultiplier,
-    hit: enemy.hit != null ? enemy.hit : Math.round((EM.hitPerLv || 8) * enemyLevel),
-    dodge: enemy.dodge != null ? enemy.dodge
-      : Math.round((((EM.dodgeAtRef || {})[emType]) || 140) * Math.pow(enemyLevel / (EM.refLevel || 55), EM.dodgeExp || 1.35)),
-    lifesteal: enemy.lifesteal != null ? enemy.lifesteal : 0,
-    pen: enemy.pen != null ? enemy.pen : 0,
-    dmgBonus: enemy.dmgBonus != null ? enemy.dmgBonus : 0,
-    dr: enemy.dr != null ? enemy.dr : 0,
+    spd: pick(EX && EX.spd, enemy.spd, undefined), // 与前端一致：enemy-data 必配 spd；缺省则 NaN（前端同样行为）
+    critRate: pick(EX && EX.critRate, enemy.critRate, B.critRate),
+    critDamage: pick(EX && EX.critDamage, enemy.critDamage, B.critMultiplier),
+    hit: pick(EX && EX.hit, enemy.hit, Math.round((EM.hitPerLv || 8) * enemyLevel)),
+    dodge: pick(EX && EX.dodge, enemy.dodge,
+      Math.round((((EM.dodgeAtRef || {})[emType]) || 140) * Math.pow(enemyLevel / (EM.refLevel || 55), EM.dodgeExp || 1.35))),
+    lifesteal: pick(EX && EX.lifesteal, enemy.lifesteal, 0),
+    pen: pick(EX && EX.pen, enemy.pen, 0),
+    dmgBonus: pick(EX && EX.dmgBonus, enemy.dmgBonus, 0),
+    dr: pick(EX && EX.dr, enemy.dr, 0),
     // 塔怪主动技（2026-09-10）：只有塔怪会带；野图怪 undefined → 下方判定一个随机数都不消耗
     skill: enemy.skill
   };
@@ -425,7 +441,7 @@ function simulateFight(input) {
   let killBuffActive = !!input.pendingKillBuff;
   let corruptionStacks = 0;
   const scale = B.speedScale || 1;
-  const hitAt = 320, backMs = 300;
+  const hitAt = SIM_HIT_AT, backMs = SIM_BACK_MS;
   const freeze = { pet: false, enemy: false };
   const freezeUntil = { pet: 0, enemy: 0 };
   let pendingKillBuffOut = input.pendingKillBuff === true;
@@ -773,4 +789,4 @@ function simulateSessionScript(input) {
   return { events, endHp: Math.max(0, Math.round(hp)), petMaxHp: stats.hp, totalExp: events.reduce((s, e) => s + (e.exp || 0), 0), bossState: bs, consumedMs: Math.max(0, (Number(seconds) || 0) * 1000 - Math.max(0, msLeft)) };
 }
 
-window.BattleSim = { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState };
+window.BattleSim = { simulateSession, simulateSessionScript, simulateFight, petStats, calcDamage, expFromBattle, mulberry32, pickWeighted, skillOf, getEquipBonuses, getBloodline, getAwakenState, rollBoss, bossRand, BOSS_CHANCE, BOSS_PITY, BOSS_COOLDOWN, resolveLineId, godDefOf, getBaseSpeed, getStatCoeff, getMechCoeff, SIM_HIT_AT, SIM_BACK_MS };

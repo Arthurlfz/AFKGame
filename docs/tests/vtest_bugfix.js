@@ -34,7 +34,12 @@ A(C('Pet.getPets().length')===2,'Bug3：云端宠物列表整体替换（2 只�
 // 名字标签格式是「名字 等级：N级」，按 ' 等级：' 取前缀比对（带等级是有意的：战斗中升级要能看见）
 const iconName=C('document.getElementById("pet-icon-name").textContent');
 A(iconName.split(' 等级：')[0].trim()==='旺财','Bug3：对战区名字=出战宠物（旺财，实际：'+iconName+'）');
-A(C('document.getElementById("pet-icon").textContent')==='🐶','Bug3：对战区图标=出战宠物（🐶，实际：'+C('document.getElementById("pet-icon").textContent')+'）');
+/* 图标 = 该宠的立绘归属（2026-09-23 修：旧断言比对 emoji '🐶'，
+ * 但占位 emoji 已于 2026-09-10 随立绘接入一并移除 —— `mountIcon` 只写 `dataset.pet` + 挂立绘 img，
+ * 不回退 emoji。所以断言改成查**归属**：图标元素记的宠名必须是出战宠。） */
+const iconPet=C('document.getElementById("pet-icon").dataset.pet');
+A(iconPet==='旺财','Bug3：对战区图标=出战宠物立绘（dataset.pet=旺财，实际：'+iconPet+'）');
+A(C('document.getElementById("pet-icon").textContent')==='','Bug3：图标回退路径不留占位 emoji（09-10 起立绘缺席时留空）');
 // setActive 写入云端 is_active：莱姆出战 → 云端旺财变 false、莱姆变 true
 const wId=C('Pet.getPets().find(p=>p.name==="旺财").id');
 const lId=C('Pet.getPets().find(p=>p.name==="莱姆").id');

@@ -395,7 +395,7 @@
 | # | 事项 | 状态 | 说明 |
 |---|---|---|---|
 | 1 | 服务端权威（Server Authority） | 🔴 待做 | 数值结算从客户端搬到服务端，否则推广即被拆 |
-| 2 | 迁移应用记录 | 🟠 待做 | 谁按什么顺序应用了哪些 SQL、当前库停在哪个版本，无记录 |
+| 2 | 迁移应用记录 | ✅ 已建台账（2026-09-23） | 见 **`docs/迁移应用台账.md`**（45 个迁移文件逐个对照线上 32 表 / 53 函数 / 2 条 cron）。**真缺口 1 个**：`resource_trial_runs` 线上不存在（副本 EF 依赖它；现在不痛，副本服务端权威化那天会炸 ⇒ 列为该工程第一步） |
 | 3 | AI 阶段 2（服务端 AI） | 🟡 待做 | 真共享市场需 Worker；当前阶段 1 各浏览器各自市场 |
 | 4 | 毕业图内容（图 11-17） | 🟡 待做 | 当前锁死占位；AI 毕业档 persona 需毕业装需求 |
 | 5 | 云端 bot 交易记录买家昵称 | ✅ 已完成（2026-09-11） | 三个 `bot_buy_*` 改为接收 `p_buyer_name`，由客户端在收购那一刻从当次会话的 persona 取（`market.js` 的 `botBuyerName()`）；历史 2 行已回填。服务端不存 persona 名单——它每次会话随机生成、不落库，服务端无从得知「这次是谁来买」 |
@@ -433,7 +433,14 @@
    - 改函数请**新建文件**，别回头改已执行过的文件；确实要重放旧文件，跑完必须再跑一次 `migrate_security_reapply.sql`。
    - 已加「🔴 禁止重放」头注释的：`migrate_bot_buy.sql`（最初版无守卫）、`migrate_trade_records_ref.sql`（5 个函数抄的是守卫上线前的旧版）、`migrate_material_listings.sql`（`bot_buy_material` 原文无守卫）。
 7. **测试存量红（2026-09-11 基线，跑全量时别当成自己改坏的）**：
-   - **稳定红 5 个**：`vtest_action_freeze` / `vtest_boss`(D4) / `vtest_bugfix`(emoji 断言过期) / `vtest_equip_score` / `vtest_pet_skill`
+   - 🔴 **2026-09-23 更新：存量红已清零（全量 94 通过 / 0 失败，baseline 已重设）。**
+     三个长期红的真因**全是"测试写死旧常量"**，不是代码坏：
+     · `vtest_action_freeze` / `vtest_pet_skill`：把 `speedScale` 写死成旧值 **12**（现 **18**）
+       ⇒ 行动条永远填不满 ⇒ "该出手时没出手"。改成从 `Config.battle.speedScale` 推导。
+     · `vtest_bugfix`(Bug3)：断言比对占位 emoji `🐶`，而 emoji 占位 2026-09-10 随立绘接入已移除
+       ⇒ 改成查立绘归属（`#pet-icon` 的 `dataset.pet` == 出战宠名）。
+     ⭐ 教训：**测试里不许写死会变的常量**；看到 `for (i<13)`、`=== 12` 这类数字先怀疑它。
+     （**旧名单留痕**，防以后有人照旧文档找"存量红"：~~稳定红 5 个：`vtest_action_freeze` / `vtest_boss`(D4) / `vtest_bugfix` / `vtest_equip_score` / `vtest_pet_skill`~~）
    - **flaky 2 个**（时红时绿，**别把它的转绿当成自己的功劳**）：`vtest_enemy_balance`（蒙特卡洛随机）、`vtest_botbuy`（异步等待，单独跑 4/4 通过但全量里偶发红）
      ~~`vtest_tier_rarity`~~ 已于 2026-09-12 摘掉 flaky 帽子（见下），现在 3 个变 2 个。
    - ⚠️ 判定 flaky 的方法：单独连跑 3~4 次，全过 = 大概率是 flaky；再跑一次全量复验。**别急着当成自己改坏了或改好了。**

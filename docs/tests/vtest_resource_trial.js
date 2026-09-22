@@ -31,6 +31,8 @@ const localStorageStub = {
 let floorCtx = null;
 let winUntilFloor = 20;      // 前 N 层赢，之后输（默认全赢）
 let hpLossPerFloor = 0;      // 每层固定掉血（测跨层累计用）
+let healInGap = false;       // 层间空隙里偷偷把血回满（模拟漏网的回血路径，测 hpCarry 兜底）
+let hpAtFloorStart = [];     // 每层开打那一刻的血量（用于验证结转值覆盖了空隙回血）
 const battleStub = {
   beginTrialFloor(ctx2) { floorCtx = ctx2; return true; },
   isRunning: () => false,
@@ -80,17 +82,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 逐层驱动：等引擎开层 → 按 winUntilFloor/hpLossPerFloor 决定该层胜负 → 回调
 async function runTrial(routeId) {
   gained.length = 0;
+  hpAtFloorStart.length = 0;
   const done = Engine.start(routeId, {});
   let guard = 0;
   while (guard++ < 500) {
     await sleep(1);
     if (floorCtx) {
       const fc = floorCtx; floorCtx = null;
+      hpAtFloorStart.push(ctx.Pet.getCurHp(pet)); // 开层时引擎已做过 hpCarry 覆盖
       const state = Engine.getState();
       const win = state.floor <= winUntilFloor;
       const petHp = win ? Math.max(1, ctx.Pet.getCurHp(pet) - hpLossPerFloor) : 0;
       ctx.Pet.setCurHp(pet, petHp);
       fc.onEnd({ win, petHp, petMaxHp: pet.stats.hp });
+      // 复现「层间空隙偷偷回血」：onEnd 之后、下一层 setTimeout 之前把血拉满
+      if (win && healInGap) ctx.Pet.setCurHp(pet, pet.stats.hp);
     } else if (!Engine.getState().running) {
       break;
     }
@@ -122,7 +128,7 @@ async function runTrial(routeId) {
   for (let f = 1; f <= 20; f++) hpSeq.push(Engine.floorEnemyStats(route1, f).hp);
   ok(hpSeq.every((v, i) => i === 0 || v > hpSeq[i - 1]), '守关者血量逐层严格递增（难度只跟层数走）');
   ok(Engine.floorEnemyStats(route1, 20).hp > Engine.floorEnemyStats(route1, 6).hp * 5,
-    '顶层守关者强度远超前期（满成长+装备才有得上）');
+    '顶层守关者强度远超前期（毕业宠+装备才有得上；成长无上限，旧「成长有上限」的说法已作废）');
   const elite5 = Engine.floorDifficultyOf(route1, 5), floor4 = Engine.floorDifficultyOf(route1, 4);
   ok(elite5 > floor4 * 1.1, '强档层（5/10/15/20）难度跳档（eliteMult 阶梯）');
   const diffs = [];
@@ -200,6 +206,16 @@ async function runTrial(routeId) {
   ok(hpLossPerFloor > 0 && r.ok, '带掉血跑通全层（跨层累计前提）');
   ok(strong.curHp < strong.stats.hp, '通关后宠物血量没有回满（跨层累计，不白给）');
   strong.curHp = strong.stats.hp; hpLossPerFloor = 0;
+
+  /* ============ 7b. 层间空隙的回血必须被结转值覆盖（副本「整局一管血」守值） ============
+   * 历史：20 层 = 19 个空隙，每秒 +20% 最大血 ≈ 白送 +266% 血，副本比校准难度简单一大截。
+   * 引擎侧兜底 = 每层开打前用上一层收尾血量覆盖（与 tower-engine 的 hpCarry 同口径）。 */
+  ticket = 1; hpLossPerFloor = 500; healInGap = true;
+  await runTrial('temper');
+  ok(hpAtFloorStart.length >= 2, '跑了至少两层（层间回血守值的前提）');
+  ok(hpAtFloorStart[1] === strong.stats.hp - 500,
+    '第 2 层开打时血量 = 上一层结转值 ' + hpAtFloorStart[1] + '（空隙里的回血被覆盖，不是满血 ' + strong.stats.hp + '）');
+  healInGap = false; strong.curHp = strong.stats.hp; hpLossPerFloor = 0;
 
   /* ============ 8. 每日刷新：北京时间 12:00 换日 ============ */
   ok(Access.dayKeyOf(new Date('2026-09-10T03:59:00Z')) === '2026-9-9', '北京时间 11:59 仍算上一试炼日（key=2026-9-9）');

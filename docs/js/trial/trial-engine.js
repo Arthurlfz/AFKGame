@@ -6,6 +6,11 @@
  *  3. 战斗页占用权：进副本前 claim（抢占野图挂机），终局释放
  * 不负责：进入资格（trial-access.js）、奖励结算（trial-rewards.js）、任何 UI 渲染。
  * 依赖：config、trial-config/access/rewards、battle（beginTrialFloor hook）、pet、materials。
+ *
+ * ⚠️ 血量累计（与 tower-engine 同口径）：副本是「整局一管血」，层与层之间的 700ms 空隙
+ * 不该回血。野图回血时钟（main.js 每秒 regenTick）已按战斗页占用权在副本期间整体让位，
+ * hpCarry 保留为兜底 —— 每层开打前用上一层的战绩值覆盖血量，防任何漏网的回血路径
+ * （历史：20 层 = 19 个空隙，每秒 +20% 最大血 ≈ 白送 +266% 血，副本会比校准难度简单一大截）。
  * ============================================================ */
 (function () {
   'use strict';
@@ -16,7 +21,7 @@
   /* ---------- 运行时状态 ---------- */
   const state = {
     running: false, route: null, floor: 0, maxFloor: 0,
-    result: null, timer: null, access: null
+    result: null, timer: null, access: null, hpCarry: null
   };
 
   // 运行事件（UI 订阅：floor/floorClear/floorFail/settle/log）；node 测试可直接注入收集
@@ -33,7 +38,8 @@
    *          × eliteMult^(已跨过的强档层数) × route.difficulty
    *          —— 复合递增 + 强档层阶梯永久保留：难度全程严格递增，绝不倒退。
    * 怪数值 = baseStats × (怪等级 / floorLevelEnd) × 层难度。
-   * baseStats 锚点 = 第 20 层（Lv100·难度 ≈1.0）的怪，校准目标 = 满成长+主流装备可过。 */
+   * baseStats 锚点 = 第 20 层（Lv100·难度 ≈1.0）的怪，校准目标 = 毕业宠（成长 100 档）+主流装备可过。
+   * ⚠️ 成长**没有上限**（2026-09-17 取消软上限 100），旧「成长有上限」的说法已作废。 */
   function floorLevelOf(floor) {
     const c = cfg();
     const total = Math.max(2, Number(c.floors) || 20);
@@ -102,6 +108,10 @@
     const enemy = floorEnemyStats(route, state.floor);
     const Pet = window.Pet;
     const pet = Pet && Pet.getActivePet ? Pet.getActivePet() : null;
+    // 用上一层的战绩值覆盖空隙里偷偷回的血（见文件头注释）
+    if (state.hpCarry != null && Pet.setCurHp) Pet.setCurHp(pet, state.hpCarry);
+    state.hpCarry = null;
+
     const petMaxHp = (pet && Pet.getStats) ? Pet.getStats(pet).hp : 1;
     const petHp = (pet && Pet.getCurHp) ? Pet.getCurHp(pet) : petMaxHp;
     emit({ type: 'floor', route, floor: state.floor, total: cfg().floors || 20, enemy, petHp, petMaxHp });
@@ -121,7 +131,8 @@
       emit({ type: 'floorClear', route: state.route, floor: state.floor, petHp, petMaxHp });
       log(`✓ 第 ${state.floor} 层通过（剩余血量 ${petMaxHp > 0 ? Math.max(0, Math.round(petHp / petMaxHp * 100)) : 0}%）`);
       if (state.floor >= total) { finish(true); return; }
-      // 血量跨层累计：战斗引擎每层结束已把 HP 写回宠物（setCurHp），下一层快照自然带上
+      // 血量跨层累计：记下本层收尾血量，下一层开打前用它覆盖空隙里的回血（见文件头注释）
+      state.hpCarry = Math.max(0, Math.round(petHp));
       state.timer = setTimeout(() => { state.timer = null; if (state.running) beginFloor(); }, cfg().floorDelayMs || 700);
     } else {
       emit({ type: 'floorFail', route: state.route, floor: state.floor, petHp: 0, petMaxHp });
@@ -195,6 +206,26 @@
       return { ok: false, error: '战斗页尚未就绪（上一场战斗正在收尾），请稍后再试' };
     }
     try {
+      /* ===== 服务端权威（2026-09-23）：成败与奖励由服务器判定，本地只播结果 =====
+       * ⛔ 这条路径**不扣票、不发奖**（服务器已经做过了）—— 本地再来一次就是静默双倍收益。 */
+      if (window.TrialServer && window.TrialServer.isOn()) {
+        const res = await window.TrialServer.start({ routeId, petId: pet.cloudId });
+        if (!res || res.ok !== true) {
+          releasePage();
+          return { ok: false, error: (res && res.error) || '副本结算失败', detail: (res && res.detail) || '' };
+        }
+        state.running = true;
+        state.route = route;
+        state.floor = 0;
+        state.maxFloor = 0;
+        state.result = null;
+        state.access = null;   // 资格由服务器判定（免费次数 / 门票都在服务端账本里）
+        state.hpCarry = null;
+        emit({ type: 'start', route, total: c.floors || 20 });
+        replayServerRun(res);
+        return await waitUntilDone();
+      }
+
       const access = await window.TrialAccess.consumeEntry(routeId);
       if (!access.ok) return { ok: false, error: access.error };
 
@@ -204,12 +235,99 @@
       state.maxFloor = 0;
       state.result = null;
       state.access = access;
+      state.hpCarry = null;
       emit({ type: 'start', route, total: c.floors || 20 });
       beginFloor();
       return await waitUntilDone();
     } finally {
       releasePage(); // 正常终局 finish() 已释放（幂等）；异常路径由这里兜住
     }
+  }
+
+  /* ---------- 服务端结果的回放（2026-09-23） ----------
+   * 服务器给的是「每层：怪什么样 / 赢没赢 / 打完剩多少血」的战报，这里照着播：
+   * 层进度（UI.updateTrialFloor）+ 战斗日志 + 终局结算面板（UI.showTrialSettle）。
+   * ⚠️ 不写宠物血量、不发奖励 —— 一切以服务器那一份为准。
+   * ⚠️ 打架的逐帧画面目前没有（服务器模式没有实时战斗引擎），表现为「逐层播报」；
+   *    要补就走 battle-settle 那套战报播放器（服务器能给出每层战斗事件），那是另一件事。 */
+  async function replayServerRun(res) {
+    const floors = Array.isArray(res.floors) ? res.floors : [];
+    const total = cfg().floors || 20;
+    const guardianName = ((state.route || {}).guardian || {}).name || '试炼之影';
+    const Pet = window.Pet || {};
+    const pet = Pet.getActivePet ? Pet.getActivePet() : null;
+    const petName = (pet && pet.name) || '出战宠物';
+    const petMaxHp = (pet && Pet.getStats) ? Pet.getStats(pet).hp : 1;
+
+    let petStartHp = petMaxHp;
+    for (let i = 0; i < floors.length; i++) {
+      if (!state.running) return;
+      const f = floors[i];
+      state.floor = f.floor;
+      const enemyHp = (f.enemy && f.enemy.hp) || 0;
+      const enemy = {
+        name: guardianName, level: f.level, enemyType: 'evolved',
+        hp: enemyHp, maxHp: enemyHp,
+        atk: (f.enemy && f.enemy.atk) || 0, def: (f.enemy && f.enemy.def) || 0
+      };
+      emit({ type: 'floor', route: state.route, floor: f.floor, total, enemy, petHp: petStartHp, petMaxHp });
+      log(`第 ${f.floor}/${total} 层 · ${guardianName} Lv.${f.level}（血 ${enemyHp} 攻 ${enemy.atk} 防 ${enemy.def}）`);
+
+      /* 演出：把怪物摆进战斗区 + 照服务器给的出手序列打一遍。
+       * 走**公共播放器** `ui/battle/show.js`（挂机下一步也改用它，全项目只留这一份）。
+       * 没有 UI（node 测试）时它会立即返回，不拖时间。 */
+      const Show = window.BattleShow;
+      if (Show && Show.play) {
+        try {
+          const petSpd = (pet && Pet.getStats) ? Pet.getStats(pet).spd : 40;
+          const enemySpd = (floorEnemyStats(state.route, f.floor) || {}).spd || 80;
+          await Show.play({
+            petName, enemyName: guardianName,
+            petMaxHp, petStartHp, petEndHp: f.petHpLeft,
+            enemyMaxHp: enemyHp, events: f.events, win: !!f.win,
+            petSpd, enemySpd            // 行动条按真实速度推（与战核同公式）
+          });
+        } catch (e) { /* 演出异常不阻断结算 */ }
+      }
+      if (!state.running) return;
+
+      if (f.win) {
+        state.maxFloor = f.floor;
+        emit({ type: 'floorClear', route: state.route, floor: f.floor, petHp: f.petHpLeft, petMaxHp });
+        log(`✓ 第 ${f.floor} 层通过（剩余血量 ${petMaxHp > 0 ? Math.max(0, Math.round(f.petHpLeft / petMaxHp * 100)) : 0}%）`);
+      } else {
+        emit({ type: 'floorFail', route: state.route, floor: f.floor, petHp: 0, petMaxHp });
+        log(`第 ${f.floor} 层倒下…… 副本结束`);
+      }
+      petStartHp = Math.max(0, Number(f.petHpLeft) || 0);
+      if (i < floors.length - 1) await new Promise(r => { state.timer = setTimeout(() => { state.timer = null; r(); }, cfg().floorDelayMs || 700); });
+    }
+    finishServer(res);
+  }
+
+  /* 服务端路径的终局：不调 TrialRewards（不发奖），只出结算面板 + 任务上报 */
+  function finishServer(res) {
+    state.result = {
+      maxFloor: Number(res.maxFloor) || 0,
+      tierFloor: Number(res.tierFloor) || 0,
+      cleared: !!res.cleared,
+      reward: Array.isArray(res.reward) ? res.reward : [],
+      error: null,
+      floors: cfg().floors || 20,
+      consumed: res.usedFree ? 'free' : 'ticket',
+      freeLeft: null
+    };
+    state.running = false;
+    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    if (window.Quest && window.Quest.reportType) {
+      try {
+        window.Quest.reportType('trialRun', 1);
+        window.Quest.reportType('trialFloor', state.result.maxFloor || 0, { mode: 'max' });
+      } catch (e) { console.warn('[trial] 任务上报失败', e); }
+    }
+    releasePage();
+    emit({ type: 'settle', route: state.route, result: state.result });
+    return state.result;
   }
   // 层推进是异步链（setTimeout 驱动），这里轮询等待终局，保持旧 API「await 拿结算」的形态
   function waitUntilDone() {

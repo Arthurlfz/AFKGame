@@ -53,9 +53,12 @@
 ## 四、干完活必做
 
 - **跑测试**：`cd docs && npm run check`
-  ✅ **2026-09-17 实测：83 通过 / 3 失败（共 86 个 vtest），约 65 秒**（`run_all.js` 已并发，默认 6 路）。
+  ✅ **2026-09-23 实测：94 通过 / 0 失败（共 94 个 vtest），约 65 秒**（`run_all.js` 已并发，默认 6 路）。
   这条命令会自动跟 `docs/tests/baseline.json` 对比，**明确告诉你有没有新搞红的**，不用自己记数字。
-  - 存量红 3 个（**不是你的锅，别去修**）：`action_freeze` / `bugfix`(emoji 断言过期) / `pet_skill`
+  - **存量红已清零（2026-09-23）**：三个都是**测试写死旧常量**，不是代码坏 ——
+    `action_freeze` / `pet_skill` 把 `speedScale` 写死成旧值 12（现 18）⇒ 行动条永远填不满；
+    `bugfix` 的 Bug3 断言比对占位 emoji `🐶`（立绘 09-10 接入后已移除）⇒ 改成查立绘归属 `dataset.pet`。
+    ⚠️ **教训：测试里不许写死会变的常量，要从 config 推导**（`vtest_*` 里凡是硬编码的 12/13 都值得怀疑）。
   - flaky 2 个（时红时绿）：`enemy_balance` / `botbuy` —— 报红先单独连跑 3~4 次，全绿才算真回归
   - 其它：`npm run test`（只跑，不对比）｜`npm run test:v`（看失败详情）｜`npm run baseline`（**把当前设为新基线 —— 只在确认过的健康状态用**）
   - 调并发：`cd docs/tests && node run_all.js --jobs=4`
@@ -164,7 +167,7 @@
 |---|---|---|
 | `js/core/` | 领域逻辑（不画界面）：数值、战斗、掉落、市场、会话 | `config.js`(数值唯一源) / `battle.js` / `idle-bridge.js` |
 | `js/ui/` | 页面与组件 UI，一个文件一页/一组件；**同族 ≥4 个文件就建子目录**（见 9.6） | `ui-market.js` / `ui-console.js` / `ui-common.js` |
-| `js/ui/battle/` | **战斗页一族**（已归档）：主入口 `index.js` + `act` / `loot` / `tip` / `roster` / `summary` / `stage-fx`，说明书在该目录 `README.md` | `js/ui/battle/index.js` |
+| `js/ui/battle/` | **战斗页一族**（已归档）：主入口 `index.js` + `act` / `loot` / `tip` / `roster` / `summary` / `stage-fx` / **`show`（照战报演一场的公共播放器）**，说明书在该目录 `README.md` | `js/ui/battle/index.js` |
 | **`js/fx/`** | **纯表现"素材特效"，一套特效一个文件**（样式进 `css/fx.css` 一节、素材进 `assets/effects/<名字>/`） | `hit-fx.js`（命中脚底墨爆） |
 | `js/pet/` | 宠物领域：养成 / 合成 / 进化 / 敌人数据 | `pet.js` / `pet_merge.js` / `enemy-data.js` |
 | `js/equipment/` | 装备：词缀 / 打造 / 分解 | `equipment_craft.js` / `salvage.js` |

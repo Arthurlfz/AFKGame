@@ -6,7 +6,8 @@
 //      ⇒ "双方都停"改在**托管演出的观感层**实现（`idle-bridge.js` 的 freezeUntil，只影响画面、不改出刀数）。
 //      旧红线的代价记录原样保留，**不删原文**：
 //        「红线：只冻结出手方。试过全场冻结，双方轮流播演出 = 每回合串行等，60 秒从 9 场掉到 7 场」
-//   ⚠️ 本测试自 2026-09-15 基线起就是【存量红】，与上面这条决定无关。
+//   ✅ 2026-09-23 修：自 09-15 起它一直是【存量红】，真因是下面把 speedScale 写死成旧值 12
+//      （现 18）⇒ 行动条永远填不满 ⇒ "该出手时没出手"。改成从 Config 推导，全绿。
 const fs = require('fs'), vm = require('vm');
 const pet = { name: '测试宠', icon: 'x', level: 10 };
 const els = {};
@@ -46,12 +47,15 @@ const S = () => ctx.Battle.state;
 // 手动"等"完一次演出：执行对应的冻结定时器（= 命中 + 归位），按入队顺序取
 const settle = () => { const i = timers.findIndex(x => x.ms === 620); if (i < 0) return false; timers.splice(i, 1)[0].fn(); return true; };
 
-/* —— 场景一：双方同速，各冻各的 —— */
+/* —— 场景一：双方同速，各冻各的 ——
+ * ⚠️ 2026-09-23 修：这里原来写死 13 次（按旧 speedScale=12 算的），
+ *    speedScale 调成 18 之后就永远填不满 ⇒ 本测试长期存量红。
+ *    正确算法：每 tick 累加 spd/speedScale，spd=100 时满条需要 **speedScale** 次。 */
+const TICKS_FULL = Math.ceil(ctx.Config.battle.speedScale || 1);
 ctx.Battle.selectArea('a');
 ctx.Battle.startAutoBattle(() => {});
 timers.length = 0;
-// spd 100 / speedScale 12 → 每次 tick +8.33，13 次满条（浮点累加，12 次差一点点）
-for (let i = 0; i < 13; i++) tick();
+for (let i = 0; i < TICKS_FULL; i++) tick();
 A(S().petAction === 0 && S().enemyAction === 0, '双方同时满条时各出各的手（不互相吞回合）');
 A(timers.filter(t => t.ms === 620).length === 2, '冻结时长各自 = 命中时刻(320) + 归位后摇(300)');
 
@@ -72,7 +76,7 @@ ctx.Battle.stopAutoBattle();
 ctx.EnemyData.list[0].spd = 50; // 敌方半速：我方演出期间它本该攒到一半
 ctx.Battle.startAutoBattle(() => {});
 timers.length = 0;
-for (let i = 0; i < 13; i++) tick();   // 我方满条出手；敌方约 54
+for (let i = 0; i < TICKS_FULL; i++) tick();   // 我方满条出手；敌方半速 → 约 50
 const enemyMid = S().enemyAction;
 A(S().petAction === 0 && enemyMid > 40 && enemyMid < 100, '我方起手时敌方正攒到一半');
 for (let i = 0; i < 6; i++) tick();    // 我方演出未完（620ms ≈ 6 个 tick）

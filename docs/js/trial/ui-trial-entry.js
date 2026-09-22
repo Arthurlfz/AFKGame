@@ -23,8 +23,11 @@
   function entryLine(routeId) {
     const A = window.TrialAccess;
     const info = (A && A.entryInfo) ? A.entryInfo(routeId) : { freeLeft: 0, freePerDay: 0, ticketQty: 0 };
+    /* ⚠️ 服务端权威下 freeLeft 可能是 null（服务器还没回），**不能当 0 显示** ——
+     * 那会让三个副本看起来都"免费用尽"（2026-09-23 用户报「门票没对齐」）。 */
+    const fl = info.freeLeft;
     const freeTxt = info.freePerDay > 0
-      ? `今日免费 <b>${info.freeLeft}/${info.freePerDay}</b>`
+      ? `今日免费 <b>${fl == null ? '—' : fl}/${info.freePerDay}</b>`
       : '门票模式';
     return `${freeTxt} · 门票 <b>${info.ticketQty}</b>`;
   }
@@ -36,11 +39,15 @@
     const route = (A && A.routeOf) ? A.routeOf(routeId) : null;
     const pet = window.Pet && window.Pet.getActivePet ? window.Pet.getActivePet() : null;
     if (!info || !route) return { label: '进入副本', disabled: true };
-    const canFree = info.freeLeft > 0;
+    /* freeLeft == null = 服务器还没回 ⇒ 只按"等级够不够"决定能不能点，
+     * 免费还是扣票交给服务器判定（它是唯一权威）。别在这里替它做决定。 */
+    const unknown = info.freeLeft == null;
+    const canFree = unknown ? true : info.freeLeft > 0;
     const canTicket = info.ticketQty > 0;
     const levelOk = !!(pet && (Number(pet.level) || 1) >= (Number(route.minLevel) || 1));
-    const label = canFree ? `免费进入（剩 ${info.freeLeft} 次）` : (canTicket ? '消耗门票进入' : '免费次数用尽 · 需门票');
-    return { label, disabled: !(levelOk && (canFree || canTicket)) };
+    const label = unknown ? '进入副本（次数核对中）'
+      : (canFree ? `免费进入（剩 ${info.freeLeft} 次）` : (canTicket ? '消耗门票进入' : '免费次数用尽 · 需门票'));
+    return { label, disabled: !levelOk || !(canFree || canTicket) };
   }
 
   /* ---------- 面板（世界地图标题栏「资源副本」入口，也是引导 N6 的落点） ---------- */
@@ -122,11 +129,13 @@
       ? `出战：<b>${esc(active.name)}</b> · Lv.<b>${active.level || 1}</b>`
       : '还没有出战宠物';
     const levelOk = !!(active && (Number(active.level) || 1) >= (Number(route.minLevel) || 1));
-    const canFree = info.freeLeft > 0;
+    const unknown = info.freeLeft == null;   // 服务器还没回：不替它下结论
+    const canFree = unknown ? true : info.freeLeft > 0;
     const canTicket = info.ticketQty > 0;
-    const goDisabled = !(levelOk && (canFree || canTicket));
-    const goTxt = canFree ? `免费进入（剩 ${info.freeLeft} 次）` : (canTicket ? '消耗门票进入' : '免费次数用尽 · 需门票');
-    const freeClass = info.freeLeft > 0 ? '' : ' warn';
+    const goDisabled = !levelOk || !(canFree || canTicket);
+    const goTxt = unknown ? '进入副本（次数核对中）'
+      : (canFree ? `免费进入（剩 ${info.freeLeft} 次）` : (canTicket ? '消耗门票进入' : '免费次数用尽 · 需门票'));
+    const freeClass = (info.freeLeft != null && info.freeLeft <= 0) ? ' warn' : '';
 
     return `
       <div class="nd-top">
