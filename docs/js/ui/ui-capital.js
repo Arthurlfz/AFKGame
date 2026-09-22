@@ -73,14 +73,10 @@
       for (const b of BUILDINGS) host.appendChild(makeMarker(b));
       rendered = true;
     }
-    // 热区跟随底图实际渲染区域（cover）：图加载完成时定位一次，窗口尺寸变化时重算
-    const img = $('capital-bg');
-    if (img && img.complete && img.naturalWidth) layoutCapital();
-    else if (img) img.addEventListener('load', layoutCapital);
+    layoutCapital();
     if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', layoutCapital);
     bindCapital();
   }
-
   /* ---------- 热区布局：cover 模式下跟随底图实际显示区域 ----------
    * 底图 City.png 为 16:9（3584x2016），而舞台是随窗口变化的弹性比例。
    * 建筑坐标 = 相对底图的百分比；cover 会把图等比放大到铺满舞台，
@@ -90,19 +86,14 @@
    * 热区 left/top = 偏移 + 图内百分比x图实际尺寸。 */
   function layoutCapital() {
     const stage = $('capital-stage');
-    const img = $('capital-bg');
-    if (!stage || !img) return;
+    if (!stage) return;
     const sw = stage.clientWidth, sh = stage.clientHeight;
-    const iw = img.naturalWidth, ih = img.naturalHeight;
-    if (!sw || !sh || !iw || !ih) return;
-    const scale = Math.max(sw / iw, sh / ih);
-    const dw = iw * scale, dh = ih * scale;
-    const offX = (sw - dw) / 2, offY = (sh - dh) / 2;
+    if (!sw || !sh) return;
     document.querySelectorAll('.cap-bldg').forEach(el => {
       const b = BUILDINGS.find(x => x.id === el.dataset.id);
       if (!b) return;
-      el.style.left = (offX + b.x / 100 * dw) + 'px';
-      el.style.top = (offY + b.y / 100 * dh) + 'px';
+      el.style.left = (b.x / 100 * sw) + 'px';
+      el.style.top = (b.y / 100 * sh) + 'px';
     });
   }
 

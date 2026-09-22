@@ -89,7 +89,13 @@
       { path: 'nirvana.minLevel', label: '涅槃等级门槛', min: 1, max: 100, step: 1, note: '只有神级宠能涅槃' },
       { path: 'pet.babyGrowth.min', label: '孵化成长下限', min: 1, max: 100, step: 1 },
       { path: 'pet.babyGrowth.max', label: '孵化成长上限', min: 1, max: 100, step: 1 },
-      { path: 'pet.godPets.minGrowth', label: '成神成长门槛', min: 0, max: 200, step: 1 },
+      { path: 'pet.godPets.minGrowth', label: '成神成长门槛（仅提示文案）', min: 0, max: 200, step: 1 },
+      /* ⚠️ 上面那条 `pet.godPets.minGrowth` **只被 UI 文案读**（各处提示语里的"成长≥N"），
+       *   真正的判定在 `synthesize.god.minGrowth`（pet_merge.js 的 godSynthInfo）——
+       *   两个字段都叫"成神成长门槛"，调错那个不会报错、也不会有任何效果
+       *   （两条现值都是 60，所以一直没人发现）。下面两条才是判定的那个。 */
+      { path: 'synthesize.god.minGrowth', label: '成神·主宠成长门槛（判定）', min: 0, max: 200, step: 1 },
+      { path: 'synthesize.god.subMinGrowth', label: '成神·副宠成长门槛（判定）', min: 0, max: 200, step: 1, note: '0 = 副宠不看成长（只要终阶 + 等级）；2026-09-20 起为 0' },
       /* 2026-09-16：原 `pet.expPool.perCrystal`（满级经验池·每颗晶石）与 `nirvana.crystalBonus.*`（晶石加成）
        * 两项随凝魂晶石整套删除，调参项一并摘掉（留空注释，别再往这里加回已退役的字段）。 */
     ] },

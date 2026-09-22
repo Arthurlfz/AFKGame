@@ -226,9 +226,15 @@
 
     // 神级宠规则
     const G = P.godPets || {};
+    const SG = (Config.synthesize && Config.synthesize.god) || null;
     const godCells = [];
+    /* 2026-09-20：原来第一条是 `['成神成长门槛','minGrowth',...]`（读 `pet.godPets.minGrowth`）——
+     *   那个字段**没有任何判定或文案在读**（判定与全站提示都走 `synthesize.god.*`），
+     *   调它不会报错、也不会有任何效果（两值恰好都是 60，所以一直没人发现）。
+     *   现在直连判定字段（下面 push 的两条）。 */
+    if (SG) godCells.push(field('成神·主宠成长门槛', () => SG.minGrowth, v => { SG.minGrowth = v; }, { min: 0, max: 200, step: 1, int: true }));
+    if (SG) godCells.push(field('成神·副宠成长门槛', () => SG.subMinGrowth, v => { SG.subMinGrowth = v; }, { min: 0, max: 200, step: 1, int: true }));
     const godNum = [
-      ['成神成长门槛', 'minGrowth', 0, 200, 1, true],
       ['出生成长上限', 'birthGrowthCap', 0, 200, 1, true],
       ['合成终阶等级要求', 'baseLevelRequire', 1, 100, 1, true],
       ['至尊神石降级', 'supremeStoneLevelReduce', 0, 60, 1, true],

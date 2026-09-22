@@ -48,6 +48,24 @@
 .shop-card-limit { font-size: var(--fs-xs); color: var(--text-faint); }
 .shop-card .btn-mini { margin-top: 6px; align-self: flex-start; }
 
+/* ---------- 三排货架（2026-09-20） ----------
+ * 商品从「一片平铺」改成按用途分排（扩容 / 礼包 / 名牌），需要一点层级把排分开。
+ * 卡片本身不动（.shop-card 仍是市集同一规格），这里只负责排标题与排间距。 */
+.shop-shelves { display: flex; flex-direction: column; gap: var(--gap-md); }
+.shop-shelf-head {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-family: var(--font-title); font-size: var(--fs-lg); color: var(--accent-hi);
+  letter-spacing: 1px; padding: 0 2px 6px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-weak);
+}
+.shop-shelf-head .hint { font-family: var(--font-body); font-size: var(--fs-xs); color: var(--text-faint); letter-spacing: 0; }
+/* 「使用中」的名牌：禁用态不该是灰按钮（灰 = 坏了/不能点，玩家会以为出问题）。
+ * 用强调色描边表达"这就是你当前戴的那一档"，与旁边可点的「使用」区分开。 */
+.shop-tag-on {
+  border-color: var(--accent); color: var(--accent-hi);
+  background: rgb(var(--action-gold-rgb) / .1); opacity: 1;
+}
+
 /* ---------- 卡密兑换 ---------- */
 .shop-pay-note { font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.6; margin-bottom: var(--gap-sm); }
 .shop-redeem { display: flex; gap: var(--gap-sm); align-items: center; flex-wrap: wrap; }

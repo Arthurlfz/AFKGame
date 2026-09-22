@@ -458,7 +458,6 @@
       console.warn('[guide] 引导经验包未生效：没有宠物');
       return { ok: false, error: '没有宠物' };
     }
-    const Supabase = window.Supabase;
     const needName = [];
     let boosted = 0;
     for (const pet of list) {
@@ -469,24 +468,15 @@
       if ('exp' in pet) pet.exp = 0;   // 顶完不残留旧经验，避免到门槛就立刻再升一级
       needName.push(pet.name || '魂兽');
       boosted++;
-      if (Supabase) {
-        try {
-          if (pet.cloudId) {
-            // 已建档：更新等级/经验（绝不 INSERT——savePet 是建档，会复制出重复宠）
-            await Supabase.updatePet(pet.cloudId, { level: pet.level, exp: 0 });
-          } else if (Supabase.savePet) {
-            const r = await Supabase.savePet(pet);
-            if (!r.error && r.data && r.data.id) pet.cloudId = r.data.id;
-          }
-        } catch (e) {
-          console.warn('[guide] 引导经验包等级云端存档失败', e);
-          // 2026-09-11：这条失败绝不能再静默 —— 本地已顶到目标等级、UI 也弹了"生效"，
-          // 但云端没写进去。玩家一刷新等级回退，而账本已记账（不能再领一次），等于凭空丢了。
-          // 至少要如实告诉玩家，让他知道要重新登录而不是以为游戏坏了。
-          if (window.UI && window.UI.addLog) {
-            window.UI.addLog('⚠️ 引导等级云端存档失败，刷新后可能回退（重新登录可再试）');
-          }
-        }
+      /* 存档走共享的 savePetProgress（updatePet / savePet 的选择只在那里做一次）。
+       * ⚠️ 2026-09-22：原来这里只 try/catch 异常，**没检查 updatePet 返回的 error**
+       *   ⇒ 云端写失败（网络/权限）时静默放过，玩家刷新才发现等级回退。
+       * 2026-09-11：这条失败绝不能再静默 —— 本地已顶到目标等级、UI 也弹了"生效"，
+       *   但云端没写进去。玩家一刷新等级回退，而账本已记账（不能再领一次），等于凭空丢了。
+       *   至少要如实告诉玩家，让他知道要重新登录而不是以为游戏坏了。 */
+      const okSave = await savePetProgress(pet);
+      if (!okSave && window.UI && window.UI.addLog) {
+        window.UI.addLog('⚠️ 引导等级云端存档失败，刷新后可能回退（重新登录可再试）');
       }
     }
     if (!boosted) {
@@ -527,6 +517,32 @@
       try { window.UI.showToast('经验包已发放', `${pack.name} ×1 —— 背包 · 消耗品里点击使用（直升 Lv${pack.cap}）`); } catch (e) { /* 忽略 */ }
     }
   }
+  /* 宠物等级/经验写回云端（经验包使用 / 引导顶级共用这一份，别各写一套）。
+   * ⛔ 已建档的宠必须走 updatePet —— Supabase.savePet 是**无条件 INSERT**（建档语义），
+   *   拿它"保存"已有的宠会再插一行，刷新后「莫名多出一堆重复宠」（2026-09-08 血泪）。
+   * 返回 false = 没存上（调用方必须告诉玩家，绝不能静默，同 2026-09-11 那条决定）。 */
+  async function savePetProgress(pet) {
+    const S = window.Supabase;
+    const user = (window.UI && window.UI.getAuthUser) ? window.UI.getAuthUser() : null;
+    if (!S || !user) return true;   // 未登录：本地玩，本来就没有云端可写
+    try {
+      if (pet.cloudId) {
+        const r = await S.updatePet(pet.cloudId, {
+          level: pet.level, exp: Math.max(0, Math.round(Number(pet.exp) || 0))
+        });
+        return !r.error;
+      }
+      if (S.savePet) {
+        const r = await S.savePet(pet);
+        if (!r.error && r.data && r.data.id) pet.cloudId = r.data.id;
+        return !r.error;
+      }
+      return false;
+    } catch (e) {
+      console.warn('[guide] 宠物进度云端存档失败', e);
+      return false;
+    }
+  }
   async function useExpPack(name) {
     const M = window.Materials;
     if (!M || !M.spend) return { ok: false, error: '材料系统未就绪' };
@@ -551,10 +567,25 @@
       const before = Number(pet.level) || 1;
       const spent0 = await M.spend(name, 1);
       if (!spent0.ok) return { ok: false, error: spent0.error || '使用失败' };
-      if (Pet.grantExp) Pet.grantExp(pet, Number(gen.amount) || 0);
+      /* 🔴 2026-09-22 补：原来 grantExp 完就 return —— 包已经在**服务端**扣掉了
+       *   （Materials.spend 走云端原子扣 spend_material），但涨出来的等级/经验**从没写过云端**
+       *   ⇒ 刷新/重登后等级回退、包也没了 = 玩家眼里的"经验被吞"。
+       *   与战斗结算同口径：updatePet(cloudId, { level, exp })。
+       * ⚠️ 托管期间本地 level/exp 是演出预演值（服务器真账领先）→ 先结清真账再写
+       *   （duringPetEdit，与引导经验包同口径），否则写完立刻被下一次真账覆盖回去，照样白吃。 */
+      const applyAndSave = async () => {
+        if (Pet.grantExp) Pet.grantExp(pet, Number(gen.amount) || 0);
+        return savePetProgress(pet);
+      };
+      const IB = window.IdleBridge;
+      const saved = (IB && IB.duringPetEdit) ? await IB.duringPetEdit(applyAndSave) : await applyAndSave();
+      if (!saved && window.UI && window.UI.addLog) {
+        // 包已扣、云端没写进去；再领一次不可能（账本已记），只能如实说（2026-09-11 同一条决定）
+        window.UI.addLog('⚠️ 经验包等级云端存档失败，刷新后可能回退（重新登录可再试）');
+      }
       const after = Number(pet.level) || before;
       if (window.UI && window.UI.renderAll) { try { window.UI.renderAll(); } catch (e) { /* 忽略 */ } }
-      return { ok: true, exp: Number(gen.amount) || 0, level: after, levelUp: after > before, petName: pet.name };
+      return { ok: true, exp: Number(gen.amount) || 0, level: after, levelUp: after > before, petName: pet.name, saved: !!saved };
     }
 
     // ---- 引导经验包：档位锁死，全部已达标 → 用了也白用，省着 ----

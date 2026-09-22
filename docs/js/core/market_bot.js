@@ -323,17 +323,25 @@
   /* ---------- 补货检查（每 intervalMs 执行一次） ---------- */
   async function tick() {
     if (!MB.enabled) return;
+    /* 补货量一律**受上限约束**（2026-09-22 内测 🟠7）：以前无条件每 tick 加 perTick 件、
+     * 假单只增不减 ⇒ 两分钟能从 87 涨到 496。现在到顶就不补，只有被买走才回补。
+     * 统一算法：want = max(每 tick 基础量, 下限 - 现有) ，再被 (上限 - 现有) 截断。 */
+    const want = (cur, base, min, max) => {
+      const cap = Math.max(1, max);
+      if (cur >= cap) return 0;                                   // 到顶：不再补
+      return Math.max(0, Math.min(Math.max(base, min - cur), cap - cur));
+    };
     const current = Market.getBotListings().length;
-    const target = Math.max(MB.perTick || 5, (MB.minActive || 20) - current);
+    const target = want(current, MB.perTick || 5, MB.minActive || 20, MB.maxActive || 48);
     if (target > 0) await restock(target);
     const currentPets = Market.getBotPetListings().length;
-    const targetPets = Math.max(MB.petPerTick || 2, (MB.petMinActive || 10) - currentPets);
+    const targetPets = want(currentPets, MB.petPerTick || 2, MB.petMinActive || 10, MB.petMaxActive || 20);
     if (targetPets > 0) restockPets(targetPets);
     const curMat = (Market.getBotMaterialListings ? Market.getBotMaterialListings() : []).length;
-    const tarMat = Math.max(MB.perTick || 5, (MB.minMaterial || 8) - curMat);
+    const tarMat = want(curMat, MB.perTick || 5, MB.minMaterial || 8, MB.maxMaterial || 16);
     if (tarMat > 0) restockMaterials(tarMat);
     const curEgg = (Market.getBotEggListings ? Market.getBotEggListings() : []).length;
-    const tarEgg = Math.max(MB.perTick || 5, (MB.minEgg || 5) - curEgg);
+    const tarEgg = want(curEgg, MB.perTick || 5, MB.minEgg || 5, MB.maxEgg || 12);
     if (tarEgg > 0) restockEggs(tarEgg);
     if (window.UI && UI.renderMarket) UI.renderMarket();
   }

@@ -57,12 +57,45 @@
 
   const timeNow = () => new Date().toTimeString().slice(0, 5);
 
+  /* ---------- 同类掉落合并（2026-09-22）----------
+   * 问题：挂机时掉落频道被同一件材料刷屏（腐变之心 ×1 → ×1 → ×1…），一屏只看得见三四种东西，
+   *   真正的"稀有掉落"全被冲没了。
+   * 做法：调用方给出 mergeKey（如 'mat:腐变之心'）+ mergeRender(总数)；
+   *   若**上一条消息就是同类**、且 2 分钟内，就把数量加在它身上、就地改那一行文本。 */
+  const MERGE_WINDOW_MS = 120000;
+  /* 就地改一行 DOM（不整列重建）——整列重建会把顶档掉落的流光动画打回起点，
+   * 那正是 renderList 做增量渲染要避免的事。节点找不到（列还没渲染到这行 / 不是同一屏）才退回整列重建。 */
+  function patchRow(entry) {
+    for (const root of consoleRoots()) {
+      const list = root.querySelector('.chat-list');
+      if (!list) continue;
+      const node = list.querySelector ? list.querySelector('[data-seq="' + entry.seq + '"]') : null;
+      const txt = node && node.querySelector ? node.querySelector('.chat-text') : null;
+      if (txt) txt.innerHTML = entry.html;
+      else { list.__seqs = null; list.__cat = null; }   // 这一列没这行 → 下次整列重建兜底
+    }
+    renderChatPanel();
+  }
+
   /* ---------- 统一入口（分类写日志 + 刷新全部消息容器显示） ----------
-   * structured：可选结构化字段（如社交消息的 {name,self,text}），弹窗优先用它排版
-   * （名字/内容分离），没有就退回 html。 */
+   * structured：可选结构化字段（如社交消息的 {name,self,text} 或掉落的 {mergeKey,mergeQty,mergeRender}），
+   * 弹窗优先用它排版（名字/内容分离），没有就退回 html。 */
   function consoleLog(cat, html, structured) {
+    const s = structured || null;
+    const last = history[history.length - 1];
+    if (s && s.mergeKey && last && last.cat === cat && last.mergeKey === s.mergeKey
+        && (Date.now() - (last.mergedAt || 0)) < MERGE_WINDOW_MS) {
+      last.qty = (last.qty || 1) + (s.mergeQty || 1);
+      last.mergedAt = Date.now();
+      last.html = (typeof s.mergeRender === 'function') ? s.mergeRender(last.qty) : last.html;
+      last.time = timeNow();
+      patchRow(last);
+      return;
+    }
     // seq：单调递增的流水号，renderList 靠它判断"哪些行是新的"，才能增量渲染（见 renderList 注释）
-    history.push(Object.assign({ cat, time: timeNow(), html, seq: ++seq }, structured || {}));
+    const entry = Object.assign({ cat, time: timeNow(), html, seq: ++seq, mergedAt: Date.now() }, s || {});
+    if (s && s.mergeKey) entry.qty = s.mergeQty || 1;
+    history.push(entry);
     if (history.length > MAX) history.shift();
     renderChatPanel();
   }
@@ -78,10 +111,25 @@
   let myName = '玩家';            // 当前登录显示名
   let lastSendTime = 0;           // 防刷屏
 
-  // 渲染一条聊天消息进社交分类（name 已转义；同时存结构化字段供弹窗排版）
-  function renderChatMessage(name, text, isSelf) {
-    const tag = isSelf ? '<b style="color:var(--accent)">' + escHtml(name) + '</b>' : '<b>' + escHtml(name) + '</b>';
-    consoleLog('social', CHAT_ICON + ' ' + tag + '：' + escHtml(text), { name: escHtml(name), self: isSelf, text: escHtml(text) });
+  /* 聊天里别人戴的名牌：uid → key。
+   * 一次拉一页（在 loadChatHistory 里），**不逐条请求** —— getCurrentUser 单次 550ms 的教训。
+   * Realtime 推来的陌生发言人：本条先不显示名牌，顺手把它补进缓存，下一条就带上了
+   * （不为了一个新名牌把整列重渲染 —— 那会把掉落/顶档的流光动画打回起点）。 */
+  let chatTags = {};
+
+  // 渲染一条聊天消息进社交分类（名字交给 UI.nameTag：它负责转义 + 按名牌 key 上色）
+  function renderChatMessage(name, text, isSelf, uid) {
+    const key = isSelf
+      ? ((window.Supabase && window.Supabase.getPerksCache) ? window.Supabase.getPerksCache().name_tag : null)
+      : chatTags[uid];
+    const label = (window.UI && window.UI.nameTag) ? window.UI.nameTag(name, key) : escHtml(name);
+    const tag = isSelf ? '<b style="color:var(--accent)">' + label + '</b>' : '<b>' + label + '</b>';
+    /* ⚠️ structured.name 存**原始名字**（不转义）：聊天列表真正的渲染在 `chatMsgHtml()`，
+     * 那边要把名字交给 UI.nameTag（上名牌 + 转义）；这里先转义会导致二次转义（显示成 &amp;）。
+     * 全项目只有 chatMsgHtml 一处读 m.name（2026-09-20 核实）。
+     * 🔴 同时把 uid 存进去 —— 名牌要按 uid 查，之前没存，所以列表里永远拿不到名牌。 */
+    consoleLog('social', CHAT_ICON + ' ' + tag + '：' + escHtml(text),
+      { name: name, uid: uid || (isSelf ? (window.__chatMyId || null) : null), self: isSelf, text: escHtml(text) });
   }
 
   // 加载最近聊天历史（进游戏先显示）
@@ -91,12 +139,18 @@
     if (error || !data || !data.length) return;
     // 历史按时间正序显示（查询是倒序的，翻转）
     const rows = [...data].reverse();
+    // 名牌：这一页的发言人**一次取完**；失败/未登录返回 {}，当没名牌显示，绝不挡聊天
+    if (window.Supabase.fetchPerksOf) {
+      try { chatTags = await window.Supabase.fetchPerksOf(rows.map(r => r.user_id)); } catch (e) { /* 名牌失败不影响聊天 */ }
+    }
     for (const r of rows) {
       if (seenIds.has(r.id)) continue;
       seenIds.add(r.id);
-      renderChatMessage(r.sender_name, r.message, r.user_id === (window.__chatMyId || ''));
+      renderChatMessage(r.sender_name, r.message, r.user_id === (window.__chatMyId || ''), r.user_id);
     }
     // 历史只进本地，不依赖 Realtime 广播
+    markAllRead();      // 历史不算未读
+    renderChatPanel();
   }
 
   // 订阅 Realtime：别人发消息实时收到
@@ -111,7 +165,14 @@
         if (!row || !row.id || !row.message) return;
         if (seenIds.has(row.id)) return;   // 自己发的（本地已显示过）跳过
         seenIds.add(row.id);
-        renderChatMessage(row.sender_name, row.message, false);
+        renderChatMessage(row.sender_name, row.message, false, row.user_id);
+        /* 陌生人第一次发言：本条先不带名牌（拿不到就先不显示），顺手把它补进缓存，
+         * 下一条就带上了 —— 不为了一个新名牌把整列重渲染（那会打断顶档流光的动画）。 */
+        if (row.user_id && !chatTags[row.user_id] && window.Supabase.fetchPerksOf) {
+          window.Supabase.fetchPerksOf([row.user_id]).then(m => {
+            if (m && m[row.user_id]) chatTags[row.user_id] = m[row.user_id];
+          }).catch(() => { /* 名牌失败静默 */ });
+        }
       })
       .subscribe();
   }
@@ -227,32 +288,61 @@
     return roots;
   }
 
-  // 聊天弹窗社交消息：名字 / 内容分离排版（demo 样式）；系统/掉落消息退回 html 渲染
+  /* 聊天弹窗社交消息：名字 / 内容分离排版（demo 样式）；系统/掉落消息退回 html 渲染
+   * 🔴 2026-09-20 名牌踩坑（用户连报三次"没显示"的真因）：
+   *   **社交消息的名字是在这里拼的**，不是 renderChatMessage 里那份 html ——
+   *   之前只改了 renderChatMessage，等于白改，列表里永远看不到名牌。
+   * 名牌的视觉（放大 / 加粗 / 流光 / 入场闪白）全在 game.css 的 `.name-tag--*` 里，
+   * 这里只负责把 key 交出去；名字交给 UI.nameTag（它内部转义，所以 m.name 存的是原文）。 */
   function chatMsgHtml(m) {
+    // data-seq：掉落合并时要按流水号就地改这一行（见 patchRow），别省 —— 省了就只能整列重建、动画全断
     if (m.cat === 'social') {
-      return '<div class="chat-msg social' + (m.self ? ' self' : '') + '">' +
+      const key = m.self
+        ? ((window.Supabase && window.Supabase.getPerksCache) ? window.Supabase.getPerksCache().name_tag : null)
+        : chatTags[m.uid];
+      const label = (window.UI && window.UI.nameTag) ? window.UI.nameTag(m.name, key) : escHtml(m.name || '');
+      return '<div class="chat-msg social' + (m.self ? ' self' : '') + '" data-seq="' + m.seq + '">' +
         '<span class="chat-time">' + m.time + '</span>' +
-        '<span class="chat-name">' + (m.name || '') + '</span>' +
+        '<span class="chat-name">' + label + '</span>' +
         (m.self ? '<span class="chat-me-tag">我</span>' : '') +
         '<span class="chat-text">' + (m.text || m.html) + '</span></div>';
     }
-    return '<div class="chat-msg ' + m.cat + '">' +
+    return '<div class="chat-msg ' + m.cat + '" data-seq="' + m.seq + '">' +
       '<span class="chat-time">' + m.time + '</span>' +
       '<span class="chat-ic">' + (CAT_ICON[m.cat] || CAT_ICON.system) + '</span>' +
       '<span class="chat-text">' + m.html + (m.action === 'openQuest' ? ' <button class="chat-action" data-chat-action="openQuest">去领取</button>' : '') + '</span></div>';
   }
+  // 社交消息的 text 字段是【已转义】的，patchRow 直接写回时不带标签；这里保持与 chatMsgHtml 一致即可
 
   /* 渲染单个容器的频道 tab（点谁切谁，切后刷新所有容器） */
+  /* 未读数（2026-09-22）：只统计**这次进入游戏之后**来的消息（记忆读到的历史聊天不算"新"）。
+   * 切到某个频道就把它清掉；徽章只出现在非当前频道上。 */
+  const seenUpTo = {};
+  function unreadOf(cat) {
+    const from = seenUpTo[cat] || 0;
+    return history.reduce((n, m) => n + (m.cat === cat && m.seq > from ? 1 : 0), 0);
+  }
+  function markRead(cat) { if (cat) seenUpTo[cat] = seq; }
+  // 一次性把全部频道标成已读：进游戏时读到的历史聊天不是"新消息"，不该顶着 50 条未读
+  function markAllRead() { TABS.forEach(c => { seenUpTo[c] = seq; }); }
+
   function renderTabs(tabsEl) {
     if (!tabsEl) return;
     tabsEl.innerHTML = TAB_META.map(t => {
       const n = history.filter(m => m.cat === t.id).length;
+      const un = t.id === activeTab ? 0 : unreadOf(t.id);
+      const badge = un > 0 ? '<span class="chat-tab-unread" title="' + un + ' 条新消息">' + (un > 99 ? '99+' : un) + '</span>' : '';
       return '<button class="chat-tab' + (t.id === activeTab ? ' on' : '') + '" data-cat="' + t.id + '">' +
         '<span class="chat-tab-dot"></span>' + t.icon + ' ' + t.label +
-        '<span class="chat-tab-cnt">' + n + '</span></button>';
+        '<span class="chat-tab-cnt">' + n + '</span>' + badge + '</button>';
     }).join('');
     tabsEl.querySelectorAll('.chat-tab').forEach(btn => {
-      btn.onclick = () => { activeTab = btn.dataset.cat; saveActiveTab(); renderChatPanel(); };
+      btn.onclick = () => {
+        activeTab = btn.dataset.cat;
+        markRead(activeTab);          // 看过了就清零
+        saveActiveTab();
+        renderChatPanel();
+      };
     });
   }
 
@@ -302,6 +392,20 @@
       if (list) renderList(list);
     }
   }
+
+  /* 名牌换档后，**已经显示在页面上的老消息不会自己变色** ——
+   * 名字颜色是"渲染那一刻"嵌进 HTML 的，不动它就一直是旧名牌。
+   * 🔴 2026-09-20 用户报「货不对板」：选了血月，聊天里自己的名字还是金色
+   *    （服务端其实 18:33 就切好了 —— 查库才确认不是切换失败，是这个显示问题）。
+   * 做法：清掉增量渲染的锚点（`__seqs`/`__cat`）强制整列重建。
+   * 代价是重播一次入场流光 —— 换档是显式操作，这一次重播可以接受。 */
+  UI.repaintConsole = function () {
+    for (const root of consoleRoots()) {
+      const list = root.querySelector('.chat-list');
+      if (list) { list.__seqs = null; list.__cat = null; }
+    }
+    renderChatPanel();
+  };
 
   /* ---------- 底部聊天弹窗（透明可调；对齐任务面板/装备打造的浮层体系） ---------- */
   function openChatPanel() {
@@ -442,6 +546,7 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChatPanel(); });
     initInlineConsoles();
     initSplitters();
+    markAllRead();      // 打开界面时已读基线对齐（否则历史消息会顶一堆未读徽章）
     renderChatPanel();
   }
 
@@ -451,6 +556,7 @@
 
   /* ---------- 对外 API ---------- */
   UI.consoleLog = consoleLog;
+  UI.consoleMarkRead = markAllRead;   // 登录/读历史之后调一次，把未读基线对齐
   UI.openChatPanel = openChatPanel;
   UI.closeChatPanel = closeChatPanel;
   // 登录后调用：加载聊天历史 + 订阅实时消息（未登录不调用，避免无会话订阅失败）

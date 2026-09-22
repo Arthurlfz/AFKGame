@@ -43,7 +43,9 @@ create policy user_perks_select_own on public.user_perks
 -- ③ 商品：市场挂单额度 +5（限购 2 次 → 最多 +10，与 CHECK 上限对齐）
 insert into public.products (sku, title, kind, price_gems, limit_per_user, payload, icon, sort, active) values
   ('perk_listing_5', '市场挂单额度 +5', 'convenience', 20, 2,
-   '{"perks":{"listing_slots":5}}', '🏷', 20, true)
+   -- 图标用 assets/ui 的水墨 PNG，不用 emoji（2026-09-20：emoji 跟水墨牌匾风格打架，用户点名"太廉价"）。
+   -- ⚠️ migrate_shop_perks2.sql 里也有一份同 sku 的行（幂等 upsert 会覆盖成同一份），两处必须一致。
+   '{"perks":{"listing_slots":5}}', '<img class="mat-img" src="assets/ui/ic_stall.png" alt="">', 20, true)
 on conflict (sku) do update set
   title = excluded.title, kind = excluded.kind, price_gems = excluded.price_gems,
   limit_per_user = excluded.limit_per_user, payload = excluded.payload,

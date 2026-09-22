@@ -28,6 +28,23 @@
   // 自动追踪：进度到这个比例的任务自动顶上追踪栏（手动钉的优先，格子不够时自动的先被挤掉）
   const AUTO_TRACK_RATIO = 0.8;
 
+  /* ---------- 提交结果就地反馈（2026-09-21 内测清单 🟠16「任务提交没反馈」）----------
+   * 🔴 根因与市集"购买失败没反应"是同一个：`UI.showToast` 只往**消息中心**写一行字，
+   * 而任务面板是浮层、引导条在屏幕角落 —— 玩家正盯着的是这两处，不是消息中心，
+   * 于是"交没交成、给了什么奖励"完全不知道。
+   * ⇒ 成败都要**就地**写进玩家正在看的容器里（消息中心那份照写，供事后回看）。
+   * ⚠️ 顺序：卡片的提交成功后会调 renderQuestPanel() 整块重绘 —— 先写会被冲掉，
+   *   所以调用点一律放在**重绘之后**；失败分支不重绘，直接写即可。 */
+  function questResult(container, text, ok) {
+    if (!container || !container.insertBefore) return;
+    const old = container.querySelector('.quest-result');
+    if (old) old.remove();
+    const line = document.createElement('div');
+    line.className = 'quest-result' + (ok === false ? ' is-err' : '');
+    line.textContent = text;   // 奖励名等玩家可控内容一律文本，不当 HTML 拼
+    container.insertBefore(line, container.firstChild);
+  }
+
   /* ---------- 一级分类（tab） ----------
    * 唯一来源 = quest-config.js 的 KIND_META（标签/图标只在那边定义一份，UI 不抄第二份）。
    * done = 已完成聚合视图（它是视图不是分类，永远排在最后）。
@@ -264,12 +281,18 @@
           btn.disabled = false;
           btn.textContent = label;
         }
-        if (r.error) { UI.showToast ? UI.showToast('任务失败', r.error) : alert(r.error); return; }
-        // 引导任务走"奖励即钥匙"弹窗（拿到什么 + 给谁用 + 一键跳下一关）；其余维持 toast
+        if (r.error) {
+          if (UI.showToast) UI.showToast('任务失败', r.error); else alert(r.error);
+          questResult(body, '提交失败：' + r.error, false);
+          return;
+        }
+        const rewardText = (r.rewards || []).join('、');
+        // 引导任务走"奖励即钥匙"弹窗（拿到什么 + 给谁用 + 一键跳下一关）；其余就地给一行结果
         const q = Quest.getQuests().find(x => x.id === btn.dataset.id);
-        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
+        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + rewardText);
         renderQuestPanel();
         renderQuestTracker(); // 交完的任务要从追踪栏撤下
+        questResult($('quest-body'), '已提交 · 奖励：' + rewardText, true);  // 重绘之后再写，先写会被冲掉
       };
     });
   }
@@ -292,11 +315,17 @@
           btn.disabled = false;
           btn.textContent = label;
         }
-        if (r.error) { UI.showToast ? UI.showToast('任务失败', r.error) : alert(r.error); return; }
+        if (r.error) {
+          if (UI.showToast) UI.showToast('任务失败', r.error); else alert(r.error);
+          questResult(body, '提交失败：' + r.error, false);
+          return;
+        }
+        const rewardText = (r.rewards || []).join('、');
         const q = Quest.getQuests().find(x => x.id === btn.dataset.id);
-        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + r.rewards.join('、'));
+        if (!(q && showGuideReward(q)) && UI.showToast) UI.showToast('任务完成', '奖励：' + rewardText);
         renderQuestPanel();
         renderQuestTracker();
+        questResult($('quest-body'), '已提交 · 奖励：' + rewardText, true);
       };
     });
     body.querySelectorAll('.quest-track').forEach(btn => {
@@ -676,6 +705,7 @@
    * 量到 0×0 → hotspot 引擎会当"缺失"隐藏，控制台刷警告。
    * 这里轮询等目标真正可见（≤1.5s）再弹；goGuide 紧随其后同步切页，下一帧就量到了。 */
   function guideHint(it) {
+    return; // ponytail: 引导条已经够用，聚光高亮弹窗多余，直接关掉
     try {
       if (!it || !it.isTutorial || !it.target) return;
       if (!window.Onboarding || !window.Onboarding.spotlight) return;
@@ -721,9 +751,14 @@
    * 收起后只剩一枚右上角胶囊：任务条数 + 可提交数（不打开就知道有没有奖可领）。
    * 状态存 localStorage（体验型标记，丢了大不了展开一次，不进云端）。 */
   const TRACK_COLLAPSE_KEY = 'fos_track_collapsed';
-  let trackCollapsed = (function () {
-    try { return localStorage.getItem(TRACK_COLLAPSE_KEY) === '1'; } catch (e) { return false; }
-  })();
+  /* null = 玩家从没手动收起/展开过（首次）⇒ 由下面"有没有引导任务"自动决定默认态。 */
+  function collapsePref() {
+    try {
+      const v = localStorage.getItem(TRACK_COLLAPSE_KEY);
+      return v === '1' ? true : v === '0' ? false : null;
+    } catch (e) { return null; }
+  }
+  let trackCollapsed = (function () { const p = collapsePref(); return p == null ? false : p; })();
   function setTrackCollapsed(v) {
     trackCollapsed = !!v;
     try { localStorage.setItem(TRACK_COLLAPSE_KEY, trackCollapsed ? '1' : '0'); } catch (e) { /* 忽略 */ }
@@ -798,12 +833,19 @@
 
     bar.style.display = '';
     const readyN = items.filter(it => it.done).length;
-    bar.classList.toggle('is-collapsed', trackCollapsed);
+    /* 默认展开还是收起（2026-09-22 内测 🟠8「任务条挡着市集内容」）：
+     * 这条是**常驻浮动层**（z-index 90，压在页面内容上），展开态一大块盖住右上角商品卡。
+     * 规则：**玩家手动操作过 ⇒ 完全尊重他的选择**；从没操作过 ⇒ 有引导任务才展开
+     * （新手必须看得见引路人的"现在/为什么"），否则默认收成小胶囊 —— 数量与"可提交 N"照常显示，
+     * 不打开也知道有没有奖可领。这样既不挡市集，也不丢新手引导。 */
+    const pref = collapsePref();
+    const collapsed = (pref == null) ? !items.some(it => it.isTutorial) : pref;
+    bar.classList.toggle('is-collapsed', collapsed);
     // 标题栏 = 左侧 ⠿ 拖动手柄 + 右侧折叠按钮（职责分开：拖就拖、点就点）
     const toggleHtml = `<div class="qt-head">`
       + `<span class="qt-grip" title="按住这里拖动，挪到不挡视线的位置">⠿</span>`
-      + `<button type="button" class="qt-toggle" title="${trackCollapsed ? '展开任务列表' : '收起任务列表（不再占屏幕）'}">`
-      + (trackCollapsed
+      + `<button type="button" class="qt-toggle" title="${collapsed ? '展开任务列表' : '收起任务列表（不再占屏幕）'}">`
+      + (collapsed
         ? `<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg> 任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''}`
         : `任务 ${items.length}${readyN ? ' · <b>可提交 ' + readyN + '</b>' : ''} ▾`)
       + `</button></div>`;
@@ -856,7 +898,7 @@
     bindTrackerDrag(bar, bar.querySelector('.qt-head'));   // 整条标题栏 = 拖动把手
     const toggleBtn = bar.querySelector('.qt-toggle');
     if (toggleBtn) {
-      toggleBtn.onclick = () => { setTrackCollapsed(!trackCollapsed); renderQuestTracker(); };
+      toggleBtn.onclick = () => { setTrackCollapsed(!collapsed); renderQuestTracker(); };
     }
     bar.querySelectorAll('.qt-go').forEach(b => {
       b.onclick = () => {
@@ -888,16 +930,23 @@
         let r;
         try { r = await Quest.completeQuest(b.dataset.id); }
         finally { b.disabled = false; b.textContent = label; }
-        if (r && r.error) { if (UI.showToast) UI.showToast('领取失败', r.error); return; }
+        if (r && r.error) {
+          if (UI.showToast) UI.showToast('领取失败', r.error);
+          questResult(bar, '领取失败：' + r.error, false);
+          return;
+        }
         // 引导条交任务：优先弹"奖励即钥匙"（拿到什么 + 下一步要用 + 一键跳过去）
         const it = items.find(x => x.id === b.dataset.id);
-        if (!(it && showGuideReward(it)) && UI.showToast && r) UI.showToast('任务完成', '奖励：' + (r.rewards || []).join('、'));
+        const rwText = (r && r.rewards || []).join('、');
+        if (!(it && showGuideReward(it)) && UI.showToast && r) UI.showToast('任务完成', '奖励：' + rwText);
         if (UI.renderAll) UI.renderAll();
         renderQuestTracker();
+        questResult(bar, '已领取 · 奖励：' + rwText, true); // 同上：重绘之后再写
       };
     });
-    const skip = bar.querySelector('.qt-skip');
-    if (skip) skip.onclick = () => { if (Quest.skipGuide) Quest.skipGuide(); renderQuestTracker(); };
+    bar.querySelectorAll('.qt-skip').forEach(b => {
+      b.onclick = () => { if (Quest.skipGuide) Quest.skipGuide(); renderQuestTracker(); };
+    });
     // 补发钥匙：账本限每关每种 1 次；重复点会被 grantOnce 拦下并提示
     bar.querySelectorAll('.qt-reissue').forEach(b => {
       b.onclick = async () => {
@@ -922,7 +971,16 @@
   }
 
   /* ---------- 面板开关（左侧滑出抽屉，动画节奏对齐装备打造 craft-drawer） ---------- */
-  function openQuestPanel() {
+  /* questId 可选：直接打开并定位到某一条任务（觉醒页的「去交觉醒之路」用它）。
+   * 只影响"打开时选哪条/哪个分类"，面板本身的交互不变；
+   * 任务找不到（未解锁/已完成）就照常打开列表 —— 绝不让这个可选参数把面板打开这件事弄坏。 */
+  function openQuestPanel(questId) {
+    if (questId && window.Quest && window.Quest.getQuests) {
+      try {
+        const q = window.Quest.getQuests().find(x => x.id === questId);
+        if (q) { activeCat = normCat(q.kind || 'series'); selectedQuestId = q.id; }
+      } catch (e) { console.warn('[quest] 定位任务失败', questId, e); }
+    }
     renderQuestPanel();
     renderQuestBadge();
     const host = $('quest-panel');

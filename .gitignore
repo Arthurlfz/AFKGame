@@ -101,9 +101,20 @@ video/out/
 # ⚠️ 2026-09-17：`tools/` 的入库内容已全部移除（48 个 `patch-*.py`/`bump-v-*.py`/`revert-*.py`
 #   一次性脚本 + `frames-*`/`meowa-atk`/`atk-*` 帧图 —— 逐帧动画实测不可用，
 #   `pet-sprites.js` 的 `ANIM_ENABLED` 已关停；素材需要回溯时从 git 历史取）。
-#   本目录只剩这里被忽略的浏览器缓存，而它当时**被浏览器进程占用、没删干净**，
-#   所以这条规则先留着（否则 `?? tools/` 会一直污染 git status）。
-#   👉 关掉浏览器后手动删掉整个 `tools/` 目录，删完这条规则就可以一起删。
-tools/
+# ⚠️ 2026-09-21 修正：原来忽略的是整个 `tools/`，但库里现在**有正式工具**要入库：
+#   `serve.js`（本地并发服务器，`启动游戏.bat` 和 `package.json` 都指向它）
+#   `repack-sheet.js` / `gif2sheet.js`（素材体检与转换）。
+#   ⇒ 只忽略那份被浏览器占用的缓存目录，别把整个 tools/ 关掉
+#     （否则 clone 下来的机器上 `启动游戏.bat` 找不到 serve.js 直接废）。
+#   👉 `tools/test-out/` 是浏览器 user-data-dir（当时被进程占用没删干净）；
+#      关掉浏览器后可直接删掉整个 `tools/test-out/`，这条规则也可以一起删。
+tools/test-out/
+
+# ===== 本地素材加工用的第三方二进制（2026-09-21）=====
+# `tools/_bin/` = `npm i --prefix tools/_bin @ffmpeg-installer/ffmpeg` 装的 ffmpeg（**几十 MB**），
+#   用途：把画布生成的视频拆成逐帧图（血月神狐动态帧，见 `绘图skill`）。
+#   ⚠️ 纯本地开发工具：**绝不入库**，也不影响游戏本体（游戏零依赖、跑测试不需要它）。
+#   👉 换机器时重新执行上面那条 npm 命令即可，不是漏提交。
+tools/_bin/
 
 

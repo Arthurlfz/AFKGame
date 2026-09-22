@@ -119,13 +119,23 @@
   }
   /* 🔴 档位 class 与颜色 class **必须在同一个 span 上**：顶档的流光靠 `currentColor` 取色，
    * 拆成两层（外层档位、内层颜色）的话，外层取到的是继承色而不是装备/材料的颜色 → 金装会变成默认色。 */
-  function addLootEntry(html, tier, colorCls) {
+  /* merge = { key, qty, render(n) }（可选）：同类掉落合并显示。
+   * 挂机时同一件材料会连着出（腐变之心 ×1 ×1 ×1…），把掉落频道刷成一屏重复内容、
+   * 真正的稀有掉落被冲掉。给了 merge 之后，2 分钟内的同类掉落会并成「腐变之心 ×5」一行
+   * （合并逻辑在 ui-console.js 的 consoleLog：那是一条消息进多个容器的唯一入口）。 */
+  function addLootEntry(html, tier, colorCls, merge) {
     if (!UI.consoleLog) return;
     const t = Math.max(1, Math.min(3, Number(tier) || 1));
     // 档位 class 用通用的 hi2 / hi3（不是 loot-t*）：鉴定揭晓、打造出 T1、地图掉落预览都要复用同一套
     const cls = [colorCls || '', t > 1 ? 'hi' + t : ''].filter(Boolean).join(' ');
+    const wrap = h => (cls ? '<span class="' + cls + '">' + h + '</span>' : h);
     // 掉落消息统一进消息控制台（loot 分类）；时间戳与滚动由控制台负责
-    UI.consoleLog('loot', cls ? '<span class="' + cls + '">' + html + '</span>' : html);
+    const structured = (merge && merge.key) ? {
+      mergeKey: merge.key,
+      mergeQty: merge.qty || 1,
+      mergeRender: n => wrap(typeof merge.render === 'function' ? merge.render(n) : html)
+    } : null;
+    UI.consoleLog('loot', wrap(html), structured);
   }
 
   function showLoot(reward) {
@@ -134,7 +144,9 @@
     if (!reward || reward.type === 'none') return;
     if (reward.type === 'material') {
       const name = reward.material, qty = reward.qty || 1;
-      addLootEntry(`${esc(name)} ×${qty}`, lootTierOf(name), matClassOf(name));
+      // 材料按名字合并（同一件材料连着掉 → 「腐变之心 ×5」一行），避免掉落频道被重复条目刷屏
+      addLootEntry(`${esc(name)} ×${qty}`, lootTierOf(name), matClassOf(name),
+        { key: 'mat:' + name, qty, render: n => esc(name) + ' ×' + n });
       flyToBag(`${name} ×${qty}`, matClassOf(name) === 'loot-c-evo' ? 'is-evo' : '');
       if (lootTierOf(name) >= 3) {
         StageFx().banner('loot-banner', [{ c: 'lb-k', t: '稀有掉落' }, { c: 'lb-n', t: name }, { c: 'lb-s', t: '×' + qty }, { c: 'lb-line', t: '' }]);

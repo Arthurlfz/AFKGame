@@ -148,22 +148,26 @@
     const S = SYN();
     const G = S.god;
     const Pet = window.Pet;
-    const empty = { ready: false, chance: 0, god: null, minGrowth: 60, minStage: 5, levelRequire: 60, item: null };
+    const empty = { ready: false, chance: 0, god: null, minGrowth: 60, subMinGrowth: 60, minStage: 5, levelRequire: 60, item: null };
     if (!G || !Pet || !main || !sub) return empty;
     const item = itemId ? (Config.itemOf ? Config.itemOf(itemId) : null) : null;
     const st = p => (Pet.getEvolveStage ? Pet.getEvolveStage(p) : ((p.evolveTimes || 0) + 1));
     const minG = G.minGrowth || 60, minS = G.minStage || 5;
+    /* 副宠成长门槛（2026-09-20 用户拍板：副宠是燃料，不再要求成长 ≥60）：
+     *   ⚠️ 字段缺失时**回退成主宠门槛**（= 旧行为），这样老的云端快照 / 老测试桩
+     *     不会因为我加了个新字段就静默放宽门槛。 */
+    const subG = (G.subMinGrowth != null) ? G.subMinGrowth : minG;
     const GP = Config.pet && Config.pet.godPets;
     const baseLevel = (GP && GP.baseLevelRequire) || 60;
     const levelReduce = (item && item.levelRequireReduce) || 0;
     const levelRequire = Math.max(1, baseLevel - levelReduce);
     const ready = st(main) >= minS && st(sub) >= minS
-      && (main.growth || 0) >= minG && (sub.growth || 0) >= minG
+      && (main.growth || 0) >= minG && (sub.growth || 0) >= subG
       && (main.level || 1) >= levelRequire && (sub.level || 1) >= levelRequire;
     const chance = ready ? ((item && item.godChance != null) ? item.godChance : 0.3) : 0;
     const god = ready && GP && GP.ofLine
       ? GP.ofLine(main.lineId || main.name) : null;
-    return { ready, chance, god, minGrowth: minG, minStage: minS, levelRequire, item };
+    return { ready, chance, god, minGrowth: minG, subMinGrowth: subG, minStage: minS, levelRequire, item };
   }
 
   /* ============================================================
@@ -188,8 +192,11 @@
     if (M.requireGodPet !== false) {
       const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(main) : !!main.isGodPet;
       if (!isGod) {
-        const minG = (Config.pet && Config.pet.godPets && Config.pet.godPets.minGrowth) || 60;
-        return { error: `只有神级宠才能涅槃（神级宠：两只终阶宠 + 成长≥${minG} 合成，30% 概率；持涅槃丹必出）` };
+        /* 门槛数值一律读【判定字段】`synthesize.god.minGrowth`。
+         * ⚠️ 原来读的是 `pet.godPets.minGrowth` —— 那个只喂 UI 文案、调了不生效
+         *    （"同一件事两份数据"的老坑，2026-09-20 一并收口）。 */
+        const minG = (Config.synthesize && Config.synthesize.god && Config.synthesize.god.minGrowth) || 60;
+        return { error: `只有神级宠才能涅槃（神级宠：主宠终阶 + 成长≥${minG}，副宠只要终阶、不看成长；在合成里搏出，概率看合成道具、至尊神石必出）` };
       }
     }
     if (main.level < M.minLevel || sub.level < M.minLevel) {

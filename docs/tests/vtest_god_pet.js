@@ -3,7 +3,8 @@
  * 依据：《系统重设计·落地执行手册_v1》2.6（神级宠）/ 2.7（涅槃）
  * 覆盖：
  *   1. 神级宠配置：8 只、statCoeff = 普通宠 ×1.5、有 sprite（不回退 emoji）
- *   2. 合成门槛：主副宠都【终阶】+【成长 ≥ minGrowth】
+ *   2. 合成门槛：主副宠都【终阶】+ 等级达标；**主宠**成长 ≥ minGrowth
+ *      （2026-09-20 用户拍板：副宠是燃料，不再要求成长 —— 见 config synthesize.god.subMinGrowth）
  *   3. 概率：30% 出神级宠；持涅槃丹 100% 且消耗 1 颗
  *   4. 神级宠出生：独立名字/基础值/成长系数、生而为终阶
  *   5. 涅槃：普通宠被拒；神级宠吸收 50%（2026-09-15 起高成长有分段阻尼）、消耗涅磐兽 5 只、等级重置回 1
@@ -51,6 +52,8 @@ async function mkPet(name, growth, tag, stage, level) {
     '神级宠 statCoeff = 对应普通宠 ×1.5（手册 2.6）');
   A(C('(Config.pet.godPets.list||[]).every(g=>!!g.sprite)'), '每只神级宠都有 sprite（复用终形态立绘，不回退 emoji）');
   A(C('Config.pet.godPets.minGrowth') === 60, '神级宠成长门槛 = 60（手册原值，落地方案 R1）');
+  A(C('Config.synthesize.god.minGrowth') === 60 && C('Config.synthesize.god.subMinGrowth') === 0,
+    '成神门槛：主宠成长 ≥ 60、副宠不看成长（2026-09-20 用户拍板；副宠只看终阶 + 等级）');
   A(C(`(()=>{const s=Config.itemsOf('synth');const g=id=>{const i=s.find(x=>x.id===id);return i?i.godChance:null};return g('synth_stone')===0.3&&g('synth_shift')===0.6&&g('synth_supreme')===1})()`),
     '神级宠概率由合成道具决定：合成之石 30% / 百变魔石 60% / 至尊神石 100%');
   A(C('Config.nirvana.requireGodPet') === true, '涅槃要求神级宠（requireGodPet = true）');
@@ -69,10 +72,18 @@ async function mkPet(name, growth, tag, stage, level) {
   A(Math.abs(info1.chance - 0.3) < 1e-9, '无涅槃丹时概率 = 30%');
   A(info1.god && info1.god.name === '血月神狐', '血狐线对应的神级宠 = 血月神狐');
 
-  // 副宠成长不足 → 不达标
-  C(`Pet.getPets().find(p=>p.id===${b}).growth=59.9`);
+  /* 2026-09-20：副宠不再要求成长（只看终阶 + 等级）——主宠成长成了**唯一**成长门槛，
+   * 所以正反两面都要守住：① 主宠成长不足 → 不达标；② 副宠成长再低（5）→ 照样达标；
+   * ③ subMinGrowth 缺省时（老云端快照 / 老测试桩）必须回退成主宠门槛，不许静默放宽。 */
+  C(`Pet.getPets().find(p=>p.id===${a}).growth=59.9`);
+  const infoMainLow = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}))`);
+  A(infoMainLow.ready === false && infoMainLow.chance === 0, '主宠成长 < 60：不满足神级宠条件（副宠放宽后，主宠是唯一成长门槛）');
+  C(`Pet.getPets().find(p=>p.id===${a}).growth=60`);
+  C(`Pet.getPets().find(p=>p.id===${b}).growth=5`);
   const info2 = C(`Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}))`);
-  A(info2.ready === false && info2.chance === 0, '副宠成长 < 60：不满足神级宠条件');
+  A(info2.ready === true && Math.abs(info2.chance - 0.3) < 1e-9, '副宠成长 5（远低于 60）→ 仍满足条件（副宠是燃料，不看成长）');
+  const info2b = C(`(()=>{const g=Config.synthesize.god,bak=g.subMinGrowth;delete g.subMinGrowth;const r=Merge.godSynthInfo(Pet.getPets().find(p=>p.id===${a}),Pet.getPets().find(p=>p.id===${b}));g.subMinGrowth=bak;return r})()`);
+  A(info2b.ready === false, 'subMinGrowth 缺省时回退成主宠门槛（老快照 / 老测试桩不会被静默放宽）');
   C(`Pet.getPets().find(p=>p.id===${b}).growth=60`);
   // 副宠不是终阶 → 不达标
   C(`Pet.getPets().find(p=>p.id===${b}).evolveStage=4`);

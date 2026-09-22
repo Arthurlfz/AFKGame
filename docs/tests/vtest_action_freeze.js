@@ -1,6 +1,12 @@
-// vtest_action_freeze.js —— 出手演出期间，出手那一方的行动条必须冻住，立绘归位后才继续走
+// vtest_action_freeze.js —— 出手演出期间行动条必须冻住，立绘归位后才继续走
 //   （老 bug：tick 恒温 100ms 一直累加，人还在半路下一次已经在蓄力，看着像连招乱放不像回合制）
-//   （红线：只冻结出手方。试过全场冻结，双方轮流播演出 = 每回合串行等，60 秒从 9 场掉到 7 场）
+//   ⚠️🔴 2026-09-21：用户要求"出手期间双方进度条都停"，但**这条红线在本文件（本地战斗）里必须守住**：
+//      试过把 battle.js 改成"双方同冻" ⇒ `vtest_server_sim` 的 E 场景立刻红
+//      （前端 30 秒 8 场 vs 服务器 9 场）—— 本地战斗必须与服务器同种子一致，**服务器才是真账**。
+//      ⇒ "双方都停"改在**托管演出的观感层**实现（`idle-bridge.js` 的 freezeUntil，只影响画面、不改出刀数）。
+//      旧红线的代价记录原样保留，**不删原文**：
+//        「红线：只冻结出手方。试过全场冻结，双方轮流播演出 = 每回合串行等，60 秒从 9 场掉到 7 场」
+//   ⚠️ 本测试自 2026-09-15 基线起就是【存量红】，与上面这条决定无关。
 const fs = require('fs'), vm = require('vm');
 const pet = { name: '测试宠', icon: 'x', level: 10 };
 const els = {};
@@ -80,7 +86,8 @@ tick();
 A(S().petAction > 0, '停止再开不残留冻结状态（否则挂机会卡死在第一手）');
 
 const srcBattle = fs.readFileSync('../js/core/battle.js', 'utf8');
-const srcUi = fs.readFileSync('../js/ui/ui-battle.js', 'utf8');
+// ⚠️ 2026-09-21：出手演出已迁出 ui-battle.js → ui-battle-act.js（一个文件一个职责），这里两个都读
+const srcUi = fs.readFileSync('../js/ui/battle/index.js', 'utf8') + fs.readFileSync('../js/ui/battle/act.js', 'utf8');
 A(/if \(!freeze\.pet\)/.test(srcBattle) && /if \(!freeze\.enemy\)/.test(srcBattle), 'battle.js 的 tick 按侧跳过累加（不是整场早退）');
 A(/attackRecoverMs/.test(srcBattle), 'battle.js 向表现层讨要归位时长（命中不等于演完）');
 A(/UI\.attackRecoverMs\s*=/.test(srcUi), 'ui-battle.js 对外导出归位时长');

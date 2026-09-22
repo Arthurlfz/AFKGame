@@ -371,6 +371,11 @@
     const skillHoldMs = 0; const hitAt = window.UI.animateAttack(attacker, skillHoldMs) || 320;
     // 命中之后立绘还要收招回位（后摇），这段时间也算演出 —— 归位才算打完这一下
     const backMs = window.UI.attackRecoverMs ? (window.UI.attackRecoverMs(attacker) || 0) : 0;
+    /* ⚠️ 这里**只能冻出手方** —— 这是「前端本地战斗必须与服务器同种子一致」的要求
+     *（见 `vtest_server_sim.js` 的 E 场景：30 秒循环，前端场次/经验/血量都要等于服务器）。
+     * 2026-09-21 实测：把这行改成"双方同冻"后前端变慢 ⇒ 前端 8 场 / 服务器 9 场，守值直接红。
+     * ⇒ 想要"双方进度条都停"（用户 2026-09-21 的要求）**只能在托管演出的观感层做**
+     *   （`idle-bridge.js` 的 freezeUntil：那里只影响画面，不改出刀数）。别在本文件再试一次。 */
     const skillAnimMs = 0; freezeAction(isPet ? 'pet' : 'enemy', hitAt + backMs + skillAnimMs);
     setTimeout(() => {
       const result = calcDamage(atkData, defData);

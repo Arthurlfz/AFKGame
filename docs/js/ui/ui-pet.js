@@ -111,27 +111,121 @@
     el.classList.add('changed');
     setTimeout(() => el.classList.remove('changed'), 500);
   }
+  /* ---------- 养成 tab 的"还差什么"（2026-09-21 内测 🟠12：四个 tab 全亮，后三个新手进不去）----------
+   * 做法：**只提示、不置灰不拦截** —— 点进去看看也谈不上是什么损失（AGENTS §七：只有"失败会丢资产"
+   * 才值得拦）。玩家要的信息是"我现在够不够"，不是一道禁止入内的门。
+   * 🔴🔴 2026-09-22 修正（用户实机抓到"觉醒显示未开启不对"）：上一版是**我自己拼条件**，
+   *   与三个页面各自的真实判据对不上（觉醒页用的是"这只宠在主动技能表里 = 终形态"，
+   *   合成页用 `Merge.canSynthesize` 还额外排除了穿装备/在售/神级宠）。
+   * ⇒ 现在一律**直接调 core 自己的判定**（Merge.canSynthesize / canNirvanaMain + 觉醒页同款技能表口径），
+   *   本文件不拼第二份条件。改门槛只动 core，这里自动跟着走。
+   *
+   * ⭐ 两态必须分开（上一版的第二个错）：**没资格** vs **有资格但缺材料** 是两回事 ——
+   *   "还差终形态魂兽"= 这个玩法还没开；"缺 1 颗觉醒石"= 开了，只是这次做不了。
+   *   都写成「未开启」会让已经熬到终形态的玩家以为自己白练了。 */
+  /* 门槛判定的结构化版本：{ reason, kind }，kind ∈ 'pet'（还没资格）/ 'item'（有资格、只差东西）。
+   * 为什么要分：角标要按类型分色 → 实心红点=只差东西、空心灰点=还没资格。
+   * 对外只暴露字符串版（petTabGate），页面文案照旧。 */
+  function petTabGateInfo(name) {
+    const pets = getPets() || [];
+    const Merge = window.Merge || {};
+    const listed = (p) => !!(window.Market && window.Market.isListed && p.cloudId && window.Market.isListed(p.cloudId));
+    if (name === 'synth') {
+      const lv = (Config.synthesize || {}).minLevel || 40;
+      const ok = (p) => (Merge.canSynthesize ? Merge.canSynthesize(p) : (p.level || 1) >= lv) && !listed(p);
+      const n = pets.filter(ok).length;
+      return n >= 2 ? null : { kind: 'pet', reason: `需要两只 Lv.${lv} 以上、没穿装备且不在出售的宠物，现在有 ${n} 只` };
+    }
+    if (name === 'merge') {   // ⚠️ 涅槃 tab 的 data-pet-tab 叫 merge，不是 nirvana
+      const ok = (p) => (Merge.canNirvanaMain ? Merge.canNirvanaMain(p) : false) && !listed(p);
+      const n = pets.filter(ok).length;
+      const N = Config.nirvana || {};
+      return n >= 1 ? null : { kind: 'pet', reason: `需要一只 Lv.${N.minLevel || 60} 以上的神级宠（且不在出售），现在有 ${n} 只` };
+    }
+    if (name === 'awaken') {
+      /* 终形态的口径 = 觉醒页 `petList()` 同一套：这只宠的名字在主动技能表里
+       * （`Config.pet.evolution.activeSkills`），神级宠查它复用立绘的原名；
+       * **已经觉醒过的宠一定算**（它已经用上了这个玩法）。 */
+      const skills = (Config.pet && Config.pet.evolution && Config.pet.evolution.activeSkills) || {};
+      const skillOf = (p) => {
+        if (p.awakened) return true;
+        const base = String(p.name || '').replace(/·异变$/, '');
+        if (skills[base]) return true;
+        const sp = (window.Pet && window.Pet.isGodPet && window.Pet.isGodPet(p) && window.Pet.spriteNameOf)
+          ? window.Pet.spriteNameOf(p) : null;
+        return !!(sp && skills[sp]);
+      };
+      const finals = pets.filter(skillOf);
+      if (!finals.length) return { kind: 'pet', reason: '还差：终形态魂兽（先在「进化」页进化到终阶）' };
+      if (finals.every(p => p.awakened)) return null;   // 全部已觉醒：没有可做的事了
+      const stone = (window.Materials && window.Materials.getQuantity) ? Number(window.Materials.getQuantity('觉醒石')) || 0 : 0;
+      return stone >= 1 ? null : { kind: 'item', reason: '缺 1 颗觉醒石：做任务「觉醒之路」可反复领取' };
+    }
+    return null;   // 资料 / 进化：一直都能用
+  }
+  function petTabGate(name) {
+    const info = petTabGateInfo(name);
+    return info ? info.reason : null;
+  }
+  function renderPetTabHints() {
+    const tabs = $('pet-tabs');
+    if (!tabs || !tabs.querySelectorAll) return;
+    tabs.querySelectorAll('.pet-tab').forEach(btn => {
+      const info = petTabGateInfo(btn.dataset.petTab);
+      // 完整原因挂 title（hover 可见）：玩家要知道的是"缺什么、去哪弄"，不是一句"缺材料"
+      if (info) btn.setAttribute('title', info.reason); else btn.removeAttribute('title');
+      /* 角标从"文字后缀"改成"右上角小圆点"（2026-09-22）：
+       * 文字后缀把 tab 条挤得参差不齐；圆点不占位，鼠标悬停能看到完整原因。
+       * 两态分色（CSS `.pet-tab-dot` / `.pet-tab-dot.is-locked`）：
+       *   实心红点 = 有资格、只差材料；空心灰点 = 玩法还没开（差宠物）—— 别让刚练到终形态的人以为白练。 */
+      let dot = btn.querySelector('.pet-tab-dot');
+      if (info && !dot) {
+        dot = document.createElement('span');
+        dot.className = 'pet-tab-dot';
+        btn.appendChild(dot);
+      }
+      if (info) dot.className = 'pet-tab-dot' + (info.kind === 'pet' ? ' is-locked' : '');
+      else if (dot) dot.remove();
+    });
+  }
+
   /* ---------- 宠物面板 ---------- */
   function renderPetPanel() {
+    renderPetTabHints();   // 先刷新养成 tab 提示（没有出战宠时也要刷新，所以放在 return 之前）
     const pet = getActivePet();
     if (!pet) return;
     const s = getStats(pet);
     const base = window.Pet.baseStats(pet);
     const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
-    // 资料页大头像：优先逐帧动画立绘，无动画素材回退头像版（裁切头部，96x96 contain 到 110px 框更聚焦）
+    /* 资料页头像（`.pet-avatar` = 158×158 的肖像框）：**优先头像版**（头肩特写），没有头像素材才回退逐帧动画立绘。
+     * 🔴 2026-09-21 用户拍板**反转顺序**（原来是"动画立绘优先"）：框只有一百多像素，全身立绘塞进去就是
+     *    "一只小蚂蚁在动"，脸都看不清；头肩像在这个尺寸才立得住。
+     * ⚠️ **战斗页保持"动画立绘优先"**（那里是 350px 的大位，要看动作）—— 两处顺序不同是刻意的，别顺手统一。 */
     const pa = $('pet-avatar');
     if (pa) {
-      if (PetSprites && PetSprites.mountAnimated(pa, pet.name)) {}
-      else if (PetSprites && PetSprites.mountAvatar(pa, pet.name)) {}
+      if (PetSprites && PetSprites.mountAvatar(pa, pet.name)) {}
+      else if (PetSprites && PetSprites.mountAnimated(pa, pet.name)) {}
       else pa.textContent = '';
     }
     $('pet-name').textContent = pet.name;
     $('pet-level').textContent = 'Lv.' + pet.level;
     $('exp-bar').style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
-    $('exp-text').textContent = `${pet.exp}/${expNeed(pet.level)}`;
-    $('pet-growth').textContent = pet.growth.toFixed(1);
+    $('exp-text').textContent = `${fmtNum(pet.exp)}/${fmtNum(expNeed(pet.level))}`;
+    // 「成长」是全游戏最核心也最抽象的术语（🟠10 / 🟡7）：它决定每升一级能加多少属性
+    const growthEl = $('pet-growth');
+    if (growthEl) {
+      growthEl.textContent = pet.growth.toFixed(1);
+      growthEl.title = '成长决定这只宠每升一级能加多少属性：数字越大，练同级就越强 —— 判断一只宠好不好的第一指标';
+    }
+    /* 术语就地解释（2026-09-22 内测 🟠10"术语太多，新玩家看不懂"）：
+     * 不删术语（那是游戏的一部分），但每个术语都要能**就地看懂它到底是什么意思** ——
+     * 悬停给完整解释，能塞下白话的地方直接写在旁边。 */
     const reborn = $('pet-reborn');
-    if (reborn) reborn.textContent = `转生 ${pet.rebornCount || 0} 次`;
+    if (reborn) {
+      const n = pet.rebornCount || 0;
+      reborn.textContent = n ? `转生 ${n} 次（涅槃重练过 ${n} 次）` : '转生 0 次（还没涅槃过）';
+      reborn.title = '涅槃一次就记一次：涅槃会把等级打回 1 级，换来成长永久上涨 —— 转生次数越多，这只宠的底子越厚';
+    }
     const skillInfo = $('pet-active-skill-info');
     if (skillInfo) {
       // 用 skillOf 而不是 activeSkills[名字]：变异宠名字带「·异变」，直接查表必然查不到，
@@ -142,15 +236,26 @@
       const chanceTxt = skill ? `${Math.round((skill.triggerChance || 0) * 100)}% 概率发动` : '';
       const effect = skill ? `${Math.round(skill.damageMultiplier * 100)}% 伤害${skill.maxHpDamageRate ? ` + 目标最大生命 ${Math.round(skill.maxHpDamageRate * 100)}%` : ''}` : '';
       const tierTxt = skill && skill.tier && skill.tier < 3 ? `（${skill.tierName} 档·进化升档）` : '';
+      /* 还没解锁时（🟠11「主动技能没说明」）：不能只说"以后会解锁"，
+       * 要说出**这只宠将来会学什么** + 怎么才能拿到 —— 玩家才知道现在该往哪练。 */
+      const future = skill ? null : finalSkillOf(pet.name);
+      const futureTxt = future
+        ? `将来会学：${future.name}（${skillEffectLine(future)} · ${future.cooldownTurns} 回合冷却）`
+        : '';
       skillInfo.textContent = skill
         ? `主动技能：${skill.name}${tierTxt} · ${chanceTxt} · ${effect} · ${skill.cooldownTurns} 回合冷却`
-        : '主动技能：一阶选分支后解锁，随进化升档';
+        : `主动技能：终形态 Lv.60 解锁${futureTxt ? ' — ' + futureTxt : '，随进化升档'}`;
     }
-    // 血脉特质胶囊（出战面板常驻；空态显示"无血脉特质"）
+    // 血脉特质胶囊（出战面板常驻；空态以前只写"无血脉特质" —— 玩家不知道那是什么、怎么得到）
     const traitsEl = $('pet-traits');
     if (traitsEl) {
       const th = PetUI.traitsHtml(pet);
-      traitsEl.innerHTML = th || '<span class="trait-none">无血脉特质</span>';
+      if (th) {
+        traitsEl.innerHTML = th;
+      } else {
+        traitsEl.innerHTML = '<span class="trait-none">还没有额外天赋</span>';
+        traitsEl.title = '天赋是宠物带的小加成（吸血、暴击之类）：孵化时可能自带，合成/涅槃也有机会得到';
+      }
     }
     // 觉醒徽标（觉醒页用觉醒石激活后永久亮起，与等级无关）
     const awEl = $('pet-awaken');
@@ -185,19 +290,22 @@
       const curStage = stages.find(x => x.stage === cur) || null;
       const nx = E.nextStage ? E.nextStage(pet) : null;
       const eqCount = Object.values(pet.equipment || {}).filter(Boolean).length;
+      const fmt = PetUI.fmtNum;
       const rows = [];
       if (nx) {
         const gap = Math.max(0, (nx.minLevel || 0) - (pet.level || 0));
         rows.push('<div class="pn-row">'
           + '<span class="pn-label">下一形态</span>'
-          + `<span class="pn-value">${escapeHtml(curStage ? curStage.label : '当前')} → <b>${escapeHtml(nx.label)}</b></span>`
+          + `<span class="pn-value">${escapeHtml(curStage ? curStage.label : '当前')} <span class="lg-arrow">→</span> <b>${escapeHtml(nx.label)}</b></span>`
           + `<span class="pn-tip">${gap > 0 ? `还差 ${gap} 级（Lv.${nx.minLevel}）` : `等级已够 · Lv.${nx.minLevel}`}</span>`
           + '</div>');
         if (nx.material) {
+          const haveM = (window.Materials && window.Materials.getQuantity) ? Number(window.Materials.getQuantity(nx.material)) || 0 : null;
+          const needM = nx.amount || 1;
           rows.push('<div class="pn-row">'
             + '<span class="pn-label">需要</span>'
-            + `<span class="pn-value">${escapeHtml(nx.material)} ×${nx.amount || 1}</span>`
-            + `<span class="pn-tip">${escapeHtml(nx.desc || '')}</span>`
+            + `<span class="pn-value">${escapeHtml(nx.material)} ×${fmt(needM)}</span>`
+            + `<span class="pn-tip">${haveM != null ? (haveM >= needM ? '材料已够' : `还差 ${fmt(needM - haveM)} 个`) : escapeHtml(nx.desc || '')}</span>`
             + '</div>');
         }
       } else {
@@ -207,34 +315,36 @@
           + '<span class="pn-tip">可走合成 / 涅槃继续变强</span>'
           + '</div>');
       }
+      /* 装备：进度条 + 加成 chips 网格（原来是一行被截断的长串「攻击+177 生命+50767…」） */
       const bnTxt = getBonusText(pet);
       rows.push('<div class="pn-row">'
         + '<span class="pn-label">装备</span>'
         + `<span class="pn-value">已穿 ${eqCount}/12</span>`
-        + `<span class="pn-tip">${bnTxt && bnTxt !== '无' ? escapeHtml(bnTxt) : '暂无加成'}</span>`
-        + '</div>');
-      // 快捷操作按钮：可进化/可合成时直接跳转对应 tab
-      let actions = '';
+        + `<span class="pn-tip">${bnTxt && bnTxt !== '无' ? '装备加成见下' : '暂无加成 · 去背包里给宠穿上'}</span>`
+        + '</div>'
+        + '<div class="pn-row pn-eq">' + PetUI.barHtml(eqCount, 12, eqCount >= 12 ? 'is-ok' : '') + '</div>');
+      /* ⚠️ 这里**不再**铺装备加成 chips：装备加成的明细已经在右边「次级属性」那一格里
+       *（那里是它的家，还有悬停浮层），铺两遍既重复又把「下一步」撑成两屏高。 */
+      /* 条件 checklist（V2 要求「下一步」里带条件清单）：
+       * 等级 / 进化素材 / 进化次数 三项逐条 ✓✗ —— 玩家看完就知道差哪一样，不用去别的页面对。 */
       if (nx) {
-        const gap = Math.max(0, (nx.minLevel || 0) - (pet.level || 0));
-        if (gap <= 0) {
-          actions += '<button class="pn-action" data-goto-tab="evolve">去进化 →</button>';
-        }
+        const minLv = nx.minLevel || 1;
+        const matName = nx.material;
+        const needM = nx.amount || 1;
+        const haveM = (matName && window.Materials && window.Materials.getQuantity) ? Number(window.Materials.getQuantity(matName)) || 0 : null;
+        const conds = [{ ok: (pet.level || 1) >= minLv, text: '等级 ≥ <b>Lv.' + minLv + '</b>（当前 Lv.' + (pet.level || 1) + '）' }];
+        if (matName) conds.push({ ok: haveM != null && haveM >= needM, text: '备好 <b>' + escapeHtml(matName) + ' ×' + needM + '</b>' + (haveM != null ? '（持有 ' + fmt(haveM) + '）' : '') });
+        // 不加小标题（"进化条件"四个字占一整行，条件本身自己说明了自己）
+        rows.push('<div class="pn-row">' + PetUI.condListHtml(conds) + '</div>');
       }
-      actions += '<button class="pn-action" data-goto-tab="synth">去合成 →</button>';
-      actions += '<button class="pn-action" data-goto-tab="merge">去涅槃 →</button>';
-      nextEl.innerHTML = '<div class="pn-head">下一步</div>' + rows.join('') +
-        '<div class="pn-actions">' + actions + '</div>';
-      // 绑定跳转
-      nextEl.querySelectorAll('.pn-action').forEach(btn => {
-        btn.onclick = () => {
-          const tabName = btn.dataset.gotoTab;
-          const tab = document.querySelector('.pet-tab[data-pet-tab="' + tabName + '"]');
-          if (tab) tab.click();
-        };
-      });
+      /* 按钮不在这里 —— V2 硬性规则：五个 tab 的 CTA 按钮统一放右内容区底部 CTA 栏
+       *（#profile-confirm，见 游戏.html），保证四页位置完全一致。 */
+      nextEl.innerHTML = rows.join('');
     }
-    const hpText = `${Math.round(getCurHp(pet))}/${s.hp}`;
+    // CTA 栏里的"当前出战"徽章（V2：与三个次按钮同栏）
+    const ctPet = $('ctabar-pet');
+    if (ctPet) ctPet.textContent = pet.name;
+    const hpText = `${fmtNum(Math.round(getCurHp(pet)))}/${fmtNum(Math.round(s.hp))}`;
     if ($('pet-hp').textContent !== hpText) flashStat('pet-hp');
     $('pet-hp').textContent = hpText;
     // 属性数字走滚动（2026-09-20）：升级/进化/换装时能看到数字"涨"上去，不是硬切。
@@ -243,7 +353,7 @@
       const el = $('pet-' + k);
       const v = Math.round(s[k]);
       if (el.textContent !== String(v)) flashStat('pet-' + k);
-      UI.setNum(el, v);
+      UI.setNum(el, v, { fmt: x => fmtNum(Math.round(x)) });   // 千分位（六位数以上才看得出来，但口径要统一）
     });
     // 暴击率/暴击伤害（真实属性，来自 getStats）
     const critEl = $('pet-crit');
@@ -272,7 +382,7 @@
     ['hit', 'dodge'].forEach(key => {
       const el = $('pet-' + key);
       if (!el) return;
-      const txt = String(Math.round(s[key]));
+      const txt = fmtNum(Math.round(s[key]));
       if (el.textContent !== txt) flashStat('pet-' + key);
       el.textContent = txt;
       if (typeof el.setAttribute === 'function') el.title = mechTip(key);
@@ -323,16 +433,18 @@
     if (!pet) return;
     const s = getStats(pet);
     const profile = (Config.pet.petProfiles && Config.pet.petProfiles[pet.lineId || pet.name]) || Config.pet.defaultPetProfile;
+    // 属性面板左列的宠物头像（资料页 `pet-avatar` / 装备页 `eqp-avatar`，都是 158×158 肖像框）
+    // —— 同资料页口径：**头像版优先**（见上面那条注释的原因），动画立绘只在大图位（战斗页）用。
     const av = $id('avatar');
     if (av) {
-      if (PetSprites && PetSprites.mountAnimated(av, pet.name)) {}
-      else if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {}
+      if (PetSprites && PetSprites.mountAvatar(av, pet.name)) {}
+      else if (PetSprites && PetSprites.mountAnimated(av, pet.name)) {}
       else av.textContent = '';
     }
     const nm = $id('name'); if (nm) nm.textContent = pet.name;
     const lv = $id('level'); if (lv) lv.textContent = 'Lv.' + pet.level;
     const eb = $id('exp-bar'); if (eb) eb.style.width = Math.min(100, (pet.exp / expNeed(pet.level)) * 100) + '%';
-    const et = $id('exp-text'); if (et) et.textContent = `${pet.exp}/${expNeed(pet.level)}`;
+    const et = $id('exp-text'); if (et) et.textContent = `${fmtNum(pet.exp)}/${fmtNum(expNeed(pet.level))}`;
     const gr = $id('growth'); if (gr) gr.textContent = pet.growth.toFixed(1);
     const rn = $id('reborn');
     if (rn) {
@@ -340,16 +452,16 @@
       rn.textContent = `转生 ${rebornN} 次`;
       rn.hidden = rebornN <= 0; // 没转生过就不显示（旧版永远挂着一行"转生 0 次"= 白占地方，还像玩法入口）
     }
-    const hp = $id('hp'); if (hp) hp.textContent = `${Math.round(getCurHp(pet))}/${Math.round(s.hp)}`;
+    const hp = $id('hp'); if (hp) hp.textContent = `${fmtNum(Math.round(getCurHp(pet)))}/${fmtNum(Math.round(s.hp))}`;
     // 攻击/防御/速度：取整显示（基底经 materialTier 相乘为小数，取整更干净）
     // 数字滚动统一走动效层（2026-09-20）：面板 id 常驻 ⇒ setNum 拿得到上次的值当起点，会自己滚
     const sn = (id, v, fmt) => { const el = $id(id); if (el) UI.setNum(el, v, fmt ? { fmt } : undefined); };
-    ['atk', 'def', 'spd'].forEach(k => sn(k, Math.round(s[k])));
+    ['atk', 'def', 'spd'].forEach(k => sn(k, Math.round(s[k]), x => fmtNum(Math.round(x))));
     sn('crit', Math.round(s.critRate * 100), x => Math.round(x) + '%');
     sn('critdmg', Math.round(s.critDamage * 100), x => Math.round(x) + '%');
     // 命中/闪避是固定数值（非百分比），直接显示数值；吸血是百分比
-    sn('hit', Math.round(s.hit));
-    sn('dodge', Math.round(s.dodge));
+    sn('hit', Math.round(s.hit), x => fmtNum(Math.round(x)));
+    sn('dodge', Math.round(s.dodge), x => fmtNum(Math.round(x)));
     const lsEl = $id('ls'); if (lsEl) lsEl.textContent = Math.round(s.lifesteal * 100) + '%';
     const bn = $id('bonus'); if (bn) {
       const equip = getBonusText(pet);
@@ -391,38 +503,24 @@
     } else if (petFilterMode === 'equipped') {
       pets = pets.filter(p => Object.values(p.equipment || {}).filter(Boolean).length > 0);
     }
-    for (const pet of pets) {
-      const equipCount = Object.values(pet.equipment || {}).filter(Boolean).length; // 已穿装备数
-      const card = document.createElement('div');
-      const isActive = pet.id === activeId;
-      const isGod = window.Pet && window.Pet.isGodPet ? window.Pet.isGodPet(pet) : !!pet.isGodPet;
-      card.className = 'pet-card' + (isActive ? ' active' : '') + (isGod ? ' pet-card--god' : '');
-      card.innerHTML = `${isActive ? '<div class="pet-card-badge">出战</div>' : ''}
-        ${isGod ? '<div class="pet-card-god-badge">神</div>' : ''}
-        <div class="icon">${iconHtml(pet.name)}</div>
-        <div class="pname">${pet.name}</div>
-        ${(function(){var bl=window.Pet&&window.Pet.getBloodline?window.Pet.getBloodline(pet):null;return bl?'<div class="pet-card-bloodline">血统 · '+bl.name+'</div>':'';})()}
-        <div class="meta">Lv.${pet.level} · 成长${pet.growth.toFixed(1)}${window.Pet&&window.Pet.stageLabel?' · '+window.Pet.stageLabel(pet):''}</div>
-        <div class="meta">装备${equipCount}/12</div>`;
-      card.onclick = () => {
-        if (pet.cloudId && window.Market && Market.isListed && Market.isListed(pet.cloudId)) {
-          UI.showToast('⚠️ 已上架的宠物不能出战', '请先在市场取回');
-          return;
-        }
+    /* 统一宠物卡（PetUI.renderList）—— 5 个 tab 同一套：40px 圆头像 + 两行。
+     * 资料页只锁「在集市出售中」的宠（点它出战会被拦），其余一律能点：换出战没有任何代价。
+     * 卡片上的血统说明撤了（两行卡放不下）—— 悬停详情里有（bindPetTip 的 petTipHtml）。 */
+    PetUI.renderList(list, pets, {
+      selectedId: activeId,
+      badgeOf: p => (p.id === activeId ? '出战' : ''),
+      lockOf: p => (p.cloudId && window.Market && Market.isListed && Market.isListed(p.cloudId))
+        ? '在集市出售中 · 先在「市集 · 我的上架」取回' : null,
+      extraOf: p => (p.id === activeId ? '<span class="lg-on">当前出战</span>' : ''),
+      emptyHtml: petSearchQ || petFilterMode !== 'all'
+        ? '没有符合条件的宠物（换个筛选看看）'
+        : '还没有宠物：去「背包 · 素材蛋」孵化一只',
+      onPick: (pet) => {
         setActive(pet.id);
         addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg> ${pet.name} 出战！`, 'battle');
         UI.renderAll();
-      };
-      if (equipCount > 0) {
-        const eqTag = document.createElement('div');
-        eqTag.className = 'pet-eq-tag';
-        eqTag.innerHTML = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg> 有装备';
-        eqTag.title = '穿着装备的宠物不能融合，请先卸下装备';
-        card.appendChild(eqTag);
       }
-      bindPetTip(card, pet);
-      list.appendChild(card);
-    }
+    });
     // 绑定搜索框和筛选下拉（只绑一次）
     const searchEl = $('pet-search');
     const filterEl = $('pet-filter');
@@ -485,10 +583,12 @@
       orbit.appendChild(div);
     });
     wrap.appendChild(orbit);
+    // 装备环绕中心的宠物位（`.equip-orbit-art` = **220px 圆形框**、overflow:hidden）
+    // —— 圆框里放全身立绘，头脚会被圆弧切掉 ⇒ 这里也**头像版优先**。
     const art = orbit.querySelector('#equip-orbit-art');
     if (art) {
-      if (typeof PetSprites !== 'undefined' && PetSprites.mountAnimated(art, pet.name)) {}
-      else if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {}
+      if (typeof PetSprites !== 'undefined' && PetSprites.mountAvatar(art, pet.name)) {}
+      else if (typeof PetSprites !== 'undefined' && PetSprites.mountAnimated(art, pet.name)) {}
       else art.textContent = '';
     }
   }
@@ -608,6 +708,18 @@
 
   /* ---------- 宠物页顶部 tab 切换（资料 / 进化 / 合成 / 涅槃 / 觉醒） ---------- */
   function initPetTabs() {
+    /* 底部 CTA 栏里的跳转按钮（资料页的去进化/去合成/去涅槃）：事件委托绑一次。
+     * ⚠️ 必须在下面的 `__petTabBound` 早退之前绑 —— 否则第二次进宠物页就绑不上了。 */
+    const cta = $('profile-confirm');
+    if (cta && !cta.__bound) {
+      cta.__bound = true;
+      cta.addEventListener('click', e => {
+        const btn = e.target && e.target.closest ? e.target.closest('[data-goto-tab]') : null;
+        if (!btn) return;
+        const tab = document.querySelector('.pet-tab[data-pet-tab="' + btn.dataset.gotoTab + '"]');
+        if (tab) tab.click();
+      });
+    }
     const tabs = $('pet-tabs');
     if (!tabs || tabs.__petTabBound) return;
     tabs.__petTabBound = true;
@@ -624,6 +736,9 @@
   }
 
   /* ---------- 对外 API（宠物页） ---------- */
+  // 养成门槛的唯一读法（合成/涅槃/觉醒三个 tab 的角标与页面空态共用，
+  // 免得每个页面各拼一份条件 —— 改门槛只动 petTabGate 一处）
+  UI.petTabGate = petTabGate;
   UI.renderPetPanel = renderPetPanel;
   UI.renderPetList = renderPetList;
   UI.showPetTip = showPetTip;
@@ -660,6 +775,32 @@
         '<b style="color:' + color + '">' + escapeHtml(id) + '</b><i>T' + tier + '</i>' + eff + '</span>';
     }).join('') + '</div>';
   }
+  /* ---------- 终形态 / 终形态主动技能（共享给进化页与宠物资料页）----------
+   * 2026-09-22 内测 🟠11「主动技能没说明」+ 🟠14「两条分支看不出区别」都需要它，
+   * 所以只在这（PetUI）写一份，进化页调它 —— 别在两个页面各拼一份。
+   * 🔴 取证事实：**两条分支的数值本来完全一样**（速度/成长/门槛全同），
+   *   真正的差异只有两样：① 最终长成哪个形态 ② 那个终形态的**主动技能**。
+   *   ⇒ 不造假差异，把这两样摆出来（进化页按技能选分支）。
+   * ⚠️ 取**终形态技能的原值（满档）**，不用 `skillOf(一阶名)`：后者返回 I 档缩放值，会误导玩家。 */
+  function finalFormOf(name) {
+    const tree = (window.Config && window.Config.pet && window.Config.pet.evolution && window.Config.pet.evolution.tree) || {};
+    let cur = name, next = tree[cur], guard = 0;
+    while (Array.isArray(next) && next.length && guard++ < 12) { cur = next[0].to; next = tree[cur]; }
+    return cur;
+  }
+  function finalSkillOf(name) {
+    const E = window.Config && window.Config.pet && window.Config.pet.evolution;
+    return ((E && E.activeSkills) || {})[finalFormOf(name)] || null;
+  }
+  // 技能效果一句话（概率 / 倍率 / 附加真伤），终形态满档口径
+  function skillEffectLine(sk) {
+    if (!sk) return '';
+    const chance = Math.round((sk.triggerChance || 0) * 100);
+    const mult = Math.round((sk.damageMultiplier || 1) * 100);
+    const extra = sk.maxHpDamageRate ? ` + 目标最大生命 ${Math.round(sk.maxHpDamageRate * 100)}%` : '';
+    return `${chance}% 概率打出 ${mult}% 伤害${extra}`;
+  }
+
   function traitInheritLine(main, sub, type) {
     const cfg = (window.Config && window.Config.traitInherit) || {};
     const subTraits = (sub && sub.traits) || [];
@@ -682,6 +823,241 @@
     return '<div class="es-preview-row">' + label + '：副宠特质（' + escapeHtml(names) + '）各 ' + giveP +
       '% 概率植入（同类型取高阶；上限 ' + cap + ' 条）；用锁魂玉可指定一条 100% 植入</div>';  
   }
+  /* ============================================================
+   * 宠物军团组件库（2026-09-22）—— 5 个 tab 共用同一套
+   *
+   * 为什么放在这里：本文件就是"宠物页共享 API"的家（iconHtml / tooltip / 特质胶囊），
+   * 进化/合成/涅槃/觉醒四页在 游戏.html 里**后加载**、直接取 `PetUI.*` —— 天然能拿到。
+   * ⛔ 别在各页面里再抄一份卡片/按钮/进度条：抄了就是第二份事实源，早晚两边长得不一样
+   *   （这正是 2026-09-22 那次评审里"5 个 tab 同类组件各式各样"的成因）。
+   * 样式全部在 `css/pet-legion.css`（挂在 #tab-pet 之下）。
+   * ============================================================ */
+
+  /* 千分位（191,531）。全站数值统一口径；成长值这类小数字不用它，免得看起来像另一个量级。 */
+  function fmtNum(n) {
+    const v = Number(n);
+    if (!isFinite(v)) return '0';
+    return v.toLocaleString('en-US');
+  }
+  // 当前阶（1~5）：判定只在 core，UI 不重算
+  function stageOf(pet) {
+    return (window.Pet && window.Pet.getEvolveStage) ? window.Pet.getEvolveStage(pet) : ((pet.evolveTimes || 0) + 1);
+  }
+  /* 阶段总数：**从 config 的 stages 表推**，别再硬写 5（改阶段表时界面要跟着走）。
+   * （原来这个函数只长在 ui-pet-evolve.js 里，卡片要显示 x/5 阶，就上移到共享库来 —— 唯一一份。） */
+  function stageTotal() {
+    return (((Config.pet && Config.pet.evolution && Config.pet.evolution.stages) || []).length) || 5;
+  }
+  function isGodOf(pet) {
+    return (window.Pet && window.Pet.isGodPet) ? window.Pet.isGodPet(pet) : !!(pet && pet.isGodPet);
+  }
+  const equipCountOf = pet => Object.values((pet && pet.equipment) || {}).filter(Boolean).length;
+
+  /* 统一宠物卡：两行（① 名称 + 等级 ② 成长 / 阶数 / 转生 / 装备）+ 成长微条。
+   * opts.selectedId         选中的宠 id（高亮）
+   * opts.onPick(pet)        点选回调
+   * opts.lockOf(pet)        返回"为什么不能选"，非空 → 置灰 + 写明原因（点它只提示，不选）
+   * opts.badgeOf(pet)       左上角小徽标文字（如"出战"）
+   * opts.extraOf(pet)       追加的第三行 HTML（如"接近条件：差 1 级"）
+   * 返回 DOM 元素（⚠️ 必须 createElement + onclick：守值 vtest_nirvana_ui 依赖 list.children[0].onclick） */
+  function listCard(pet, opts) {
+    const o = opts || {};
+    const card = document.createElement('div');
+    const lock = o.lockOf ? o.lockOf(pet) : null;
+    const sel = !!o.selectedId && pet.id === o.selectedId;
+    const god = isGodOf(pet);
+    card.className = 'pet-card' + (sel ? ' active' : '') + (god ? ' pet-card--god' : '') + (lock ? ' is-locked' : '');
+    const badge = o.badgeOf ? o.badgeOf(pet) : '';
+    const reborn = Number(pet.rebornCount) || 0;
+    const gbar = Math.max(4, Math.min(100, Math.round(pet.growth || 0)));
+    card.innerHTML =
+      (god ? '<div class="pet-card-god-badge">神</div>' : '')
+      + (badge ? '<div class="pet-card-badge">' + escapeHtml(badge) + '</div>' : '')
+      + '<div class="icon">' + iconHtml(pet.name) + '</div>'
+      + '<div class="card-info">'
+      +   '<div class="lg-row1"><span class="pname">' + escapeHtml(pet.name) + '</span>'
+      +     '<span class="lg-lv">Lv.' + (pet.level || 1) + '</span></div>'
+      +   '<div class="lg-row2">'
+      +     '<span>成长 <b>' + (pet.growth || 0).toFixed(1) + '</b></span>'
+      +     '<span>' + stageOf(pet) + '/' + stageTotal() + ' 阶</span>'
+      +     (reborn ? '<span>转生 <b>' + reborn + '</b></span>' : '')
+      +     '<span>装备 <b>' + equipCountOf(pet) + '/12</b></span>'
+      +   '</div>'
+      +   (o.extraOf ? o.extraOf(pet) : '')
+      +   (lock ? '<span class="lg-why">' + escapeHtml(lock) + '</span>' : '')
+      +   '<div class="growth-bar"><i style="width:' + gbar + '%"></i></div>'
+      + '</div>';
+    bindPetTip(card, pet);
+    card.onclick = () => {
+      if (lock) { showToast('不能选这只', lock); return; }
+      if (o.onPick) o.onPick(pet);
+    };
+    return card;
+  }
+
+  /* 渲染一整个列表：可用在前、锁定的排后面（玩家第一眼看到的永远是"能用的"）。
+   * emptyHtml：列表为空时的占位（各页自己写"这是什么玩法/还差什么"）。 */
+  function renderList(container, pets, opts) {
+    if (!container) return;
+    const o = opts || {};
+    container.innerHTML = '';
+    const list = pets || [];
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'lg-empty-hint';
+      empty.innerHTML = o.emptyHtml || '还没有宠物';
+      container.appendChild(empty);
+      return;
+    }
+    const rank = p => (o.lockOf && o.lockOf(p) ? 1 : 0);
+    list.slice().sort((a, b) => rank(a) - rank(b)).forEach(p => container.appendChild(listCard(p, o)));
+  }
+
+  /* 步骤提示（选主宠 → 选方向 → 确认）：已完成打勾 / 当前高亮 / 未做置灰。
+   * steps: [{ label, state: 'done' | 'cur' | 'todo' }] */
+  function stepsHtml(steps) {
+    return '<div class="lg-steps">' + stepsItems(steps) + '</div>';
+  }
+  function stepsItems(steps) {
+    return (steps || []).map(s => {
+      const st = s.state === 'done' ? ' is-done' : s.state === 'cur' ? ' is-cur' : '';
+      return '<span class="lg-step' + st + '">' + escapeHtml(s.label) + '</span>';
+    }).join('');
+  }
+  // 把步骤条填进一个已有的容器（页面里预留的空 div，省得各页再拼一遍字符串）
+  function stepsInto(el, steps) {
+    if (el && el.innerHTML != null) el.innerHTML = stepsItems(steps);
+  }
+
+  /* 进度条（x/y 必须配它，禁止裸文本）。cls 可传 'is-ok' / 'lg-bar--sm' */
+  function barHtml(have, need, cls) {
+    const n = Math.max(1, Number(need) || 1);
+    const pct = Math.max(0, Math.min(100, (Number(have) || 0) / n * 100));
+    return '<span class="lg-bar' + (cls ? ' ' + cls : '') + '"><i style="width:' + pct.toFixed(1) + '%"></i></span>';
+  }
+  /* 一行进度：标签 + 条 + 数值 */
+  function progHtml(label, have, need) {
+    const h = Number(have) || 0, n = Number(need) || 0;
+    const ok = h >= n && n > 0;
+    return '<div class="lg-prog' + (ok ? ' is-ok' : '') + '">'
+      + '<span class="k">' + escapeHtml(label) + '</span>'
+      + barHtml(h, n, ok ? 'is-ok' : '')
+      + '<span class="v">' + fmtNum(h) + ' / ' + fmtNum(n) + '</span></div>';
+  }
+  /* 属性加成 chips（两列网格）：rows = [{ label, val, flat }]，flat=true 表示绝对值不加 % */
+  function chipsHtml(rows, cols) {
+    return '<div class="lg-chips' + (cols === 3 ? ' lg-chips--3' : '') + '">' + (rows || []).map(r =>
+      '<span class="lg-chip' + (r.flat ? ' is-flat' : '') + '"><span>' + escapeHtml(r.label) + '</span><b>'
+      + escapeHtml(String(r.val)) + '</b></span>').join('') + '</div>';
+  }
+  /* 条件清单（逐项 ✓/✗）：rows = [{ ok, text }] —— 涅槃的主宠/副宠条件、资料页「下一步」的进化条件共用。
+   * 规则用它拆成可勾选的项目，玩家不用读一大段话才知道差哪一项。 */
+  function condListHtml(rows) {
+    return '<div class="lg-check">' + (rows || []).map(r =>
+      '<div' + (r.ok ? ' class="ok"' : '') + '>' + r.text + '</div>').join('') + '</div>';
+  }
+
+  /* 自定义下拉（替换原生 <select>）：原生框在暗色面板里是系统灰、和整体割裂。
+   * opts = [{ value, label, disabled }]，返回 HTML；调用方拿到后自己绑 .lg-select__opt 的点击（见 bindSelect）。 */
+  function selectHtml(id, opts, cur) {
+    const list = opts || [];
+    const curOpt = list.find(o => String(o.value) === String(cur)) || list[0] || { label: '—' };
+    return '<div class="lg-select" id="' + id + '">'
+      + '<button type="button" class="lg-select__btn"><span class="lg-select__label">' + escapeHtml(curOpt.label) + '</span><span class="caret">▾</span></button>'
+      + '<div class="lg-select__list">' + list.map(o =>
+        '<div class="lg-select__opt' + (String(o.value) === String(curOpt.value) ? ' on' : '') + (o.disabled ? ' disabled' : '') + '" data-v="' + escapeHtml(String(o.value)) + '">'
+        + escapeHtml(o.label) + '</div>').join('') + '</div></div>';
+  }
+  /* 绑自定义下拉：scope 里找 #id，点按钮开合、点选项回调 onPick(value)。
+   * ⚠️ 测试桩的 querySelector 返回空壳、querySelectorAll 返回 [] ⇒ 这里必须做能力判断，不能直接 .forEach。 */
+  function bindSelect(scope, id, onPick) {
+    if (!scope || !scope.querySelector) return;
+    const box = scope.querySelector('#' + id);
+    if (!box) return;
+    const btn = box.querySelector ? box.querySelector('.lg-select__btn') : null;
+    if (btn) btn.onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); box.classList.toggle('open'); };
+    const opts = (box.querySelectorAll ? box.querySelectorAll('.lg-select__opt') : []) || [];
+    opts.forEach(o => {
+      o.onclick = (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+        if (o.className && o.className.indexOf('disabled') >= 0) return;
+        box.classList.remove('open');
+        if (onPick) onPick(o.dataset ? o.dataset.v : o.getAttribute('data-v'));
+      };
+    });
+  }
+
+  /* 培育记录（本机、最多 5 条）：
+   * 进化 / 培育这类"喂素材换成长"的操作，事后想回看"我这只宠到底吃了多少"。
+   * ⚠️ 只写 localStorage（纯前端记录），**不写宠物的等级/经验** —— 托管期间客户端不许碰真账。 */
+  const REC_KEY = 'fof_pet_records';
+  function loadRecords() {
+    try { return JSON.parse(localStorage.getItem(REC_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function pushRecord(key, text, delta) {
+    if (!key) return;
+    try {
+      const all = loadRecords();
+      const arr = all[key] || [];
+      arr.unshift({ t: Date.now(), text: String(text || ''), d: String(delta || '') });
+      all[key] = arr.slice(0, 5);
+      localStorage.setItem(REC_KEY, JSON.stringify(all));
+    } catch (e) { /* 隐私模式/测试桩：记不下不影响操作本身 */ }
+  }
+  function recordsHtml(key, title) {
+    const arr = (loadRecords()[key]) || [];
+    if (!arr.length) return '';
+    return '<div class="lg-head">' + escapeHtml(title || '培育记录') + '<span class="hint">最近 ' + arr.length + ' 次 · 只记在本机</span></div>'
+      + '<div class="lg-records">' + arr.map(r => {
+        let hh = '';
+        try {
+          const d = new Date(r.t);
+          hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        } catch (e) { hh = ''; }
+        return '<div class="lg-rec"><span class="t">' + hh + '</span><span>' + escapeHtml(r.text) + '</span>'
+          + (r.d ? '<span class="d">' + escapeHtml(r.d) + '</span>' : '') + '</div>';
+      }).join('') + '</div>';
+  }
+
+  /* 不可逆操作的二次确认 —— 复用**项目唯一的那块确认面板**（装备分解用的 #salvage-modal）。
+   * ⛔ 不新建第二个确认框：同一件事两份实现 = 迟早两边行为不一致。
+   * 面板不可用时退回 window.confirm；测试桩里两者都没有 → 直接执行（与 salvageConfirm 同口径）。 */
+  function confirmIrreversible(opts) {
+    const o = opts || {};
+    const run = () => { try { if (o.onOk) o.onOk(); } catch (e) { console.error('[pet] 确认后执行失败', e); } };
+    if (typeof UI.salvageConfirm === 'function') {
+      UI.salvageConfirm({
+        title: o.title, bodyHtml: o.bodyHtml, okLabel: o.okLabel,
+        fallbackText: o.fallbackText, onOk: run
+      });
+      return;
+    }
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (window.confirm(o.fallbackText || '确认执行？此操作不可撤销。')) run();
+      return;
+    }
+    run();
+  }
+
+  PetUI.fmtNum = fmtNum;
+  PetUI.stageOf = stageOf;
+  PetUI.stageTotal = stageTotal;
+  PetUI.isGodOf = isGodOf;
+  PetUI.equipCountOf = equipCountOf;
+  PetUI.listCard = listCard;
+  PetUI.renderList = renderList;
+  PetUI.stepsHtml = stepsHtml;
+  PetUI.stepsItems = stepsItems;
+  PetUI.stepsInto = stepsInto;
+  PetUI.barHtml = barHtml;
+  PetUI.progHtml = progHtml;
+  PetUI.chipsHtml = chipsHtml;
+  PetUI.condListHtml = condListHtml;
+  PetUI.selectHtml = selectHtml;
+  PetUI.bindSelect = bindSelect;
+  PetUI.confirmIrreversible = confirmIrreversible;
+  PetUI.pushRecord = pushRecord;
+  PetUI.recordsHtml = recordsHtml;
   PetUI.iconHtml = iconHtml;
   PetUI.petTipHtml = petTipHtml;
   PetUI.showPetTip = showPetTip;
@@ -690,5 +1066,8 @@
   PetUI.flashStat = flashStat;
   PetUI.traitsHtml = traitsHtml;
   PetUI.traitInheritLine = traitInheritLine;
+  PetUI.finalFormOf = finalFormOf;
+  PetUI.finalSkillOf = finalSkillOf;
+  PetUI.skillEffectLine = skillEffectLine;
   UI.traitsHtml = traitsHtml;
 })();

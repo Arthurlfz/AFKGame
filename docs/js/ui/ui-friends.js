@@ -13,6 +13,10 @@
   }
   const ONLINE_MS = 5 * 60 * 1000;
   const isOnline = p => !!(p && p.last_seen_at && (Date.now() - new Date(p.last_seen_at).getTime()) < ONLINE_MS);
+  /* 好友 / 请求方戴的名牌：uid → key，进页面时**一次取完**（不逐条请求）。
+   * 拿不到就显示普通名字 —— 名牌只是装饰，不能因为它让好友页渲染失败。 */
+  let frTags = {};
+  const nameOf = (id, name) => (UI.nameTag ? UI.nameTag(name || '玩家', frTags[id]) : esc(name || '玩家'));
   async function profilesOf(ids) {
     const c = S(); if (!c || !ids.length) return {};
     const { data } = await c.from('profiles').select('id, nickname, last_seen_at').in('id', ids);
@@ -108,7 +112,7 @@
       const p = prof[id] || {};
       const hot = unread.indexOf(id) >= 0 ? '<span class="fr-dot" title="有未读"></span>' : '';
       return `<div class="fr-row">
-        <span class="fr-name"><a class="fr-link" data-fid="${esc(id)}">${esc(p.nickname || '玩家')}</a>${hot}</span>
+        <span class="fr-name"><a class="fr-link" data-fid="${esc(id)}">${nameOf(id, p.nickname)}</a>${hot}</span>
         <span class="fr-state ${isOnline(p) ? 'on' : ''}">${isOnline(p) ? '在线' : '离线'}</span>
         <button class="fr-btn" data-act="chat" data-fid="${esc(id)}">私聊</button>
         <button class="fr-btn ghost" data-act="del" data-fid="${esc(id)}">删除</button>
@@ -117,7 +121,7 @@
 
     const incRows = inc.map(r => {
       const p = prof[r.user_id] || {};
-      return `<div class="fr-row"><span class="fr-name">${esc(p.nickname || '玩家')} 想加你为好友</span>
+      return `<div class="fr-row"><span class="fr-name">${nameOf(r.user_id, p.nickname)} 想加你为好友</span>
         <button class="fr-btn" data-act="accept" data-rid="${esc(r.id)}">同意</button>
         <button class="fr-btn ghost" data-act="reject" data-rid="${esc(r.id)}">拒绝</button></div>`;
     }).join('') || '<div class="fr-empty">没有待处理的好友请求</div>';

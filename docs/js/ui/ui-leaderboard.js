@@ -12,6 +12,14 @@
   }
 
   let tab = 'growth';   // 'growth' | 'tower'（记住玩家上次看的那个）
+  /* 榜上这些人戴的名牌：uid → key。渲染榜之前**一次取回**（最多 50 个 uid），
+   * 绝不逐条请求 —— getCurrentUser 单次 550ms 的教训。拿不到就当没名牌。 */
+  let lbTags = {};
+
+  /* 名字 + 名牌统一走 UI.nameTag（它负责转义），没名牌时退回普通名字。 */
+  function nameHtml(r) {
+    return (window.UI && window.UI.nameTag) ? window.UI.nameTag(r.name, lbTags[r.uid]) : escapeHtml(r.name);
+  }
 
   async function myId() {
     try {
@@ -82,7 +90,7 @@
       if (r.uid === my) myRank = rank;
       html += '<div class="lb-row' + (r.uid === my ? ' me' : '') + '">'
         + '<span class="lb-rank">' + medal(rank) + '</span>'
-        + '<span class="lb-name">' + escapeHtml(r.name) + (r.uid === my ? '（你）' : '') + '</span>'
+        + '<span class="lb-name">' + nameHtml(r) + (r.uid === my ? '（你）' : '') + '</span>'
         + '<span class="lb-pet">' + escapeHtml(r.sub || '') + '</span>'
         + '<span class="lb-growth">' + escapeHtml(r.main) + '</span>'
         + '</div>';
@@ -99,6 +107,10 @@
     try {
       const res = tab === 'tower' ? await towerRows() : await growthRows();
       if (res.err) { body.innerHTML = '<div class="lb-error">' + escapeHtml(res.err) + '</div>'; return; }
+      // 名牌：整屏一次取完（失败/未登录返回 {}，当没名牌显示，不挡榜单）
+      if (window.Supabase && window.Supabase.fetchPerksOf) {
+        try { lbTags = await window.Supabase.fetchPerksOf(res.rows.map(r => r.uid)); } catch (e) { lbTags = {}; }
+      }
       paint(body, res.rows, my);
     } catch (e) {
       body.innerHTML = '<div class="lb-error">加载失败：' + escapeHtml(e && (e.message || String(e))) + '</div>';

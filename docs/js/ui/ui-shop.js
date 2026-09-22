@@ -34,6 +34,13 @@
   // 魔石系统总开关：Config.shop.enabled === false → 整条魔石线下线（界面隐藏 + 不打接口）
   const enabled = () => !(Config.shop && Config.shop.enabled === false);
 
+  /* 权益缓存刷新：挂单额度 / 背包容量 / 育兽栏位 / 名牌都读同一份（Supabase.perksCache）。
+   * 走 Market.refreshPerks 是因为历史上它是那个口；Supabase.refreshPerks 是同一份数据的另一入口。 */
+  const refreshPerksCache = async () => {
+    if (Market && Market.refreshPerks) { await Market.refreshPerks(); return; }
+    if (Supabase && Supabase.refreshPerks) await Supabase.refreshPerks();
+  };
+
   // 开关 → 界面可见性。renderShop 每次 renderAll 都会走，状态不会漂移；
   // 用 inline display（不是 hidden 属性）：.tab-page.active / .sb-btn 的 display 规则会盖掉 [hidden]。
   function applyVisibility() {
@@ -104,21 +111,48 @@
     function boughtCount(sku) {
       return orders.filter(o => o.sku === sku && o.status === 'delivered').length;
     }
-    const goodsHtml = products.length
-      ? products.map(p => {
-        const bought = boughtCount(p.sku);
-        const lim = p.limit_per_user || 0;
-        const soldOut = lim > 0 && bought >= lim;
-        const poor = wallet.gems < p.price_gems;
+    const GEM_SVG = '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg>';
+    /* 单张商品卡。名牌卡不是「购买 / 已达上限」，而是三态：
+     *   未解锁 → 购买；已解锁未戴 → 使用；正在戴 → 使用中（禁用）。
+     * 为什么名牌单独一条按钮逻辑：它不限购（可以买到别的档、也能摘下来再戴回来），
+     * 用「限购次数」那套表达不出来 —— 重复购买由服务端返回 owned 挡住。 */
+    function cardHtml(p) {
+      const bought = boughtCount(p.sku);
+      const lim = p.limit_per_user || 0;
+      const soldOut = lim > 0 && bought >= lim;
+      const poor = wallet.gems < p.price_gems;
+      const st = tagState(p);
+      let btn;
+      if (st && st.active) {
+        btn = '<button class="btn-mini shop-tag-on" disabled>使用中</button>';
+      } else if (st && st.unlocked) {
+        btn = `<button class="btn-mini primary shop-use" data-tag="${escapeHtml(st.key)}">使用</button>`;
+      } else {
         const btnText = soldOut ? '已达上限' : poor ? '魔石不足' : '购买';
-        return `
+        btn = `<button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${(soldOut || poor) ? 'disabled' : ''}>${btnText}</button>`;
+      }
+      return `
         <div class="shop-card">
-          <div class="shop-card-icon">${p.icon || '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg>'}</div>
+          <div class="shop-card-icon">${p.icon || GEM_SVG}</div>
           <div class="shop-card-title">${escapeHtml(p.title)}</div>
-          <div class="shop-card-desc">${escapeHtml(goodsDesc(p.payload))}</div>
+          <div class="shop-card-desc">${escapeHtml(goodsDesc(p))}</div>
           ${lim > 0 ? `<div class="shop-card-limit">限购 ${lim} 次 · 已买 ${bought}</div>` : ''}
-          <div class="shop-card-price"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.744 17.736a6 6 0 1 1-7.48-7.48"/><path d="M15 6h1v4"/><path d="m6.134 14.768.866-.5 2 3.464"/></svg> ${p.price_gems}${p.price_cents ? ` <span class="shop-card-rmb">≈ ${(p.price_cents / 100).toFixed(0)} 元</span>` : ''}</div>
-          <button class="btn-mini primary shop-buy" data-sku="${escapeHtml(p.sku)}" ${(soldOut || poor) ? 'disabled' : ''}>${btnText}</button>
+          <div class="shop-card-price">${GEM_SVG} ${p.price_gems}${p.price_cents ? ` <span class="shop-card-rmb">≈ ${(p.price_cents / 100).toFixed(0)} 元</span>` : ''}</div>
+          ${btn}
+        </div>`;
+    }
+
+    /* 三排货架（空排不渲染，免得出现一个空标题）。
+     * 商品全空时才显示「暂无商品」；还在读显示「正在读取商品…」——
+     * 这两句以前是同一句，玩家分不清"没货"和"还没拉回来"。 */
+    const goodsHtml = products.length
+      ? SHELVES.map(s => {
+        const list = products.filter(p => shelfOf(p) === s.id);
+        if (!list.length) return '';
+        return `
+        <div class="shop-shelf">
+          <div class="shop-shelf-head">${escapeHtml(s.title)}${s.note ? `<span class="hint">${escapeHtml(s.note)}</span>` : ''}</div>
+          <div class="shop-grid">${list.map(cardHtml).join('')}</div>
         </div>`;
       }).join('')
       : (goodsLoaded
@@ -146,7 +180,7 @@
 
       <div class="panel">
         <div class="panel-title"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 魔石商店<span class="hint">只卖便利，不影响战力</span></div>
-        <div class="shop-grid">${goodsHtml}</div>
+        <div class="shop-shelves">${goodsHtml}</div>
       </div>
 
       <div class="panel">
@@ -157,23 +191,63 @@
     bindShopActions();
   }
 
-  /* 商品内容描述。两种 payload：
-   *   materials = { 材料名: 数量 } → 走 add_material 直发背包
-   *   perks     = { 权益键: 数量 } → 走 user_perks（便利类，不进战力）：
-   *               listing_slots 挂单额度 / inventory_slots 背包装备位 / pet_slots 育兽栏位
+  /* 商品内容描述。三种 payload：
+   *   materials  = { 材料名: 数量 } → 走 add_material 直发背包
+   *   perks      = { 权益键: 数量 } → 走 user_perks（便利类，不进战力）：
+   *                listing_slots 挂单额度 / inventory_slots 背包装备位 / pet_slots 育兽栏位
+   *   cosmetics  = { unlock_tag: key } → 流光名牌（买下永久解锁 + 自动戴上，可随时切换）
    * ⚠️ 2026-09-12 拍板商店只卖便利不卖数值，所以 materials 类目后续不应再新增。
-   * 2026-09-16：从"只认挂单额度"改成按权益键查表 —— 以后加便利权益只需动这张表。 */
+   * 2026-09-16：从"只认挂单额度"改成按权益键查表 —— 以后加便利权益只需动这张表。
+   * 2026-09-20：加名牌。名牌的颜色与流光全在 game.css（这里只说一句效果，不写色值）。 */
   const PERK_LABEL = {
     listing_slots: '市场挂单上限',
     inventory_slots: '背包装备位',
     pet_slots: '育兽栏位'
   };
-  function goodsDesc(payload) {
-    const m = payload && payload.materials;
+  const perks = () => (Supabase && Supabase.getPerksCache) ? Supabase.getPerksCache() : {};
+  const tagDefs = () => (Config.shop && Config.shop.nameTags) || {};
+
+  /* 货架分组：**由 payload 推导，不写 sku 名单**。
+   * 写名单 = 第二份真源，以后加商品必然漏改一处（项目已因「两份名单」栽过）。
+   *   名牌（cosmetics）  → 名牌排
+   *   多项权益的打包      → 礼包排
+   *   单项权益 / 材料     → 扩容排
+   * 认不出的形态一律归扩容排：宁可排得朴素，也不能让新商品在商店里凭空消失。 */
+  const SHELVES = [
+    { id: 'capacity', title: '扩容', note: (Config.shop && Config.shop.shelves && Config.shop.shelves.capacity) || '' },
+    { id: 'bundle', title: '礼包', note: (Config.shop && Config.shop.shelves && Config.shop.shelves.bundle) || '' },
+    { id: 'tag', title: '名牌', note: (Config.shop && Config.shop.shelves && Config.shop.shelves.tag) || '' }
+  ];
+  function shelfOf(p) {
+    const pl = (p && p.payload) || {};
+    if (pl.cosmetics) return 'tag';
+    return Object.keys(pl.perks || {}).length > 1 ? 'bundle' : 'capacity';
+  }
+
+  /* 名牌卡的三种状态：未解锁（购买）/ 已解锁未戴（使用）/ 正在戴（使用中）。
+   * 真源是服务端 user_perks（name_tags 已解锁集合 + name_tag 当前佩戴），这里只读缓存。 */
+  function tagState(p) {
+    const key = p && p.payload && p.payload.cosmetics && p.payload.cosmetics.unlock_tag;
+    if (!key) return null;
+    const own = perks();
+    return {
+      key,
+      unlocked: Array.isArray(own.name_tags) && own.name_tags.indexOf(key) >= 0,
+      active: own.name_tag === key
+    };
+  }
+
+  function goodsDesc(p) {
+    const pl = (p && p.payload) || {};
+    if (pl.cosmetics && pl.cosmetics.unlock_tag) {
+      const def = tagDefs()[pl.cosmetics.unlock_tag] || {};
+      return `名字永久解锁${def.effect ? '（' + def.effect + '）' : ''}，可随时切换`;
+    }
+    const m = pl.materials;
     if (m) return Object.keys(m).map(k => `${k} ×${m[k]}`).join('、');
-    const pk = payload && payload.perks;
+    const pk = pl.perks;
     if (pk) {
-      const cache = (window.Supabase && window.Supabase.getPerksCache) ? window.Supabase.getPerksCache() : {};
+      const cache = perks();
       const parts = Object.keys(PERK_LABEL)
         .filter(k => Number(pk[k]) > 0)
         .map(k => {
@@ -199,6 +273,9 @@
     document.querySelectorAll('.shop-buy').forEach(b => {
       b.onclick = () => doBuy(b.dataset.sku);
     });
+    document.querySelectorAll('.shop-use').forEach(b => {
+      b.onclick = () => doUseTag(b.dataset.tag);
+    });
   }
 
   async function doRedeem(code) {
@@ -216,6 +293,29 @@
   }
 
   let buying = false; // 购买闸门：spendGems 是一次云端往返，期间连点会重复扣魔石
+  let usingTag = false; // 换名牌同理：一次云端往返，连点会打出多个请求
+
+  /* 换名牌：只把 key 交给服务端，由服务端校验「这一档你有没有解锁」。
+   * ⚠️ 这里**故意不做本地先行**：名牌是给别人看的，本地先戴上、云端没戴上的话，
+   *    玩家会以为自己换了，而聊天/市集里别人看到的还是旧的 —— 这种「看起来成功」最难查。 */
+  async function doUseTag(tag) {
+    if (!tag || usingTag) return;
+    usingTag = true;
+    const r = await Supabase.setMyNameTag(tag).catch(() => ({ ok: false, code: 'error' }));
+    usingTag = false;
+    if (!r.ok) {
+      const msg = r.code === 'notowned' ? '这一档还没有解锁'
+        : r.code === 'nologin' ? '请先登录再切换'
+        : '切换失败，稍后再试';
+      showToast('❌ 名牌切换失败', msg);
+      return;
+    }
+    await refreshPerksCache();
+    UI.renderAll();
+    // 聊天里**已经显示出来的**老消息也得换色：名字颜色是渲染那一刻写死的（见 ui-console 的 repaintConsole）
+    if (UI.repaintConsole) UI.repaintConsole();
+    showToast('名牌已更换', '聊天、市集、排行榜上都会显示');
+  }
   /* 购买中的按钮反馈（2026-09-17）：闸门只挡住了重复扣款，但按钮既不变字也不禁用，
    * 云端往返这一秒里玩家看到的还是「购买」，会以为没点着然后狂点。 */
   function setBuyingVisual(sku, on) {
@@ -238,6 +338,16 @@
     setBuyingVisual(sku, true);
     const r = await Supabase.spendGems(sku, ref).catch(e => ({ ok: false, message: (e && e.message) || '购买失败' }));
     buying = false;
+    /* 'owned' =「你已经拥有这件名牌」，服务端**一分钱都没扣**（判定在扣款之前）。
+     * 它既不是成功购买也不是失败：按钮要放回来，提示要讲人话，
+     * 否则玩家看到"购买失败"会以为钱丢了。 */
+    if (r.code === 'owned') {
+      setBuyingVisual(sku, false);
+      showToast('已拥有这件名牌', '不用重复买，直接点「使用」即可');
+      await refreshPerksCache();
+      renderShop();
+      return;
+    }
     if (!r.ok) {
       const msg = r.code === 'insufficient' ? '魔石不足' : r.code === 'limit' ? '已达购买上限' : (r.message || '购买失败');
       showToast('❌ 购买失败', msg);
@@ -249,6 +359,7 @@
      *   perks 类     → 写的是 user_perks，要重拉 Market 的额度缓存，
      *                  否则挂单上限还停在旧值，玩家会以为「买了没生效」。 */
     const isPerk = !!(p.payload && p.payload.perks);
+    const isTag = !!(p.payload && p.payload.cosmetics);
     if (p.payload && p.payload.materials) {
       /* ⚠️ 必须带 bound_qty：少这一列，setCloudMaterials 会当成"这些材料全不绑定"，
        * 把本地绑定数整体清零 —— 玩家在商店买一次东西，背包里的「绑定」堆就集体消失。
@@ -256,11 +367,14 @@
       const { data } = await Supabase.getClient().from('materials').select('name,quantity,bound_qty');
       if (data) Materials.setCloudMaterials(data);
     }
-    if (isPerk && Market && Market.refreshPerks) await Market.refreshPerks();
+    // 名牌也走这一口：买下后 name_tag 变了，商店卡片要在「使用中 / 使用」之间跟着变
+    if ((isPerk || isTag) && Market && Market.refreshPerks) await Market.refreshPerks();
     addLog(`<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买 ${p.title}，花费 ${p.price_gems} ${cur()}`);
-    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买成功！', isPerk ? `${p.title} 已生效` : `${p.title} 已发到背包`);
+    showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg> 购买成功！', isTag ? `${p.title} 已生效，名字已带上` : isPerk ? `${p.title} 已生效` : `${p.title} 已发到背包`);
     await Promise.all([refreshWallet(), refreshOrders()]);
     UI.renderAll();
+    // 名牌是"买下即戴上" ⇒ 聊天里已显示的名字也要一起换色（同 doUseTag）
+    if (isTag && UI.repaintConsole) UI.repaintConsole();
   }
 
   /* ---------- 对外 API ---------- */

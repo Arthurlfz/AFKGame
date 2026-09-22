@@ -37,4 +37,25 @@
 ✅ 正确写法：**图标与文案分开传，只有文案进 esc** ——
 `logEpic(icon, text)` → `'<span class="tw-epic">' + (icon||'') + esc(text) + '</span>'`（同 `logLootLoot`）。
 ⚠️ 守值：`vtest_tower_ui.js` 第 ⑤ 节 —— 桩掉 consoleLog 收 html，断言**没有 `&lt;svg`** 且**真有 `<svg`**。
+
+## 🔴 showToast 不是浮层提示（2026-09-21 内测实测定案）
+`UI.showToast` **只是往消息中心写一行字**（底部聊天弹窗 / 页面内嵌 console）。而内嵌 console 只挂在
+**世界地图/主城/战斗/宠物页**四个下半区——**市集/商店/背包浮窗等场景根本没有内嵌 console**，
+弹窗还开着时消息也全被弹窗挡住 ⇒ 玩家正盯着操作的地方，永远看不到"提示"，感知 = "点了没反应"
+（内测清单 🟠4 购买失败没反馈、🟠16 任务提交没反馈都是这个根因）。
+⇒ **规矩：关键操作的成败反馈必须"就地"显示在玩家正看着的界面里**
+（弹窗开着 → 错误行写进弹窗，参照 `ui-market.js` openBuyConfirm 的 `.buy-confirm-error`）；
+showToast/消息中心那份照写，供事后回看，但**不能当唯一反馈**。
 （写新播报函数时照抄这个模式；凡是"图标 + 动态文字"的通道都适用。）
+
+## 🔴 CSS 两个常踩的结构坑（2026-09-22 宠物页 V2 重构实测）
+1. **`grid-area` 命名线会泄漏**：只要父级曾用 `grid-template-areas: "a b c"` + 子项 `grid-area: b`，
+   把三列下移到**新的** grid 容器后，那些 `grid-area` 仍生效 —— 新网格会凭空多出几列、行高错乱
+   （实测：三列变五列、中间那格被压成 34px）。⇒ 重构布局时**把旧命名网格整套删掉**，
+   不要在新容器上打补丁（子项上的 `grid-area` 就是地雷）。
+2. **`.tab-page.active` 是 `display:block`、高度 auto** ⇒ 页内所有 `height:100%` 静默失效，
+   表现是"内容撑不满 + 容器出现空滚"。任何"撑满整屏"的页面前，先给页容器**确定高度**
+   （`#app:has(#tab-X.active) #tab-X { height: 100% }`），再谈 flex 撑满。
+   配套：`display:flex/grid` 只准写在 `.active` 上（写宽选择器会碾压 `.tab-page{display:none}`，项目红线）。
+3. **`!important` 会锁死后续调尺寸**：`game.css` 里给头像写 `width:180px !important` 后，
+   任何新布局都改不动它。改布局时**优先删旧的 `!important`**，别加新的去对抗。

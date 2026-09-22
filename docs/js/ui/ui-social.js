@@ -16,6 +16,10 @@
     const m = {}; for (const p of (data || [])) m[p.id] = p.nickname || '玩家';
     return m;
   }
+  /* 名牌（2026-09-20）：社交面板里的名字也走统一渲染。
+   * 进面板时按 uid **一次取完**（卖家 + 留言作者），拿不到就显示普通名字。 */
+  let socTags = {};
+  const tagOf = (id, name) => (UI.nameTag ? UI.nameTag(name || '玩家', socTags[id]) : esc(name || '玩家'));
 
   /* ---------- 关注 ---------- */
   async function isFollowing(sellerId) {
@@ -47,7 +51,11 @@
     const { data } = await c.from('board_messages').select('id, author_id, body, created_at')
       .eq('seller_id', sellerId).order('created_at', { ascending: false }).limit(50);
     const names = await nameOf([...new Set((data || []).map(r => r.author_id))]);
-    return (data || []).map(r => ({ id: r.id, body: r.body, created_at: r.created_at, author: names[r.author_id] || '玩家' }));
+    // authorId 一并带出去：渲染层要靠它查作者戴的名牌
+    return (data || []).map(r => ({
+      id: r.id, body: r.body, created_at: r.created_at,
+      author: names[r.author_id] || '玩家', authorId: r.author_id
+    }));
   }
   async function post(sellerId, body) {
     const c = S(), myId = await me();
@@ -81,10 +89,10 @@
         + `<span class="soc-price">${r.qty || 0} ${esc(r.mat || '')}</span></div>`).join('')
       : '<div class="soc-empty">他现在没有在售的东西</div>';
     const msgs = (st.board || []).length
-      ? (st.board || []).map(m => `<div class="soc-msg"><b>${esc(m.author)}</b>${esc(m.body)}</div>`).join('')
+      ? (st.board || []).map(m => `<div class="soc-msg"><b>${tagOf(m.authorId, m.author)}</b>${esc(m.body)}</div>`).join('')
       : '<div class="soc-empty">还没有人留言</div>';
     return `<div class="soc-panel">
-      <div class="soc-head"><span class="soc-title">卖家 · ${esc(name || '玩家')}</span>${followBtn}</div>
+      <div class="soc-head"><span class="soc-title">卖家 · ${tagOf(sellerId, name)}</span>${followBtn}</div>
       <div class="soc-sub">他的在售</div>
       <div class="soc-list">${sellRows}</div>
       <div class="soc-sub">留言板</div>
@@ -96,7 +104,12 @@
 
   function render(host, sellerId, name) {
     host.innerHTML = '<div class="soc-empty">加载中…</div>';
-    Promise.all([isFollowing(sellerId), selling(sellerId), board(sellerId)]).then(([f, s, b]) => {
+    Promise.all([isFollowing(sellerId), selling(sellerId), board(sellerId)]).then(async ([f, s, b]) => {
+      // 名牌：卖家 + 留言作者一次取完（失败就当没名牌，不挡面板）
+      if (window.Supabase && window.Supabase.fetchPerksOf) {
+        try { socTags = await window.Supabase.fetchPerksOf([sellerId].concat((b || []).map(m => m.authorId))); }
+        catch (e) { socTags = {}; }
+      }
       host.innerHTML = panelHtml(sellerId, name, { following: f, selling: s, board: b });
       bind(host, sellerId, name);
     }).catch(() => { host.innerHTML = '<div class="soc-empty">加载失败</div>'; });
@@ -126,11 +139,15 @@
   async function myFollowsHtml() {
     const list = await following();
     if (!list.length) return '<div class="soc-empty">你还没关注任何人</div>';
+    // 名牌：关注列表一次取完（失败就当没名牌，不挡列表）
+    if (window.Supabase && window.Supabase.fetchPerksOf) {
+      try { socTags = await window.Supabase.fetchPerksOf(list.map(f => f.id)); } catch (e) { socTags = {}; }
+    }
     const rows = [];
     for (const f of list) {
       const items = await selling(f.id);
       rows.push('<div class="soc-row"><span class="soc-name">'
-        + `<a class="soc-link" data-seller="${esc(f.id)}">${esc(f.name)}</a></span>`
+        + `<a class="soc-link" data-seller="${esc(f.id)}">${tagOf(f.id, f.name)}</a></span>`
         + `<span class="soc-price">在售 ${items.length} 件</span></div>`);
     }
     return '<div class="soc-panel"><div class="soc-head"><span class="soc-title">我的关注</span></div>'

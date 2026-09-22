@@ -455,21 +455,23 @@ const pngOk = pngHead.length === 33
 A(pngOk,
   `命中墨爆 PNG IHDR 为 2304×256、bitDepth=8、colorType=6（RGBA，真透明通道）`);
 // ⚠️ 版本号会各自往前走（只改 JS 就别动 CSS 的号，白拉 285KB 没意义）：
-//   game.css → fx4（fx3 之后又移走了命中特效的样式）｜fx.css → fx1｜hit-fx.js → fx1
+//   game.css → evodiff（fx4 之后：进化页 forge-bar 常驻 + 任务提交就地反馈 + 养成 tab 角标与空态 + 分支差异展示，2026-09-21~22 内测清单）｜fx.css → fx1｜hit-fx.js → fx1
 //   战斗页一族（js/ui/battle/）→ mv1：归档进目录后统一升号
 //   （迁移史：fx5~9 = 命中特效 / 悬浮提示 / 掉落+舞台原语 / 名册+结算 / 出手演出 相继从 ui-battle.js 迁出）
-A(/css\/game\.css\?v=20260921fx4/.test(srcHtml)
+A(/css\/game\.css\?v=20260922legion1/.test(srcHtml)
   && /css\/fx\.css\?v=20260921fx1/.test(srcHtml)
   && /js\/fx\/hit-fx\.js\?v=20260921fx1/.test(srcHtml)
   // 战斗页一族（2026-09-21 从 js/ui/ 归档到 js/ui/battle/，版本号统一升到 mv1）
-  && /js\/ui\/battle\/index\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/act\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/loot\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/tip\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/roster\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/summary\.js\?v=20260921mv1/.test(srcHtml)
-  && /js\/ui\/battle\/stage-fx\.js\?v=20260921mv1/.test(srcHtml),
-  '游戏.html 里 CSS 与战斗页一族的版本号都要对（game.css fx4 / fx.css fx1 / hit-fx fx1 / js/ui/battle/* mv1）—— 改了 JS/CSS 不升号=改了等于没改');
+  && /js\/ui\/battle\/index\.js\?v=20260922mv2/.test(srcHtml)
+  && /js\/ui\/battle\/act\.js\?v=20260922mv2/.test(srcHtml)
+  // 2026-09-22：loot.js 因「同类掉落合并」单独升到 legion1 —— 只改一个文件就只升它一个
+  //（全族一起升 = 让玩家白拉 6 个没变的文件）
+  && /js\/ui\/battle\/loot\.js\?v=20260922legion1/.test(srcHtml)
+  && /js\/ui\/battle\/tip\.js\?v=20260922mv2/.test(srcHtml)
+  && /js\/ui\/battle\/roster\.js\?v=20260922mv2/.test(srcHtml)
+  && /js\/ui\/battle\/summary\.js\?v=20260922mv2/.test(srcHtml)
+  && /js\/ui\/battle\/stage-fx\.js\?v=20260922mv2/.test(srcHtml),
+  '游戏.html 里 CSS 与战斗页一族的版本号都要对（game.css evodiff / fx.css fx1 / hit-fx fx1 / js/ui/battle/* mv1）—— 改了 JS/CSS 不升号=改了等于没改');
 
 /* ⭐ 立绘尺寸有【三处】要同步：基准（min(Npx, Ncqh)）/ 矮视口写死（@media max-height:880px）/ 变异怪写死。
  * 2026-09-21 用户"宠物素材有点小"的根因就是**矮视口那档把立绘锁死在 200px**，而基准那条

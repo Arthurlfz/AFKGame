@@ -481,19 +481,32 @@
       return { gems: 0, totalRecharged: 0, error: e && e.message, missing: true };
     }
   }
-  /* 我的玩家权益（魔石买的便利类：挂单额度 / 背包格数 / 育兽栏位）
+  /* 我的玩家权益（魔石买的便利类：挂单额度 / 背包格数 / 育兽栏位 / 名牌）
    * 服务端权威：user_perks 表只有 SELECT 策略，写入只走 spend_gems。
-   * 2026-09-16：从"只有挂单额度"扩成三项 —— 装备与宠物开始有容量上限，扩建道具走同一套权益。 */
-  const EMPTY_PERKS = { listing_slots: 0, inventory_slots: 0, pet_slots: 0 };
+   * 2026-09-16：从"只有挂单额度"扩成三项 —— 装备与宠物开始有容量上限，扩建道具走同一套权益。
+   * 2026-09-20：名牌状态也归入同一份缓存，商店、聊天、市集和排行榜都从这里读。 */
+  const EMPTY_PERKS = {
+    listing_slots: 0,
+    inventory_slots: 0,
+    pet_slots: 0,
+    name_tag: null,
+    name_tags: []
+  };
   async function getMyPerks() {
     try {
       const { data, error } = await client.rpc('get_my_perks');
       if (error) return { ...EMPTY_PERKS, error: error.message };
+      // 无记录时 RPC 返回 0 行，不能直接解构 data[0]（2026-09-20 线上契约）。
       const row = (data && data[0]) || null;
+      const tags = row && Array.isArray(row.name_tags)
+        ? row.name_tags.filter(Boolean).map(String)
+        : [];
       return {
         listing_slots: (row && row.listing_slots) || 0,
         inventory_slots: (row && row.inventory_slots) || 0,
         pet_slots: (row && row.pet_slots) || 0,
+        name_tag: row && row.name_tag ? String(row.name_tag) : null,
+        name_tags: tags,
         error: null
       };
     } catch (e) {
@@ -502,25 +515,74 @@
   }
   /* 权益本地缓存（登录时拉一次，界面同步读）。
    * 放这里而不是各模块各存一份：挂单额度 / 背包容量 / 育兽栏位读的必须是同一份数字，
-   * 否则买了扩建会出现"这边生效、那边没生效"。Market.refreshPerks 现在是它的转发。 */
+   * 否则买了扩建会出现"这边生效、那边没生效"；名牌也必须跟着同一趟刷新，否则商店
+   * 会在购买后继续显示旧的"购买"按钮。 */
   let perksCache = { ...EMPTY_PERKS };
   async function refreshPerks() {
     const p = await getMyPerks();
     perksCache = {
       listing_slots: Number(p.listing_slots || 0),
       inventory_slots: Number(p.inventory_slots || 0),
-      pet_slots: Number(p.pet_slots || 0)
+      pet_slots: Number(p.pet_slots || 0),
+      name_tag: p.name_tag ? String(p.name_tag) : null,
+      name_tags: Array.isArray(p.name_tags) ? p.name_tags.filter(Boolean).map(String) : []
     };
     return perksCache;
   }
-  const getPerksCache = () => ({ ...perksCache });
+  const getPerksCache = () => ({
+    listing_slots: perksCache.listing_slots,
+    inventory_slots: perksCache.inventory_slots,
+    pet_slots: perksCache.pet_slots,
+    name_tag: perksCache.name_tag,
+    name_tags: Array.isArray(perksCache.name_tags) ? [...perksCache.name_tags] : []
+  });
+
+  /* 名牌只允许服务端决定是否已拥有；空串/null 表示摘掉名牌。
+   * 前端只传 key，不在这里写颜色或发奖逻辑，避免 UI 状态和服务端权益分叉。 */
+  async function setMyNameTag(tag) {
+    const value = tag == null ? null : (String(tag).trim() || null);
+    try {
+      const { data, error } = await client.rpc('set_name_tag', { p_tag: value });
+      if (error) return { ok: false, code: 'error' };
+      const code = String(data || 'error');
+      return { ok: code === 'ok', code };
+    } catch (e) {
+      return { ok: false, code: 'error' };
+    }
+  }
+
+  /* 批量读取别人当前佩戴的名牌：列表页一次取完，绝不逐条 getCurrentUser。
+   * 2026-09-20：getCurrentUser 单次 550ms 的事故已经说明，任何逐条请求都会拖死聊天/市集/榜单；
+   * 名牌是可选装饰，表不存在或 RLS/网络失败时必须静默退回无名牌。 */
+  async function fetchPerksOf(uids) {
+    const ids = Array.from(new Set((Array.isArray(uids) ? uids : [])
+      .map(id => String(id == null ? '' : id).trim())
+      .filter(Boolean)));
+    if (!ids.length) return {};
+    try {
+      const { data, error } = await getClient().from('user_perks')
+        .select('user_id,name_tag')
+        .in('user_id', ids);
+      if (error) return {};
+      const out = {};
+      for (const row of data || []) {
+        const id = row && row.user_id ? String(row.user_id) : '';
+        const tag = row && row.name_tag ? String(row.name_tag) : '';
+        if (id && tag) out[id] = tag;
+      }
+      return out;
+    } catch (e) {
+      return {};
+    }
+  }
 
   /* ---------- 容量上限（2026-09-16 用户拍板：装备/宠物设上限，卖扩建道具） ----------
    * 真源：基础值在 `Config.capacity`，扩建值在 user_perks（服务端权威，登录时拉到 perksCache）。
    * kind: 'bag'（背包里的装备）| 'pet'（名下宠物）
-   * ⚠️ 装备容量**服务端也有一份**（`battle_settle` 发装备前会数一遍）—— 这里改基础值必须同步改
-   *    那条 RPC，否则前台拦得住、托管挂机拦不住。
-   * 放在这个模块是因为它是 perksCache 的持有者；界面显示与掉落入包都问这一个口，避免各算各的。 */
+   * 放在这个模块是因为它是 perksCache 的持有者；界面显示与掉落入包都问这一个口，避免各算各的。
+   * ⚠️ 2026-09-20 核实：旧注释说「装备上限服务端也有一份（battle_settle 发装备前会数一遍）」，
+   *    但在 supabase/ 全目录里搜不到这条拦截 —— 实际只有前台拦，托管挂机那条链没有同样的检查。
+   *    这是既有缺口，本批只更正注释、不加拦截（加拦截牵涉"拦下来的产出怎么处理"，属设计决策）。 */
   function capacityOf(kind) {
     const c = ((window.Config && window.Config.capacity) || {})[kind] || {};
     const bonusKey = kind === 'pet' ? 'pet_slots' : 'inventory_slots';
@@ -784,6 +846,12 @@
     fetchItemById, loadTradeRecords,
     consumeEgg, loadEggCount, addEgg,
     getMyWallet, getMyPerks, refreshPerks, getPerksCache, capacityOf, usageOf, redeemCode, spendGems, fetchProducts, fetchMyOrders,
+    // 🔴 名牌两个口（2026-09-20 事故）：函数写在上头、**忘了加进这个导出对象** ⇒
+    //    Supabase.fetchPerksOf / setMyNameTag 都是 undefined，且失败是静默的：
+    //    前者被 `if (window.Supabase.fetchPerksOf)` 挡住（名字永远没颜色），
+    //    后者在 async 里抛 TypeError 被吞掉（点「使用」毫无反应）。
+    //    ⭐ 新增对外接口后，务必回来确认这一行；vtest_shop.js 有断言守着。
+    setMyNameTag, fetchPerksOf,
     listEgg, fetchEggMarket, fetchMyListedEggIds, buyEgg, cancelEggListing,
     listMaterial, fetchMaterialMarket, fetchMyListedMaterialIds, buyMaterial, cancelMaterialListing, botBuyMaterial,
     fetchQuestProgress, saveQuestProgress, completeQuest, fetchQuestClaims,

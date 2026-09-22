@@ -226,7 +226,8 @@
     return 'other';
   }
   function medianQty(list, keyOf) {
-    const vals = list.map(l => Number(l.material_qty || 0)).filter(v => v > 0).sort((a, b) => a - b);
+    // keyOf 可选：传了就按它取值（成长中位复用同一份算法，不另写一份）
+    const vals = list.map(l => Number((keyOf ? keyOf(l) : l.material_qty) || 0)).filter(v => v > 0).sort((a, b) => a - b);
     if (!vals.length) return null;
     const mid = Math.floor(vals.length / 2);
     return vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
@@ -677,12 +678,28 @@
       : `<span class="mk-price">${l.material_qty} <b>${mat.icon} ${mat.name}</b></span>${deal}`;
     const traitsHtml = (UI.traitsHtml && l.pet_traits && l.pet_traits.length) ? `<div class="mk-traits">${UI.traitsHtml({ traits: l.pet_traits })}</div>` : '';
     const age = ageLabel(l);
+    /* ---------- 成长区分度（2026-09-21 内测 🟠6：「成长 8 和成长 3 看不出哪个好」）----------
+     * ⛔ 不引进"品级"（宪法：不学分层品级）—— 只把玩家判断好坏真正需要的信息摆出来：
+     * ① 成长是宠物的核心价值 → 提亮放大，比等级显眼（原来和等级挤在一行灰字里一样大）；
+     * ② 与**同款（同一进化线）在售成长的中位数**比较，高于中位给「高于同款」——
+     *    复用市集已有的比价语言（"低于市价 40%"），样本 <3 不标（样本太少没意义）；
+     * ③ 达到神级合成门槛（Config.synthesize.god.minGrowth = 唯一事实源）→ 顶档标记：
+     *    在这游戏里那是真门槛（两只终阶宠搏神级宠要用），不是装饰。 */
+    const godMinG = (Config.synthesize && Config.synthesize.god && Config.synthesize.god.minGrowth) || 60;
+    const gVal = Number(l.pet_growth) || 0;
+    const peers = (pool || []).filter(x => x !== l && peerGroupKey(x) === peerGroupKey(l));
+    const gMed = peers.length >= 3 ? medianQty(peers, x => Number(x.pet_growth || 0)) : null;
+    const gHi = gMed != null && gVal > gMed;
+    const gGod = gVal >= godMinG;
+    const growthHtml = `<span class="mk-growth">成长 ${gVal.toFixed(1)}</span>`
+      + (gHi ? `<span class="mk-tag-hi" title="高于同款在售成长中位 ${Number(gMed).toFixed(1)}">高于同款</span>` : '')
+      + (gGod ? `<span class="mk-tag-god" title="成长 ${godMinG} 起：可在合成里搏一只神级宠">可搏神级宠</span>` : '');
     div.innerHTML = `
       <div class="mk-card-top">
         ${avatar ? `<img class="mk-avatar" src="${avatar}" alt="${escapeHtml(l.pet_name)}">` : '<div class="mk-avatar mk-avatar--item"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.2 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/><path d="M18.8 10.8a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 13.2c-3 0-4.8 1.7-4.8 3.9 0 2.4 1.8 4.4 4.8 4.4s4.8-2 4.8-4.4c0-2.2-1.8-3.9-4.8-3.9z"/></svg></div>'}
         <div class="mk-card-info">
           <div class="mk-name-row"><div class="mk-name">${escapeHtml(l.pet_name)}</div>${mineTag}</div>
-          <div class="mk-meta">成长${l.pet_growth} · Lv.${l.pet_level}${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
+          <div class="mk-meta">${growthHtml} · Lv.${l.pet_level}${l.seller ? ' · ' + (l.seller_id ? '<span class="mk-seller-link" data-seller="' + escapeHtml(l.seller_id) + '">' + escapeHtml(l.seller) + '</span>' : escapeHtml(l.seller)) : ''}${age ? ' · ' + age : ''}</div>
         </div>
       </div>
       ${traitsHtml}
@@ -886,6 +903,26 @@
     }
   }
 
+  /* 卖家名牌（2026-09-20）：牌子的颜色画在卡片里的 `.mk-seller-link[data-seller]` 上。
+   * **渲染后补齐**，而不是渲染前 await：renderMarket 是同步函数、被 renderAll 直接调用，
+   * 改成异步会让整页渲染推迟一帧（点筛选会看到闪动），而名牌只是锦上添花。
+   * 一次取回本页所有卖家（真实玩家挂单才带 seller_id，AI 假单没有）→ 就地替换那几个节点。
+   * ⚠️ 节点文本已经过一次转义，读回来的 textContent 是原文，再交给 UI.nameTag（它内部转义）。 */
+  function paintSellerTags() {
+    if (!UI.nameTag || !window.Supabase || !window.Supabase.fetchPerksOf) return;
+    const nodes = Array.prototype.slice.call(document.querySelectorAll('.mk-seller-link[data-seller]'));
+    if (!nodes.length) return;
+    const uids = [];
+    nodes.forEach(n => { const id = n.dataset.seller; if (id && uids.indexOf(id) < 0) uids.push(id); });
+    window.Supabase.fetchPerksOf(uids).then(map => {
+      if (!map) return;
+      nodes.forEach(n => {
+        const key = map[n.dataset.seller];
+        if (key) n.innerHTML = UI.nameTag(n.textContent, key);
+      });
+    }).catch(() => { /* 名牌失败静默：卖家名照常显示 */ });
+  }
+
   function renderMarket() {
     if (window.Tips) Tips.show('market_watch', '★ 关注低价', '点商品卡片右下角☆可关注该宠名，降价时高亮');
     renderMarketFilterPanel();
@@ -939,6 +976,8 @@
       const clearBtn = document.getElementById('mk-clear-filters');
       if (clearBtn) clearBtn.onclick = resetMarketFilters;
     }
+
+    paintSellerTags();   // 名片渲染完再补卖家名牌（见函数注释）
   }
 
   /* ---------- 查价（上架弹窗用） ----------
@@ -992,7 +1031,21 @@
       const res = isPet
         ? (l.isBot ? await Market.buyBotPet(l.id) : await Market.buy(l.id))
         : (l.isBot ? await Market.buyBotItem(l.id) : await Market.buyItem(l.id));
-      if (res.error) { showToast('❌ 购买失败', res.error); return; } // 失败保留弹窗：让玩家看清商品再重试
+      if (res.error) {
+        showToast('❌ 购买失败', res.error);
+        // 🔴 就地反馈（2026-09-21 内测清单「购买失败没反应」的真因）：showToast 只写进
+        // 消息中心（底部聊天弹窗 / 内嵌 console），而市集页**没有**内嵌 console ——
+        // 玩家正盯着购买弹窗，错误却记在别处 = 感知上就是"没反应"。
+        // 失败原因必须直接写在弹窗里（弹窗本来就开着、失败保留不关）；消息中心那份保留，供事后回看。
+        // textContent 而非 innerHTML：res.error 可能含服务端原文，不当 HTML 拼。
+        const body = $('trade-body');
+        const line = document.createElement('div');
+        line.className = 'warn buy-confirm-error';
+        line.textContent = '购买失败：' + (typeof res.error === 'string' ? res.error : '未知错误，请稍后再试');
+        const old = body.querySelector('.buy-confirm-error');
+        if (old) old.replaceWith(line); else body.appendChild(line);
+        return;
+      } // 失败保留弹窗：让玩家看清商品再重试
       // 本地扣材料（真实购买：云端 RPC 已扣，本地同步减；假单购买 buyBot* 内部已扣，不重复）
       if (l.material_type && !l.isBot) Materials.spendLocal(l.material_type, l.material_qty || 0);
       showToast('<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg> 购买成功！', isPet ? `${l.pet_name} 已加入你的宠物列表`

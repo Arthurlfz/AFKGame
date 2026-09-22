@@ -60,11 +60,19 @@ A(Merge.canMerge(godBare) === true, '没穿装备的 Lv60 宠 = 可作副宠');
 
 /* ---------- ③ UI 用的是正确的那一个 ---------- */
 const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'js', 'ui', 'ui-pet-merge.js'), 'utf8');
-A(/Merge\.canNirvanaMain\(/.test(uiSrc), '涅槃页的主宠筛选调用 Merge.canNirvanaMain');
-// 主宠筛选那一段里不许再出现 canMerge（副宠候选在另一个函数里，用的是 getMergeCandidates）
-const mainBlock = (uiSrc.match(/const cands = getPets\(\)\.filter[\s\S]{0,300}?;/) || [''])[0];
-A(mainBlock.length > 0 && !/canMerge\(/.test(mainBlock),
-  '主宠筛选里不再出现 canMerge（避免再被误套副宠判据）');
+A(/Merge\.canNirvanaMain\(/.test(uiSrc), '涅槃页的主宠门槛调用 Merge.canNirvanaMain');
+/* ⚠️ 2026-09-22 结构变了：主宠不再自己 `filter` 一遍（那会让不合格的宠在列表里彻底消失），
+ *   改走 PetUI.renderList 的 `lockOf` —— 全部宠物都列出来、不合格的置灰并写明原因。
+ *   锚点因此从 `const cands = getPets().filter…` 改成"截出 lockOf 那一段"。
+ *   **结构再变就同步改这里**（锚点过期 = 这条守值变成假的，比没有更糟）。 */
+const i0 = uiSrc.indexOf('lockOf:');
+const i1 = uiSrc.indexOf('onPick:', i0);
+const mainBlock = (i0 >= 0 && i1 > i0) ? uiSrc.slice(i0, i1) : '';
+A(mainBlock.length > 0,
+  '找得到涅槃页的主宠门槛那一段（lockOf；找不到说明结构又变了，要同步改本测试）');
+A(/Merge\.canNirvanaMain\(/.test(mainBlock), '主宠门槛用的是 canNirvanaMain（穿满装备的神宠也能选）');
+// 那一段里不许出现 canMerge（副宠候选在另一个函数里，用的是 getMergeCandidates）
+A(!/canMerge\(/.test(mainBlock), '主宠门槛里不出现 canMerge（避免再被误套副宠判据）');
 
 console.log(failures ? `\n${failures} 条失败` : '\n全部通过');
 process.exit(failures ? 1 : 0);

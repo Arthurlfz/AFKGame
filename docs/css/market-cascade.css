@@ -148,6 +148,26 @@
 }
 .mk-name-row .mk-name{flex:0 1 auto;}
 
+/* ---------- 成长区分度（2026-09-21 内测 🟠6：「成长 8 和成长 3 看不出哪个好」）----------
+   成长 = 宠物的核心价值，原来却和等级挤在同一行灰字里、一样大 ⇒ 玩家分不出好坏。
+   改法（不引进"品级"）：把成长提亮放大 + 两个相对标签（同款中位 / 神级合成门槛）。 */
+.mk-growth{
+  font-family:var(--font-num);font-weight:700;font-size:1.06em;letter-spacing:.02em;
+  color:var(--accent-hi);
+}
+.mk-tag-hi,.mk-tag-god{
+  display:inline-flex;align-items:center;font-size:.62rem;line-height:1;padding:2px 5px;
+  border-radius:4px;margin-left:5px;vertical-align:1px;
+}
+.mk-tag-hi{
+  color:var(--r-blue);background:rgb(var(--r-blue-rgb) / .16);
+  border:1px solid rgb(var(--r-blue-rgb) / .45);
+}
+.mk-tag-god{
+  color:var(--r-gold);background:rgb(var(--r-gold-rgb) / .18);
+  border:1px solid rgb(var(--r-gold-rgb) / .55);
+}
+
 /* ---------- 交易信息面板（材料 / 税收 / 记录） ---------- */
 .market-info{border-radius:12px;}
 .market-info-head{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;}

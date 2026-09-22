@@ -9,21 +9,35 @@ const ctx={console,setTimeout,clearTimeout,setInterval,clearInterval,fetch:globa
 ctx.window=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('../js/vendor/supabase.min.js','utf8'),ctx);
 vm.runInContext(fs.readFileSync('vstub.js','utf8'),ctx);
-for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-shell.js','../js/ui/ui-login.js','../js/ui/ui-dialog.js','../js/ui/ui-popover.js','../js/ui/ui-battle.js','../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js','../js/ui/ui-bag.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js','../js/ui/ui-shop.js','../js/main.js'])VTF.load(ctx,f);
+for(const f of ['../js/core/config.js','../js/core/supabase.js','../js/equipment/equipment.js','../js/pet/pet.js','../js/core/items.js','../js/core/materials.js','../js/core/drop.js','../js/core/market.js','../js/equipment/equipment_craft.js','../js/equipment/salvage.js','../js/pet/pet_merge.js','../js/pet/pet_evolve.js','../js/core/battle.js','../js/ui/ui-common.js','../js/ui/ui-shell.js','../js/ui/ui-login.js','../js/ui/ui-dialog.js','../js/ui/ui-popover.js','../js/ui/battle/index.js','../js/ui/battle/tip.js','../js/ui/battle/stage-fx.js','../js/ui/battle/loot.js','../js/ui/battle/act.js','../js/ui/battle/roster.js','../js/ui/battle/summary.js','../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js','../js/ui/ui-bag.js','../js/ui/ui-equipment.js','../js/ui/ui-craft.js','../js/ui/ui-market.js','../js/ui/ui-market-sell.js','../js/ui/ui-market-records.js','../js/ui/ui-shop.js','../js/main.js'])VTF.load(ctx,f);
 let failures=0;const A=(ok,msg)=>{if(ok)console.log('PASS: '+msg);else{console.error('FAIL: '+msg);failures++}};const C=code=>vm.runInContext(code,ctx);const S=ms=>new Promise(r=>setTimeout(r,ms));
 
 /* 商品按【真实服务端现状】摆放，不是按 migrate_shop.sql 的初始数据。
  * ⚠️ 2026-09-12 起商店只卖便利、不卖数值：涅磐兽 / 传说进化素材 / 凝魂晶石 / 宠物蛋 / 打造石礼包
  *    五个 materials 类商品已全部下架（见 migrate_shop_perks.sql），只留 perks 类。
  *    桩数据必须与真实 products 表同步，否则「测试全绿、线上对不上」——这次就是这么漂的。 */
+/* 商品图标：一律用 assets/ui 的水墨 PNG，**不用 emoji**（emoji 是彩色位图，跟水墨牌匾风格打架，
+ * 且换字体/换平台会变形；用户 2026-09-20 点名「为什么还是用 emoji 占位，真的太廉价了」）。
+ * 下面这个 ic() 与迁移脚本里拼串的写法等价，两边必须同源。 */
+C(`const ic = n => '<img class="mat-img" src="assets/ui/' + n + '.png" alt="">'`);
 C(`productsTable.push(
-  {sku:'gems_60',title:'小袋魔石',kind:'recharge',price_cents:600,price_gems:null,gems:60,bonus_gems:6,payload:{},icon:'🪙',active:true,sort:1},
-  {sku:'perk_listing_5',title:'市场挂单额度 +5',kind:'convenience',price_cents:null,price_gems:20,gems:0,bonus_gems:0,payload:{perks:{listing_slots:5}},icon:'🏷',active:true,sort:20,limit_per_user:2},
-  {sku:'perk_pricey',title:'贵价便利品（测余额不足）',kind:'convenience',price_cents:null,price_gems:50,gems:0,bonus_gems:0,payload:{perks:{listing_slots:1}},icon:'🧪',active:true,sort:21}
+  {sku:'gems_60',title:'小袋魔石',kind:'recharge',price_cents:600,price_gems:null,gems:60,bonus_gems:6,payload:{},icon:ic('ic_gem'),active:true,sort:1},
+  {sku:'perk_bag_50',title:'背包扩建 +50 格',kind:'convenience',price_cents:null,price_gems:50,gems:0,bonus_gems:0,payload:{perks:{inventory_slots:50}},icon:ic('ic_bag'),active:true,sort:10,limit_per_user:5},
+  {sku:'perk_pet_5',title:'育兽栏扩建 +5 位',kind:'convenience',price_cents:null,price_gems:50,gems:0,bonus_gems:0,payload:{perks:{pet_slots:5}},icon:ic('ic_egg'),active:true,sort:11,limit_per_user:4},
+  {sku:'perk_listing_5',title:'市场挂单额度 +5',kind:'convenience',price_cents:null,price_gems:20,gems:0,bonus_gems:0,payload:{perks:{listing_slots:5}},icon:ic('ic_stall'),active:true,sort:12,limit_per_user:2},
+  {sku:'bundle_traveler',title:'旅者行囊',kind:'convenience',price_cents:null,price_gems:85,gems:0,bonus_gems:0,payload:{perks:{inventory_slots:50,pet_slots:5}},icon:ic('ic_box'),active:true,sort:20,limit_per_user:1},
+  {sku:'bundle_pioneer',title:'拓荒者行囊',kind:'convenience',price_cents:null,price_gems:170,gems:0,bonus_gems:0,payload:{perks:{inventory_slots:100,pet_slots:10}},icon:ic('ic_crown'),active:true,sort:21,limit_per_user:1},
+  {sku:'tag_jade',title:'青玉名牌',kind:'convenience',price_cents:null,price_gems:15,gems:0,bonus_gems:0,payload:{cosmetics:{unlock_tag:'jade'}},icon:ic('ic_mat_souljade'),active:true,sort:30,limit_per_user:null},
+  {sku:'tag_violet',title:'幽紫名牌',kind:'convenience',price_cents:null,price_gems:30,gems:0,bonus_gems:0,payload:{cosmetics:{unlock_tag:'violet'}},icon:ic('ic_rune'),active:true,sort:31,limit_per_user:null},
+  {sku:'tag_gilded',title:'鎏金名牌',kind:'convenience',price_cents:null,price_gems:60,gems:0,bonus_gems:0,payload:{cosmetics:{unlock_tag:'gilded'}},icon:ic('ic_gem'),active:true,sort:32,limit_per_user:null},
+  {sku:'tag_bloodmoon',title:'血月名牌',kind:'convenience',price_cents:null,price_gems:100,gems:0,bonus_gems:0,payload:{cosmetics:{unlock_tag:'bloodmoon'}},icon:ic('ic_mat_bloodcrystal'),active:true,sort:33,limit_per_user:null},
+  {sku:'perk_pricey',title:'贵价便利品（测余额不足）',kind:'convenience',price_cents:null,price_gems:50,gems:0,bonus_gems:0,payload:{perks:{listing_slots:1}},icon:ic('ic_rune'),active:true,sort:40,limit_per_user:null}
 )`);
 C(`redeemTable.push({code:'SOUL-TEST-01',sku:'gems_60',max_uses:1,used_count:0,expires_at:null})`);
-// 桩里没有 user_perks 表，给个本地兜底（真实环境由 get_my_perks RPC 提供）
-C(`Supabase.getMyPerks=async()=>({listing_slots:0})`);
+// 桩里没有 user_perks 表，给个本地兜底（真实环境由 get_my_perks RPC 提供五列：
+// 三列容量 + name_tag 当前佩戴 + name_tags 已解锁集合，见 migrate_shop_perks2.sql）
+C(`Supabase.getMyPerks=async()=>({listing_slots:0,inventory_slots:0,pet_slots:0,name_tag:null,name_tags:[]})`);
+C(`Supabase.fetchPerksOf=async()=>({})`);
 
 // Config.shop.enabled 已于 2026-09-12 打开（魔石=便利货币）。这里显式再写一次，
 // 免得以后有人关掉开关时本测试静默失效。
@@ -86,6 +100,64 @@ A(C('UI.getGems()')===26,'买两次后余额 66-40=26（实 '+C('UI.getGems()')+
 r=await C(`Supabase.spendGems('perk_pricey','ref-5')`);
 A(!r.ok&&r.code==='insufficient','余额不足 → insufficient（26 < 50）');
 A(C('UI.getGems()')===26,'扣款失败的订单不扣币（仍 26）');
+
+/* ---- 三排货架 + 名牌三态（2026-09-20）----
+ * 用户拍板：商店分三排（扩容 / 礼包 / 名牌）；名牌买下永久解锁、可自由切换。
+ * 这一排也是"商店太空"的正解 —— 牌子是唯一能一直补货的品类。 */
+g=C(`els['shop-root'].innerHTML`);
+A(g.indexOf('shop-shelf-head')>=0,'商店按排渲染（有货架标题，不再是一片平铺）');
+A(g.indexOf('扩容')>=0&&g.indexOf('礼包')>=0&&g.indexOf('名牌')>=0,'三排标题齐全：扩容 / 礼包 / 名牌');
+A(g.indexOf('背包扩建 +50 格')>=0&&g.indexOf('育兽栏扩建 +5 位')>=0,
+  '扩容商品在架（补上断链：游戏里「去商店扩建」的指引终于有货）');
+A(g.indexOf('旅者行囊')>=0&&g.indexOf('拓荒者行囊')>=0,'礼包商品在架');
+A(g.indexOf('青玉名牌')>=0&&g.indexOf('血月名牌')>=0,'名牌商品在架');
+A(g.indexOf('背包装备位永久 +50')>=0,'权益文案读得到（PERK_LABEL 有对应键，不是显示 undefined）');
+
+// 名牌三态①：未解锁 → 购买
+A(g.indexOf('使用中')<0,'未解锁时不显示「使用中」');
+
+// 名牌三态②：已解锁但没戴 → 使用
+// ⚠️ 桩要打在 getPerksCache 上，不能打在 Supabase.getMyPerks 上：
+//    refreshPerks 调的是它闭包里的 getMyPerks，替换导出的引用对它无效（改了也静默不生效）。
+//    商店卡片读的正是 getPerksCache()，所以这个桩才是"真实数据来源"的替身。
+C(`Supabase.getPerksCache=()=>({listing_slots:0,inventory_slots:0,pet_slots:0,name_tag:null,name_tags:['jade']})`);
+await C('UI.refreshShop()');await S(120);
+g=C(`els['shop-root'].innerHTML`);
+A(g.indexOf('shop-use')>=0,'已解锁未佩戴 → 显示「使用」按钮');
+
+// 名牌三态③：正在戴 → 使用中
+C(`Supabase.getPerksCache=()=>({listing_slots:0,inventory_slots:0,pet_slots:0,name_tag:'jade',name_tags:['jade']})`);
+await C('UI.refreshShop()');await S(120);
+g=C(`els['shop-root'].innerHTML`);
+A(g.indexOf('使用中')>=0,'当前佩戴 → 显示「使用中」');
+A(g.indexOf('shop-tag-on')>=0,'「使用中」有专门样式类（灰掉的普通按钮会让人以为坏了）');
+
+/* 🔴 名牌接口必须真的导出到 window.Supabase（2026-09-20 事故）：
+ * 函数写在模块里、但忘了加进导出对象 ⇒ 两个都是 undefined，而且**失败是静默的**：
+ *   · fetchPerksOf 被 `if (...)` 挡住 → 名字永远没颜色；
+ *   · setMyNameTag 在 async 里抛 TypeError 被吞 → 点「使用」毫无反应。
+ * 用户当时报的正是这两条。 */
+A(typeof C('Supabase.fetchPerksOf')==='function','Supabase.fetchPerksOf 已导出（漏了=名牌静默失效）');
+A(typeof C('Supabase.setMyNameTag')==='function','Supabase.setMyNameTag 已导出（漏了=点「使用」没反应）');
+/* 换档后必须重绘聊天：名字颜色是渲染那一刻写死的，不重绘就变成「选了血月、名字还是金色」
+ * （2026-09-20 用户报的「货不对板」—— 服务端其实早就切好了，是显示没跟上）。 */
+/* ⚠️ 这两条只能静态查：ui-console.js 一加载就订阅 Realtime，而测试桩没有 client.channel
+ * （会抛 TypeError: client.channel is not a function），所以**不能**把它加进上面的加载列表。 */
+A(/UI\.repaintConsole\s*=/.test(fs.readFileSync('../js/ui/ui-console.js','utf8')),
+  'ui-console 导出了 repaintConsole（换档后重绘聊天里的老消息）');
+/* 🔴 聊天列表的名字必须走 UI.nameTag —— 2026-09-20 连踩两次：
+ * 社交消息的名字是在 `chatMsgHtml()` 里拼的（不是 renderChatMessage 那份 html），
+ * 只改 renderChatMessage 等于白改，用户在聊天里永远看不到名牌。 */
+const consSrc = fs.readFileSync('../js/ui/ui-console.js','utf8');
+A(/UI\.nameTag\(m\.name/.test(consSrc), 'chatMsgHtml 里聊天名字走 UI.nameTag（名牌要在这一层接）');
+A(/uid: uid/.test(consSrc), 'structured 里存了 uid（名牌按 uid 查，不存就永远拿不到）');
+A(/UI\.repaintConsole/.test(fs.readFileSync('../js/ui/ui-shop.js','utf8')),
+  'ui-shop 换名牌后会调用 repaintConsole（否则老消息一直是旧颜色）');
+
+/* 名牌渲染工具：未知 key 必须退回普通名字（脏数据 / 以后下架某档时，不能让整屏渲染崩掉） */
+A(C(`UI.nameTag('老王','jade')`).indexOf('name-tag--jade')>=0,'UI.nameTag 给已知名牌挂类名');
+A(C(`UI.nameTag('老王','nope')`)==='老王','UI.nameTag 对未知 key 退回纯名字');
+A(C(`UI.nameTag('a<b','jade')`).indexOf('&lt;b')>=0,'UI.nameTag 负责转义（名字是玩家可控文本）');
 
 /* ---- 表/函数缺失时不崩，给「未开通」提示 ---- */
 C('Supabase.getMyWallet=async()=>({gems:0,totalRecharged:0,missing:true})');

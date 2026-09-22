@@ -264,6 +264,14 @@
     if (!skill) {
       btn.disabled = true;
       btn.textContent = '主动技能 · 未解锁';
+      /* 🟠11「主动技能没说明」：只写"未解锁"玩家还是不知道自己将来能得到什么、往哪练。
+       * 现在把**这只宠将来会学的技能**写进悬停（查询走 PetUI 那份，不在这儿另抄）。 */
+      const act = (window.Pet && window.Pet.getActivePet) ? window.Pet.getActivePet() : null;
+      const UI2 = window.PetUI;
+      const future = (act && UI2 && UI2.finalSkillOf) ? UI2.finalSkillOf(act.name) : null;
+      btn.title = (future && UI2 && UI2.skillEffectLine)
+        ? `终形态 Lv.60 解锁：${future.name}（${UI2.skillEffectLine(future)} · ${future.cooldownTurns} 回合冷却）`
+        : '终形态 Lv.60 解锁主动技能';
       return;
     }
     if (opts && opts.auto) {

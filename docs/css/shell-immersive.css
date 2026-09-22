@@ -317,6 +317,11 @@
   grid-template-columns: minmax(0, 1fr) var(--side-console-w);
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 8px;
+  /* 🔴 必须显式撑满容器：`.tab-page.active` 是 display:block、高度为 auto，
+   *    不写这行的话 `minmax(0,1fr)` 那一行是"按内容"算的 ⇒ 内容区高度不确定，
+   *    里面的 `height:100%`（内容撑满 / CTA 栏贴底）全部失效，页面整体变高 → 容器出现滚动条
+   *    （V2 验收里报的"内容未填满却可滚"就是这一条）。 */
+  height: 100%;
 }
 #app:has(#tab-pet.active) #tab-pet .pet-page-head {
   grid-column: 1; grid-row: 1;

@@ -36,6 +36,17 @@
     if (UI.onAuthChange) UI.onAuthChange(!!authUser);
   }
   function isLoggedIn() { return !!authUser; }
+  /* 邮箱脱敏（2026-09-22）：顶栏账号区是"别人一眼就能看到"的地方（截图 / 直播 / 分享屏幕）。
+   * 显示完整邮箱 = 把账号名喊出来。规则：本地部分保留前 3 位，其余打码，域名照留（776***@qq.com）。
+   * 只改显示 —— 真值一律从 authUser 取，任何逻辑都不许读这段文本。 */
+  function maskEmail(raw) {
+    const s = String(raw == null ? '' : raw);
+    const at = s.indexOf('@');
+    if (at <= 0) return s ? s.slice(0, 2) + '***' : '';
+    const local = s.slice(0, at);
+    const keep = local.slice(0, Math.min(3, Math.max(1, local.length - 1)));
+    return keep + '***' + s.slice(at);
+  }
   function renderAuth() {
     const box = $('auth-box');
     box.innerHTML = '';
@@ -45,8 +56,10 @@
     box.appendChild(label);
     if (authUser) {
       const mail = document.createElement('b');
+      mail.className = 'acc-mail';
       mail.style.color = '#4ecca3';
-      mail.textContent = authUser.email;
+      mail.textContent = maskEmail(authUser.email);   // 脱敏显示，别把完整邮箱写在脸上
+      mail.title = '账号已脱敏显示（鼠标移开不会暴露完整邮箱）';
       box.appendChild(mail);
       const spacer = document.createElement('span');
       spacer.style.flex = '1';
@@ -388,8 +401,27 @@
   }
 
   /* ---------- 对外 API（通用部分；其余在页面 UI 文件中挂载） ---------- */
+  /* ---------- 名牌渲染（2026-09-20）----------
+   * 名牌 = 名字的颜色 / 流光。key 由服务端权威决定（user_perks.name_tag），前端只按 key 挂类名，
+   * 颜色与动效一律留在 game.css（见 `.name-tag--*`）。
+   * 唯一入口：所有显示玩家名字的地方都走这里（聊天 / 市集挂单 / 排行榜 / 好友），
+   * 这样「以后加一档名牌」只需动 config.shop.nameTags + 迁移脚本 + game.css，不用去翻四处调用点。
+   * ⚠️ 名字是玩家可控文本 ⇒ **转义在这里做**；调用点不要再转一次（会显示成 &amp;）。
+   * ⚠️ 认不出的 key（脏数据 / 以后下架某档）退回无名牌、不抛错 —— 名牌只是装饰，
+   *    不能因为它让聊天或榜单整块渲染失败。 */
+  function nameTag(name, tagKey) {
+    const safe = escapeHtml(name == null ? '' : name);
+    const key = tagKey == null ? '' : String(tagKey).trim();
+    if (!key) return safe;
+    const defs = (Config && Config.shop && Config.shop.nameTags) || {};
+    if (!defs[key]) return safe;   // 白名单校验：key 直接拼进 class，必须先确认它认识
+    return '<span class="name-tag name-tag--' + key + '">' + safe + '</span>';
+  }
+
   UI.$ = $;
   UI.escapeHtml = escapeHtml;
+  UI.maskEmail = maskEmail;
+  UI.nameTag = nameTag;
   UI.setAuthUser = setAuthUser;
   UI.getAuthUser = function () { return authUser; };
   UI.isLoggedIn = isLoggedIn;

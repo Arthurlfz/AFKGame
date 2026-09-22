@@ -572,6 +572,13 @@ let lastIdStoneN = null;   // 上次渲染时手上的鉴定石数量（底部�
           finally { card.__busy = false; }
           if (!r || !r.ok) { if (showToast) showToast('使用失败', (r && r.error) || '未知错误'); return; }
           if (!showToast) return;
+          /* 🔴 包已经在**服务端**扣掉了，等级却没写进云端 ⇒ 刷新就回退、包也没了。
+           * 这种"看着成功其实会丢"的结果必须就地弹出来（消息中心那条 log 玩家未必看得到），
+           * 规则见 topics/UI与玩法约定：关键操作的成败反馈要在玩家正看着的地方显示。 */
+          if (r.saved === false) {
+            showToast('⚠️ 等级没存上云端', '经验已生效，但服务器写入失败 —— 刷新后可能回退（重新登录可再试）');
+            return;
+          }
           if (r.exp > 0) showToast('经验已入账', `${r.petName || '出战魂兽'} +${Number(r.exp).toLocaleString()} 经验` + (r.levelUp ? ` · 升到 Lv.${r.level}` : ''));
           else showToast('经验包已使用', '魂兽直升 Lv' + r.level + '（教学期门槛，无需刷怪）');
         };
