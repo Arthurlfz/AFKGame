@@ -1,0 +1,952 @@
+/* ============================================================
+ * css/pet-legion.css —— 「宠物军团」5 个 tab 的排版规范与组件库（2026-09-22）
+ *
+ * 一件事：把宠物页 5 个 tab（资料 / 进化 / 合成 / 涅槃 / 觉醒）的**同类东西统一成一套**，
+ *   并把每个 tab 的内容撑满可用高度（原来下半屏大片空白、按钮像文字链、x/y 裸文本）。
+ *
+ * 为什么单开一个文件（而不是往 game.css 里堆）：
+ *   ① 规矩：新功能一律新建文件（AGENTS §九）；本文件就是这条 UI 规范的家。
+ *   ② 本文件所有规则都挂在 `#tab-pet` 之下 —— **ID 选择器的优先级天然压过 game.css 里的类选择器**，
+ *      所以不需要一个 `!important`（项目铁律：禁止补丁式覆盖）。
+ *   ③ 只在宠物页生效：市集 / 图鉴 / 好友页也用了 `.pet-card`，
+ *      那些页面的样式**一像素都不动**（它们没有 #tab-pet 祖先）。
+ *
+ * 🔴 红线：绝不写 `#tab-pet { display: ... }` 这类会命中未激活页的 display 规则
+ *   （会碾压 `.tab-page{display:none}`，页面切换直接失效）。本文件只写 `#tab-pet` 的后代，
+ *   或在 `.pet-tab-pane.active` 上加高度 —— 都是未激活时不匹配的写法。
+ *
+ * 组成：
+ *   一、主题与语义色    二、撑满高度    三、tab 角标    四、统一列表卡
+ *   五、步骤条          六、CTA 按钮     七、进度条      八、chips / 数值行
+ *   九、警示条         十、记录列表    十一、资料 tab   十二、祭坛页（进化/合成/涅槃/觉醒）
+ * ============================================================ */
+
+/* ------------------------------------------------------------
+ * 一、主题与语义色（V3 §3 配色收敛：每页**唯一**主题色 + 全站唯一警示红）
+ *
+ * 主题色（只用于三处：Tab 选中态 / 页标题 / 主 CTA 描边；⛔ 禁止大面积当文字色）：
+ *   资料 · 进化 = 金 #D4AF37    合成 = 铜橙 #C87F4A
+ *   涅槃 = 赭橙 #D2691E（**已与警示红解耦** —— 以前涅槃页整页是朱红，跟"危险"混成一片）
+ *   觉醒 = 紫 #8E6CCB
+ * 页面只读 `--lg-accent`，换主题只改变量、不改样式；Tab 按钮上也各挂一份（见第二节末尾）。
+ *
+ * 值的一提的三条硬规矩（V3 §3）：
+ *   ① 数值统一白 / 金两色；**只有涨跌值**用绿(#3FB950) / 红(#E5484D)。
+ *   ② #E5484D 是全站唯一警示红，只给「不可逆操作 CTA」和「校验失败」用。
+ *   ③ 进度条统一金：已得=金、未得=灰 —— 禁止紫 / 绿混进进度条。
+ * ------------------------------------------------------------ */
+#tab-pet {
+  --lg-accent: #d4af37;
+  --lg-accent-rgb: 212 175 55;
+  --lg-gold: #d4af37;                 /* 数值用金（语义固定，不随页面变色） */
+  --lg-gold-rgb: 212 175 55;
+  --lg-danger: #e5484d;               /* 全站唯一警示红 */
+  --lg-danger-rgb: 229 72 77;
+  --lg-up: #3fb950;                   /* 涨值（仅数值对照表） */
+  --lg-down: #e5484d;                 /* 跌值 */
+  /* 背景三级（V3 §3）：页面底 / 卡片 / 边框 */
+  --lg-bg: #0e1210;
+  --lg-card: #161b18;
+  --lg-line: rgb(212 175 55 / .15);
+  /* 字号阶梯（V3 §4）：页标题 20 / 区块标题 15 / 正文 13 / 辅助 11（最小 11px） */
+  --lg-fs-title: 20px;
+  --lg-fs-sec: 15px;
+  --lg-fs-body: 13px;
+  --lg-fs-help: 11px;
+}
+#tab-pet .pet-tab-pane[data-pet-pane="synth"] { --lg-accent: #c87f4a; --lg-accent-rgb: 200 127 74; }
+#tab-pet .pet-tab-pane[data-pet-pane="merge"] { --lg-accent: #d2691e; --lg-accent-rgb: 210 105 30; }
+#tab-pet .pet-tab-pane[data-pet-pane="awaken"] { --lg-accent: #8e6ccb; --lg-accent-rgb: 142 108 203; }
+
+/* ------------------------------------------------------------
+ * 一之二、Tab 选中态跟着页面主题色走
+ * `.pet-tabs` 是 pane 的**兄弟**节点，拿不到 pane 上的变量 ⇒ 在按钮自己身上再挂一份。
+ * game.css 里 `.pet-tab.active` 写死了金色，这里用 ID 前缀的更高优先级覆盖成主题色
+ *（不是补丁：本文件就是宠物页的样式规范，页面主题色本来就该在这里定义）。
+ * ------------------------------------------------------------ */
+#tab-pet .pet-tabs .pet-tab[data-pet-tab="synth"] { --lg-accent: #c87f4a; --lg-accent-rgb: 200 127 74; }
+#tab-pet .pet-tabs .pet-tab[data-pet-tab="merge"] { --lg-accent: #d2691e; --lg-accent-rgb: 210 105 30; }
+#tab-pet .pet-tabs .pet-tab[data-pet-tab="awaken"] { --lg-accent: #8e6ccb; --lg-accent-rgb: 142 108 203; }
+#tab-pet .pet-tabs .pet-tab.active {
+  color: var(--lg-accent);
+  border-color: rgb(var(--lg-accent-rgb) / .5);
+  text-shadow: 0 0 10px rgb(var(--lg-accent-rgb) / .4);
+  background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .18), rgb(var(--lg-accent-rgb) / .04));
+}
+#tab-pet .pet-tabs .pet-tab.active::after {
+  background: var(--lg-accent); box-shadow: 0 0 8px rgb(var(--lg-accent-rgb) / .85);
+}
+
+/* ------------------------------------------------------------
+ * 二、撑满可用高度（V3 骨架：页签 = 左名录 360px + 右内容列（面板 + CTA 栏））
+ *
+ * 缺一层 flex 就撑不开（老坑：父容器缺 height → 子级 flex:1 失效）：
+ *   ① tab 页签本身（flex 纵向）   ② 页签里的 .pet-wrap（左右两列，吃掉剩余高度）
+ *   ③ 右列内部：面板 flex:1 + CTA 栏 flex:none
+ * 🔴 V3 §6 的结构性改动：**CTA 栏从「页签的兄弟」搬成「右列的最后一个孩子」** ——
+ *    它因此天然只覆盖右内容区宽度（不再横贯到左侧 360px 名录上），
+ *    也天然跟右列同宽、跟面板贴底。这一步是靠改 DOM 做到的，**不是靠 margin 硬拉**
+ *    （硬拉要写死 360px+gap，换个列宽就崩 —— 项目禁止补丁式修复）。
+ * 🔴 display:flex 只写在 `.pet-tab-pane.active` 上：未激活时不匹配，绝不会碾压
+ *    `.pet-tab-pane{display:none}`（项目红线）。
+ * ------------------------------------------------------------ */
+#tab-pet .pet-tab-pane.active { height: 100%; display: flex; flex-direction: column; }
+#tab-pet .pet-wrap { flex: 1 1 auto; min-height: 0; height: auto; align-items: stretch; }
+#tab-pet .pcol { min-height: 0; }
+/* 右列各块的高度分配（V3）：
+ *   面板（.panel）= 吃满剩余  ·  CTA 栏 = 固定 72px  ·  资料页的视觉区 = 按内容 */
+#tab-pet .pcol > .panel,
+#tab-pet .pcol > .lg-profile-row { flex: 1 1 auto; min-height: 0; }
+#tab-pet .pcol > .panel.pet-hero-panel { flex: 0 0 auto; }
+#tab-pet .pcol > .lg-ctabar { flex: 0 0 auto; }
+
+/* 左列：魂兽名录 —— 标题固定、列表自己滚动（原来整个面板滚动，标题会被滚走）。
+ * 🔴 必须显式写成**单列**：全局 `.pet-list` 是 auto-fill 网格，360px 的栏里会挤成两列
+ *    ⇒ 每张卡只剩 ~150px 宽，宠物名被截成「腐…」（截图实测）。 */
+#tab-pet .pet-vault { display: flex; flex-direction: column; min-height: 0; }
+#tab-pet .pet-vault .pet-list {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;
+}
+#tab-pet .pet-vault .pet-list .pet-card { margin-bottom: 0; }
+/* 资料页（V3 收尾也换成 .pet-vault）比祭坛页多一行搜索/筛选，它不参与弹性、也不许被压扁 */
+#tab-pet .pet-vault .pet-list-filter { flex: none; }
+
+/* 右列：祭坛面板 —— 头固定、主体吃满；**面板自身不滚动**。
+ * 🔴 V3 §2-红框2/3（用户实测"业火炉左侧竖条 + 右列双滚动条"）：根因是**同时存在两个滚动容器**——
+ *    `.pcol`（列）自己 overflow-y:auto，面板主体 `.evolve-stage` 又 overflow-y:auto，
+ *    再叠加三列卡各自的 overflow ⇒ 一根竖条落在炉子左边、右列还出现第二条滚动条。
+ *    V3 定死：**整页只留一个滚动容器 = .evolve-stage（面板主体）**。
+ *    ⇒ `.pcol` 不再滚（见第十四节），三列卡不再滚（见第十三节），
+ *      面板的高度改成**由内容决定**（去掉 height:100%，让 flex 决定）。 */
+#tab-pet .pet-wrap--altar .pet-altar {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+/* 1080p 现实：进化/涅槃两页按行规格排下来，内容总高 > 可视高
+ *（右栏吃掉 23.6% 宽、顶栏 + 页签 + CTA 栏吃掉 ~150px 高）。
+ * 所以面板主体滚 —— 滚动条只出现在面板内，CTA 栏永远固定在底部可见。
+ * ⚠️ 这个是本页**唯一**的滚动条，别再在它里面加第二层 overflow。 */
+#tab-pet .evolve-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+
+/* ------------------------------------------------------------
+ * 三、Tab 角标：缺材料 / 未开启
+ * 原来是文字后缀（「涅槃 缺材料」），把 tab 条挤得不整齐。
+ * 现在改成右上角小圆点，具体缺什么放 title（hover 可见）。
+ *   实心红点 = 有资格、只差材料（这次做不了）
+ *   空心灰点 = 还没资格（玩法还没开）—— 两态必须分得开，别让刚练到终形态的玩家以为白练了
+ * ------------------------------------------------------------ */
+#tab-pet .pet-tab-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lg-danger); box-shadow: 0 0 6px rgb(var(--lg-danger-rgb) / .6);
+}
+#tab-pet .pet-tab-dot.is-locked {
+  background: transparent; box-shadow: none;
+  border: 1px solid var(--text-faint);
+}
+
+/* ------------------------------------------------------------
+ * 四、统一宠物列表卡（5 个 tab 共用一套，禁止各页各写）
+ * 两行：
+ *   第一行 = 名称 + 等级徽章
+ *   第二行 = 成长 / 阶数 / 转生 / 装备（等宽小字，中间用细点分隔）
+ * 状态：.active 出战或已选 · .pet-card--god 神级 · .is-locked 不满足条件（置灰 + 写明原因）
+ * ------------------------------------------------------------ */
+#tab-pet .pet-list .pet-card {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 6px; text-align: left;
+  background-color: var(--panel); background-image: var(--ui-paper-texture);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+#tab-pet .pet-list .pet-card:hover { border-color: rgb(var(--lg-accent-rgb) / .55); transform: translateX(2px); }
+#tab-pet .pet-list .pet-card.active {
+  border-color: var(--lg-accent);
+  box-shadow: inset 0 0 0 1px rgb(var(--lg-accent-rgb) / .4), 0 0 14px rgb(var(--lg-accent-rgb) / .16);
+  background-color: var(--panel-2);
+}
+/* 圆头像 + 名字（名字按 tab 强调色走：一眼看出当前在哪个玩法里选宠） */
+#tab-pet .pet-list .pet-card .icon {
+  flex: none; width: 40px; height: 40px; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .3); border-radius: 50%;
+  background-image: radial-gradient(circle at 34% 28%, rgb(var(--lg-accent-rgb) / .18), transparent 62%), var(--ui-paper-texture);
+  overflow: hidden;
+}
+#tab-pet .pet-list .pet-card .icon img.pet-avatar-sprite,
+#tab-pet .pet-list .pet-card .icon img.pet-sprite {
+  width: 40px; height: 40px; margin: 0; border-radius: 50%; object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / .6));
+}
+#tab-pet .pet-list .pet-card.active .icon { border-color: var(--lg-accent); }
+#tab-pet .pet-list .pet-card .card-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#tab-pet .pet-list .pet-card .lg-row1 { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+#tab-pet .pet-list .pet-card .pname {
+  font-family: var(--font-title); font-weight: 700; font-size: var(--lg-fs-sec); color: var(--text-hi);
+  margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#tab-pet .pet-list .pet-card.active .pname { color: var(--lg-accent); }
+#tab-pet .pet-list .pet-card .lg-lv {
+  flex: none; font-family: var(--font-num); font-size: var(--lg-fs-help); font-weight: 700;
+  padding: 0 6px; border: 1px solid rgb(var(--lg-accent-rgb) / .45); border-radius: var(--radius-xs);
+  color: var(--lg-accent);
+}
+/* 第二行：成长 / 阶数 / 转生 / 装备 —— 等宽数字，用细点分隔（不给每个数字套盒子）。
+ * V3 §3：数值统一**白 / 金**两色 —— 这里给金（见下方 b）。 */
+#tab-pet .pet-list .pet-card .lg-row2 {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px;
+  font-size: var(--lg-fs-help); color: var(--text-dim); line-height: 1.5;
+}
+#tab-pet .pet-list .pet-card .lg-row2 span { position: relative; white-space: nowrap; }
+#tab-pet .pet-list .pet-card .lg-row2 span + span::before {
+  content: "·"; position: absolute; left: -5px; color: var(--text-faint);
+}
+#tab-pet .pet-list .pet-card .lg-row2 b { font-family: var(--font-num); color: var(--lg-gold); font-weight: 700; }
+/* 成长微条（第三行，弱化到几乎只剩一条线） */
+#tab-pet .pet-list .pet-card .growth-bar { height: 2px; margin: 0; border-radius: 0; background: rgb(255 255 255 / .07); }
+#tab-pet .pet-list .pet-card .growth-bar > i { background: linear-gradient(90deg, rgb(var(--lg-accent-rgb) / .45), var(--lg-accent)); }
+
+/* 神级：走**金**，不用紫（V3 §3：每页颜色数 ≤4 —— 主题色/金/灰白/警示红。
+ *   "神级"的辨认交给铭牌上那枚金色「神」字圆徽 + 金边，不再额外引入第五种颜色）。
+ *   ⚠️ 市集 / 图鉴页的神级仍是紫（那两页不归本文件管），宠物页内统一金。 */
+#tab-pet .pet-list .pet-card.pet-card--god { border-color: rgb(var(--lg-gold-rgb) / .55); }
+#tab-pet .pet-list .pet-card.pet-card--god .pname { color: var(--lg-gold); }
+#tab-pet .pet-list .pet-card.pet-card--god .icon { border-color: rgb(var(--lg-gold-rgb) / .65); }
+#tab-pet .pet-list .pet-card .pet-card-god-badge {
+  position: absolute; right: 8px; top: 8px; left: auto; bottom: auto;
+  width: 18px; height: 18px; line-height: 18px; font-size: var(--lg-fs-help); text-align: center;
+  color: var(--ink); background: linear-gradient(180deg, var(--r-gold), var(--accent-dim)); border-radius: 50%;
+}
+#tab-pet .pet-list .pet-card .pet-card-badge {
+  position: absolute; right: 8px; top: -1px; left: auto;
+  font-family: var(--font-title); font-size: var(--lg-fs-help); letter-spacing: 1px; font-weight: 700;
+  color: var(--ink); background: var(--lg-accent); padding: 0 5px; border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+}
+/* 不满足条件：置灰 + 原因（不许等玩家选完才在右边报错）。
+ * ⚠️ V3 §1：**前置校验**落在名录上 —— 不能选的宠直接置灰禁选 + 写明原因，
+ *    而不是让人选进来之后在卡片里再弹一条红字（那是"先允许犯错再骂人"）。
+ *    原因文字用**灰白**（整卡已置灰，里面再放红字只会糊成一片；红只留给"校验失败"的主提示）。 */
+#tab-pet .pet-list .pet-card.is-locked { opacity: .5; cursor: not-allowed; }
+#tab-pet .pet-list .pet-card.is-locked:hover { transform: none; border-color: var(--line); }
+#tab-pet .pet-list .pet-card .lg-why {
+  display: block; margin-top: 1px; font-size: var(--lg-fs-help); color: var(--text-faint);
+}
+#tab-pet .pet-list .pet-card .lg-why b { color: var(--text-faint); }
+/* 出战中（资料页） */
+#tab-pet .pet-list .pet-card .lg-on { font-size: var(--lg-fs-help); color: var(--lg-gold); }
+
+/* ------------------------------------------------------------
+ * 五、步骤条（选主宠 → 选方向 → 确认）
+ * 三层含义用**明度**分层，不用颜色（V3 §3 颜色预算）：
+ *   未做 = text-faint（最暗） · 已完成 = text-dim + ✓ · 当前 = 主题色
+ * ------------------------------------------------------------ */
+#tab-pet .lg-steps { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 0 0 8px; }
+#tab-pet .lg-step {
+  position: relative; padding: 3px 10px 3px 20px;
+  font-size: var(--lg-fs-help); letter-spacing: .5px; color: var(--text-faint);
+  border: 1px solid var(--line-weak); border-radius: var(--radius-xs); background: rgb(0 0 0 / .18);
+}
+#tab-pet .lg-step::before { content: "○"; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: .9em; }
+#tab-pet .lg-step.is-done { color: var(--text-dim); border-color: var(--line); }
+#tab-pet .lg-step.is-done::before { content: "✓"; color: var(--text-dim); }
+#tab-pet .lg-step.is-cur {
+  color: var(--lg-accent); border-color: rgb(var(--lg-accent-rgb) / .6);
+  background: rgb(var(--lg-accent-rgb) / .1); font-weight: 700;
+}
+#tab-pet .lg-step.is-cur::before { content: "◈"; color: var(--lg-accent); }
+
+/* ------------------------------------------------------------
+ * 六、CTA 按钮（唯一的确认按钮组件）
+ * 三态必须都有：可点（描边 + hover 发光）/ 禁用（置灰）/ hover。
+ * 禁用时按钮**不被替换文字**，原因写在按钮下方的 .lg-cta-why 里 —— 玩家看得到"为什么不能点"。
+ * ------------------------------------------------------------ */
+#tab-pet .lg-cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 40px; padding: 9px 22px;
+  font-family: var(--font-title); font-size: var(--fs-lg); font-weight: 700; letter-spacing: 2px;
+  color: var(--lg-accent); background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .14), rgb(0 0 0 / .25));
+  border: 1px solid rgb(var(--lg-accent-rgb) / .6); border-radius: var(--radius-sm);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .06); cursor: pointer;
+  transition: background .16s ease, box-shadow .16s ease, color .16s ease, transform .12s ease;
+}
+#tab-pet .lg-cta:hover:not(:disabled) {
+  color: var(--text-hi); background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .26), rgb(var(--lg-accent-rgb) / .08));
+  box-shadow: 0 0 14px rgb(var(--lg-accent-rgb) / .35), inset 0 1px 0 rgb(255 255 255 / .12);
+}
+#tab-pet .lg-cta:active:not(:disabled) { transform: translateY(1px); }
+#tab-pet .lg-cta:disabled {
+  color: var(--text-faint); border-color: var(--line); background: var(--btn-bg-disabled);
+  box-shadow: none; cursor: not-allowed; letter-spacing: 1px;
+}
+/* 危险动作（涅槃 / 合成：等级重置、素材消失）——按钮本身变**唯一警示红**，点之前就知道这不是小事 */
+#tab-pet .lg-cta--danger {
+  color: var(--lg-danger); border-color: rgb(var(--lg-danger-rgb) / .65);
+  background: linear-gradient(180deg, rgb(var(--lg-danger-rgb) / .18), rgb(0 0 0 / .28));
+}
+#tab-pet .lg-cta--danger:hover:not(:disabled) {
+  color: #fff; border-color: var(--lg-danger);
+  background: linear-gradient(180deg, rgb(var(--lg-danger-rgb) / .34), rgb(var(--lg-danger-rgb) / .12));
+  box-shadow: 0 0 16px rgb(var(--lg-danger-rgb) / .4);
+}
+/* 次级动作（去合成 / 去涅槃 / 前往获取）——比主 CTA 轻一档 */
+#tab-pet .lg-cta--ghost {
+  min-height: 32px; padding: 6px 14px; font-size: var(--lg-fs-body); letter-spacing: 1px;
+  color: var(--text); border-color: var(--line-hi); background: rgb(0 0 0 / .2);
+}
+#tab-pet .lg-cta--ghost:hover:not(:disabled) { color: var(--lg-accent); border-color: var(--lg-accent); box-shadow: none; }
+/* 禁用原因行（按钮**不许消失**，原因挨着它显示） */
+#tab-pet .lg-cta-why {
+  display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px; font-size: var(--lg-fs-body); color: var(--text-faint); line-height: 1.6;
+}
+#tab-pet .lg-cta-why.is-bad { color: var(--lg-danger); }
+#tab-pet .es-confirm { display: flex; flex-direction: column; align-items: stretch; }
+
+/* ------------------------------------------------------------
+ * 七、进度条（任何 x/y 都必须配一条，禁止裸文本）
+ * 🔴 V3 §3：**统一主金色系** —— 已得 = 金、未得 = 灰。
+ *    不许再出现"紫 / 绿混用"（觉醒页 10 格材料条、涅槃/进化页的 x/y 全部同步到这里）。
+ * ------------------------------------------------------------ */
+#tab-pet .lg-bar {
+  display: block; position: relative; height: 6px; border-radius: 3px; overflow: hidden;
+  background: var(--inset); box-shadow: var(--shadow-inset);
+}
+#tab-pet .lg-bar > i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, rgb(var(--lg-gold-rgb) / .5), var(--lg-gold));
+  transition: width .3s ease;
+}
+#tab-pet .lg-bar.is-ok > i { background: linear-gradient(90deg, rgb(var(--lg-gold-rgb) / .75), #f0d98a); }
+#tab-pet .lg-bar--sm { height: 4px; border-radius: 2px; }
+#tab-pet .lg-bar--sm > i { border-radius: 2px; }
+/* 进度行：标签 + 条 + 数值（标签固定宽，数值等宽右对齐） */
+#tab-pet .lg-prog { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 8px; margin: 5px 0; font-size: var(--lg-fs-body); }
+#tab-pet .lg-prog > .k { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tab-pet .lg-prog > .v { font-family: var(--font-num); color: var(--text); font-weight: 700; white-space: nowrap; }
+#tab-pet .lg-prog.is-ok > .v { color: var(--lg-gold); }
+
+/* ------------------------------------------------------------
+ * 八、chips（属性加成 / 结果预览格）与数值行
+ * 设计规范：**一组一个盒子**，不给每个数字都套一个框。chip 是"一组里的一个词条"，尺寸统一。
+ * ------------------------------------------------------------ */
+#tab-pet .lg-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+#tab-pet .lg-chips--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#tab-pet .lg-chip {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 3px 8px; border-radius: var(--radius-xs);
+  background: rgb(0 0 0 / .22); border: 1px solid var(--line-weak);
+  font-size: var(--lg-fs-help); color: var(--text-dim);
+}
+/* V3 §3：数值统一白 / 金 —— chip 里的值给金（原来是绿的，属于"进度/数值混用颜色"） */
+#tab-pet .lg-chip > b { font-family: var(--font-num); color: var(--lg-gold); font-weight: 700; }
+#tab-pet .lg-chip.is-flat > b { color: var(--text); }
+/* 大字数值（"结果"焦点：成长 958.2 / 伤害 +20%） */
+#tab-pet .lg-big { font-family: var(--font-num); font-weight: 800; font-size: 2.2rem; line-height: 1.1; color: var(--lg-gold); }
+#tab-pet .lg-big small { font-size: var(--lg-fs-sec); font-weight: 400; color: var(--text-dim); margin-left: 6px; }
+#tab-pet .lg-arrow { color: var(--text-faint); font-size: var(--lg-fs-sec); padding: 0 4px; }
+#tab-pet .lg-num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* 结果 / 当前 双卡角标 */
+/* 卡片角标（CURRENT / RESULT / 主素材…）：
+ * ⚠️ 用**静态 flex 项**（卡片本身是 flex column），不要 absolute ——
+ *    absolute 会跟卡里居中排版的宠物名叠在一起（截图实测「血月神狐」被压出重影）。 */
+#tab-pet .lg-cap {
+  align-self: flex-start; flex: none; padding: 2px 10px 2px 8px; margin-bottom: 6px;
+  font-family: var(--font-num); font-size: var(--lg-fs-help); font-weight: 700; letter-spacing: 1.5px;
+  color: var(--ink); background: var(--text-faint); border-radius: var(--radius-xs);
+}
+#tab-pet .lg-cap--cur { background: var(--text-dim); }
+#tab-pet .lg-cap--res { background: var(--lg-accent); }
+#tab-pet .evo-card, #tab-pet .pet-card2 { position: relative; }
+
+/* 页标题 20px（V3 §4 阶梯第一档）。
+ * ⚠️ game.css 的 `.pet-wrap--altar .altar-title` 写的是 `--fs-xl`（24px），这里按阶梯收一档；
+ *    字距从 6px 收到 4px —— 20px 配 6px 太散，"涅槃 · 业火"会长得像两个词。 */
+#tab-pet .pet-wrap--altar .altar-title { font-size: var(--lg-fs-title); letter-spacing: 4px; }
+
+/* 区块标题（15px，V3 §4 阶梯第二档；右侧可挂 ? 帮助 / hint） */
+#tab-pet .lg-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-title); font-size: var(--lg-fs-sec); letter-spacing: 2px; color: var(--lg-accent);
+  border-bottom: 1px solid rgb(var(--lg-accent-rgb) / .22); padding-bottom: 5px; margin-bottom: 8px;
+}
+#tab-pet .lg-head .hint { letter-spacing: 0; font-size: var(--lg-fs-help); color: var(--text-faint); }
+/* 标题右侧的 ? 帮助入口（复用 game.css 的 .q-tip，仅调位置） */
+#tab-pet .altar-head .q-tip { margin-left: 6px; vertical-align: 1px; }
+#tab-pet .altar-head .altar-title { display: inline-flex; align-items: center; }
+
+/* ------------------------------------------------------------
+ * 九、警示条（不可逆 / 高风险）——常驻，不靠弹窗才提醒
+ * 用的是**全站唯一警示红** (#E5484D)。
+ * ⚠️ V3 §4：警示条是"页面只留一行"的那个元素 —— 它只写**结论**（会失去什么），
+ *    完整说明一律进二次确认弹窗 / tooltip，别在正文里铺开。
+ * ------------------------------------------------------------ */
+#tab-pet .lg-warn {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 8px 0; padding: 7px 12px; border-radius: var(--radius-sm);
+  border: 1px solid rgb(var(--lg-danger-rgb) / .5); background: rgb(var(--lg-danger-rgb) / .1);
+  color: var(--lg-danger); font-size: var(--lg-fs-body); line-height: 1.6;
+}
+#tab-pet .lg-warn b { color: var(--lg-danger); }
+#tab-pet .lg-warn--calm {
+  border-color: var(--line); background: rgb(0 0 0 / .2); color: var(--text-dim);
+}
+#tab-pet .lg-warn--calm b { color: var(--text); }
+
+/* 条件 checklist（涅槃页主宠 / 副宠条件）：**黑白清单**呈现。
+ * 🔴 V3 §3：这一块**不允许出现红字** —— 满足 = 白字 + ✓，不满足 = 灰字 + ✗，
+ *    靠"明度 + 勾叉"分层，不靠颜色（红只留给警示条与禁用原因）。
+ *    （原来是 ✗ 红 / ✓ 绿，一屏里红绿金紫全齐，玩家看不出哪个才是"危险"。） */
+#tab-pet .lg-check { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 8px; }
+#tab-pet .lg-check > div {
+  display: flex; align-items: baseline; gap: 7px;
+  font-size: var(--lg-fs-body); color: var(--text-faint); line-height: 1.7;
+  /* V3 §4：单行超 40 字必须断行（长条件句在 300px 宽的卡里会顶出去） */
+  white-space: normal; overflow-wrap: anywhere;
+}
+#tab-pet .lg-check > div::before { content: "✗"; color: var(--text-faint); font-weight: 700; flex: none; }
+#tab-pet .lg-check > div.ok { color: var(--text); }
+#tab-pet .lg-check > div.ok::before { content: "✓"; color: var(--text); }
+
+/* 三步流程图解（空态填白，替代"什么都没有"） */
+#tab-pet .lg-flow { display: flex; align-items: stretch; gap: 8px; margin: 10px 0; }
+#tab-pet .lg-flow > div {
+  flex: 1 1 0; min-width: 0; padding: 8px; text-align: center;
+  border: 1px dashed rgb(var(--lg-accent-rgb) / .35); border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / .18);
+}
+#tab-pet .lg-flow .fi { font-size: 1.6rem; line-height: 1.4; color: var(--text-dim); }
+#tab-pet .lg-flow .fh { font-family: var(--font-title); color: var(--lg-accent); font-size: var(--lg-fs-body); letter-spacing: 1px; }
+#tab-pet .lg-flow .fd { font-size: var(--lg-fs-help); color: var(--text-faint); line-height: 1.6; }
+#tab-pet .lg-flow .lg-arrow { align-self: center; }
+
+/* ------------------------------------------------------------
+ * 十、记录列表（培育记录 / 进化之路）
+ * ------------------------------------------------------------ */
+#tab-pet .lg-records { display: flex; flex-direction: column; gap: 3px; }
+#tab-pet .lg-rec {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px;
+  padding: 4px 8px; border-left: 2px solid rgb(var(--lg-accent-rgb) / .4);
+  background: rgb(0 0 0 / .18); font-size: var(--lg-fs-help); color: var(--text-dim);
+}
+#tab-pet .lg-rec .t { font-family: var(--font-num); color: var(--text-faint); }
+/* 记录里的"+X"是**历史数值**，按"数值用金"走（不是实时涨跌，不给绿） */
+#tab-pet .lg-rec .d { font-family: var(--font-num); color: var(--lg-gold); font-weight: 700; }
+/* 进化之路：阶段轨道（同步骤条：明度分层，不用绿） */
+#tab-pet .lg-track { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+#tab-pet .lg-track > span {
+  position: relative; padding: 4px 10px 4px 18px; font-size: var(--lg-fs-help); color: var(--text-faint);
+  border: 1px solid var(--line-weak); background: rgb(0 0 0 / .2);
+}
+#tab-pet .lg-track > span + span { border-left: 0; }
+#tab-pet .lg-track > span::before { content: "○"; position: absolute; left: 5px; }
+#tab-pet .lg-track > span.done { color: var(--text-dim); border-color: var(--line); }
+#tab-pet .lg-track > span.done::before { content: "✓"; color: var(--text-dim); }
+#tab-pet .lg-track > span.cur { color: var(--lg-accent); border-color: rgb(var(--lg-accent-rgb) / .55); background: rgb(var(--lg-accent-rgb) / .1); }
+#tab-pet .lg-track > span.cur::before { content: "◈"; color: var(--lg-accent); }
+#tab-pet .lg-track > span.lock { color: var(--text-faint); opacity: .75; }
+/* 锁定的进化树（神宠：走不了进化树，就把它灰着摊出来 + 说明原因） */
+#tab-pet .lg-locked-tree { position: relative; opacity: .45; filter: grayscale(.7); pointer-events: none; }
+#tab-pet .lg-locked-tree .lg-lock-note {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  opacity: 1; filter: none; font-size: var(--lg-fs-body); color: var(--lg-danger); line-height: 1.7;
+  background: rgb(8 11 12 / .55); border: 1px solid rgb(var(--lg-danger-rgb) / .4);
+}
+
+/* ------------------------------------------------------------
+ * 十一、资料 tab：立绘主视觉 + 属性卡 + 「下一步」
+ * ------------------------------------------------------------ */
+/* 立绘：圆形描边 + 呼吸光（V2 定为 140px；框只有一百多像素，用头像版才看得清脸） */
+#tab-pet .pet-avatar {
+  width: 140px; height: 140px; border-radius: 50%;
+  border: 2px solid rgb(var(--action-gold-rgb) / .7);
+  box-shadow:
+    0 0 0 5px rgb(0 0 0 / .55), 0 0 0 6px rgb(var(--action-gold-rgb) / .22),
+    0 0 34px rgb(var(--action-gold-rgb) / .28), inset 0 0 30px rgb(0 0 0 / .5);
+}
+#tab-pet .pet-hero-art::before { border-radius: 50%; inset: -20px; }
+/* 出战宠物视觉区（V2 §1：居中，高 300px）。
+ * ⚠️ 1080p 下右栏吃掉 23.6% 宽、顶栏 + CTA 栏吃掉 ~150px 高 ⇒ 视觉区占 300px 时
+ *    "属性卡 + 下一步/次级属性" 两行会被挤出屏幕（实测溢出 46px）。取 280px 折中：
+ *    立绘仍是 140px、居中不变，观感一致但能整屏放下（不长滚动条）。 */
+#tab-pet .pet-hero { gap: 8px; margin-bottom: 6px; min-height: 232px; justify-content: center; }
+/* 徽章行压缩：这块是"附加信息"，不该跟视觉区抢高度。
+ * 血统 / 血脉天赋的完整说明在宠物悬停详情里（petTipHtml）——同一份信息不铺两处。 */
+#tab-pet .pet-badges { gap: 4px; }
+#tab-pet .pet-badges .pet-bloodline,
+#tab-pet .pet-badges .pet-traits { display: none; }
+#tab-pet .pet-badges .pet-badge-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#tab-pet .pet-badges .pet-active-skill-info { padding: 2px 0; }
+
+/* 属性区整体压缩（1080p 下资料页有"视觉区 + 属性 + 两栏"三行，每行都要省着用） */
+#tab-pet .pet-stats { gap: 6px; padding: 8px 2px 4px; }
+/* 属性卡（V2 规格）：**五张等宽**，卡片之间 16px 背景缝隙（原来 gap 6px 挤在一起，
+ * 生命那格显示 "1,861/1,861" 太宽会顶到隔壁的 "1,279"，看着就是黏连成一串数字）。 */
+#tab-pet .pet-stats-main { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+#tab-pet .pet-stats-main .pstat,
+#tab-pet .pet-stats-sub .pstat { padding: 6px 8px 7px; gap: 2px; }
+#tab-pet .pet-stats-sub .pstat-value { font-size: var(--fs-sm); }
+/* 条件清单行距收紧（1080p 下资料页/涅槃页都靠这点空间放下整行） */
+#tab-pet .lg-check { gap: 0; margin: 4px 0 6px; }
+#tab-pet .lg-check > div { line-height: 1.5; }
+#tab-pet .pn-row { padding: 2px 0; }
+#tab-pet .pn-row .lg-head, #tab-pet .pn-row + .pn-row { margin-bottom: 4px; }
+/* 🔴 V3 §2-红框2/3：**删除列级兜底滚动**（原来这里写 `overflow-y: auto`）。
+ * 它与面板主体的 `.evolve-stage` 撞成"两层滚动"—— 实测表现就是用户截图里那根
+ * 「业火炉左侧的竖条 / 右列的双滚动条」。V3 定死：**一页只准一个滚动容器 = .evolve-stage**。
+ * 左列不需要它：`.pet-vault .pet-list` 自己就滚。 */
+#tab-pet .pet-stats-main .pstat {
+  grid-column: auto; min-width: 0; padding: 12px 10px 13px;
+}
+#tab-pet .pet-stats-main .pstat-value {
+  /* 字号跟视口宽走（clamp）：1920 下约 20px、窄屏自动缩到 16px ——
+   * 生命那种 "3,825/3,825" 的长数字在窄屏也不会被省略号吃掉（省略号只是最后一道保险）。 */
+  font-size: clamp(1rem, 1.05vw, 1.4rem); max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 生命是唯一显示 "当前/上限" 两个数的格子（文本长度≈别的两倍），单独再压一档字号，
+ * 免得在窄屏被省略号吃掉主属性（省略号只是最后一道保险，不该出现在生命/攻击上）。 */
+#tab-pet .pet-stats-main .pstat-hp .pstat-value { font-size: clamp(.85rem, .95vw, 1.2rem); }
+#tab-pet .pet-stats-main .pstat-label { font-size: var(--fs-2xs); letter-spacing: 2px; }
+/* 次级属性：3 列网格，**默认展开**（V2：不再是一条没内容的空折叠条）；
+ * 9 项 + 装备加成横跨整行 = 满格，不留空位。 */
+#tab-pet .pet-stats-sub { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+#tab-pet .pet-stats-sub .pstat { min-width: 0; }
+#tab-pet .pet-stats-sub .pstat-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tab-pet .pet-more-stats summary { cursor: pointer; font-size: var(--fs-xs); color: var(--text-dim); padding: 4px 0; }
+#tab-pet .pet-more-stats summary:hover { color: var(--lg-accent); }
+/* 装备加成那格横跨整行（它是"一组的汇总"，不跟单项属性抢格子） */
+#tab-pet .pet-stats-sub .pstat-wide { grid-column: 1 / -1; }
+/* 属性区标题（原来没有标题，五张卡直接贴在上面） */
+#tab-pet .lg-sec-title {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 12px;
+  font-family: var(--font-title); font-size: var(--lg-fs-sec); letter-spacing: 2px; color: var(--lg-accent);
+  border-bottom: 1px solid rgb(var(--lg-accent-rgb) / .22); padding-bottom: 6px;
+}
+#tab-pet .lg-sec-title .hint { letter-spacing: 0; font-size: var(--lg-fs-help); color: var(--text-faint); }
+/* 装备加成 tooltip 里的长句改成一组 chips */
+#tab-pet .lg-chips.is-in-pop b { color: var(--text-hi); }
+
+/* 「下一步」区块：贴面板底部（面板被撑满时，空白落在中段而不是下段） */
+#tab-pet .pet-hero-panel { display: flex; flex-direction: column; }
+#tab-pet .pet-next { margin-top: auto; }
+#tab-pet .pn-head { font-family: var(--font-title); letter-spacing: 3px; }
+/* 装备进度：6/12 配进度条 */
+#tab-pet .pn-eq { margin: 4px 0 2px; }
+#tab-pet .pn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+#tab-pet .pn-actions .pn-action { flex: 1 1 0; min-width: 110px; }
+
+/* ------------------------------------------------------------
+ * 十二、祭坛页（进化 / 合成 / 涅槃 / 觉醒）
+ * ------------------------------------------------------------ */
+/* 左右两张卡（当前 / 结果）：统一高度，内容居中 */
+#tab-pet .evo-card {
+  position: relative; padding: 14px 12px 12px; text-align: center;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .28); border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .06), rgb(0 0 0 / .22));
+}
+#tab-pet .evo-card.next { border-color: rgb(var(--lg-accent-rgb) / .55); background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .12), rgb(0 0 0 / .2)); }
+#tab-pet .evo-card .avatar {
+  width: 96px; height: 96px; margin: 6px auto; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .4); background: rgb(0 0 0 / .3);
+}
+#tab-pet .evo-card .avatar img.pet-avatar-sprite,
+#tab-pet .evo-card .avatar img.pet-sprite { width: 92px; height: 92px; object-fit: contain; }
+#tab-pet .evo-card .pname,
+#tab-pet .pet-card2 .pname { font-family: var(--font-title); font-size: var(--lg-fs-sec); color: var(--text-hi); }
+#tab-pet .evo-card .pmeta,
+#tab-pet .pet-card2 .pmeta { font-size: var(--lg-fs-help); color: var(--text-dim); margin-top: 3px; line-height: 1.6; }
+/* 「形态不变」那一阶的大字成长对比（957.5 → 958.2） */
+#tab-pet .evo-card .bigrow {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 6px;
+  font-family: var(--font-num); font-size: 1.5rem; color: var(--text-dim);
+}
+#tab-pet .evo-card .qtip-slot { margin-left: 4px; }
+/* 属性对照表：表格缩到紧凑 + 变化列上色。
+ * V3 §3：**这里才是全站唯二允许用绿 / 红的地方**（涨跌值）。
+ *   ⚠️ 别把这两条的颜色改成金/白 —— "涨了还是跌了"靠颜色看是最省脑子的。 */
+#tab-pet .cmp-table { width: 100%; margin-top: 8px; }
+#tab-pet .cmp-table td.up { color: var(--lg-up); font-weight: 700; }
+#tab-pet .cmp-table td.down { color: var(--lg-down); font-weight: 700; }
+/* 方向卡：两列并排，选中态用 tab 强调色。
+ * ⚠️ 1080p 下这是"额外一行"（V2 的四行规格里没提它，但选方向是必须的功能）——
+ *    所以做成**紧凑横条**（一行高），别再占 90px 竖卡。 */
+#tab-pet .alt-routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+#tab-pet .alt-route {
+  display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px; text-align: center;
+  padding: 6px 8px; cursor: pointer;
+}
+/* 只收掉"→ 标签"那句次要说明；**分支技能那一行必须留**（V1 已验收：两条分支的差别就在技能上，
+ * 藏起来等于让玩家瞎选）。它压成一行小字。 */
+#tab-pet .alt-route small { display: none; }
+#tab-pet .alt-route .rt-skill { font-size: var(--lg-fs-help); color: var(--text-faint); }
+#tab-pet .alt-route .rt-skill b { color: var(--text-hi); }
+#tab-pet .alt-route .ic { width: 24px; height: 24px; }
+#tab-pet .alt-route .ic img.pet-avatar-sprite,
+#tab-pet .alt-route .ic img.pet-sprite { width: 22px; height: 22px; }
+#tab-pet .alt-route.on { border-color: var(--lg-accent); box-shadow: inset 0 0 0 1px rgb(var(--lg-accent-rgb) / .35); }
+#tab-pet .alt-route .rt-name { display: flex; align-items: center; gap: 5px; font-weight: 700; color: var(--text-hi); }
+/* 等级门槛标签：够 = 金、不够 = 警示红（这是"校验失败"，红用得着） */
+#tab-pet .alt-route .lv-tag { font-family: var(--font-num); font-size: var(--lg-fs-help); padding: 0 5px; border-radius: var(--radius-xs); border: 1px solid; }
+#tab-pet .alt-route .lv-tag.ok { color: var(--lg-gold); border-color: rgb(var(--lg-gold-rgb) / .5); }
+#tab-pet .alt-route .lv-tag.no { color: var(--lg-danger); border-color: rgb(var(--lg-danger-rgb) / .5); }
+/* 结果预览条：格子化（原来是一排裸文本）。数值走**金**（V3 §3：数值统一白/金）。 */
+#tab-pet .preview-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+#tab-pet .preview-bar .pv {
+  padding: 7px 10px; border: 1px solid var(--line-weak); border-radius: var(--radius-xs);
+  background: rgb(0 0 0 / .2);
+}
+#tab-pet .preview-bar .pv .k { font-size: var(--lg-fs-help); color: var(--text-faint); letter-spacing: 1px; }
+#tab-pet .preview-bar .pv .v { font-family: var(--font-num); font-size: var(--fs-lg); color: var(--lg-gold); font-weight: 700; }
+#tab-pet .preview-bar .pv .v small { display: block; font-family: var(--font-body); font-size: var(--lg-fs-help); font-weight: 400; color: var(--text-dim); }
+#tab-pet .preview-foot { margin-top: 8px; font-size: var(--lg-fs-body); color: var(--text-dim); line-height: 1.8; }
+#tab-pet .preview-foot b { color: var(--text-hi); }
+#tab-pet .es-preview-row.warn, #tab-pet .warn { color: var(--lg-danger); font-weight: 700; }
+/* 炼妖炉 / 业火炉：**不再是"一个撑满整列的空箱子"**（V3 §1）。
+ *   原来这里（game.css 的 .forge-core）写死 height:100%，塞在 .lg-cauldron-col 里
+ *   就把丹体顶到中间、把底下两行文字挤出可视区 —— 用户截图里那个"过高的空箱体"就是它。
+ *   V3：高度按内容（height:auto），整列用 justify-content:center 居中。 */
+#tab-pet .forge-core { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: auto; }
+#tab-pet .forge-core .cauldron {
+  width: 128px; height: 128px; line-height: 128px; border-radius: 50%;
+  font-family: var(--font-title); font-size: 2.4rem; color: var(--lg-accent);
+  border: 1px solid rgb(var(--lg-accent-rgb) / .5);
+  background: radial-gradient(circle at 50% 34%, rgb(var(--lg-accent-rgb) / .25), transparent 68%), rgb(0 0 0 / .35);
+  box-shadow: 0 0 18px rgb(var(--lg-accent-rgb) / .18);
+}
+/* 业火炉：走本页主题色（赭橙），**不再单独写红** —— V3 把"涅槃 = 危险红"的耦合解开了 */
+#tab-pet .forge-core .cauldron.fire {
+  color: var(--lg-accent);
+  border-color: rgb(var(--lg-accent-rgb) / .55);
+  background: radial-gradient(circle at 50% 34%, rgb(var(--lg-accent-rgb) / .3), transparent 68%), rgb(0 0 0 / .35);
+}
+#tab-pet .forge-core .cauldron-tip { font-size: var(--lg-fs-help); color: var(--text-faint); text-align: center; line-height: 1.5; }
+
+/* 觉醒：核心收益焦点卡（技能图标 + 大字 +20%）
+ * 颜色一律读本页主题色（觉醒 = 紫 #8E6CCB），不再写死 `--r-purple` —— 换主题只改一处。 */
+#tab-pet .lg-focus {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .55); border-radius: var(--radius-sm);
+  background: radial-gradient(600px 160px at 20% -30%, rgb(var(--lg-accent-rgb) / .22), transparent 62%), rgb(0 0 0 / .25);
+}
+#tab-pet .lg-focus .fi {
+  flex: none; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; color: var(--lg-accent); border: 1px solid rgb(var(--lg-accent-rgb) / .5); border-radius: 50%;
+  background: rgb(0 0 0 / .3);
+}
+#tab-pet .lg-focus .fk { font-size: var(--lg-fs-help); color: var(--text-faint); letter-spacing: 2px; }
+#tab-pet .lg-focus .fv { font-family: var(--font-title); font-size: var(--lg-fs-title); color: var(--text-hi); }
+#tab-pet .lg-focus .fg { font-family: var(--font-num); font-weight: 800; font-size: 2.6rem; color: var(--lg-accent); line-height: 1; }
+/* V2 §5-1：焦点卡高 160px（驱动玩家去刷材料的唯一理由，给它最大视觉权重） */
+#tab-pet .lg-focus { min-height: 160px; }
+/* 「等级 Lv.60 → Lv.1」那一格：V3 §3 明确要求**统计格走黑白**（不回红字）。
+ *   全页红色只保留两处：不可逆 CTA + 校验失败提示。 */
+#tab-pet .preview-bar .pv.pv-danger .v { color: var(--text-hi); }
+#tab-pet .preview-bar .pv.pv-danger .v small { color: var(--text-dim); }
+/* 表单行（消耗与强化）：左标签右控件 */
+#tab-pet .lg-field {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 8px 0; font-size: var(--lg-fs-body); color: var(--text-dim);
+}
+#tab-pet .lg-field > .k { flex: none; color: var(--text-faint); letter-spacing: 1px; }
+#tab-pet .lg-field > .v { font-family: var(--font-num); color: var(--text-hi); }
+#tab-pet .lg-field .lg-select { flex: 1 1 auto; min-width: 0; }
+/* 觉醒材料进度网格：图1~图10 各自一条 */
+#tab-pet .lg-mats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 4px 14px; }
+
+/* 详细规则折叠（默认收起） */
+#tab-pet details.lg-details { margin-top: 10px; border-top: 1px dashed rgb(var(--lg-accent-rgb) / .25); padding-top: 8px; }
+#tab-pet details.lg-details > summary {
+  cursor: pointer; list-style: none; font-size: var(--lg-fs-body); color: var(--text-dim);
+  display: flex; align-items: center; gap: 6px;
+}
+#tab-pet details.lg-details > summary::-webkit-details-marker { display: none; }
+#tab-pet details.lg-details > summary::before { content: "▸"; color: var(--lg-accent); }
+#tab-pet details.lg-details[open] > summary::before { content: "▾"; }
+#tab-pet details.lg-details > summary:hover { color: var(--lg-accent); }
+#tab-pet details.lg-details .lg-doc { margin-top: 6px; font-size: var(--lg-fs-body); color: var(--text-dim); line-height: 1.85; }
+#tab-pet details.lg-details .lg-doc b { color: var(--text); }
+
+/* 空态/提示块（各 tab 未选主宠时用）统一成"卡片"而不是一行灰字 */
+#tab-pet .lg-box {
+  padding: 12px 14px; border: 1px solid rgb(var(--lg-accent-rgb) / .22); border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / .2); font-size: var(--lg-fs-body); color: var(--text-dim); line-height: 1.85;
+}
+#tab-pet .lg-box b { color: var(--text-hi); }
+#tab-pet .lg-box .lg-head { margin-bottom: 6px; }
+#tab-pet .lg-empty-hint { text-align: center; color: var(--text-faint); font-size: var(--lg-fs-body); padding: 10px 0; }
+
+/* ============================================================
+ * 十三、V3 骨架（2026-09-22，视觉降噪修订版；覆盖 V2 规格中的滚动/CTA 两条）
+ *
+ * 规格（硬性，五个 tab 共用）：
+ *   · 左面板 360px 固定不缩 + 右内容区
+ *   · 间距系统 8 / 16 / 24（面板 16、区块 24：见 .altar-head margin-bottom）
+ *   · 兄弟面板等高（grid stretch），禁止"一柱擎天"窄条；高度**按内容自适应**
+ *   · CTA 按钮统一放**右内容区底部 72px CTA 栏**（四页位置/尺寸/样式完全一致）
+ *   · 卡片：可见边框 1px + 16px 内边距；数值卡最小 160px、溢出省略
+ *   · **一页只准一个滚动容器**（.evolve-stage）—— 内部各列一律不许 overflow
+ * ============================================================ */
+#tab-pet .pet-wrap { grid-template-columns: 360px minmax(0, 1fr); gap: 16px; }
+#tab-pet .pcol { gap: 16px; }
+/* 背景三级（V3 §3）：页面底 #0E1210 → 由 .pet-wrap 铺底；卡片 #161B18；边框 rgba(212,175,55,.15) */
+#tab-pet .pet-wrap { background-color: var(--lg-bg); }
+#tab-pet .pcol > .panel {
+  background-color: var(--lg-card);
+  border: 1px solid var(--lg-line);
+  padding: 16px;
+}
+/* ⚠️ V2 那条 `> *:last-child { flex:1 }` 已删除：
+ *   CTA 栏搬进列内后它就是"最后一个孩子"，会被这条规则拉成弹性项（栏高被撑开）。
+ *   现在改成**按角色显式分配**（写在第二节）：面板吃满、CTA 栏固定、资料页视觉区按内容。 */
+
+/* CTA 栏（V3 §6 强制规格）：
+ *   ① 范围 = **右内容区宽度**（不含左侧 360px 名录）—— 靠"它是 .pcol 的孩子"天然成立
+ *   ② 按钮**右对齐**，右边距 24px，垂直居中
+ *   ③ 主按钮：高 48px、最小宽 200px、描边发光；禁用置灰（禁用态由 .lg-cta:disabled 管）
+ *   ④ 栏背景 rgba(212,175,55,.06) + 顶部 1px 分隔线 */
+#tab-pet .lg-ctabar {
+  flex: none; min-height: 72px; display: flex; align-items: center; justify-content: flex-end;
+  gap: 12px; padding: 12px 24px; margin: 0;
+  border-top: 1px solid rgb(var(--lg-gold-rgb) / .3);
+  background: rgb(var(--lg-gold-rgb) / .06);
+}
+#tab-pet .lg-ctabar .es-confirm {
+  flex: 1 1 auto; flex-direction: row; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin: 0;
+}
+/* 主 CTA 规格（次级 .lg-cta--ghost 不受这条约束：资料页那三个"去XX"要保持轻量） */
+#tab-pet .lg-ctabar .lg-cta:not(.lg-cta--ghost) { min-height: 48px; min-width: 200px; }
+/* 条件满足 → 呼吸光效（"这个能点了"不用玩家去读文字） */
+@keyframes lg-cta-breathe {
+  0%, 100% { box-shadow: inset 0 1px 0 rgb(255 255 255 / .06), 0 0 6px rgb(var(--lg-accent-rgb) / .18); }
+  50% { box-shadow: inset 0 1px 0 rgb(255 255 255 / .1), 0 0 18px rgb(var(--lg-accent-rgb) / .45); }
+}
+#tab-pet .lg-ctabar .lg-cta:not(:disabled):not(.lg-cta--ghost) { animation: lg-cta-breathe 2.8s ease-in-out infinite; }
+/* ⚠️ 动画会盖掉 hover 的 box-shadow（动画优先级高于普通声明）⇒ 悬停时停掉呼吸，把发光还给 hover */
+#tab-pet .lg-ctabar .lg-cta:not(:disabled):not(.lg-cta--ghost):hover { animation: none; }
+/* 禁用原因：**挨着按钮、排在它左边**（同一栏内展示，不再"按钮消失只剩一句红字"） */
+#tab-pet .lg-ctabar .lg-cta-why { margin: 0 14px 0 0; text-align: right; justify-content: flex-end; }
+#tab-pet .lg-ctabar .lg-ctabar-badge { flex: none; margin-right: auto; }
+/* 行栅格（每页第一行都是"三块等高"） */
+#tab-pet .lg-row3 { display: grid; gap: 16px; align-items: stretch; }
+/* V3 §2-红框3：第一行**高度改自适应**（V2 的固定 300px + 卡内 overflow 是"双滚动条"的成因）。
+ * 三列仍等高（grid stretch 由最高的那列决定），太高的部分交给唯一的滚动容器 .evolve-stage。 */
+#tab-pet .lg-row3--evo,
+#tab-pet .lg-row3--nir { grid-template-columns: 1.6fr minmax(48px, auto) 1.6fr; min-height: 300px; height: auto; }
+#tab-pet .lg-row3 > .evo-card, #tab-pet .lg-row3 > .pet-card2 { height: 100%; margin: 0; display: flex; flex-direction: column; }
+/* 三列等高卡里的头像：120px（280px 的卡里还要放名字 / 属性 / 条件清单） */
+#tab-pet .lg-row3 > .evo-card .avatar,
+#tab-pet .lg-row3 > .pet-card2 .avatar {
+  width: 120px; height: 120px; margin: 8px auto; font-size: var(--fs-2xl);
+}
+#tab-pet .lg-row3 > .evo-card .avatar img.pet-avatar-sprite,
+#tab-pet .lg-row3 > .pet-card2 .avatar img.pet-avatar-sprite,
+#tab-pet .lg-row3 > .evo-card .avatar img.pet-sprite,
+#tab-pet .lg-row3 > .pet-card2 .avatar img.pet-sprite { width: 116px; height: 116px; object-fit: contain; }
+#tab-pet .lg-row3 > .evo-card .pmeta { margin-top: auto; }
+#tab-pet .lg-arrow-cell { display: flex; align-items: center; justify-content: center; }
+#tab-pet .lg-row2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+#tab-pet .lg-row2col > .lg-box { height: 100%; margin: 0; }
+/* 进化后预览条（V2 第二行：96px 全宽） */
+#tab-pet .lg-strip {
+  display: flex; align-items: center; gap: 12px; min-height: 96px; padding: 12px 16px;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .28); border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgb(var(--lg-accent-rgb) / .07), rgb(0 0 0 / .22));
+}
+#tab-pet .lg-strip .lg-strip-art {
+  flex: none; width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgb(var(--lg-accent-rgb) / .45); background: rgb(0 0 0 / .3);
+}
+#tab-pet .lg-strip .lg-strip-art img { width: 60px; height: 60px; object-fit: contain; }
+#tab-pet .lg-strip .lg-strip-main { flex: 1 1 auto; min-width: 0; }
+#tab-pet .lg-strip .lg-strip-t { font-family: var(--font-title); font-size: var(--lg-fs-sec); color: var(--text-hi); }
+#tab-pet .lg-strip .lg-strip-s { font-size: var(--lg-fs-help); color: var(--text-dim); line-height: 1.6; }
+/* 合成三列（V2）：主素材卡 | 炼妖炉 | 副素材面板，三列等高拉伸 */
+#tab-pet .lg-synth3 {
+  display: grid; gap: 16px; align-items: stretch; height: auto; min-height: 0;
+  grid-template-columns: minmax(220px, 320px) minmax(180px, 260px) minmax(0, 1fr);
+}
+#tab-pet .lg-synth3 > * { min-width: 0; min-height: 0; }
+/* 炼妖炉一列（V3 §1 核心修正：**删掉那个过高的空箱体**）。
+ *   V2 时这一列是"1px 边框 + 渐变底 + 16px 内边距"的盒子，而它会被三列等高拉到 ~300px，
+ *   里面只有一颗 128px 的丹 → 上下各留一大块空箱，用户直接点名"最怪"。
+ *   V3：这一列**不再是箱子**（无边框无底色），只做垂直居中 —— 视觉上"丹体浮在两卡之间"。 */
+#tab-pet .lg-cauldron-col {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 0 8px; border: 0; background: none;
+}
+#tab-pet .lg-cauldron-col .cauldron-tip { font-size: var(--lg-fs-help); }
+#tab-pet .lg-cauldron-col .lg-cauldron-warn { color: var(--lg-danger); font-size: var(--lg-fs-help); text-align: center; line-height: 1.6; }
+/* 空态垂直居中（副素材缺失时）：用 flex:1 撑满整列，**不要 height:100%**
+ *   （父级是 flex 容器 + overflow 时百分比高度会静默失效 → 内容又贴顶，正是用户报的那条）。 */
+#tab-pet .lg-center { display: flex; flex-direction: column; justify-content: center; flex: 1 1 auto; min-height: 0; }
+/* 觉醒材料网格：5 列 × 2 行 */
+#tab-pet .lg-mats5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+#tab-pet .lg-mat {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px; min-width: 0;
+  border: 1px solid var(--line-weak); border-radius: var(--radius-sm); background: rgb(0 0 0 / .22);
+}
+#tab-pet .lg-mat .lg-mat-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#tab-pet .lg-mat .lg-mat-ico { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; color: var(--lg-accent); }
+#tab-pet .lg-mat .lg-mat-ico svg, #tab-pet .lg-mat .lg-mat-ico img { width: 20px; height: 20px; }
+#tab-pet .lg-mat .lg-mat-name { font-size: var(--lg-fs-help); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tab-pet .lg-mat .lg-mat-num { font-family: var(--font-num); font-size: var(--lg-fs-help); color: var(--text-dim); }
+/* V3 §3：已得 = **金**（原来是绿）。觉醒页这 10 格曾经绿紫金混在一起，正是"进度条多色混用"。 */
+#tab-pet .lg-mat.is-ok { border-color: rgb(var(--lg-gold-rgb) / .55); }
+#tab-pet .lg-mat.is-ok .lg-mat-num { color: var(--lg-gold); }
+/* 任务引导条（觉醒页第三块） */
+#tab-pet .lg-taskbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 16px; border: 1px solid rgb(var(--lg-accent-rgb) / .3); border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / .22);
+}
+#tab-pet .lg-taskbar .lg-taskbar-info { flex: 1 1 240px; min-width: 0; }
+#tab-pet .lg-taskbar .lg-taskbar-info .k { font-size: var(--lg-fs-help); color: var(--text-faint); letter-spacing: 1px; }
+#tab-pet .lg-taskbar .lg-taskbar-info .v { font-family: var(--font-num); font-size: var(--fs-lg); color: var(--lg-gold); }
+#tab-pet .lg-taskbar .lg-cta { flex: none; }
+/* 自定义下拉（替换原生 select：原生框在暗色面板里是系统灰、与整体割裂） */
+#tab-pet .lg-select { position: relative; display: inline-block; min-width: 200px; }
+#tab-pet .lg-select__btn {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  min-height: 34px; padding: 6px 10px; cursor: pointer;
+  color: var(--text); background: var(--inset); border: 1px solid var(--line-hi); border-radius: var(--radius-sm);
+  font-size: var(--lg-fs-body); text-align: left;
+}
+#tab-pet .lg-select__btn:hover { border-color: var(--lg-accent); color: var(--lg-accent); }
+#tab-pet .lg-select__btn .caret { color: var(--text-faint); }
+#tab-pet .lg-select__list {
+  display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); z-index: 40;
+  max-height: 220px; overflow-y: auto; padding: 4px;
+  background-color: var(--panel-2); background-image: var(--ui-paper-texture);
+  border: 1px solid rgb(var(--lg-accent-rgb) / .45); border-radius: var(--radius-sm); box-shadow: var(--shadow-panel);
+}
+#tab-pet .lg-select.open .lg-select__list { display: block; }
+#tab-pet .lg-select__opt {
+  padding: 6px 8px; font-size: var(--fs-xs); color: var(--text-dim); cursor: pointer; border-radius: var(--radius-xs);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#tab-pet .lg-select__opt:hover { background: rgb(var(--lg-accent-rgb) / .14); color: var(--text-hi); }
+#tab-pet .lg-select__opt.on { color: var(--lg-accent); font-weight: 700; }
+#tab-pet .lg-select__opt.disabled { opacity: .45; cursor: not-allowed; }
+/* 「下一步」区块（资料页第三行左）与次级属性（右）并排时，两边都要能撑满 */
+#tab-pet .lg-profile-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; margin-top: 12px; }
+#tab-pet .lg-profile-row > .panel { margin: 0; height: 100%; padding: 10px 14px; }
+#tab-pet .lg-profile-row .panel-title { margin-bottom: 6px; }
+
+/* 进化/涅槃/合成三页的"行"在 .evolve-stage 里纵向排：
+ *   V3：**所有行都按内容高度**（`flex: none`），超出部分统一由 .evolve-stage 滚。
+ *   不再有"某一行吃剩余高度 + 行内自己滚"——那正是"双滚动条"的成因。 */
+#tab-pet .evolve-stage > .lg-row3,
+#tab-pet .evolve-stage > .lg-synth3,
+#tab-pet .evolve-stage > .es-preview { flex: none; }
+#tab-pet #evolve-extra {
+  flex: none; display: flex; flex-direction: column; gap: 16px;
+}
+/* 三列里的"格子"容器：按内容（列内**不**滚），卡片**拉伸占满整列**。
+ * 🔴 这里必须显式写 `align-items: stretch; justify-content: flex-start` ——
+ *   game.css 里还有一条 `.pet-wrap--altar .evolve-stage .es-main/.es-target { justify-content:center;
+ *   align-items:center; overflow-y:auto }`（当年为了"把卡片居中"写的）：
+ *     · `align-items:center` ⇒ 卡片宽度 = **内容宽度**，压根没占满右列
+ *       （实测：副宠卡 227px / 列 371px，V3 §2-红框3 要的就是"拉伸占满"）；
+ *     · `overflow-y:auto` ⇒ 又一根列内滚动条（红框2 那根竖条的另一半来源）。
+ *   空态需要的居中由 `.lg-center` 自己负责（它自带 justify-content:center），不靠容器。 */
+#tab-pet .lg-row3 .es-main, #tab-pet .lg-row3 .es-target,
+#tab-pet .lg-synth3 .es-main, #tab-pet .lg-synth3 .es-target {
+  display: flex; flex-direction: column;
+  align-items: stretch; justify-content: flex-start;
+  min-height: 0; overflow: visible;
+}
+/* 副素材候选条：**允许换行**（候选多时原来是横向硬挤，每张卡被压到几十像素） */
+#tab-pet .lg-synth3 .sub-options,
+#tab-pet .lg-row3--nir .sub-options { flex-wrap: wrap; margin-top: 8px; }
+/* `.es-sub-list` 是历史占位（JS 现在直接写 .es-main/.es-target，这个节点永远是空的）——
+ * 它原来带一条 overflow-y，正好是"多出来的那根滚动条"。整条规则在这里废掉。 */
+/* 涅槃页：预览区（统计条 / 曲线 / 对比表）按内容，滚交给 .evolve-stage */
+#tab-pet .evolve-stage > .es-preview { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+/* 进化页：预览区（预览条 + 两栏）按内容，进化之路按内容 */
+#tab-pet .evolve-stage > #evolve-preview { display: flex; flex-direction: column; gap: 16px; }
+/* 觉醒页：右区四块纵向撑满，底部「详细规则」贴底 */
+#tab-pet #awaken-detail {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px;
+}
+/* 觉醒页的统计格与材料格都压缩（这块要装四块内容，1080p 下每格都得省着用） */
+#tab-pet #awaken-detail .preview-bar .pv { padding: 6px 10px; }
+#tab-pet #awaken-detail .preview-bar .pv .v { font-size: var(--fs-md); }
+/* V3 收尾（目标：1080p 一屏放下，不再内部滚）：
+ *   ① 注释行内化 —— "1 / 1" 和「可以觉醒」本来就一句话，竖着排白占 20px；
+ *   ② 区块间距 16 → 12（只动觉醒页这一列）。
+ *   实测：overflow 从 25px → 0（1440×900 仍放不下，那是窗口太矮，不是排版问题）。 */
+#tab-pet #awaken-detail .preview-bar .pv .v small { display: inline; margin-left: 6px; }
+#tab-pet #awaken-detail { gap: 12px; }
+#tab-pet .lg-mats5 { gap: 8px; }
+#tab-pet .lg-mat { padding: 6px 8px; gap: 4px; }
+#tab-pet .lg-mat .lg-mat-num { font-size: var(--lg-fs-help); }
+#tab-pet #awaken-detail > details.lg-details { margin-top: auto; }
+/* 觉醒页那行"以最短板为准"的规则说明（V3 收尾：总进度/最短板两行已删，规则留一句就够） */
+#tab-pet .quest-total-hint {
+  padding: 0; background: none; border: 0; text-align: left;
+  font-size: var(--lg-fs-help); color: var(--text-faint); line-height: 1.6;
+}
+/* 面板标题与内容之间的呼吸（V3 §2：**统一 24px**，消除标题区拥挤感） */
+#tab-pet .pet-altar .altar-head { margin-bottom: 24px; }
+#tab-pet .pet-altar .altar-head + .lg-steps { padding-bottom: 16px; }
+/* 三列里的卡片要**撑满整列**（V2：禁止"一柱擎天"式窄条；条件 checklist 贴底） */
+#tab-pet .lg-row3 .es-main > .pet-card2,
+#tab-pet .lg-row3 .es-target > .pet-card2,
+#tab-pet .lg-synth3 .es-main > .pet-card2,
+#tab-pet .lg-synth3 .es-target > .pet-card2 {
+  display: flex; flex-direction: column; height: 100%; margin: 0;
+}
+#tab-pet .lg-row3 .es-main > .pet-card2 > .lg-head:last-of-type,
+#tab-pet .lg-synth3 .es-main > .pet-card2 > .lg-head:last-of-type { margin-top: auto; }
+/* 🔴 V3 §2-红框2/3：**这里原来给四个 .es-main/.es-target 写了 `overflow-y: auto`** ——
+ *   三列各自成滚动容器，叠上列级滚动就出现了用户看到的那两根竖条。
+ *   现在整段删除：一页只有 .evolve-stage 一个滚动容器，卡片内容直接撑高行、由外层滚。 */
+#tab-pet .lg-row3 .lg-check { flex: none; }
+
+/* ============================================================
+ * 十四、V3 收口：字号阶梯 / 行内说明 / 长句断行
+ *
+ * 字号阶梯（V3 §4 死规矩）：页标题 20 / 区块标题 15 / 正文 13 / 辅助 11，最小 11px。
+ *   命名规范：**所有新写的文字都必须挑一档用**，不要随手 var(--fs-2xs)（12px）或 var(--fs-md)（18px）：
+ *   `--lg-fs-title`(20) / `--lg-fs-sec`(15) / `--lg-fs-body`(13) / `--lg-fs-help`(11)
+ * ============================================================ */
+#tab-pet .lg-select__opt { font-size: var(--lg-fs-body); }
+/* 「下一步」区块与「次级属性」是 .pcol 的直接孩子，列自身已有 16px gap ⇒ 去掉多余的 margin-top */
+#tab-pet .lg-profile-row { margin-top: 0; }
+
+/* ⚠️ game.css 的 `.pet-wrap--altar .hint` / `.pet-wrap--altar .warn` 是**整段提示块**的样式
+ *   （虚线/红框 + 内边距 + 居中），但选择器写得太宽 —— 会无差别命中"区块标题里那个行内小字"
+ *   和"预览区里的一行警告"，把它们也套成盒子（一屏里冒出好几个虚线小方块）。
+ *   这里按**上下文**把框去掉，恢复行内语义；独立成块的 .hint / .warn 不受影响。 */
+#tab-pet .lg-head .hint,
+#tab-pet .lg-sec-title .hint,
+#tab-pet .lg-taskbar .hint,
+#tab-pet .preview-bar .pv .hint,
+#tab-pet .altar-head .hint {
+  background: none; border: 0; padding: 0; text-align: inherit;
+}
+#tab-pet .es-preview-row.warn,
+#tab-pet .preview-foot .warn,
+#tab-pet .lg-chips .warn {
+  background: none; border: 0; padding: 0; text-align: left;
+}
+
+/* 🔴 V3 §1：**空容器不许画框**。
+ *   `.es-preview` 自带 1px 边框 + 内边距 —— 各页在"还没内容"时把它 `innerHTML=''`，
+ *   那只空盒子照样占 100+px 并画出一条框（用户截图里合成页底下那条空箱体就是这个）。
+ *   判据用 `:empty`（真的是空节点），不要靠各页自己记得 hide。 */
+#tab-pet .es-preview:empty,
+#tab-pet #evolve-extra:empty,
+#tab-pet .lg-synth3 > .lg-cauldron-col:empty { display: none; }
+
+/* V3 §4：单行超 40 字必须断行（正文块统一允许换行；数字/标签自己写 nowrap） */
+#tab-pet .lg-box,
+#tab-pet .lg-warn,
+#tab-pet .lg-doc,
+#tab-pet .preview-foot,
+#tab-pet .lg-cta-why,
+#tab-pet .lg-empty-hint { overflow-wrap: anywhere; }
