@@ -19,11 +19,15 @@
   const esc = v => UI.escapeHtml ? UI.escapeHtml(String(v || '')) : String(v || '');
   const cfg = () => (window.Config && window.Config.tower) || {};
 
-  /* ---------- 横向 30 格层阶刻度条（塔专属，懒创建） ---------- */
+  /* ---------- 横向 30 格层阶刻度条（塔专属，懒创建） ----------
+   * ⚠️ 进出场必须同步挂/摘 .bp-arena 上的 tw-mode 标记：
+   *   沉浸式外壳里战斗页画面顶到窗口边、顶栏浮在画面上（fixed 0~44px），
+   *   而刻度条是 .bp-arena 里唯一的【静态流】顶部子元素 —— 不让位就整条压在顶栏底下
+   *   （2026-09-22 用户实测「塔的进度栏被遮挡」）。让位规则见 shell-immersive.css ⑤。 */
   function ensureLadder() {
     let el = $('tw-ladder');
-    if (el) return el;
     const arena = document.querySelector('#tab-battle .bp-arena');
+    if (el) { if (arena) arena.classList.add('tw-mode'); return el; }
     const topbar = document.querySelector('#tab-battle .bp-topbar');
     if (!arena) return null;
     el = document.createElement('div');
@@ -32,11 +36,14 @@
     el.hidden = true;
     if (topbar && topbar.parentNode === arena && topbar.nextSibling) arena.insertBefore(el, topbar.nextSibling);
     else arena.insertBefore(el, arena.firstChild);
+    if (arena.classList) arena.classList.add('tw-mode');
     return el;
   }
   function hideLadder() {
     const el = $('tw-ladder');
     if (el) el.hidden = true;
+    const arena = document.querySelector('#tab-battle .bp-arena');
+    if (arena && arena.classList) arena.classList.remove('tw-mode');
   }
   /* 战斗页标题/提示是野图口径（"野外探险"）——进塔时换塔口径，退出时还原。
    * 这是「塔模式不得污染野图」的一部分：不还原的话打完塔回野图还写着"通天塔"。 */

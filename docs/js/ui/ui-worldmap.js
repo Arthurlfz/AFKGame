@@ -287,10 +287,28 @@
     const loopQuest = window.Quest && window.Quest.getQuests
       ? window.Quest.getQuests().find(q => q.type === 'collect_loop' && q.area === point.areaId)
       : null;
+    /* 委托进度（2026-09-23）：带进度条 —— 只写 "2/200" 看不出还差多远。
+     * 进度条宽度是每次渲染都不同的值，只能内联 style（走 CSS 变量只会更难读）。 */
+    const loopPct = loopQuest
+      ? Math.max(0, Math.min(100, Math.round((Number(loopQuest.progress) || 0) / (Number(loopQuest.need) || 1) * 100)))
+      : 0;
     const loopHtml = loopQuest
-      ? `<div class="nd-boss-row"><span class="k">委托</span><span class="v">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>`
+      ? `<div class="nd-boss-row col">
+          <div style="display:flex;align-items:center;gap:12px"><span class="k">委托进度</span><span class="v txt">${esc(loopQuest.name)} ${loopQuest.progress}/${loopQuest.need}</span></div>
+          <div class="pd-bar"><i style="width:${loopPct}%"></i></div>
+        </div>`
       : '';
 
+    /* 三个小组件（2026-09-23）：**必须定义在"用它们的地方"之前** ——
+     * 野怪行 / 候补卡 / 主位卡都要用，写成"用到时再定义"会撞 TDZ（报错，不是静默）。 */
+    const fmtNum = n => Math.round(Number(n) || 0).toLocaleString('en-US');
+    const growthOf = p => Number(p && p.growth) || 0;
+    // 威胁度刻度 = 该怪等级在图段内的相对位置（1~5 格），不改数值只做可视化
+    const threatOf = m => {
+      if (lo == null || hi == null || hi <= lo) return 3;
+      const r = (Number(m.level) - lo) / (hi - lo);
+      return Math.max(1, Math.min(5, Math.round(r * 4) + 1));
+    };
     // 怪物列表（普通/进化/变异分档）：真实头像图（PetSprites.avatarOf），无素材留空（不回退 emoji）。
     // 2026-09-09 补全介绍：类型 + 强度倍率 + 战斗定位（复用宠物的 petProfiles 定位，变异/进化剥「·异变」后缀查基宠）。
     const spriteOf = name => (window.PetSprites && window.PetSprites.avatarOf) ? window.PetSprites.avatarOf(name) : null;
@@ -307,39 +325,32 @@
       const role = roleOf(m.name);
       const isBoss = !!(boss && m.id === boss.id);
       const av = spriteOf(m.name);
+      // 威胁度刻度（2026-09-23）：该怪等级在图段内的**相对位置** 1~5 格（不改数值，只做可视化）
+      const thr = threatOf(m);
+      const bars = [1, 2, 3, 4, 5].map(i => `<i class="${i <= thr ? (isBoss ? 'h' : 'f') : ''}"></i>`).join('');
       return `<div class="nd-mob${m.enemyType === 'evolved' ? ' evolved' : ''}${m.enemyType === 'mutant' ? ' mutant' : ''}${isBoss ? ' is-boss' : ''}">
         <span class="ic">${av ? '<img src="' + av + '" alt="">' : ''}</span>
         <div class="tx">
-          <div class="nm">${esc(m.name)}${isBoss ? '<span class="boss-tag">霸主</span>' : ''}<span class="lv">Lv.${m.level || '—'}</span></div>
+          <div class="nm">${esc(m.name)}${isBoss ? '<span class="boss-tag">霸主</span>' : ''}</div>
           <div class="ds">${role ? esc(role) + ' · ' : ''}${typeTxt} · 强度 ×${mult}</div>
         </div>
+        <div class="rt"><div class="lv">Lv.${m.level || '—'}</div><div class="pd-thr">${bars}</div></div>
       </div>`;
     }).join('') || '<div class="nd-mob"><span class="nm">未知怪群</span></div>';
 
-    // 掉落总览（2026-09-09）：列出这张图能掉的所有东西（不含概率，概率属于数值层不给玩家看）。
-    // 数据全部现读 config：区域材料 / 进化素材档位 / 材料子权重表 / 装备 / 宠物蛋。
+    // 掉落数据源（2026-09-09 起现读 config）：区域材料 / 进化素材档位 / 材料子权重表。
+    // ⚠️ 2026-09-23：名单不再在这里拼（`dropNames`/`dropHtml` 已删），改由下方 drops/dropGrid 组装
+    //   —— 因为新版掉落预览要**按稀有度分三层 + 带占比**，拼字符串的老写法撑不住。
     const allAreas = (window.Config && window.Config.battle && window.Config.battle.areas) || [];
     const tierNo = allAreas.findIndex(a => a.id === point.areaId) + 1;
     const mwCfg = ((window.Config.drop || {}).materialWeightsByTier || {})[tierNo] || {};
     const areaMatCfg = ((window.Config.drop || {}).areaMaterials || {})[point.areaId];
-    const dropNames = [];
-    if (areaMatCfg && areaMatCfg.name) dropNames.push(areaMatCfg.name);
-    // 2026-09-17：进化素材三档已是独立键（`areaEvolutionTiers` 已删），照常按名字列出即可
-    Object.keys(mwCfg).forEach(k => {
-      if (k !== '区域材料') dropNames.push(k);
-    });
-    dropNames.push('装备（未鉴定）');
-    dropNames.push('宠物蛋');
-    /* 掉落预览也按档位分级（2026-09-14）：**复用掉落播报那套档位表**（UI.lootTierOf，
-     * 定义在 ui-battle.js），不在这里另抄一份名单 —— 抄了就是第二份事实源，改档位表时会漏。
+    /* 掉落档位**复用掉落播报那套表**（UI.lootTierOf，定义在 ui-battle.js），不另抄一份名单
+     * —— 抄了就是第二份事实源，改档位表时会漏。
      * 装备 / 宠物蛋不在材料档位表里，单独定档：宠物蛋=3（惊喜档），装备=2。 */
     const tierOf = n => (n === '宠物蛋' ? 3
       : (n === '装备（未鉴定）' ? 2
         : (UI.lootTierOf ? UI.lootTierOf(n) : 1)));
-    const dropHtml = dropNames.map(d => {
-      const t = tierOf(d);
-      return `<span class="nd-drop-chip${t > 1 ? ' hi' + t : ''}">${esc(d)}</span>`;
-    }).join('');
 
     // 出战宠物选择：pendingId = 详情页里刚点选、还没生效的宠物（点「只进战斗/开始挂机」才真正切换，
     // 不然 setActive 会换掉正在挂机的宠物，下一个战报回来 IdleBridge 就把挂机停了）
@@ -348,59 +359,177 @@
     const cur = (Pet && Pet.getActivePet) ? Pet.getActivePet() : null;
     const active = (pendingId != null) ? (pets.find(p => p.id === pendingId) || cur) : cur;
     const petChanged = !!(pendingId != null && cur && active && cur.id !== active.id);
+    /* 候补卡 schema 统一（2026-09-23 用户要求）：每张卡都是
+     * 「名字(+★神级徽标) / Lv·成长 / 成长值」—— 同一顺序、同一位置。
+     * 原来神级宠**不渲染** .p-meta（改成把 ★神级 顶到名字下面），于是同一列里
+     * 一张显示「★神级」、另一张显示「Lv.60 · 成长12.8」= 卡面字段不一致。现在一律齐。 */
     const petHtml = pets.map(p => {
       const god = (Pet && Pet.isGodPet) ? Pet.isGodPet(p) : !!p.isGodPet;
-      const growth = (p.growth || 0).toFixed(1);
-      const meta = god ? '' : `<div class="p-meta">Lv.${p.level || 1} · 成长${growth}</div>`;
-      const godTxt = god ? '<div class="p-god">★ 神级</div>' : '';
+      const g = growthOf(p).toFixed(1);
       const pAv = spriteOf(p.name);
       return `<div class="nd-pet${active && active.id === p.id ? ' active' : ''}${god ? ' god' : ''}" data-pid="${p.id}">
         <div class="p-ic">${pAv ? '<img src="' + pAv + '" alt="">' : ''}</div>
-        <div class="p-nm">${esc(p.name)}</div>${meta}${godTxt}
+        <div>
+          <div class="p-nm">${esc(p.name)}${god ? '<span class="p-god">★ 神级</span>' : ''}</div>
+          <div class="p-meta">Lv.${p.level || 1} · 成长 ${g}</div>
+        </div>
+        <div class="p-growth">${g}</div>
       </div>`;
     }).join('') || '<div class="nd-pet"><div class="p-nm">还没有宠物</div></div>';
-    const activeInfo = active
-      ? `出战：<b>${esc(active.name)}</b> · 成长 <b>${(active.growth || 0).toFixed(1)}</b>${petChanged ? '<span class="nd-pending">已改选，进入后生效</span>' : ''}`
-      : '还没有出战宠物';
+
+    /* ---------- 出征整备（2026-09-23 重构）附加口径 ----------
+     * 🔴 数据纪律：**只用游戏里真有的数，不新造玩家可见数值**（用户 2026-09-23 拍板）。
+     *  · 主数字 = 成长（pet.growth）。全项目**没有**"综合战力"字段 —— ui-pet.js 的
+     *    「成长贡献：生命 +6465…」是 level×growth 的属性增量，标签是生命/攻击/防御，不是战力。
+     *  · 对比尺刻度 = area.recGrowth（配置里唯一的"推荐值"）。
+     *  · 掉落率：材料给「占材料 x%」= materialWeightsByTier 权重算的**相对占比**；
+     *    不进权重表的（区域材料本体）/ 装备 / 蛋 只列不报率（概率口径见下方注释）。
+     *  · 领主现身规则读 window.BattleSim 的 BOSS_* 常数（与服务器 battle-sim 同源），
+     *    ⛔ 不写 config 里那句过期的"每累计 100 场出现"（那是 2026-09-05 的旧规则）。
+     *  · 预期收益只是**估算**，口径 = 700 场/时（见 config.materialWeightsByTier 头注）。
+     */
+    const aGrowth = active ? growthOf(active) : 0;
+    const recG = Number(area && area.recGrowth) || 0;
+    const ratioG = recG > 0 ? aGrowth / recG : 0;
+    const riskState = ratioG >= 1.2 ? 'safe' : (ratioG >= 0.95 ? 'even' : 'risk');
+    const riskWord = { safe: '稳 妥', even: '均 势', risk: '危 险' }[riskState];
+    const riskVerdict = riskState === 'safe' ? '预期稳定推进'
+      : (riskState === 'even' ? '胜负难料，注意回血' : '大概率打不过，建议先养宠再来');
+    // 尺子量程 = 推荐值 ×1.6（刻度线钉在推荐值处）；实际成长远超量程时截顶显示
+    const meterMax = Math.max(recG * 1.6, aGrowth * 1.05, 1);
+    const meterPct = Math.max(2, Math.min(100, Math.round(aGrowth / meterMax * 100)));
+    const markPct = Math.max(1, Math.min(99, Math.round(recG / meterMax * 100)));
+    const ratioTxt = ratioG > 0 ? '×' + (ratioG >= 10 ? Math.round(ratioG) : ratioG.toFixed(2)) : '—';
+    const stats = (active && Pet && Pet.getStats) ? Pet.getStats(active) : null;
+    const godActive = !!(active && Pet && Pet.isGodPet && Pet.isGodPet(active));
+    const activeAv = active ? spriteOf(active.name) : null;
+    // 危险度星级 = 图序 1-10 → ★1-5（把已有的"第几张图"画成星级，不新增数值）
+    const tierStars = Math.max(1, Math.min(5, Math.ceil(tierNo / 2)));
+    // 预期经验：Pet.expRange 与实发经验**同源**（宠物 tooltip 用的就是它），取区间中点
+    const FIGHTS_PER_HOUR = 700;
+    const expR = (Pet && Pet.expRange && boss) ? Pet.expRange(boss, area) : null;
+    const expPerHour = expR ? Math.round((expR.min + expR.max) / 2) * FIGHTS_PER_HOUR : null;
+    // 材料/时 = 700 场/时 × 材料分支占比（85/1006，见 config.materialWeightsByTier 头注）
+    const matPerHour = Math.round(FIGHTS_PER_HOUR * 85 / 1006);
+    // 领主规则：与服务器 battle-sim 同源的常数（缺 BattleSim 时退回注明值）
+    const BS = window.BattleSim || {};
+    const bossOdds = Math.round(1 / (Number(BS.BOSS_CHANCE) || (1 / 1600)));
+    const bossPity = Number(BS.BOSS_PITY) || 2400;
+    const bossCd = Number(BS.BOSS_COOLDOWN) || 200;
+    // 首通奖励：config 里 boss{N} 任务的一次性 reward（拿不到就整行不渲染）
+    const bossQuest = window.Quest && window.Quest.getQuests
+      ? window.Quest.getQuests().find(q => q.type === 'boss' && q.area === point.areaId) : null;
+    const clearReward = (bossQuest && bossQuest.reward)
+      ? Object.keys(bossQuest.reward).map(k => `${esc(k)} ×${bossQuest.reward[k]}`).join('、') : '';
+    // 掉落按稀有度三层：档位复用 UI.lootTierOf（掉落播报那套表的唯一事实源）
+    const mwTotal = Object.keys(mwCfg).reduce((s, k) => s + (Number(mwCfg[k]) || 0), 0) || 1;
+    const drops = [];
+    if (areaMatCfg && areaMatCfg.name) drops.push({ name: areaMatCfg.name, t: 1, pct: null });
+    Object.keys(mwCfg).forEach(k => {
+      if (k === '区域材料') return;                 // 已用该图专属材料名单独列出，不重复
+      const w = Number(mwCfg[k]) || 0;
+      drops.push({ name: k, t: tierOf(k), pct: w > 0 ? Math.max(1, Math.round(w / mwTotal * 100)) : null });
+    });
+    drops.push({ name: '装备（未鉴定）', t: 2, pct: null });
+    drops.push({ name: '宠物蛋', t: 3, pct: null });
+    const dropGrid = t => drops.filter(d => d.t === t).map(d =>
+      `<span class="nd-drop-chip${t > 1 ? ' hi' + t : ''}">${esc(d.name)}${d.pct != null ? `<span class="pc">占材料 ${d.pct}%</span>` : ''}</span>`
+    ).join('');
+
+    /* 主位卡（2026-09-23）：大数字 = **成长值**（pet.growth，真字段）。
+     * ⛔ 不要写「综合战力」：全项目没有那个字段/函数（用户 2026-09-23 拍板不新造），
+     *    ui-pet.js 的「成长贡献：生命 +6465…」是 level×growth 的属性增量，不是战力。
+     * ⚠️ 它必须定义在上一节之后：aGrowth / stats / godActive / activeAv 都在那里算。 */
+    const activeCard = active ? `
+      <div class="pd-slot">
+        <div class="pd-pav">${activeAv ? '<img src="' + activeAv + '" alt="">' : ''}</div>
+        <h3>${esc(active.name)}</h3>
+        <div class="pd-grade${godActive ? ' g-god' : ''}">${godActive ? '★ 神 级' : '◆ 普 通'}</div>
+        <div class="pd-pw">${fmtNum(aGrowth)}<small>成 长 值 · 该图推荐 ${recG || '—'}</small></div>
+        <div class="pd-stats">
+          <div><div class="k">成长</div><div class="v">${aGrowth.toFixed(1)}</div></div>
+          <div><div class="k">攻击</div><div class="v">${stats ? fmtNum(stats.atk) : '—'}</div></div>
+          <div><div class="k">防御</div><div class="v">${stats ? fmtNum(stats.def) : '—'}</div></div>
+          <div><div class="k">速度</div><div class="v">${stats ? fmtNum(stats.spd) : '—'}</div></div>
+        </div>
+      </div>` : '<div class="pd-slot"><h3>还没有出战宠物</h3></div>';
 
     return `
-      <div class="nd-top">
-        <div class="nd-title">${esc(area ? area.name : point.name)}</div>
-        <div class="nd-sub">
-          ${lo != null ? `<span>Lv.<b>${lo}~${hi}</b></span>` : ''}
-          <span>推荐成长 <b>${area && area.recGrowth ? area.recGrowth : '—'}</b></span>
-          ${cleared ? '<span>首通 <b style="color:var(--r-gold)">✓ 已完成</b></span>' : ''}
+      <header class="pd-top">
+        <h1 class="pd-title">${esc(area ? area.name : point.name)}</h1>
+        <div class="pd-tags">
+          <span class="pd-tag gold">危险度 ${'★'.repeat(tierStars)}</span>
+          ${lo != null ? `<span class="pd-tag">区域 Lv.${lo}–${hi}</span>` : ''}
+          <span class="pd-tag jade">推荐成长 ${recG || '—'}</span>
+          ${cleared ? '<span class="pd-tag jade">首通 ✓</span>' : '<span class="pd-tag red">含守关领主</span>'}
+          ${petChanged ? '<span class="pd-tag gold">已改选 · 进入后生效</span>' : ''}
         </div>
-        <button type="button" class="nd-back" id="nd-back">← 返回大地图</button>
-      </div>
-      <div class="nd-grid">
-        <div class="nd-card">
-          <div class="nd-card-title">地图介绍<span class="hint">该图会出现的野怪</span></div>
-          <div class="nd-mobs">${mobHtml}</div>
-          <div class="nd-card-title" style="margin-top:14px">掉落预览<span class="hint">这张图能掉的全部东西</span></div>
-          <div class="nd-drop-list">${dropHtml}</div>
-        </div>
-        <div class="nd-card">
-          <div class="nd-card-title">选择战斗宠物<span class="hint">点击切换出战</span></div>
-          <div class="nd-pets">${petHtml}</div>
-          <div class="nd-active-row"><span>${activeInfo}</span><span class="tag">可出战</span></div>
-        </div>
-        <div class="nd-card">
-          <div class="nd-card-title">守关领主<span class="hint">挂机按小时现身</span></div>
-          <div class="nd-boss-art">${boss && (window.PetSprites && window.PetSprites.pathOf) && window.PetSprites.pathOf(boss.name) ? '<img src="' + window.PetSprites.pathOf(boss.name) + '" alt="">' : ''}</div>
-          <div class="nd-boss-name">霸主 · ${esc(boss ? boss.name : '？？？')}</div>
-          <div class="nd-boss-rows">
-            <div class="nd-boss-row"><span class="k">等级</span><span class="v warn">Lv.${boss ? (boss.level || '—') : '—'}</span></div>
-            <div class="nd-boss-row"><span class="k">首通</span><span class="v">${cleared ? '✓ 已首通' : '未首通'}</span></div>
-            ${loopHtml}
+        <button type="button" class="pd-back" id="nd-back">← 返回大地图</button>
+      </header>
+      <main class="pd-board">
+        <section class="pd-panel">
+          <div class="pd-hd"><h3>野 怪 簿</h3><span class="sub">该图会出现的 ${mobs.length} 种</span></div>
+          <div class="pd-scroll">
+            ${mobHtml}
+            <div class="pd-sec"><h4>掉 落 预 览</h4><div class="r"></div><em>按稀有度分层</em></div>
+            ${dropGrid(3) ? `<div class="pd-tier t3"><b>传 说</b><div class="r"></div></div><div class="pd-drop-grid">${dropGrid(3)}</div>` : ''}
+            ${dropGrid(2) ? `<div class="pd-tier t2"><b>稀 有</b><div class="r"></div></div><div class="pd-drop-grid">${dropGrid(2)}</div>` : ''}
+            <div class="pd-tier t1"><b>常 规</b><div class="r"></div></div><div class="pd-drop-grid">${dropGrid(1)}</div>
+          </div>
+        </section>
+        <section class="pd-panel">
+          <div class="pd-hd"><h3>出 战 编 成</h3><span class="sub">点击候补切换主位</span></div>
+          <div class="pd-scroll">
+            ${activeCard}
+            <div class="pd-sec"><h4>候 补 名 册</h4><div class="r"></div><em>共 ${pets.length} 只</em></div>
+            <div class="pd-roster">${petHtml}</div>
+            <button type="button" class="pd-add" id="pd-goto-pet">＋ 去宠物页编队</button>
+          </div>
+        </section>
+        <section class="pd-panel pd-boss">
+          <div class="pd-hd"><h3>守 关 领 主</h3><span class="sub">每场 ${bossOdds} 分之一</span></div>
+          <div class="pd-scroll">
+            <div class="pd-bossstage">
+              <div class="pd-ring">${boss && (window.PetSprites && window.PetSprites.pathOf) && window.PetSprites.pathOf(boss.name) ? '<img src="' + window.PetSprites.pathOf(boss.name) + '" alt="">' : ''}</div>
+              <h3>霸主 · ${esc(boss ? boss.name : '？？？')}</h3>
+              <p>本图最高级怪 · 血 ×5 · 攻 ×1.5</p>
+            </div>
+            <div class="pd-rows">
+              <div class="nd-boss-row"><span class="k">等级</span><span class="v warn">Lv.${boss ? (boss.level || '—') : '—'}</span></div>
+              <div class="nd-boss-row"><span class="k">现身</span><span class="v txt">保底 ${bossPity} 场必出 · 出后冷却 ${bossCd} 场</span></div>
+              <div class="nd-boss-row"><span class="k">首通</span><span class="v ${cleared ? 'hi' : 'warn'}">${cleared ? '✓ 已首通' : '未首通'}</span></div>
+              ${clearReward ? `<div class="nd-boss-row"><span class="k">首通奖励</span><span class="v txt">${clearReward}</span></div>` : ''}
+              ${loopHtml}
+              <div class="nd-boss-row"><span class="k">专属掉落</span><span class="v txt">${esc(areaMatCfg && areaMatCfg.name ? areaMatCfg.name : '—')}</span></div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer class="pd-dep">
+        <div>
+          <div class="pd-risklab">
+            <span class="k">风 险 评 估</span>
+            <span class="st s-${riskState}">${riskWord}</span>
+            <span class="pc">${ratioTxt} · ${riskVerdict}</span>
+          </div>
+          <div class="pd-meter">
+            <i class="s-${riskState}" style="width:${meterPct}%"></i>
+            <div class="mark" style="left:${markPct}%" data-l="推荐成长 ${recG || '—'}"></div>
           </div>
         </div>
-      </div>
-      <div class="nd-foot">
-        <span class="tip">进入后自动挂机，经验 / 材料 / 装备持续入账 · <b>打不过会自动停</b></span>
-        <button type="button" class="nd-go nd-go--ghost" id="nd-fight">只进战斗</button>
-        <button type="button" class="nd-go" id="nd-idle"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg> 开始挂机</button>
-      </div>`;
+        <div>
+          <div class="pd-yield">
+            <div class="pd-chip"><span class="k">经验</span><span class="v">${expPerHour != null ? '+' + fmtNum(expPerHour) : '—'}</span><span class="u">/时</span></div>
+            <div class="pd-chip"><span class="k">材料</span><span class="v">≈ ${matPerHour}</span><span class="u">件/时</span></div>
+            <div class="pd-chip"><span class="k">领主保底</span><span class="v">${bossPity}</span><span class="u">场</span></div>
+          </div>
+          <p class="pd-note">进入后自动挂机，经验 / 材料 / 装备持续入账；<b>打不过会自动停</b>，不消耗委托次数。收益按 700 场/时 口径估算。</p>
+        </div>
+        <div class="pd-acts">
+          <button type="button" class="pd-btn" id="nd-fight">只 进 战 斗</button>
+        <button type="button" class="pd-go" id="nd-idle"><svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m13 19 6-6"/><path d="M14.5 17.5 3.586 6.586A2 2 0 013 5.172V3h2.172a2 2 0 011.414.586L17.5 14.5"/><path d="m14.828 6.172 2.586-2.586A2 2 0 0118.828 3H21v2.172a2 2 0 01-.586 1.414l-2.586 2.586"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="m5 14 4 4"/><path d="m5 21-2-2"/><path d="M7.5 16.5 4 20"/></svg> 开始挂机</button>
+        </div>
+      </footer>`;
   }
 
   // 详情页内待生效的出战选择：点卡片只先记下，点「只进战斗/开始挂机」才真正切换
@@ -415,6 +544,14 @@
     // 返回大地图：不动挂机、不应用待选宠物（看完就走，原挂机继续跑）
     const back = body.querySelector('#nd-back');
     if (back) back.onclick = () => { el.hidden = true; pendingPetId = null; };
+    /* 「去宠物页编队」（2026-09-23 新增）：本页只负责"选谁上阵"，换宠/培养回宠物页。
+     * 说明：原来设计稿里的「＋ 上阵新宠」位在本作没有对应玩法（名册 = 已拥有的全部宠），
+     * 所以这里落成真实入口，不做一个点了没反应的假格子。 */
+    const gotoPet = body.querySelector('#pd-goto-pet');
+    if (gotoPet) gotoPet.onclick = () => {
+      el.hidden = true; pendingPetId = null;
+      if (UI.switchPage) UI.switchPage('pet');
+    };
     // 出战宠物切换：只记下待选并重渲染（真正 setActive 推迟到进入按钮那一刻）
     body.querySelectorAll('.nd-pet').forEach(card => {
       card.onclick = () => {
@@ -505,6 +642,14 @@
     };
   }
 
+  /* 顶栏面包屑（2026-09-23）：详情页打开时，顶栏那节空白处显示「世界地图 / 图名」。
+   * 只写文本，**不管显隐** —— 显隐由 CSS 判定（`#area-detail[hidden]` 一挂就自动收起），
+   * 这样"关页 / 切页 / 兜底路径"都不需要各自记得清一遍（少一处漏清就是少一个残留 bug）。 */
+  function setTopCrumb(text) {
+    const el = document.getElementById('topbar-crumb');
+    if (el) el.textContent = text || '';
+  }
+
   function showAreaDetail(point) {
     const el = $('area-detail');
     const body = $('area-detail-body');
@@ -515,12 +660,14 @@
     }
     pendingPetId = null;
     renderAreaDetail(point);
+    setTopCrumb('世界地图 / ' + (point && point.name ? point.name : ''));
     el.hidden = false;
   }
 
   // 对外 API
   UI.renderWorldMapPage = renderWorldMapPage;
   UI.showAreaDetail = showAreaDetail;
+  UI.setTopCrumb = setTopCrumb;   // 副本（ui-trial-entry）/ 塔（ui-tower-entry）共用同一条面包屑
   UI.healActivePet = healActivePet;
   UI.capName = capName;
 })();

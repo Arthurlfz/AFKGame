@@ -205,6 +205,8 @@
     const body = $('tower-detail-body');
     if (!el || !body) return;
     body.innerHTML = detailHTML();
+    // 顶栏面包屑（2026-09-23）：与野图/副本共用同一个写入器（UI.setTopCrumb）
+    if (window.UI && window.UI.setTopCrumb) window.UI.setTopCrumb('世界地图 / 通天塔');
     const back = body.querySelector('#tw-back');
     if (back) back.onclick = () => { el.hidden = true; pendingPetId = null; };
     // 换出战宠：只记下待选，进入时生效（与野图详情页同口径，避免换宠打断正在跑的挂机）

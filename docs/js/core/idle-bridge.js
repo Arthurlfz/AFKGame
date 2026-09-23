@@ -721,12 +721,18 @@
     /* 经验汇总行（2026-09-23，UI 规范：日志要有"经验获取"这一档，暗金）。
      * ⚠️ 刻意**不做每场一条** —— 一次结算可能含几十场，逐条写会把战斗频道淹掉。
      * 做法：借 ui-console 已有的「同类合并」机制（mergeKey），同窗口内的经验累加到同一行。
-     * 颜色走 `--log-exp`（暗金），与掉落（品质色）分开：经验是"成长"，掉落是"收获"。 */
-    if (r.exp != null && Number(r.exp) > 0 && window.UI && window.UI.consoleLog) {
+     * 颜色走 `--log-exp`（暗金），与掉落（品质色）分开：经验是"成长"，掉落是"收获"。
+     * 🔴 2026-09-23 修（用户实测"日志没看出区别"）：原来读 `r.exp` —— 那是**补账窗**的经验
+     *   （切后台/电脑休眠那段补回来的），正常挂机时该窗恒为空 ⇒ r.exp = 0，
+     *   EF 的 pending 分支更是直接回 `exp: 0` ⇒ 这一行**几乎永远不会出现**。
+     *   本窗真正入账的经验 = 补账窗 `r.exp` + 剧本窗 `r.script.totalExp`（两者都已在服务器入账）。
+     *   同一段录像幂等重发（skipExpLevel）必须整段跳过，否则重连一次就多加一遍。 */
+    const bankedExp = (Number(r.exp) || 0) + ((r.script && Number(r.script.totalExp)) || 0);
+    if (bankedExp > 0 && !(opts && opts.skipExpLevel) && window.UI && window.UI.consoleLog) {
       const expHtml = n => '<span class="log-exp">经验 +' + Math.round(Number(n) || 0).toLocaleString() + '</span>';
       try {
-        window.UI.consoleLog('battle', expHtml(r.exp),
-          { mergeKey: 'exp', mergeQty: Number(r.exp) || 0, mergeRender: expHtml });
+        window.UI.consoleLog('battle', expHtml(bankedExp),
+          { mergeKey: 'exp', mergeQty: bankedExp, mergeRender: expHtml });
       } catch (e) { /* 日志失败不影响入账 */ }
     }
     totalFights = r.totalFights != null ? r.totalFights : (totalFights + (r.fights || 0));

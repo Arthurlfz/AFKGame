@@ -19,26 +19,28 @@
 <!-- 设计变量（颜色/尺寸/字体统一在 vars.css；v3 视觉规范 design-tokens.css 后加载覆盖同名变量，全站升级 v3 水墨配色） -->
 <link rel="stylesheet" href="css/vars.css?v=6571f00a">
 <link rel="stylesheet" href="css/fonts-lxgw.css?v=20260917font1">
-<link rel="stylesheet" href="css/design-tokens.css?v=20260923ui1">
+<link rel="stylesheet" href="css/design-tokens.css?v=20260923topfix">
 <!-- 界面外壳（登录页/顶栏/侧边栏/页面容器/对话气泡） -->
 <link rel="stylesheet" href="css/app.css?v=20260919dot3">
-<link rel="stylesheet" href="css/game.css?v=20260923perf1">
+<link rel="stylesheet" href="css/game.css?v=20260923topfix">
 <!-- 非战斗页 UI 打磨层（主按钮熔岩金/旧铁质感/控件统一；战斗页样式不在此） -->
-<link rel="stylesheet" href="css/ui-polish.css?v=20260923perf1">
+<link rel="stylesheet" href="css/ui-polish.css?v=20260923topfix">
 <!-- 素材特效样式（与 js/fx/ 里的模块配套；2026-09-21 命中墨爆从 game.css 迁到这里） -->
 <link rel="stylesheet" href="css/fx.css?v=20260921fx1">
 <!-- 全局动效基线层（按下/悬浮/浮层/列表入场；各系统专属演出仍在各自 css） -->
 <link rel="stylesheet" href="css/motion.css?v=20260916m3">
 <link rel="stylesheet" href="css/ui-onboarding.css?v=20260917fix1">
 <link rel="stylesheet" href="css/market-refresh.css?v=20260912gem3">
-<link rel="stylesheet" href="css/market-cascade.css?v=20260921growth">
+<link rel="stylesheet" href="css/market-cascade.css?v=20260923cols2">
 <link rel="stylesheet" href="css/shop.css?v=20260920shelf">
 <!-- 开发者面板（仅管理员账号可见入口） -->
 <link rel="stylesheet" href="css/dev.css?v=20260916pets1">
 <!-- 交互体验修复补丁（2026-09-10 实测后修复） -->
 <link rel="stylesheet" href="css/ui-fixes.css?v=20260923ui1">
 <!-- 沉浸式外壳（2026-09-22）：主城页画面铺满窗口 + 顶栏/页眉/消息区浮在画面上 -->
-<link rel="stylesheet" href="css/shell-immersive.css?v=20260923ui1">
+<link rel="stylesheet" href="css/shell-immersive.css?v=20260923topfix">
+<!-- 出征整备（委托所调度台）：只给世界地图的"点位详情 = 战斗前准备页"用 -->
+<link rel="stylesheet" href="css/prep-desk.css?v=20260923desk3">
 <!-- 宠物军团（宠物页 5 个 tab）的排版规范与组件库：只作用于 #tab-pet，其它页不受影响 -->
 <link rel="stylesheet" href="css/pet-legion.css?v=20260922legion5">
 <!-- 会话遮罩（同账号多标签互斥：本页被其他标签页接管时盖住） -->
@@ -200,6 +202,9 @@
   <!-- 顶栏：标题 + 账号区（快捷按钮已挪到左侧边栏） -->
   <header class="topbar app-topbar">
     <div class="title">永夜灵市<span class="title-en">EVERNIGHT BAZAAR</span></div>
+    <!-- 面包屑（2026-09-23）：只在"点位详情/副本/塔详情"开着时出现（纯 CSS 判定），
+         平时 display:none 不占位；文本由 UI.setTopCrumb 写。 -->
+    <div class="topbar-crumb" id="topbar-crumb"></div>
     <div class="spacer"></div>
     <button class="topbar-btn" id="topbar-bag" title="背包（快捷键 B）"><img class="top-ico" src="assets/ui/nav/ic_top_bag.png?v=20260919top1" alt="">背包</button>
     <button class="topbar-btn" id="topbar-quest" data-page="quest" title="任务（快捷键 Q）"><img class="top-ico" src="assets/ui/nav/ic_top_quest.png?v=20260919top1" alt="">任务</button>
@@ -685,11 +690,12 @@
       <!-- ============ 市集页（交易市场 + 我的上架 合并：顶部级联筛选 + 视图切换） ============ -->
       <section class="tab-page" id="tab-market">
         <div class="guide-bar" style="margin:0 0 10px"><img class="eic-img" src="assets/ui/ic_brush.png" alt=""> <b>上架的宠物 / 装备会被锁定</b>：期间不能出战、穿脱或改造，想用就先点「取回」。挂机掉的蛋、素材也能在这里卖。玩家之间真实交易，价格自己定。</div>
-        <!-- 市场脉动（在线人数 + 最近成交）：由 ui-market-pulse.js 渲染 -->
+        <!-- 市场脉动（在线人数 + 最近成交）：由 js/ui/market/pulse.js 渲染 -->
         <div class="market-pulse" id="market-pulse"></div>
         <div class="market-page">
-          <!-- 顶部级联筛选条 -->
+          <!-- 左栏：级联筛选（手感与改版前一致：单选 + 改上级自动清下级） -->
           <aside class="market-filters cascade-filters" id="market-filters">
+            <div class="cf-title">筛选<span class="cf-title-hint">选类型后逐级展开</span></div>
             <div class="cf-toprow">
               <div class="cf-search">
                 <input id="market-keyword" class="market-search" type="text" placeholder="搜索商品名 / 词缀 / 特质" aria-label="搜索商品名、词缀或特质" />
@@ -701,16 +707,16 @@
                   <span class="cf-price-unit">标价数</span>
                 </div>
               </div>
-              <div class="cf-path-wrap">
-                <div class="cf-path-title">当前筛选路径</div>
-                <div class="cf-path" id="cfPath"></div>
-              </div>
-              <button type="button" class="cf-reset" id="cfReset">清空全部筛选</button>
             </div>
             <div class="cf-steps" id="cfSteps"></div>
+            <div class="cf-path-wrap">
+              <div class="cf-path-title">当前筛选路径</div>
+              <div class="cf-path" id="cfPath"></div>
+            </div>
+            <button type="button" class="cf-reset" id="cfReset">清空全部筛选</button>
             <div class="cf-hint">级联规则：选择类型后，下级筛选逐级展开（宠物 → 特质 / 成长；装备 → 部位 → 稀有度 → T阶 → 词缀）。更改上级会自动重置下级。</div>
           </aside>
-          <!-- 结果区 -->
+          <!-- 中栏：结果区 -->
           <section class="market-results">
             <div class="panel">
               <div class="rp-head">
@@ -719,11 +725,20 @@
                   <button type="button" class="vt active" role="tab" aria-selected="true" data-view="all">全部在售</button>
                   <button type="button" class="vt" role="tab" aria-selected="false" data-view="mine">我的上架</button>
                 </div>
+                <div class="view-mode" id="viewMode" role="group" aria-label="版式切换">
+                  <button type="button" class="vm" data-mode="list" title="列表：一行一件，比价最顺手">列表</button>
+                  <button type="button" class="vm" data-mode="grid" title="网格：看得清立绘">网格</button>
+                </div>
+                <button type="button" class="rp-batch" id="batchToggle" aria-pressed="false">批量购买</button>
                 <span class="rp-count" id="rpCount"></span>
               </div>
               <div id="market-list"></div>
             </div>
+            <!-- 批量结账条：只在「批量购买」打开后出现，收藏在结果区底部 -->
+            <div class="mk-batch-bar" id="mk-batch-bar" style="display:none"></div>
           </section>
+          <!-- 右栏：常驻详情（选中哪件就看哪件 + 同类低价） -->
+          <aside class="market-detail" id="market-detail"></aside>
           <!-- 交易信息（材料 / 税收 / 交易记录）：可折叠 -->
           <div class="panel market-info" id="market-info">
             <div class="panel-title market-info-head" id="infoToggle"><img class="eic-img" src="assets/ui/ic_info.png" alt=""> 交易信息<span class="hint">材料 / 税收 / 交易记录</span><span class="info-arrow" id="infoArrow">▸</span></div>
@@ -1134,13 +1149,13 @@ window.PetSprites = {
 <script src="js/tower/tower-preview.js?v=20260910tower2"></script>
 <script src="js/tower/tower-engine.js?v=20260917exppack1"></script>
 <script src="js/core/battle-sim.global.js?v=20260923hitconst"></script>
-<script src="js/core/idle-bridge.js?v=20260923perf1"></script>
+<script src="js/core/idle-bridge.js?v=20260923explog"></script>
 <script src="js/ui/ui-boot.js?v=20260917b3"></script>
 <script src="js/ui/ui-common.js?v=20260922legion1"></script>
 <script src="js/ui/ui-console.js?v=20260923perf1"></script>
 <script src="js/ui/ui-session-guard.js?v=20260910sess1"></script>
 <script src="js/ui/ui-shell.js?v=20260922tippurge"></script>
-<script src="js/ui/ui-worldmap.js?v=20260918questidle1"></script>
+<script src="js/ui/ui-worldmap.js?v=20260923desk2"></script>
 <script src="js/ui/ui-capital.js?v=20260920fix2"></script>
 
 <script src="js/ui/ui-login.js?v=20260917p1"></script>
@@ -1151,11 +1166,11 @@ window.PetSprites = {
 <!-- 红点指路：哪里有任务做，就在哪个入口亮红点（数据来自任务系统，本文件只管亮灯） -->
 <script src="js/ui/ui-guide-dots.js?v=20260918dot1"></script>
 <script src="js/ui/ui-shortcuts.js?v=20260920all"></script>
-<script src="js/trial/ui-trial-entry.js?v=20260923freefix"></script>
+<script src="js/trial/ui-trial-entry.js?v=20260923crumb1"></script>
 <script src="js/trial/ui-trial-battle.js?v=20260913console1"></script>
 <script src="js/trial/ui-trial-settle.js?v=20260910trial1"></script>
 <!-- 通天塔 UI（2026-09-10）：详情页 → 整页战斗驱动 → 结算面板 -->
-<script src="js/tower/ui-tower-entry.js?v=20260917resetcard1"></script>
+<script src="js/tower/ui-tower-entry.js?v=20260923crumb1"></script>
 <script src="js/tower/ui-tower-battle.js?v=20260922tw1"></script>
 <script src="js/tower/ui-tower-settle.js?v=20260910tower5"></script>
 
@@ -1190,12 +1205,19 @@ window.PetSprites = {
 <script src="js/ui/ui-mat-entry.js?v=20260916mat14"></script>
 <script src="js/ui/ui-equipment.js?v=20260918eq1"></script>
 <script src="js/ui/ui-craft.js?v=20260916soul1"></script>
-<script src="js/ui/ui-market.js?v=20260921growth"></script>
+<!-- 市集一族：加载顺序固定（pricing 提供口径与比价，其余都从它取；index 是编排层，必须最后） -->
+<script src="js/ui/market/pricing.js?v=20260923mk1"></script>
+<script src="js/ui/market/watch.js?v=20260923mk1"></script>
+<script src="js/ui/market/facets.js?v=20260923mk1"></script>
+<script src="js/ui/market/cards.js?v=20260923mk1"></script>
+<script src="js/ui/market/detail.js?v=20260923mk1"></script>
+<script src="js/ui/market/batch.js?v=20260923mk1"></script>
+<script src="js/ui/market/index.js?v=20260923mk1"></script>
 <script src="js/ui/ui-social.js?v=20260920nametag"></script>
-<script src="js/ui/ui-market-records.js?v=36619e38"></script>
-<script src="js/ui/ui-market-sell.js?v=20260917fix1"></script>
-<script src="js/ui/ui-market-notify.js?v=20260917fix1"></script>
-<script src="js/ui/ui-market-pulse.js?v=20260917fix1"></script>
+<script src="js/ui/market/records.js?v=20260923mk1"></script>
+<script src="js/ui/market/sell.js?v=20260923mk1"></script>
+<script src="js/ui/market/notify.js?v=20260923mk1"></script>
+<script src="js/ui/market/pulse.js?v=20260923mk1"></script>
 <script src="js/ui/ui-feedback.js?v=20260917fix1"></script>
 <script src="js/ui/ui-codex.js?v=20260920godsub3"></script>
 <script src="js/ui/ui-shop.js?v=20260920repaint1"></script>

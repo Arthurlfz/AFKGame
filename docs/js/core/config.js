@@ -1461,7 +1461,7 @@ window.Config = {
     // 交易税：每满 taxPer 收 taxAmount（默认每满 8 收 1）
     taxPer: 8,
     taxAmount: 1,
-    // 每人最多同时挂单数（宠物 + 装备 + 蛋 共用上限；上架前校验，见 ui-market-sell.js）
+    // 每人最多同时挂单数（宠物 + 装备 + 蛋 共用上限；上架前校验，见 js/ui/market/sell.js）
     maxListings: 5,
     /* ---------- 交易行体验补强（2026-09-10，参考 POE 交易站 / 火炬之光交易行） ----------
      * pageSize：每个分区一次渲染多少条，超出给「显示更多」按钮（POE 分页 / 火炬翻页的等价物）

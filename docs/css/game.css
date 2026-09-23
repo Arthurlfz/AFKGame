@@ -38,10 +38,13 @@ body {
 ::-webkit-scrollbar-track { background:var(--inset); }
 ::-webkit-scrollbar-thumb { background:var(--line-hi); }
 
-/* ---------- 顶部横条 ---------- */
+/* ---------- 顶部横条 ----------
+ * ⚠️ 2026-09-23：这里原来写死 `height:44px`，与 design-tokens 的 `--topbar-h: 48px`
+ *    打架（game.css 后加载，实际一直按 44 渲染）⇒ 所有读 token 的让位规则都多让 4px。
+ *    现在高度只读 token（单一事实源）。位置/层级由 shell-immersive.css 覆盖成 fixed/90。 */
 .topbar {
   display:flex; align-items:center; gap:24px;
-  height:44px; padding:0 16px;
+  height:var(--topbar-h); padding:0 16px;
   background:var(--panel); border-bottom:1px solid var(--line);
   position:sticky; top:0; z-index:80;
 }
@@ -1058,7 +1061,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 }
 .craft-drawer { 
   pointer-events:auto;
-  position:absolute; top:44px; right:0; bottom:0; width:532px; max-width:calc(100vw - 220px);
+  /* top 只读 token（原来是写死的 44px —— 与 --topbar-h 同值纯属巧合，
+   * 2026-09-23 起顶栏高度以 token 为准，写死的那个必然错位）。 */
+  position:absolute; top:var(--topbar-h); right:0; bottom:0; width:532px; max-width:calc(100vw - 220px);
   display:flex; flex-direction:column; overflow:hidden;
   background:var(--panel); background-image:var(--tex-grain);
   border-left:1px solid var(--accent-dim); box-shadow:var(--shadow-panel);
@@ -4162,7 +4167,13 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 /* 2026-09-08 v2：全屏平铺（用户要求第一个页面平铺，不再居中弹窗） */
 .area-detail {
   /* 层级表 100 档：普通浮窗（全屏平铺的选图详情页） */
-  position: fixed; inset: 0; z-index: 100;
+  /* 🔴 2026-09-23：不再整屏覆盖 —— 让开**真实的**顶栏与左侧图标栏。
+   *    它们本来就是设计稿里的「顶部状态条 / 图标导航栏」，本作早就有；
+   *    在遮罩里再画一套假导航 = 双份入口、双份维护，还会把背包/任务/魔石/账号全挡住。
+   *    让开之后顺带解决两件事：
+   *      ① 准备页期间仍能点顶栏（背包 / 任务 / 反馈 / 魔石 / 账号）；
+   *      ② 浮起的任务追踪条（z-index 90）不再压在三栏面板边框上 —— 它回到"被浮窗盖住"的本分。 */
+  position: fixed; inset: var(--topbar-h) 0 0 var(--side-rail-w); z-index: 100;
   display: flex; align-items: stretch; justify-content: stretch;
   padding: 0;
   background: rgb(6 9 10 / .96);

@@ -90,7 +90,7 @@
     if (/兽|魂|晶|珠/.test(name)) return '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>';
     return '<svg class="eic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>';
   };
-  // 部位 → emoji 图标（背包格与装备 tooltip 共用；挂 UI 供 ui-equipment / ui-market 复用）
+  // 部位 → emoji 图标（背包格与装备 tooltip 共用；挂 UI 供 ui-equipment / js/ui/market 复用）
   const EQUIP_ICON = {
     武器: '<img class="mat-img" src="assets/ui/ic_equip_weapon.png" alt="">',
     单手剑: '<img class="mat-img" src="assets/ui/ic_equip_1hsword.png" alt="">',

@@ -6,7 +6,7 @@
  *  3. 购买：调 buy_pet / buy_item RPC（事务保证不双买），成功后刷新
  *  4. 我的上架状态（防止重复挂单）
  * 状态：listings / itemListings / myListed*Ids 仅本模块持有
- * 依赖：supabase.js（数据层）；DOM 渲染在 js/ui/（ui-market 等），流程编排在 main.js
+ * 依赖：supabase.js（数据层）；DOM 渲染在 js/ui/market/，流程编排在 main.js
  * ============================================================ */
 (function () {
   'use strict';
@@ -123,7 +123,7 @@
     return { ok: used < max, used, max, left: Math.max(0, max - used) };
   }
 
-  /* 上架额度守门（2026-09-11 下沉）：以前只有 ui-market-sell.js 一个入口记得问 listQuota()，
+  /* 上架额度守门（2026-09-11 下沉）：以前只有 js/ui/market/sell.js 一个入口记得问 listQuota()，
    * 任何新增入口（快捷上架/批量上架/引导代挂）忘了调就失效；服务端 list_* RPC 也没有
    * maxListings 兜底。现在四个 listXxx 内部统一先过这道闸，调用方不用记。 */
   function quotaGuard() {

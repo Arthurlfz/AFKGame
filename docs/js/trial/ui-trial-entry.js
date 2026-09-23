@@ -193,6 +193,8 @@
       return;
     }
     body.innerHTML = trialDetailHTML(route, point);
+    // 顶栏面包屑（2026-09-23）：与野图详情页共用同一个写入器（UI.setTopCrumb，定义在 ui-worldmap.js）
+    if (window.UI && window.UI.setTopCrumb) window.UI.setTopCrumb('世界地图 / ' + (point.name || ''));
     el.hidden = false;
     // 返回大地图
     const back = body.querySelector('#nd-back');

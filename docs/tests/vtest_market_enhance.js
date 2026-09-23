@@ -2,10 +2,12 @@
 // 覆盖：① 类型筛选支持材料/宠物蛋 ② 价格区间筛选 ③ 关键词可搜词缀/特质
 //      ④ 参考价比价标签（低于市价 / 捡漏） ⑤ 分页「显示更多」
 //      ⑥ 挂单额度 Config.trade.maxListings 真正生效（listQuota）
-//      ⑦ 离线成交汇总通知（ui-market-notify）
+//      ⑦ 离线成交汇总通知（market/notify.js）
 // 复用 vstub.js 桩；从 tests/ 目录运行（相对路径 ../js/）
 const fs = require('fs'), vm = require('vm');
 const VTF = require('./vtest_files');
+// 市集一族必须按依赖顺序整体重载（pricing 提供口径与比价，index 是编排层，必须最后）
+const MARKET_MODULES = ['../js/ui/market/pricing.js', '../js/ui/market/watch.js', '../js/ui/market/facets.js', '../js/ui/market/cards.js', '../js/ui/market/detail.js', '../js/ui/market/batch.js', '../js/ui/market/index.js'];
 const mem = (() => { const m = {}; return { getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v) }, removeItem: k => { delete m[k] } } })();
 function el() { return { setAttribute() {}, removeAttribute() {}, getAttribute: () => null, textContent: '', innerHTML: '', style: { setProperty() {} }, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains() { return false } }, appendChild(c) { this.children.push(c) }, append() {}, addEventListener(t, f) { this.handlers = this.handlers || {}; this.handlers[t] = f }, querySelector: () => el(), querySelectorAll: () => [], children: [], removeChild() {}, remove() {}, scrollTop: 0, scrollHeight: 0, disabled: false, value: '0' } }
 const els = {};
@@ -16,7 +18,7 @@ vm.runInContext(fs.readFileSync('vstub.js', 'utf8'), ctx);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const S = ms => new Promise(r => setTimeout(r, ms));
 const C = code => vm.runInContext(code, ctx);
-const reloadMarket = filters => { C(`localStorage.setItem("marketFilters",JSON.stringify(${JSON.stringify(filters)}))`); vm.runInContext(fs.readFileSync('../js/ui/ui-market.js', 'utf8'), ctx); };
+const reloadMarket = filters => { C(`localStorage.setItem("marketFilters",JSON.stringify(${JSON.stringify(filters)}))`); for (const m of MARKET_MODULES) vm.runInContext(fs.readFileSync(m, 'utf8'), ctx); };
 const textOf = sel => C(`(()=>{let out="";function walk(n){if(!n)return;if(n.innerHTML)out+=n.innerHTML;(n.children||[]).forEach(walk)}walk(els[${JSON.stringify(sel)}]);return out})()`);
 const resetEl = sel => C(`if(els[${JSON.stringify(sel)}])els[${JSON.stringify(sel)}].children=[]`);
 const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-list'); };
@@ -24,7 +26,7 @@ const resetUI = () => { resetEl('cfSteps'); resetEl('cfPath'); resetEl('market-l
 (async () => {
   for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/equipment/equipment.js', '../js/pet/pet.js', '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js', '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/core/pet-sprites.js']) VTF.load(ctx, f);
   C(`localStorage.setItem("marketFilters",JSON.stringify({kind:"all",slot:"all",rarity:"all",tier:"all",baseTier:"all",growth:"desc",sort:"latest",affixFilters:[],trait:"all",priceMin:null,priceMax:null}))`);
-  for (const f of ['../js/ui/ui-common.js', '../js/ui/ui-shell.js', '../js/ui/ui-login.js', '../js/ui/ui-dialog.js', '../js/ui/ui-popover.js', '../js/ui/battle/index.js','../js/ui/battle/tip.js','../js/ui/battle/stage-fx.js','../js/ui/battle/loot.js','../js/ui/battle/act.js','../js/ui/battle/roster.js','../js/ui/battle/summary.js', '../js/ui/ui-pet.js', '../js/ui/ui-pet-evolve.js', '../js/ui/ui-pet-merge.js', '../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', '../js/ui/ui-market.js', '../js/ui/ui-market-records.js', '../js/ui/ui-market-sell.js', '../js/ui/ui-market-notify.js', '../js/main.js']) VTF.load(ctx, f);
+  for (const f of ['../js/ui/ui-common.js', '../js/ui/ui-shell.js', '../js/ui/ui-login.js', '../js/ui/ui-dialog.js', '../js/ui/ui-popover.js', '../js/ui/battle/index.js','../js/ui/battle/tip.js','../js/ui/battle/stage-fx.js','../js/ui/battle/loot.js','../js/ui/battle/act.js','../js/ui/battle/roster.js','../js/ui/battle/summary.js', '../js/ui/ui-pet.js', '../js/ui/ui-pet-evolve.js', '../js/ui/ui-pet-merge.js', '../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js', ...MARKET_MODULES, '../js/ui/market/records.js', '../js/ui/market/sell.js', '../js/ui/market/notify.js', '../js/main.js']) VTF.load(ctx, f);
 
   await S(300); await C('Game.onLogin("ui@test.com","123456")'); await S(300);
   const now = new Date().toISOString();

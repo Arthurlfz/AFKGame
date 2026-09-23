@@ -222,24 +222,66 @@
   position: static; top: auto; left: auto; transform: none;
   width: auto; max-width: none; margin: 10px 12px 2px;
 }
+/* ④ 左侧宠物队列（.pet-roster 是 absolute; top:8px）也要从顶栏下缘起排。
+ *   ⚠️ 2026-09-23 用户实测：「宠物队列第一只点不到 / 被压住」——
+ *   点击本身已由第六节「顶栏只收真控件」兜住（不再被吞），这里补的是**视觉**：
+ *   不然第一格头像正压在「永夜灵市」标题与三个按钮底下，看着就像坏了。
+ *   ⚠️ 只对野图模式（:not(.tw-mode)）：塔模式 arena 已经 padding-top 让过位，
+ *      再抬一次会白空出 44px。 */
+#app:has(#tab-battle.active) #tab-battle .bp-arena:not(.tw-mode) .pet-roster {
+  top: calc(8px + var(--topbar-h));
+  max-height: calc(100% - 16px - var(--topbar-h));
+}
 
 /* ============================================================
- * 六、画面页：顶栏与页眉在画面上【不要"栏"的形状】
+ * 六、画面页：顶栏在画面上【不要"栏"的形状 / 不要"栏"的拦截范围】
  * 🔴 用户实测反馈：「主城被挡住了，被顶部的标题页」。
  *    根因是两条带底色的横条叠在画面顶上：顶栏（0~44px，半透明底 + 底边线 + 阴影）
  *    + 页眉（48~124px，从 84% 黑渐到透明）—— 加起来顶部 124px 被压暗一大片。
  *    它们各自都是"一条栏"，两条摞起来就像给画面盖了块黑布。
  * ⇒ 画面页上两者都去掉底色/边线/阴影，只留「浮在画面上的字与按钮」，
  *    可读性改由文字阴影兜底（阴影不会挡住画面）。
- * ⚠️ 只对三个画面页生效（主城 / 世界地图）；面板页的顶栏是实打实的导航栏，保持原样。
+ *
+ * 🔴 2026-09-23 追加修（用户实测：「这个毛玻璃总会挡住很多交互的按钮」）：
+ *   上面那轮只处理了"底色"，还剩两件事一直挡着：
+ *   ① **毛玻璃还在** —— `backdrop-filter: blur(6px)` 没撤，于是顶栏那 0~44px 整幅宽
+ *      仍把下面的画面磨成一条玻璃；战斗页更是一直带着深底色（上轮漏了它）。
+ *   ② **点击拦截范围 = 整条栏** —— 顶栏是 fixed 覆盖层、pointer-events 默认 auto，
+ *      0~44px 全幅宽都在吞点击：战斗页左侧宠物队列第一格（top:8px）、地图顶部点位、
+ *      以及以后任何从 y=0 起排的控件，全都被它吃掉。
+ *      逐个元素改 top 是打补丁（pet-roster 就漏了这一刀）⇒ 在**容器层**解决：
+ *      画面页上顶栏只让「真控件那几块」收点击，其余空间一律放行给底下的画面。
+ *      这跟上面 .capital-head / .worldmap-head 的既有做法同一套（那两条 pointer-events 注释）。
+ * ⚠️ 面板页不受影响：那里的顶栏是实打实的导航栏，全宽可点、带底色，保持原样。
  * ============================================================ */
 #app:has(#tab-capital.active) .app-topbar,
-#app:has(#tab-worldmap.active) .app-topbar {
+#app:has(#tab-worldmap.active) .app-topbar,
+#app:has(#tab-battle.active) .app-topbar {
   background-color: transparent;
   background-image: none;
   border-bottom-color: transparent;
   box-shadow: none;
+  backdrop-filter: none;               /* ① 撤掉毛玻璃：不再把画面磨成一条玻璃 */
+  pointer-events: none;                /* ② 空白区放行：底下画面控件的点击不再被吞 */
   text-shadow: 0 1px 3px rgb(0 0 0 / .9), 0 0 10px rgb(0 0 0 / .8);
+}
+/* 顶栏里真正的控件照旧可点（其余空间保持放行）：
+ * 三个按钮 + 挂机 chip + 魔石 chip + 账号区。
+ * ⚠️ .title / .spacer 刻意**不**恢复可点 —— 它们是纯装饰与占位，恢复了就等于把
+ *    画面左侧/中间那一段又封回去（.spacer 是 flex:1，一旦可点就是半条栏）。 */
+#app:has(#tab-capital.active) .app-topbar > .topbar-btn,
+#app:has(#tab-worldmap.active) .app-topbar > .topbar-btn,
+#app:has(#tab-battle.active) .app-topbar > .topbar-btn,
+#app:has(#tab-capital.active) .app-topbar > .idle-chip,
+#app:has(#tab-worldmap.active) .app-topbar > .idle-chip,
+#app:has(#tab-battle.active) .app-topbar > .idle-chip,
+#app:has(#tab-capital.active) .app-topbar > .gem-chip,
+#app:has(#tab-worldmap.active) .app-topbar > .gem-chip,
+#app:has(#tab-battle.active) .app-topbar > .gem-chip,
+#app:has(#tab-capital.active) .app-topbar > #auth-box,
+#app:has(#tab-worldmap.active) .app-topbar > #auth-box,
+#app:has(#tab-battle.active) .app-topbar > #auth-box {
+  pointer-events: auto;
 }
 /* 页眉同理：去掉那条深色渐变，改用文字阴影保证在亮画面上也看得清 */
 /* 页眉搬到画面底部（暗区）之后，那套"为亮天空准备"的重描边可以收回普通阴影。

@@ -28,7 +28,7 @@ for (const f of ['../js/core/config.js', '../js/core/supabase.js', '../js/pet/en
   '../js/core/items.js', '../js/core/materials.js', '../js/core/drop.js', '../js/core/market.js', '../js/equipment/equipment_craft.js',
   '../js/equipment/salvage.js', '../js/pet/pet_merge.js', '../js/pet/pet_evolve.js', '../js/core/battle.js', '../js/ui/ui-common.js',
   '../js/ui/ui-console.js', '../js/ui/battle/index.js','../js/ui/battle/tip.js','../js/ui/battle/stage-fx.js','../js/ui/battle/loot.js','../js/ui/battle/act.js','../js/ui/battle/roster.js','../js/ui/battle/summary.js', '../js/ui/ui-pet.js','../js/ui/ui-pet-evolve.js','../js/ui/ui-pet-merge.js','../js/ui/ui-pet-synth.js', '../js/ui/ui-equipment.js', '../js/ui/ui-craft.js',
-  '../js/ui/ui-market.js', '../js/main.js']) VTF.load(ctx, f);
+  '../js/ui/market/pricing.js', '../js/ui/market/watch.js', '../js/ui/market/facets.js', '../js/ui/market/cards.js', '../js/ui/market/detail.js', '../js/ui/market/batch.js', '../js/ui/market/index.js', '../js/main.js']) VTF.load(ctx, f);
 vm.runInContext('UI.initChat=function(){}', ctx);
 const A = (c, m) => { if (!c) { console.error('FAIL: ' + m); process.exit(1) } console.log('PASS: ' + m) };
 const S = ms => new Promise(r => setTimeout(r, ms));

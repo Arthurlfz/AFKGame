@@ -113,8 +113,18 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 *::-webkit-scrollbar-thumb { background: var(--ink-soft); border: 2px solid var(--bg-deep); border-radius: 1px; }
 *::-webkit-scrollbar-thumb:hover { background: var(--metal-dim); }
 
-.tab-page.active > * { animation: ink-page-in .24s ease both; }
-@keyframes ink-page-in { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+/* 🔴 2026-09-23 修（"顶栏挡住画面页交互"的真凶之一）：
+ * 原来这条是 `animation: ink-page-in .24s ease both`，而 keyframes 里带 `transform`。
+ * `both` 让动画**播完继续占着最终帧** ⇒ .worldmap-page / .capital-page / .battle-page
+ * 这三个页面容器**永久**带着 `transform: translateY(0)`（值虽然等于"没位移"，但 CSS 只认
+ * "是不是 none"）⇒ 它们永久变成【层叠上下文 + fixed 包含块】，页面内部再高的 z-index 也出不去：
+ *   ① 节点详情页 .area-detail（z-index:100）与通天塔详情页被顶栏（z-index:90）盖住
+ *      → 顶部那排「返回大地图 / 返回」按钮正好在顶栏底下，点不到（用户实测就是这个）；
+ *   ② 页面内 position:fixed 的浮层改成相对页容器定位 —— motion.css 第 14 条早写过这条警告，
+ *      当时只保住了 .tab-page 自己，没管它下面这层。
+ * 现在照 motion.css 同一口径修：**只淡入、不做位移、不占最终帧**。 */
+.tab-page.active > * { animation: ink-page-in .24s ease; }
+@keyframes ink-page-in { from { opacity: .35; } to { opacity: 1; } }
 .market-item, .bag-card, .equip-card, .area-card { transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 /* z-index:1 —— hover 的 transform 会让卡片变成 stacking context，把卡片内部的浮层
    （.equip-tip / .quick-tip，z-index:60）锁在这一层里。此时卡片自身仍是 z-index:auto，
@@ -323,8 +333,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   border-radius: 50%; pointer-events: none; z-index: -1;
   transition: opacity .18s ease;
 }
-.wm-marker-dot::after { width: 32px; height: 32px; opacity: .75; background: radial-gradient(circle, rgb(var(--hp-hi-rgb) / .5), rgb(var(--hp-hi-rgb) / 0) 70%); }
-.wm-marker-icon::after { width: 58px; height: 58px; opacity: .9; background: radial-gradient(circle, rgb(var(--action-gold-rgb) / .38), rgb(var(--action-gold-rgb) / 0) 70%); }
+/* 🔴 2026-09-23 修（用户实测"发光没看出区别"）：发光层垫在本体**下面**，本体把它中间那块盖住了，
+ *   所以真正看得见的只有「本体半径之外的那一圈」，亮度 = 渐变在该半径处的 alpha。
+ *   上一版：层 32px + `... 0 70%` 收尾 ⇒ 渐变有效半径只 11.2px，而红点本体半径已 8px，
+ *   露出来的 3px 环 alpha ≈ .1 ⇒ 显示上等于没有发光（性能优化做成了视觉退化）。
+ *   现在按几何定值：层 = 本体的 2.6~2.75 倍，且**亮芯留到本体边缘之外**（42% / 50% 处仍有 .42 / .34），
+ *   于是本体边缘处 alpha ≈ .44 / .36、向外交出 12~20px 的可见光晕。仍是零 blur、零请求、只改 opacity。 */
+.wm-marker-dot::after { width: 44px; height: 44px; opacity: .8; background: radial-gradient(circle, rgb(var(--hp-hi-rgb) / .55), rgb(var(--hp-hi-rgb) / .42) 42%, rgb(var(--hp-hi-rgb) / 0) 100%); }
+.wm-marker-icon::after { width: 76px; height: 76px; opacity: .9; background: radial-gradient(circle, rgb(var(--action-gold-rgb) / .5), rgb(var(--action-gold-rgb) / .34) 50%, rgb(var(--action-gold-rgb) / 0) 100%); }
 
 .wm-marker-dot { display: block; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--danger); border: 1px solid var(--ink); box-shadow: inset 0 0 4px rgb(0 0 0 / .4); transition: transform .18s ease; }
 .wm-marker:hover .wm-marker-dot, .wm-marker:focus-visible .wm-marker-dot { transform: scale(1.3); }
@@ -351,11 +367,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 /* 首通标记（2026-09-05 地图系统 A 项）：已首通的图，红点转金色 + ✓ 徽标 */
 .wm-marker--cleared .wm-marker-dot { background: rgb(var(--action-gold-rgb)); border-color: #fff; box-shadow: inset 0 0 4px rgb(0 0 0 / .4); }
-.wm-marker--cleared .wm-marker-dot::after { background: radial-gradient(circle, rgb(var(--action-gold-rgb) / .65), rgb(var(--action-gold-rgb) / 0) 70%); }
+.wm-marker--cleared .wm-marker-dot::after { background: radial-gradient(circle, rgb(var(--action-gold-rgb) / .7), rgb(var(--action-gold-rgb) / .5) 42%, rgb(var(--action-gold-rgb) / 0) 100%); }
 .wm-marker-pass { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #1a1b1c; background: rgb(var(--action-gold-rgb)); border: 1px solid #fff; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; line-height: 1.4; }
 /* 资源副本节点（2026-09-09）：菱形青玉标记，与野图红点 / 主城金圈视觉区分 */
 .wm-marker--trial .wm-marker-dot { display: block; width: 14px; height: 14px; margin-left: -7px; border-radius: 3px; background: linear-gradient(135deg, var(--jade-hi), var(--jade)); border: 1px solid var(--ink); box-shadow: inset 0 0 4px rgb(0 0 0 / .4); transform: rotate(45deg); transition: transform .18s ease; }
-.wm-marker--trial .wm-marker-dot::after { background: radial-gradient(circle, rgb(var(--jade-rgb) / .6), rgb(var(--jade-rgb) / 0) 70%); }
+.wm-marker--trial .wm-marker-dot::after { background: radial-gradient(circle, rgb(var(--jade-rgb) / .65), rgb(var(--jade-rgb) / .45) 42%, rgb(var(--jade-rgb) / 0) 100%); }
 .wm-marker--trial:hover .wm-marker-dot, .wm-marker--trial:focus-visible .wm-marker-dot { transform: rotate(45deg) scale(1.28); box-shadow: inset 0 0 6px rgb(0 0 0 / .35); }
 .wm-marker--trial:hover .wm-marker-dot::after, .wm-marker--trial:focus-visible .wm-marker-dot::after { opacity: 1; }
 /* 副本徽标（2026-09-23）：

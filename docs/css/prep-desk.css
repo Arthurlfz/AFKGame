@@ -1,0 +1,559 @@
+/* ============================================================
+ * 【本次改动点对照表】（2026-09-23 出征整备页重构 · 对应需求 1–10）
+ *
+ * 1 布局失衡（下半 55% 空） → 一屏三栏：顶简报条 / `.pd-board`（1.08:.82:.98）/ 底 `.pd-dep`，
+ *   每栏自己滚（`.pd-scroll`，5px 细条），页面不再整屏滚。
+ * 2 风险不可见 → 底栏「风险评估」= 对比尺 + 状态字（稳妥/均势/危险）+ 倍率 + 一句人话。
+ *   ⚠️ **没有胜率百分比** —— 游戏里没有任何"胜率"数据，写一个就是造假（你已拍板"123都不做"）。
+ * 3 CTA 主次不清 → 底栏通栏：主按钮「开始挂机」= 火漆鎏金块（全屏唯一高亮面 + 3.6s 光带），
+ *   次按钮「只进战斗」透明描边。两个 id（#nd-idle / #nd-fight）与绑定逻辑一字未改。
+ * 4 掉落标签墙 → 按稀有度分三层（传说/稀有/常规）+ 两列网格；材料带「占材料 x%」= 权重算的
+ *   相对占比。档位仍走 UI.lootTierOf（掉落播报那套表的唯一事实源），不另抄名单。
+ * 5 中栏下半空置 → 主位卡（大数字 + 四维）+ 候补名册 + 「＋ 去宠物页编队」真实入口。
+ * 6 "两个成长" → 查清：**只有一个 `pet.growth`，全库没有"综合战力"字段/函数**
+ *   （ui-pet.js 的「成长贡献：生命 +6465…」是 level×growth 的属性增量，标签是生命/攻击/防御）。
+ *   ⇒ 不新造 power 字段，只把措辞统一成「成长」。并列出现 6465.7 与 12.8 = **两只不同宠各自的成长**
+ *   （成长无上限，涅槃/培育可堆到数千）。
+ * 7 卡面 schema 不一致 → 统一为「名字(+★神级) / Lv·成长 / 成长值」，同序同位；神级宠不再例外。
+ * 8 左上角糊块 → 定位=顶栏那层 `backdrop-filter` 毛玻璃（画面页那份今天已撤）；本页再把遮罩
+ *   让开真实顶栏（见 game.css 的 `.area-detail`），顶栏不再被盖住也不再被糊。
+ * 9 任务条压面板边框 → 让开顶栏后，浮起的 `.quest-tracker`（z-index 90）回到"被浮窗盖住"的本分；
+ *   任务入口用真顶栏的「任务」按钮。**没有用 display:none**（会被 ui-fixes.js 误读成"教程完成"）。
+ * 10 对比度不足 → 本页局部色板：骨白 #EDE7D9 on #0F1216（≈13:1）；次级/三级两档；
+ *    数字一律等宽 + `tabular-nums`（战力/等级/掉落率右对齐）。
+ *
+ * 【字段 / DOM / class 变更清单】（方便 diff）
+ *  新增：`.pd-*` 一整套命名空间（pd-top/pd-crumb/pd-title/pd-tags/pd-tag/pd-back/pd-board/
+ *       pd-panel/pd-hd/pd-scroll/pd-sec/pd-tier/pd-drop-grid/pd-thr/pd-slot/pd-pav/pd-grade/
+ *       pd-pw/pd-stats/pd-roster/pd-add/pd-boss/pd-bossstage/pd-ring/pd-rows/pd-bar/pd-dep/
+ *       pd-risklab/pd-meter/pd-yield/pd-chip/pd-note/pd-acts/pd-btn/pd-go）、
+ *       新 id `#pd-goto-pet`（真实入口：切到宠物页）；
+ *  保留（测试与逻辑依赖，一个没删）：`#area-detail-body` / `.nd-pet[data-pid]` / `#nd-back` /
+ *       `#nd-fight` / `#nd-idle` / `.nd-mob` / `.nd-drop-chip` / `.nd-boss-row` /
+ *       文案「强度 ×」「霸主」「宠物蛋」「装备（未鉴定）」「区域材料名」；
+ *  删除：`dropNames` / `dropHtml`（死代码，换成 drops/dropGrid）；
+ *  字段名：**未改任何字段**。主数字用 `pet.growth`，尺子刻度用 `area.recGrowth`。
+ *  ⛔ 按你"123都不做"：不新造「综合战力」、不新造「推荐战力」（尺子走成长轴）、收益里不放魔石
+ *     （挂机不掉魔石，百变魔石是 Boss 掉的材料，两回事）。
+ * ============================================================ */
+
+/* ============================================================
+ * css/prep-desk.css —— 「出征整备 / 委托所调度台」（2026-09-23）
+ *
+ * 只给**世界地图 → 点位详情 = 战斗前准备页**（野图）用的新皮肤。
+ * 结构由 `js/ui/ui-worldmap.js` 的 `areaDetailHTML()` 渲染（`.pd-*` 前缀）。
+ *
+ * ⛔ 作用域约定（改了会牵连别处，别图省事）：
+ *   所有规则都挂在 `.area-detail:has(.pd)` 或 `.pd-*` 之下 ——
+ *   副本详情页（ui-trial-entry）与通天塔详情页（ui-tower-entry）共用 `.area-detail`
+ *   但这页没有 `.pd` ⇒ 它们保持原样，不受本文件影响。
+ *
+ * 视觉锚点：《暗黑地牢》出征整备屏 × 公会委托所调度台
+ *   = 漆木告示板上钉着一张鎏金委托状。公文感：2~3px 圆角、1px 描边、极轻渐变、无厚阴影。
+ * 字体：用项目既有 token（--font-title / --font-body / --font-num），**不引外部字体**
+ *   （本作字体是本地托管的，引 Google Fonts 会多一次外网请求、离线即失效）。
+ * 数字：一律 --font-num + tabular-nums，战力/等级/掉落率右对齐。
+ * 动效：光带 / 旋转环都是纯装饰，`prefers-reduced-motion` 下关掉
+ *   （design-tokens.css 已有全局 `*{}` 压制，这里再兜一层，免得将来那层被改）。
+ * ============================================================ */
+
+.area-detail:has(.pd) {
+  /* 色板（本次设计的局部变量，不污染全局主题） */
+  --pd-ink0: #090A0C; --pd-ink1: #0F1216; --pd-ink2: #151A21; --pd-ink3: #1C222B;
+  --pd-line: #252C36; --pd-line2: #333B47;
+  --pd-bone: #EDE7D9; --pd-bone2: #9C9484; --pd-bone3: #6A6357;
+  --pd-gold: #C9A24C; --pd-gold2: #EBCF8C; --pd-gold3: #7E652C;
+  --pd-cin: #C0432F; --pd-cin2: #E07057;
+  --pd-jade: #71915C; --pd-azure: #5E82AB;
+
+  background: var(--pd-ink0);
+  backdrop-filter: none;              /* 整屏磨砂会糊掉底下的地图，也让文字发灰 */
+}
+.area-detail:has(.pd) .nd-page {
+  /* 透明：环境光画在 .area-detail 上，这里铺实色会把它盖掉（整页就变成一块死黑） */
+  background-color: transparent; background-image: none;
+  border: 0; box-shadow: none;
+  /* 一屏无滚动的骨架：顶简报条 / 中间三栏 / 底启程条 */
+  height: 100%; overflow: hidden; display: flex; flex-direction: column;
+}
+.pd { display: flex; flex-direction: column; height: 100%; min-height: 0; color: var(--pd-bone); }
+
+/* ───────── 顶部简报条 ───────── */
+.pd-top {
+  flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 11px 18px 12px;
+  background: linear-gradient(180deg, rgb(255 255 255 / .025), transparent);
+  border-bottom: 1px solid var(--pd-line);
+}
+.pd-crumb {
+  font-family: var(--font-title); font-size: var(--fs-sm); letter-spacing: .2em; color: var(--pd-bone3);
+  padding-right: 14px; border-right: 1px solid var(--pd-line);
+}
+.pd-crumb b { color: var(--pd-bone); font-weight: 700; }
+.pd-title {
+  font-family: var(--font-title); font-weight: 900; font-size: 26px; letter-spacing: .12em;
+  line-height: 1.1; color: var(--pd-bone);
+  /* 地名左侧一道 3px 金条（参考稿 .mapname 的做法）：一句话把"这是哪"钉住 */
+  border-left: 3px solid var(--pd-gold); padding-left: 12px;
+}
+.pd-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-left: 4px; }
+.pd-tag {
+  font-size: var(--fs-2xs); letter-spacing: .12em; padding: 3px 9px;
+  border: 1px solid var(--pd-line2); color: var(--pd-bone2); border-radius: 2px; white-space: nowrap;
+}
+.pd-tag.gold { border-color: var(--pd-gold3); color: var(--pd-gold2); background: rgb(201 162 76 / .09); }
+.pd-tag.red { border-color: rgb(192 67 47 / .45); color: var(--pd-cin2); background: rgb(192 67 47 / .1); }
+.pd-tag.jade { border-color: rgb(113 145 92 / .5); color: #93B27C; background: rgb(113 145 92 / .1); }
+.pd-back {
+  margin-left: auto; height: 34px; padding: 0 16px; cursor: pointer;
+  font-family: var(--font-title); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .2em;
+  color: var(--pd-bone2); background: transparent;
+  border: 1px solid var(--pd-line2); border-radius: 2px; transition: color .16s ease, border-color .16s ease;
+}
+.pd-back:hover { color: var(--pd-bone); border-color: var(--pd-bone3); }
+
+/* ───────── 三栏调度台 ───────── */
+.pd-board {
+  flex: 1 1 0; min-height: 0; display: grid; gap: 14px; padding: 14px 18px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .82fr) minmax(0, .98fr);
+}
+.pd-panel {
+  position: relative; min-height: 0; display: flex; flex-direction: column;
+  /* 🔴 不用 `background` 简写塞 var()（会被当第二层图、底色丢失，项目铁律）——
+   * 底色走 background-color，肌理走 background-image 多层。
+   * 图层数必须 = 4 角 + --ui-paper-texture 自带 2 层 = **6**，少写会按规则循环取值、纸纹错位。
+   * 素材全用已有的（assets/ui/panel/ 云纹角饰 + 全站纸纹），零新资源、零请求。 */
+  background-color: #12161B;
+  background-image:
+    url("../assets/ui/panel/角-左上.png"), url("../assets/ui/panel/角-右上.png"),
+    url("../assets/ui/panel/角-左下.png"), url("../assets/ui/panel/角-右下.png"),
+    var(--ui-paper-texture);
+  background-position: left top, right top, left bottom, right bottom, 0 0, 0 0;
+  background-size: 84px 56px, 84px 56px, 84px 56px, 84px 56px, auto, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+  border: 1px solid var(--pd-line); border-radius: 3px; overflow: hidden;
+}
+/* 面板顶部一条金线：中间亮、两端隐 —— 三块面板各自"收口"，不然就是三个灰块 */
+.pd-panel::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(201 162 76 / .5), transparent);
+}
+.pd-panel.pd-boss { border-color: rgb(192 67 47 / .32); }
+.pd-hd {
+  flex: none; display: flex; align-items: baseline; gap: 12px;
+  padding: 13px 16px 10px; border-bottom: 1px solid var(--pd-line);
+  background: linear-gradient(180deg, rgb(255 255 255 / .028), transparent);
+}
+.pd-hd h3 {
+  margin: 0; font-family: var(--font-title); font-weight: 700; font-size: var(--fs-md);
+  letter-spacing: .32em; color: var(--pd-gold2);
+}
+.pd-hd .sub { font-size: var(--fs-2xs); color: var(--pd-bone3); letter-spacing: .06em; }
+.pd-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 0 16px 16px; }
+.pd-scroll::-webkit-scrollbar { width: 5px; }
+.pd-scroll::-webkit-scrollbar-thumb { background: var(--pd-line2); }
+.pd-scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* 小节标题：宋体 + 大字距 + 右侧渐隐细线 */
+.pd-sec { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; }
+.pd-sec h4 {
+  margin: 0; font-family: var(--font-title); font-size: var(--fs-xs); font-weight: 700;
+  letter-spacing: .34em; color: var(--pd-bone2); white-space: nowrap;
+}
+.pd-sec .r { flex: 1; height: 1px; background: linear-gradient(90deg, var(--pd-line2), transparent); }
+.pd-sec em { font-style: normal; font-size: var(--fs-2xs); color: var(--pd-bone3); letter-spacing: .1em; }
+
+/* ───────── 左栏·野怪簿（账簿行，不是卡片网格） ───────── */
+.pd-scroll > .nd-mob, .pd-scroll .nd-mob {
+  display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 9px 10px; margin-bottom: 3px;
+  border: 1px solid transparent; border-left: 2px solid var(--pd-line);
+  background: rgb(255 255 255 / .017); border-radius: 2px; transition: background .16s ease, transform .16s ease;
+}
+.pd-scroll .nd-mob:hover { background: rgb(255 255 255 / .05); border-color: var(--pd-line); transform: translateX(2px); }
+.pd-scroll .nd-mob.is-boss { border-left-color: var(--pd-cin); background: rgb(192 67 47 / .075); }
+.pd-scroll .nd-mob.is-boss:hover { border-color: rgb(192 67 47 / .35); }
+.pd-scroll .nd-mob .ic {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  border: 1px solid var(--pd-line2); background: radial-gradient(circle at 35% 28%, #2A3038, #12151A);
+}
+.pd-scroll .nd-mob .ic img { width: 100%; height: 100%; object-fit: cover; }
+.pd-scroll .nd-mob.is-boss .ic { border-color: rgb(192 67 47 / .5); background: radial-gradient(circle at 35% 28%, #3A1F1B, #170E0D); }
+.pd-scroll .nd-mob .tx { min-width: 0; }
+.pd-scroll .nd-mob .nm {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-title); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .05em; color: var(--pd-bone);
+}
+.pd-scroll .nd-mob .nm .lv { margin-left: auto; font-family: var(--font-num); font-size: var(--fs-2xs); color: var(--pd-bone2); }
+.pd-scroll .nd-mob .boss-tag {
+  font-size: var(--fs-2xs); letter-spacing: .14em; padding: 1px 5px; border-radius: 2px;
+  background: var(--pd-cin); color: #fff; font-weight: 500;
+}
+.pd-scroll .nd-mob .ds { font-size: var(--fs-2xs); color: var(--pd-bone3); letter-spacing: .05em; margin-top: 2px; }
+/* 右列：等级 + 威胁刻度（第三列，靠右对齐） */
+.pd-scroll .nd-mob .rt { text-align: right; }
+.pd-scroll .nd-mob .rt .lv {
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-2xs); color: var(--pd-bone2);
+}
+/* 威胁度刻度（图内相对位置，1~5 格） */
+.pd-thr { display: flex; gap: 2px; justify-content: flex-end; margin-top: 5px; }
+.pd-thr i { width: 4px; height: 9px; background: var(--pd-line2); border-radius: 1px; }
+.pd-thr i.f { background: var(--pd-gold); }
+.pd-thr i.h { background: var(--pd-cin); }
+
+/* ───────── 左栏·掉落预览（按稀有度三层） ───────── */
+.pd-tier { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; }
+.pd-tier b { font-family: var(--font-title); font-size: var(--fs-2xs); letter-spacing: .26em; font-weight: 700; }
+.pd-tier .r { flex: 1; height: 1px; background: var(--pd-line); }
+.pd-tier.t1 b { color: var(--pd-bone3); } .pd-tier.t2 b { color: var(--pd-azure); } .pd-tier.t3 b { color: var(--pd-gold2); }
+.pd-drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; }
+.pd-scroll .nd-drop-chip {
+  display: flex; align-items: center; gap: 8px; padding: 6px 9px;
+  border-left: 2px solid var(--pd-line2); background: rgb(255 255 255 / .017);
+  border-radius: 2px; font-size: var(--fs-xs); color: var(--pd-bone2);
+}
+.pd-scroll .nd-drop-chip.hi2 { border-left-color: var(--pd-azure); }
+.pd-scroll .nd-drop-chip.hi3 {
+  border-left-color: var(--pd-gold); color: var(--pd-gold2); font-weight: 500;
+  background: linear-gradient(90deg, rgb(201 162 76 / .1), rgb(255 255 255 / .017));
+}
+.pd-scroll .nd-drop-chip .pc { margin-left: auto; font-family: var(--font-num); font-size: var(--fs-2xs); color: var(--pd-bone3); }
+
+/* ───────── 中栏·出战编成 ───────── */
+.pd-slot {
+  position: relative; margin: 18px 0 4px; padding: 20px 16px 16px; text-align: center;
+  border: 1px solid var(--pd-line2); border-radius: 3px;
+  background:
+    radial-gradient(220px 160px at 20% 0%, rgb(201 162 76 / .12), transparent 70%),
+    linear-gradient(170deg, #1B212A, #121519);
+}
+.pd-slot::before {
+  content: "出 战 主 位"; position: absolute; top: -1px; left: 50%; transform: translate(-50%, -50%);
+  background: var(--pd-gold); color: #12100A; font-family: var(--font-title); font-weight: 700;
+  font-size: var(--fs-2xs); letter-spacing: .28em; padding: 3px 12px; border-radius: 2px; white-space: nowrap;
+}
+.pd-pav {
+  width: 92px; height: 92px; margin: 6px auto 12px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--pd-gold3); overflow: hidden; color: #E5B7A8;
+  background: radial-gradient(circle at 34% 26%, #4A2A2E, #1A1114);
+  box-shadow: 0 0 0 5px rgb(201 162 76 / .08), 0 10px 30px rgb(0 0 0 / .5);
+}
+.pd-pav img { width: 100%; height: 100%; object-fit: cover; }
+.pd-slot h3 {
+  margin: 0; font-family: var(--font-title); font-weight: 900; font-size: 22px; letter-spacing: .14em; color: var(--pd-bone);
+}
+.pd-grade { font-family: var(--font-title); font-size: var(--fs-xs); letter-spacing: .34em; margin-top: 5px; color: var(--pd-bone2); }
+.pd-grade.g-god { color: var(--pd-gold2); }
+/* 主数字 = 成长（本作唯一真实口径；**没有"综合战力"这个字段**，别加） */
+.pd-pw {
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: 34px; font-weight: 700; letter-spacing: .02em; color: var(--pd-gold2); margin-top: 14px; line-height: 1;
+}
+.pd-pw small {
+  display: block; font-family: var(--font-body); font-size: var(--fs-2xs); letter-spacing: .34em;
+  color: var(--pd-bone3); margin-top: 6px; font-weight: 400;
+}
+.pd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 16px; background: var(--pd-line); }
+.pd-stats div { background: var(--pd-ink2); padding: 9px 4px; }
+.pd-stats .k { font-size: var(--fs-2xs); letter-spacing: .22em; color: var(--pd-bone3); }
+.pd-stats .v { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); color: var(--pd-bone); margin-top: 3px; }
+
+.pd-roster { display: flex; flex-direction: column; gap: 4px; }
+.pd-roster .nd-pet {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 11px; align-items: center; cursor: pointer;
+  padding: 9px 11px; border: 1px solid var(--pd-line); background: rgb(255 255 255 / .017);
+  border-radius: 2px; transition: border-color .16s ease, background .16s ease;
+}
+.pd-roster .nd-pet:hover { border-color: var(--pd-gold3); background: rgb(201 162 76 / .07); }
+.pd-roster .nd-pet.active { border-color: var(--pd-gold); background: rgb(201 162 76 / .12); }
+.pd-roster .nd-pet .p-ic {
+  width: 34px; height: 34px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  border: 1px solid var(--pd-line2); background: radial-gradient(circle at 35% 28%, #2A3038, #12151A);
+}
+.pd-roster .nd-pet .p-ic img { width: 100%; height: 100%; object-fit: cover; }
+.pd-roster .nd-pet .p-nm { font-family: var(--font-title); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .05em; color: var(--pd-bone); }
+/* ⚠️ 字段 schema 统一：每张卡都是「名称 / Lv·成长 / 成长值」同一顺序同一位置 —— 神级宠也不再例外 */
+.pd-roster .nd-pet .p-meta {
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-2xs); color: var(--pd-bone3); margin-top: 2px;
+}
+.pd-roster .nd-pet .p-god { font-size: var(--fs-2xs); letter-spacing: .12em; color: var(--pd-gold); }
+.pd-roster .nd-pet .p-growth {
+  font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-sm);
+  color: var(--pd-bone2); text-align: right;
+}
+.pd-roster .nd-pet.active .p-growth { color: var(--pd-gold2); }
+.pd-add {
+  width: 100%; margin-top: 8px; padding: 11px; text-align: center; cursor: pointer;
+  background: transparent; color: inherit; font-family: var(--font-body);
+  border: 1px dashed var(--pd-line2); border-radius: 2px;
+  font-size: var(--fs-2xs); letter-spacing: .2em; color: var(--pd-bone3); transition: color .16s ease, border-color .16s ease;
+}
+.pd-add:hover { color: var(--pd-gold); border-color: var(--pd-gold3); }
+
+/* ───────── 右栏·领主情报 ───────── */
+/* 右栏内部自带内边距（立绘区 22px / 账簿 16px）⇒ 滚动容器别再叠一层 */
+.pd-panel.pd-boss .pd-scroll { padding: 0; }
+.pd-bossstage {
+  padding: 22px 16px 18px; text-align: center;
+  background: radial-gradient(280px 190px at 50% 42%, rgb(192 67 47 / .16), transparent 72%);
+  border-bottom: 1px solid var(--pd-line);
+}
+.pd-ring {
+  width: 112px; height: 112px; margin: 0 auto 14px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid rgb(192 67 47 / .5); position: relative; overflow: hidden;
+  background: radial-gradient(circle at 36% 26%, #3B201C, #150D0C);
+  box-shadow: 0 0 0 6px rgb(192 67 47 / .08), 0 0 44px rgb(192 67 47 / .22);
+}
+.pd-ring img { width: 100%; height: 100%; object-fit: cover; }
+.pd-ring::after {
+  content: ""; position: absolute; inset: -13px; border-radius: 50%;
+  border: 1px dashed rgb(192 67 47 / .28); animation: pd-spin 34s linear infinite;
+}
+@keyframes pd-spin { to { transform: rotate(360deg); } }
+.pd-bossstage h3 {
+  margin: 0; font-family: var(--font-title); font-weight: 900; font-size: 21px; letter-spacing: .2em; color: var(--pd-cin2);
+}
+.pd-bossstage p { margin: 6px 0 0; font-size: var(--fs-2xs); color: var(--pd-bone3); letter-spacing: .12em; }
+.pd-rows { padding: 4px 16px 16px; }
+.pd-rows .nd-boss-row {
+  display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--pd-line);
+}
+.pd-rows .nd-boss-row:last-child { border-bottom: 0; }
+.pd-rows .nd-boss-row.col { display: block; }
+.pd-rows .k {
+  font-family: var(--font-title); font-size: var(--fs-2xs); letter-spacing: .24em;
+  color: var(--pd-bone3); white-space: nowrap;
+}
+.pd-rows .v {
+  margin-left: auto; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); color: var(--pd-bone);
+}
+.pd-rows .v.txt { font-family: var(--font-body); font-size: var(--fs-xs); color: var(--pd-bone2); }
+.pd-rows .v.warn { color: var(--pd-cin2); }
+.pd-rows .v.hi { color: var(--pd-gold2); }
+.pd-bar { height: 6px; margin-top: 8px; background: var(--pd-ink3); border: 1px solid var(--pd-line); border-radius: 3px; overflow: hidden; }
+.pd-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--pd-gold3), var(--pd-gold)); }
+
+/* ───────── 底部启程条（通栏停靠） ───────── */
+.pd-dep {
+  flex: none; display: grid; grid-template-columns: 300px minmax(0, 1fr) auto;
+  align-items: center; gap: 26px; padding: 12px 18px;
+  border-top: 1px solid var(--pd-line2); background: linear-gradient(180deg, #0D1013, #080A0C);
+}
+.pd-risklab { display: flex; align-items: baseline; gap: 10px; }
+.pd-risklab .k { font-family: var(--font-title); font-size: var(--fs-2xs); letter-spacing: .32em; color: var(--pd-bone3); }
+.pd-risklab .st { font-family: var(--font-title); font-size: var(--fs-md); font-weight: 900; letter-spacing: .16em; }
+.st.s-safe { color: #93B27C; } .st.s-even { color: var(--pd-gold2); } .st.s-risk { color: var(--pd-cin2); }
+.pd-risklab .pc { margin-left: auto; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-xs); color: var(--pd-bone2); }
+/* 对比尺：**刻度=成长**（游戏里唯一的"推荐值"就是 recGrowth，没有战力口径） */
+.pd-meter {
+  position: relative; height: 11px; margin-top: 9px;
+  background: var(--pd-ink3); border: 1px solid var(--pd-line); border-radius: 2px;
+}
+.pd-meter i {
+  position: absolute; inset: 1px auto 1px 1px; border-radius: 1px;
+  transition: width .5s cubic-bezier(.2, .8, .2, 1), background .4s ease;
+}
+.pd-meter i.s-safe { background: linear-gradient(90deg, #3E5233, #71915C); }
+.pd-meter i.s-even { background: linear-gradient(90deg, #6B5424, #C9A24C); }
+.pd-meter i.s-risk { background: linear-gradient(90deg, #5E2118, #C0432F); }
+.pd-meter .mark { position: absolute; top: -5px; bottom: -5px; width: 1px; background: var(--pd-bone2); }
+.pd-meter .mark::after {
+  content: attr(data-l); position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-num); font-size: var(--fs-2xs); color: var(--pd-bone3); white-space: nowrap;
+}
+.pd-yield { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.pd-chip {
+  display: flex; align-items: baseline; gap: 7px; padding: 6px 12px;
+  border: 1px solid var(--pd-line); background: var(--pd-ink1); border-radius: 2px;
+}
+.pd-chip .k { font-size: var(--fs-2xs); letter-spacing: .16em; color: var(--pd-bone3); }
+.pd-chip .v { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--fs-sm); font-weight: 700; color: var(--pd-bone); }
+.pd-chip .u { font-family: var(--font-num); font-size: var(--fs-2xs); color: var(--pd-bone3); }
+.pd-note { margin: 7px 0 0; font-size: var(--fs-2xs); color: var(--pd-bone3); letter-spacing: .05em; }
+.pd-note b { color: var(--pd-cin2); font-weight: 500; }
+.pd-acts { display: flex; align-items: center; gap: 12px; }
+/* 次按钮：透明描边 */
+.pd-btn {
+  height: 52px; padding: 0 26px; cursor: pointer; background: transparent;
+  border: 1px solid var(--pd-line2); border-radius: 2px; color: var(--pd-bone2);
+  font-family: var(--font-title); font-size: var(--fs-md); font-weight: 700; letter-spacing: .26em;
+  transition: color .18s ease, border-color .18s ease;
+}
+.pd-btn:hover { color: var(--pd-bone); border-color: var(--pd-bone3); }
+/* 主按钮：火漆鎏金块 —— 全屏唯一高亮面 */
+.pd-go {
+  position: relative; height: 52px; padding: 0 40px; cursor: pointer; overflow: hidden;
+  border: 1px solid var(--pd-gold2); border-radius: 2px;
+  background: linear-gradient(180deg, #E2C278, #C9A24C 45%, #A5802F);
+  color: #1A1408; font-family: var(--font-title); font-size: var(--fs-lg); font-weight: 900; letter-spacing: .34em;
+  box-shadow: 0 0 0 3px rgb(201 162 76 / .1), 0 8px 26px rgb(201 162 76 / .18);
+}
+.pd-go::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 60px; left: -90px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / .55), transparent);
+  animation: pd-sheen 3.6s ease-in-out infinite;
+}
+@keyframes pd-sheen { 0%, 72% { left: -90px; } 100% { left: 130%; } }
+.pd-go:hover { filter: brightness(1.08); }
+.pd-go:active { transform: translateY(1px); }
+.pd :focus-visible { outline: 2px solid var(--pd-gold2); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pd-go::after { animation: none; display: none; }
+  .pd-ring::after { animation: none; }
+  .pd-meter i { transition: none; }
+}
+
+/* ───────── 响应式：<1180px 退化为单列堆叠（允许页面滚动） ───────── */
+/* ============================================================
+ * 通用外壳皮肤：顶栏那节 + 副本 / 通天塔详情页
+ * ============================================================ */
+
+/* ── 顶栏面包屑 ──
+ * 平时不存在（不占位）；详情页开着时才出现。显隐**纯 CSS 判定**（看遮罩的 [hidden]），
+ * JS 只写文本 ⇒ 关页 / 切页 / 兜底路径都不需要各自记得清一遍。 */
+.topbar-crumb {
+  display: none; align-items: center; min-width: 0;
+  padding-left: 14px; margin-left: 2px;
+  border-left: 1px solid #252C36;
+  font-family: var(--font-title); font-size: var(--fs-sm); letter-spacing: .2em;
+  color: #9C9484; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#app:has(#tab-worldmap.active):has(#area-detail:not([hidden])) .topbar-crumb,
+#app:has(#tab-worldmap.active):has(#tower-detail:not([hidden])) .topbar-crumb { display: flex; }
+
+/* ── 详情页开着时：顶栏从"透明浮条"变回**实体状态条** ──
+ * 不这么做的话，顶上 0~44px 会露一条世界地图、中间空一截，跟下面的深色面板断开（用户实测"空了一节，很难看"）。
+ * 只在详情页开着时生效：世界地图/主城/战斗的浏览态仍是"透明浮条"（沉浸式那套不动）。 */
+#app:has(#tab-worldmap.active):has(#area-detail:not([hidden])) .app-topbar,
+#app:has(#tab-worldmap.active):has(#tower-detail:not([hidden])) .app-topbar {
+  background-color: #0B0D10;
+  background-image: linear-gradient(180deg, rgb(255 255 255 / .03), transparent);
+  border-bottom-color: #252C36;
+  box-shadow: none;
+  text-shadow: none;
+  backdrop-filter: none;
+}
+
+/* ── 副本（ui-trial-entry）/ 通天塔（ui-tower-entry）详情页换皮 ──
+ * 这两页共用 `.area-detail` 与 `.nd-*` 命名，但**没有 `.pd` 结构**（DOM 与 id 被
+ * vtest_trial_node_ui / vtest_tower_ui 盯着，本轮不动结构，只换皮保持与出征整备页一致）。
+ * ⚠️ 选择器里的 `:not(:has(.pd))` 就是"这两页"的判据：出征整备页有 .pd，不受这里影响。 */
+.area-detail:not(:has(.pd)) { background: #090A0C; backdrop-filter: none; }
+/* 同上：透明才能看到环境光 */
+.area-detail:not(:has(.pd)) .nd-page { background-color: transparent; background-image: none; }
+.area-detail:not(:has(.pd)) .nd-top {
+  background: linear-gradient(180deg, rgb(255 255 255 / .025), transparent);
+  border-bottom-color: #252C36;
+}
+.area-detail:not(:has(.pd)) .nd-title { color: #EDE7D9; text-shadow: none; letter-spacing: .12em; }
+.area-detail:not(:has(.pd)) .nd-sub { color: #9C9484; }
+.area-detail:not(:has(.pd)) .nd-back {
+  border-color: #333B47; color: #9C9484;
+  font-family: var(--font-title); letter-spacing: .2em; border-radius: 2px;
+}
+.area-detail:not(:has(.pd)) .nd-back:hover { color: #EDE7D9; border-color: #6A6357; }
+.area-detail:not(:has(.pd)) .nd-card {
+  background: linear-gradient(170deg, #151A21, #0F1216 60%);
+  border-color: #252C36; border-radius: 3px; box-shadow: none;
+}
+.area-detail:not(:has(.pd)) .nd-card::before { display: none; }   /* 旧的金色顶线不要了 */
+.area-detail:not(:has(.pd)) .nd-card-title {
+  color: #C9A24C; font-family: var(--font-title); letter-spacing: .3em;
+  border-bottom-color: #252C36;
+}
+.area-detail:not(:has(.pd)) .nd-card-title .hint { color: #6A6357; }
+.area-detail:not(:has(.pd)) .nd-go {
+  border: 1px solid #EBCF8C; border-radius: 2px; color: #1A1408;
+  background: linear-gradient(180deg, #E2C278, #C9A24C 45%, #A5802F);
+  font-family: var(--font-title); font-weight: 900; letter-spacing: .26em;
+  box-shadow: 0 0 0 3px rgb(201 162 76 / .1), 0 8px 26px rgb(201 162 76 / .18);
+}
+.area-detail:not(:has(.pd)) .nd-go:hover { filter: brightness(1.08); }
+.area-detail:not(:has(.pd)) .nd-go--ghost {
+  background: transparent; border-color: #333B47; color: #9C9484; box-shadow: none;
+}
+.area-detail:not(:has(.pd)) .nd-go--ghost:hover { color: #EDE7D9; border-color: #6A6357; }
+.area-detail:not(:has(.pd)) .nd-foot { border-top-color: #252C36; }
+.area-detail:not(:has(.pd)) .nd-foot .tip { color: #6A6357; }
+.area-detail:not(:has(.pd)) .nd-mob { border-left-color: #252C36; background: rgb(255 255 255 / .017); }
+.area-detail:not(:has(.pd)) .nd-mob.is-boss { border-left-color: #C0432F; background: rgb(192 67 47 / .075); }
+.area-detail:not(:has(.pd)) .nd-boss-row { border-bottom-color: #252C36; }
+.area-detail:not(:has(.pd)) .nd-boss-row .k { color: #6A6357; font-family: var(--font-title); letter-spacing: .24em; }
+.area-detail:not(:has(.pd)) .nd-boss-row .v { color: #EDE7D9; font-family: var(--font-num); }
+
+/* ============================================================
+ * 装饰层（2026-09-23 用户："没有做点分割的装饰性东西吗 太难看了吧"）
+ *
+ * 参考稿"看着有质感"其实靠四样**零成本**的东西，上一版全没做：
+ *   ① 环境光：两层大半径径向渐变，纯黑底才有纵深，不再是一块死板
+ *   ② 面板肌理：云纹角饰 + 纸纹 —— 全用项目**已有素材**（assets/ui/panel/），零新资源
+ *   ③ 各处 1px 金色收口线（中间亮、两端隐）：顶栏 / 页眉 / 面板 / 启程条
+ *   ④ 小节标题起笔的小金菱（"野 怪 簿""掉 落 预 览"…）
+ * 全部 pointer-events:none、不进布局流、不加任何请求。
+ * ============================================================ */
+
+/* ① 环境光（左上偏金、右下偏朱砂） */
+.area-detail:has(.pd),
+.area-detail:not(:has(.pd)) {
+  background-color: #090A0C;
+  background-image:
+    radial-gradient(1100px 600px at 22% -10%, rgb(201 162 76 / .07), transparent 60%),
+    radial-gradient(900px 500px at 95% 110%, rgb(192 67 47 / .06), transparent 60%);
+}
+
+/* ③ 页眉下缘 / 启程条上缘的金线 */
+.pd-top, .pd-dep { position: relative; }
+.pd-top::after, .pd-dep::before {
+  content: ''; position: absolute; left: 0; right: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(201 162 76 / .45) 14%, rgb(201 162 76 / .45) 86%, transparent);
+}
+.pd-top::after { bottom: -1px; }
+.pd-dep::before { top: 0; }
+
+/* ③ 顶栏下缘同款金线（只在详情页开着、顶栏为实体状态条时出现） */
+#app:has(#tab-worldmap.active):has(#area-detail:not([hidden])) .app-topbar::after,
+#app:has(#tab-worldmap.active):has(#tower-detail:not([hidden])) .app-topbar::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(201 162 76 / .4) 10%, rgb(201 162 76 / .4) 90%, transparent);
+}
+
+/* ④ 小节标题起笔的小金菱 */
+.pd-sec h4::before, .pd-tier b::before {
+  content: ''; display: inline-block; background: var(--pd-gold); transform: rotate(45deg);
+  width: 5px; height: 5px; margin-right: 9px; vertical-align: 2px;
+}
+.pd-tier b::before { width: 4px; height: 4px; margin-right: 7px; }
+
+/* 出战主位卡：内描边 + 内晕（中栏的主角，多一层细节） */
+.pd-slot { box-shadow: inset 0 0 0 1px rgb(201 162 76 / .12), inset 0 0 34px rgb(0 0 0 / .45); }
+
+/* 副本 / 通天塔详情页的卡片：同一套角饰 + 顶部金线（它们没有 .pd，皮肤挂在 .nd-card 上） */
+.area-detail:not(:has(.pd)) .nd-card {
+  background-color: #12161B;
+  background-image:
+    url("../assets/ui/panel/角-左上.png"), url("../assets/ui/panel/角-右上.png"),
+    url("../assets/ui/panel/角-左下.png"), url("../assets/ui/panel/角-右下.png"),
+    var(--ui-paper-texture);
+  background-position: left top, right top, left bottom, right bottom, 0 0, 0 0;
+  background-size: 84px 56px, 84px 56px, 84px 56px, 84px 56px, auto, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+/* ⚠️ 上面"通用皮肤"那节写过 `.nd-card::before { display:none }`（去旧金线），
+ *    这里必须显式 display:block 把它拉回来，否则新金线被那条一起关掉。 */
+.area-detail:not(:has(.pd)) .nd-card::before {
+  content: ''; display: block; position: absolute; left: 0; right: 0; top: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(201 162 76 / .5), transparent);
+}
+
+@media (max-width: 1180px) {
+  .area-detail:has(.pd) { overflow: auto; }
+  .area-detail:has(.pd) .nd-page { height: auto; min-height: 100%; overflow: visible; }
+  .pd-board { grid-template-columns: 1fr; }
+  .pd-dep { grid-template-columns: 1fr; gap: 12px; }
+  .pd-panel { max-height: none; }
+  .pd-scroll { overflow: visible; }
+}
