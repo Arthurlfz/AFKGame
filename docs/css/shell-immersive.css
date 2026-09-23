@@ -139,17 +139,20 @@
  *      这样它是一条「游戏功能条」，而不是原来那条横排左对齐的后台菜单。 */
 /* 每项高度要压住：1366×768 这种矮窗口下 11 项 × 65px 会溢出 99px（侧栏被迫滚动，
    下面的「设置/百科」就被藏起来了）。压到 54px 后连"+开发者"共 11 项也放得下。 */
-.sb-btn { flex-direction: column; justify-content: center; gap: 2px; padding: 4px 0; }
+.sb-btn { flex-direction: column; justify-content: center; gap: 1px; padding: 4px 0; }
 .sb-btn .sb-icon { width: 32px; height: 32px; }
 .sb-btn .sb-icon img { width: 32px; height: 32px; }
+/* 名字常显（新手靠它认路）。2026-09-23：未选中从 --text-dim 提亮到 --text —— 原来 10px 的暗字
+ * 在暗底上几乎看不见（用户反馈"未选中太暗"）。字号仍压小，保持"图标为主、名字为辅"。 */
 .sb-btn .sb-label {
   position: static; display: block;
   font-size: 10px; letter-spacing: 0; line-height: 1.2; font-weight: 400;
-  color: var(--text-dim); background: none; border: 0; padding: 0;
-  opacity: 1; transform: none; transition: color .12s ease;
+  color: var(--text); background: none; border: 0; padding: 0;
+  opacity: .78; transform: none; transition: color .12s ease, opacity .12s ease;
+  text-shadow: var(--text-shadow-ink);   /* 水墨底上的小字要描边才立得住 */
 }
-.sb-btn:hover .sb-label { color: var(--text); }
-.sb-btn.active .sb-label { color: var(--accent-hi); }
+.sb-btn:hover .sb-label { color: var(--accent-hi); opacity: 1; }
+.sb-btn.active .sb-label { color: var(--accent-hi); opacity: 1; text-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .5); }
 /* "其他"分隔：文字收掉，只留一条细金线 */
 .sb-divider-label {
   font-size: 0; height: 1px; padding: 0; margin: 8px 4px;
@@ -207,6 +210,18 @@
 /* ② 战斗页自己的顶部 HUD 条（地图名 / 返回地图）要避开浮起的顶栏，
      否则会被压在它底下 —— 那里有「返回地图」按钮，被盖住就点不到了。 */
 #app:has(#tab-battle.active) .bp-topbar { top: calc(12px + var(--topbar-h)); }
+
+/* ③ 塔模式的「层阶刻度条」（#tw-ladder）：.bp-arena 里唯一的【静态流】顶部子元素。
+ * 🔴 2026-09-22 用户实测「塔的进度栏被遮挡」：画面页 padding:0 后它从 y=0 起排，
+ *    正好整条压在浮起的顶栏（fixed 0~44px）底下。HUD 那条能靠改 top 让位，
+ *    静态流元素让不了位 ⇒ 塔模式（.tw-mode，由 ui-tower-battle.js 挂/摘）给 arena
+ *    补 padding-top，并把塔口径的 HUD 一并收回流里 —— 两块顶部条按 DOM 顺序排、永不相叠。
+ * ⚠️ 野图没有刻度条、不挂 tw-mode：HUD 照旧 absolute 浮在 12px+topbar-h，画面照旧顶到窗口边。 */
+#app:has(#tab-battle.active) #tab-battle .bp-arena.tw-mode { padding-top: var(--topbar-h); }
+#app:has(#tab-battle.active) #tab-battle .bp-arena.tw-mode .bp-topbar {
+  position: static; top: auto; left: auto; transform: none;
+  width: auto; max-width: none; margin: 10px 12px 2px;
+}
 
 /* ============================================================
  * 六、画面页：顶栏与页眉在画面上【不要"栏"的形状】

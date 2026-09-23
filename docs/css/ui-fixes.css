@@ -181,17 +181,11 @@ body:not(:has(#dialog-box.show)) .quest-tracker .qt-submit {
  * UI 视觉优化（2026-09-10 第二轮：玩家视角反馈）
  * ============================================================ */
 
-/* ---------- 11. 侧边栏激活态加强 ---------- */
-.sb-btn.active {
-  font-weight: 700 !important;
-  border-left-width: 3px !important;
-  background: linear-gradient(90deg, rgb(var(--action-gold-rgb) / .22), transparent) !important;
-  box-shadow: inset 0 0 20px rgb(var(--action-gold-rgb) / .12), 2px 0 8px rgb(var(--action-gold-rgb) / .15) !important;
-}
-.sb-btn.active .sb-label {
-  color: var(--accent-hi, #f2b632) !important;
-  text-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .5);
-}
+/* ---------- 11. 侧边栏激活态加强 ----------
+ * ✅ 2026-09-23：这段原来用 4 个 `!important` 打补丁（项目红线：禁补丁式修复），
+ *    效果已**并入 `ui-polish.css` 的 `.sb-btn.active`**（渐变底 / 内晕 / 描边外框，不带 !important），
+ *    `.sb-label` 的选中色由 `shell-immersive.css` 统一给（那里才是名字样式的事实源）——
+ *    所以这里整段删除，别再加回来。 */
 
 /* ---------- 12. 弹窗层级感：加阴影、圆角 ---------- */
 .bag-window {
@@ -448,18 +442,26 @@ textarea:focus-visible {
  * 线稿时代用亮金 #f2b632 做半透明底；现在按钮上的是画出来的实物，
  * 底色收回到项目枯金 token，并给图标一个极淡的墨色投影，让它像嵌在牌面上的小雕刻，
  * 而不是浮在亮金方块上的贴纸。 */
+/* 2026-09-23 顶栏规范（就地重写，不叠新补丁）：
+ * ① 半透明墨底 + 1px 线 —— 原来是实心 --btn-bg(#263333)，在顶栏上像"贴上去的方块"；
+ * ② 统一内边距与圆角，三项按钮横排间距由 .app-topbar 的 gap 统一给（不再各写各的 margin）；
+ * ③ 补 focus-visible（键盘/无障碍），与 hover 同款反馈。 */
 .topbar-btn {
-  background: var(--btn-bg);
-  border-color: var(--btn-border);
+  background: rgb(12 17 18 / .5);
+  border-color: var(--line);
   min-height: 0;
   padding: 4px 12px;
   border-radius: var(--radius-sm);
+  color: var(--text);
 }
-.topbar-btn:hover {
-  background: var(--btn-bg-hover);
-  border-color: var(--btn-border-hover);
-  color: var(--text-hi);
+.topbar-btn:hover,
+.topbar-btn:focus-visible {
+  background: rgb(202 168 74 / .10);
+  border-color: var(--accent);
+  color: var(--accent-hi);
+  outline: none;
 }
+.topbar-btn.active { border-color: var(--accent); color: var(--accent-hi); }
 .topbar-btn .top-ico,
 .gem-chip .top-ico {
   width: 22px;

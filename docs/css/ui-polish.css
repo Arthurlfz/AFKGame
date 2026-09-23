@@ -9,6 +9,24 @@ body { background: var(--bg-deep); color: var(--text); font-family: var(--font-b
 .app-topbar, .sidebar { background-color: var(--panel); background-image: var(--ui-paper-texture); }
 .app-topbar { border-bottom-color: rgb(var(--action-gold-rgb) / .26); box-shadow: 0 4px 14px rgb(0 0 0 / .35); }
 .app-topbar .title { font-family: var(--font-title); text-shadow: 0 1px 0 rgb(0 0 0 / .8), 0 0 14px rgb(var(--action-gold-rgb) / .25); }
+
+/* ---------- 顶栏「状态组」打包（2026-09-23） ----------
+ * 原来 背包/任务/反馈 + 挂机chip + 魔石chip + 账号 一堆元素等距 16px 横排，看不出"哪些是一类"。
+ * 现在分三组，靠间距说话（改的是 gap，不动 DOM，零功能风险）：
+ *   ① 功能按钮（背包/任务/反馈）之间 6px  —— 同族贴近
+ *   ② 功能组 ↔ 状态组之间 14px              —— 类别切换留白
+ *   ③ 状态组内部：挂机chip · 魔石 · 账号 之间 8px —— 都是"我的状态"，打包成一簇 */
+.app-topbar { gap: 6px; }
+.app-topbar .idle-chip { margin-left: 14px; }
+.app-topbar .gem-chip { margin-left: 8px; }
+.app-topbar #auth-box { margin-left: 8px; }
+/* 魔石与账号：给同一层半透明底，视觉上"打成一包"（与按钮同高、同圆角） */
+.app-topbar .gem-chip,
+.app-topbar #auth-box {
+  padding: 4px 10px; border-radius: var(--radius-sm);
+  background: rgb(12 17 18 / .42); border: 1px solid var(--line);
+}
+.app-topbar #auth-box { font-size: var(--fs-xs); }
 .sidebar { border-right-color: rgb(var(--action-gold-rgb) / .22); }
 
 .panel, .card, .market-group, .market-controls, .market-filters, .market-item, .market-item.item,
@@ -43,10 +61,24 @@ body { background: var(--bg-deep); color: var(--text); font-family: var(--font-b
 .btn-primary:active:not(:disabled), .btn-mini.primary:active:not(:disabled), .btn:active:not(:disabled), .btn-sm:active:not(:disabled), .btn-mini:active:not(:disabled) { transform: translateY(1px); box-shadow: var(--shadow-btn-active); }
 .top-btn { background: var(--inset); border-color: var(--line); color: var(--text-dim); }
 .top-btn:hover, .top-btn.active { border-color: var(--accent); color: var(--accent-hi); background: rgb(var(--action-gold-rgb) / .1); }
-.sb-btn:hover { color: var(--text); background: rgb(216 209 189 / .035); }
-.sb-btn.active { color: var(--accent-hi); background: linear-gradient(90deg, rgb(var(--action-gold-rgb) / .13), transparent); border-left-color: var(--accent-hi); box-shadow: inset 0 0 12px rgb(var(--action-gold-rgb) / .08); text-shadow: 0 0 8px rgb(var(--action-gold-rgb) / .35); }
-.sb-btn .sb-icon { filter: grayscale(.35) sepia(.45) saturate(1.4) hue-rotate(-12deg) brightness(.9); }
-.sb-btn:hover .sb-icon, .sb-btn.active .sb-icon { filter: grayscale(.1) sepia(.3) saturate(1.8) hue-rotate(-8deg) brightness(1.12); }
+/* ---------- 侧边导航（2026-09-23 重构） ----------
+ * ① 未选中不再是"几乎看不见"：图标 brightness .9 → 1.06、文字提亮到 --text（名字档在 shell-immersive）；
+ * ② 选中"双保险"：左金条 + **1px 金色描边外框** + 内金晕 —— 原来只有一条左线，在 54px 高的项上不明显；
+ * ③ 该效果原本是 ui-fixes.css 里的 `!important` 补丁（违反红线：禁补丁式修复），现已并入本文件并删除补丁。 */
+.sb-btn:hover { color: var(--text); background: rgb(216 209 189 / .05); }
+.sb-btn.active {
+  color: var(--accent-hi);
+  background: linear-gradient(90deg, rgb(var(--action-gold-rgb) / .22), transparent);
+  border-left-color: var(--accent-hi);
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px rgb(var(--action-gold-rgb) / .55),          /* 金色描边外框（双保险的一半） */
+    inset 0 0 20px rgb(var(--action-gold-rgb) / .12),
+    2px 0 8px rgb(var(--action-gold-rgb) / .15);
+  text-shadow: 0 0 8px rgb(var(--action-gold-rgb) / .35);
+}
+.sb-btn .sb-icon { filter: grayscale(.2) sepia(.35) saturate(1.5) hue-rotate(-12deg) brightness(1.06); }
+.sb-btn:hover .sb-icon, .sb-btn.active .sb-icon { filter: grayscale(.05) sepia(.25) saturate(1.9) hue-rotate(-8deg) brightness(1.18); }
 
 input, select, textarea, .bag-filter-sel, .affix-filter-row select, .affix-filter-row input {
   background-color: var(--inset); background-image: var(--ui-paper-texture); color: var(--text);
@@ -257,7 +289,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .worldmap-page { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: var(--gap-sm); padding: var(--gap-lg); }
 .worldmap-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: none; }
 .worldmap-title { font: 700 var(--fs-xl) var(--font-title); color: var(--accent-hi); letter-spacing: 2px; text-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .28); }
-.worldmap-hint { font-size: var(--fs-sm); color: var(--text-faint); }
+/* 引导条（2026-09-23 重构）：原来是一行 13px 的灰字，跟页眉其他元素挤在一起、基本没人看。
+ * 现在做成**独立信息模块**：渐变底条（左右透明、中间深，不切一刀直线）+ 放大字号 + 描边。
+ * 同一套规则给节点详情页底部的 `.nd-foot .tip`（同类引导文案，避免两处不一致）。 */
+.worldmap-hint,
+.nd-foot .tip {
+  font-size: var(--fs-md);            /* 13px → 16px：引导要读得清 */
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, transparent, rgb(12 17 18 / .78) 14%, rgb(12 17 18 / .78) 86%, transparent);
+  text-shadow: var(--text-shadow-ink);
+}
+.nd-foot .tip { padding: 6px 12px; }
+/* 节点详情页底部那一整条：让引导成为独立的"脚注条"，不再和按钮贴在一起 */
+.nd-foot { gap: var(--gap-md); }
 /* 世界地图页内的「返回战斗」按钮：靠右，仅在已选地图时出现 */
 #btn-return-battle { margin-left: auto; }
 /* 上半区主舞台：flex:1 吃掉剩余高度，canvas 16:9 在其中居中（下部被 inline-console 占走） */
@@ -269,16 +315,49 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .wm-marker:hover .wm-marker-dot, .wm-marker:focus-visible .wm-marker-dot { transform: scale(1.3); box-shadow: 0 0 14px rgb(var(--action-gold-rgb) / .7), inset 0 0 6px rgb(0 0 0 / .35); }
 .wm-marker-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-left: -17px; font-size: 20px; border-radius: 50%; background: var(--ink); border: 2px solid var(--accent-dim); box-shadow: 0 0 0 2px rgb(0 0 0 / .5), 0 0 12px rgb(var(--action-gold-rgb) / .35), inset 0 0 8px rgb(0 0 0 / .6); transition: transform .18s ease, box-shadow .18s ease; }
 .wm-marker--capital:hover .wm-marker-icon { transform: scale(1.1); box-shadow: 0 0 0 2px rgb(0 0 0 / .5), 0 0 18px rgb(var(--action-gold-rgb) / .7); }
-.wm-marker-name { display: block; margin: 6px auto 0; width: max-content; padding: 2px 8px; color: var(--accent-hi); background: rgb(12 17 18 / .86); border: 1px solid var(--line); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 2px; line-height: normal; }
-.wm-marker-lv { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: var(--danger); background: rgb(12 17 18 / .86); border: 1px solid rgb(var(--hp-hi-rgb) / .4); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: normal; }
+/* 地名 / 等级（2026-09-23 重构）：
+ * ① 字号层级——地名 `--fs-md`(16px) > 等级 `--fs-sm`(13px) > 日志 `--fs-xs`(12px)，三级拉开；
+ * ② 加**墨色描边** `--text-shadow-ink`：水墨底图明暗交界处不再糊字（原来只有底板、没有描边）；
+ * ③ 底板从 .86 提到 .90，并统一 1px 墨边——文字块与底图彻底分开。 */
+.wm-marker-name {
+  display: block; margin: 5px auto 0; width: max-content; padding: 2px 9px;
+  color: var(--accent-hi); background: rgb(12 17 18 / .9); border: 1px solid rgb(var(--action-gold-rgb) / .34);
+  font-size: var(--fs-md); font-weight: 700; letter-spacing: 1.5px; line-height: 1.25;
+  text-shadow: var(--text-shadow-ink-strong);
+}
+.wm-marker-lv {
+  display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px;
+  color: var(--danger); background: rgb(12 17 18 / .9); border: 1px solid rgb(var(--hp-hi-rgb) / .45);
+  border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: 1.3;
+  font-family: var(--font-num);   /* 等级是数字：等宽更整齐 */
+  text-shadow: var(--text-shadow-ink);
+}
 /* 首通标记（2026-09-05 地图系统 A 项）：已首通的图，红点转金色 + ✓ 徽标 */
 .wm-marker--cleared .wm-marker-dot { background: rgb(var(--action-gold-rgb)); border-color: #fff; box-shadow: 0 0 10px rgb(var(--action-gold-rgb) / .8), inset 0 0 4px rgb(0 0 0 / .4); }
 .wm-marker-pass { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #1a1b1c; background: rgb(var(--action-gold-rgb)); border: 1px solid #fff; border-radius: 999px; font-size: var(--fs-xs); font-weight: 800; line-height: 1.4; }
 /* 资源副本节点（2026-09-09）：菱形青玉标记，与野图红点 / 主城金圈视觉区分 */
-.wm-marker--trial .wm-marker-dot { display: block; width: 14px; height: 14px; margin-left: -7px; border-radius: 3px; background: linear-gradient(135deg, #7fd4c9, #3f9e93); border: 1px solid var(--ink); box-shadow: 0 0 8px rgb(63 158 147 / .55), inset 0 0 4px rgb(0 0 0 / .4); transform: rotate(45deg); transition: transform .18s ease, box-shadow .18s ease; }
-.wm-marker--trial:hover .wm-marker-dot, .wm-marker--trial:focus-visible .wm-marker-dot { transform: rotate(45deg) scale(1.28); box-shadow: 0 0 14px rgb(63 158 147 / .85), inset 0 0 6px rgb(0 0 0 / .35); }
-.wm-marker-remain { display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px; color: #7fd4c9; background: rgb(12 17 18 / .86); border: 1px solid rgb(63 158 147 / .5); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: normal; }
-.wm-marker-remain.is-empty { color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5); }
+.wm-marker--trial .wm-marker-dot { display: block; width: 14px; height: 14px; margin-left: -7px; border-radius: 3px; background: linear-gradient(135deg, var(--jade-hi), var(--jade)); border: 1px solid var(--ink); box-shadow: 0 0 8px rgb(var(--jade-rgb) / .55), inset 0 0 4px rgb(0 0 0 / .4); transform: rotate(45deg); transition: transform .18s ease, box-shadow .18s ease; }
+.wm-marker--trial:hover .wm-marker-dot, .wm-marker--trial:focus-visible .wm-marker-dot { transform: rotate(45deg) scale(1.28); box-shadow: 0 0 14px rgb(var(--jade-rgb) / .85), inset 0 0 6px rgb(0 0 0 / .35); }
+/* 副本徽标（2026-09-23）：
+ * ① 字面色值（#7fd4c9 / rgb(63 158 147)）收进 `--jade-hi` / `--jade-rgb` token（此前散落三处）；
+ * ② 加**呼吸微动效**：只动 opacity（0.78↔1），不动 transform —— 动 transform 会触发重排/重绘，
+ *    地图上十几个节点一起动就是掉帧的来源。看得见"这里有事发生"就够了。
+ * ③ 加一层**小尺寸**发光（徽标只有十几像素，单层 box-shadow 代价可忽略；
+ *    节点本体那圈大 blur 的贴图化留到性能批次）。 */
+.wm-marker-remain {
+  display: block; margin: 3px auto 0; width: max-content; padding: 1px 7px;
+  color: var(--jade-hi); background: rgb(12 17 18 / .88); border: 1px solid rgb(var(--jade-rgb) / .5);
+  border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 700; letter-spacing: 1px; line-height: 1.3;
+  font-family: var(--font-num);
+  box-shadow: 0 0 8px rgb(var(--jade-rgb) / .35);
+  animation: wm-remain-breathe 2.4s ease-in-out infinite;
+}
+.wm-marker-remain.is-empty {
+  color: var(--danger-hi); border-color: rgb(var(--hp-hi-rgb) / .5);
+  box-shadow: none; animation: none;     /* 次数用尽 = 没戏了，不发光、不呼吸 */
+}
+@keyframes wm-remain-breathe { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wm-marker-remain { animation: none; } }
 /* 通天塔节点（2026-09-10）：朱红圆点 + 金环，与副本节点（青玉菱形）视觉区分；常驻可见（塔没有首通概念） */
 .wm-marker--tower .wm-marker-dot { display: block; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background-color: var(--danger); background-image: radial-gradient(circle at 34% 30%, #e08a6a, var(--danger)); border: 1px solid var(--r-gold); box-shadow: 0 0 10px rgb(var(--hp-hi-rgb) / .6), 0 0 0 2px rgb(0 0 0 / .45), inset 0 0 5px rgb(0 0 0 / .45); transition: transform .18s ease, box-shadow .18s ease; }
 .wm-marker--tower:hover .wm-marker-dot, .wm-marker--tower:focus-visible .wm-marker-dot { transform: scale(1.26); box-shadow: 0 0 16px rgb(var(--r-gold-rgb) / .85), 0 0 0 2px rgb(0 0 0 / .45), inset 0 0 6px rgb(0 0 0 / .4); }

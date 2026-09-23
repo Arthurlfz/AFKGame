@@ -2295,12 +2295,24 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .chat-tab[data-cat="battle"] .chat-tab-dot { background:var(--danger-hi); }
 .chat-tab[data-cat="system"] .chat-tab-dot { background:var(--accent); }
 
-/* 消息流 */
+/* 消息流（2026-09-23 网格对齐 + 行高规范）：
+ * ① 三列网格 [时间 | 图标 | 正文] —— 原来是 flex + gap，每行按内容宽度各排各的，
+ *    时间戳一会儿靠左一会儿跟着字数浮动，"扫一列"很难。网格让三列严格对齐。
+ * ② 行高统一 1.5（`--log-line-h`），与字号层级表一致。
+ * ③ 时间戳走 `--log-time`（深灰）、战斗流水走 `--log-kill`（白浅灰）——
+ *    按用途分色：时间不抢、动作清楚、掉落用品质色（下面那段）。
+ * ⚠️ 社交频道有"名字"一列，网格列数不够时用 auto 兜住，不写死列宽。 */
 .chat-list { flex:1; min-height:0; overflow:auto; margin:0 -2px; padding-right:2px; }
 .chat-empty { padding:30px 0; text-align:center; color:var(--text-faint); font-size:0.889rem; }
-.chat-msg { display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-radius:var(--radius-sm); line-height:1.55; font-size:0.889rem; }
+.chat-msg {
+  display:flex; align-items:flex-start; gap:6px; padding:5px 8px;
+  border-radius:var(--radius-sm); line-height:var(--log-line-h, 1.5); font-size:0.889rem;
+}
+/* ⚠️ 网格只给"三段结构"的行（时间|图标|正文）。社交消息是四段（时间|名字|我|正文），
+ * 套三列网格会把正文挤到下一行 —— 所以社交行保持 flex。 */
+.chat-msg:not(.social) { display:grid; grid-template-columns:auto auto 1fr; align-items:start; column-gap:6px; }
 .chat-msg:hover { background:rgb(255 255 255 / .025); }
-.chat-time { flex:none; color:var(--text-faint); font-family:var(--font-num); font-size:0.722rem; padding-top:3px; }
+.chat-time { grid-column:1; flex:none; color:var(--log-time, var(--text-faint)); font-family:var(--font-num); font-size:0.722rem; padding-top:3px; white-space:nowrap; }
 .chat-name { flex:none; max-width:76px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--r-blue); font-weight:700; font-size:0.833rem; }
 .chat-msg.self .chat-name { color:var(--accent-hi); }
 .chat-me-tag { flex:none; font-size:0.667rem; color:var(--ink); background:var(--accent); border-radius:var(--radius-xs); padding:0 4px; margin-top:4px; line-height:1.4; }
@@ -2309,9 +2321,11 @@ select.sell-input option { background:var(--panel); color:var(--text); }
 .chat-msg.system .chat-text { color:var(--text-dim); }
 .chat-msg.system .chat-ic { color:var(--accent); flex:none; }
 .chat-msg.loot .chat-ic { color:var(--r-gold); flex:none; }
-/* 战斗频道：一行一条流水，量大 → 压暗一档，别把掉落/系统的重点盖过去 */
+/* 战斗频道（2026-09-23 改色）：原来正文压到 --text-dim（#9A9484），在暗底上"整片灰"，
+ * 击杀/流水分不清。现在走 --log-kill（白浅灰）——主体清楚，靠图标色与掉落色区分频道，
+ * 仍然是全站最"安静"的一档（掉落是品质色 + 字号档位，系统是说明，都不会被盖过）。 */
 .chat-msg.battle .chat-ic { color:var(--danger-hi); flex:none; }
-.chat-msg.battle .chat-text { color:var(--text-dim); }
+.chat-msg.battle .chat-text { color:var(--log-kill, var(--text)); }
 .chat-msg.loot .chat-text b { color:var(--text-hi); }
 /* 掉落播报的视觉语言（2026-09-13）：挂机没有"地上的东西"可以踩，掉宝只能靠消息控制台拉注意力。
  * 分工：**字号 = 稀有度**（档位表 config.js 的 drop.lootTiers），**颜色 = 用途 / 东西本身**。
