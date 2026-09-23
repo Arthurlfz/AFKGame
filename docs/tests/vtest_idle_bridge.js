@@ -344,6 +344,25 @@ const mkRes = obj => ({ ok: true, status: 200, json: async () => obj });
   A(/duringPetEdit/.test(srcOf('pet_evolve.js')) && /duringPetEdit/.test(srcOf('pet_merge.js')) && /duringPetEdit/.test(srcOf('tutorial_mode.js')),
     'S4. 进化/合成/涅槃/引导顶等级 都走 IdleBridge.duringPetEdit（先结清真账再改宠物）');
 
+  /* ---------- S5. 挂机要账链不许断 + 静默停摆必须告警（2026-09-23） ----------
+   * 事故：用户夜里挂机，早上看消息列表「最后一次收到经验是五六小时前」。
+   * 根因：兜底结算链 `await settleNow(); if (active) schedule();` **没有 try/catch** ——
+   *   settleNow 内部（尤其演出层 presentSettle）抛一次，schedule() 就永不执行，链子断掉；
+   *   而正常结算靠 rAF 驱动，夜里切后台/电脑休眠时 rAF 是暂停的 ⇒ 再没人要账 = 静默几小时。
+   * 规则（三条，缺一不可）：
+   *   ① 兜底链必须放 finally（抛异常也要重挂）
+   *   ② 入账与演出分开保护（画面坏了不许把要账带走）
+   *   ③ 长时间没成功结算 → 看门狗自愈 + 在消息列表里明说（不许静默） */
+  const IB = srcOf('idle-bridge.js');
+  A(/finally\s*\{[\s\S]{0,120}if \(active\) schedule\(\)/.test(IB),
+    'S5a. 兜底结算链挂在 finally 里（settleNow 抛异常也不会断链）');
+  A(/function watchdog\(\)/.test(IB) && /watchdog\(\);/.test(IB),
+    'S5b. 有看门狗：长时间没成功结算会主动自愈');
+  A(/lastSettleOkAt\s*=\s*Date\.now\(\)/.test(IB),
+    'S5c. 成功结算会记录时间戳（看门狗靠它判断"静默多久"）');
+  A(/try\s*\{[\s\S]{0,80}presentSettle\(/.test(IB),
+    'S5d. 演出层 presentSettle 被 try 包住（画面异常不许掐死要账）');
+
   /* ---------- T. 静态守值：斩杀那一刀的伤害飘字不许被"同帧隐藏敌人"吃掉（2026-09-15） ----------
    * 事故：伤害飘字是 appendChild 到 #enemy-icon 里的，而 #enemy-icon 就在 #enemy-fighter 里。
    * 本场结算时若【同一个同步块里】立刻 display:none，刚生成的数字浏览器一次都没画过 ——

@@ -90,6 +90,8 @@
   let scriptIdx = -1;       // 当前事件下标（-1 = 尚未开始）
   let currentScriptId = null; // 当前/已在播的剧本身份（服务器幂等重发同一段时用来判重，不重播不重复给经验）
   let nextScriptTryAt = 0;  // 剧本获取失败后的重试冷却时间戳
+  let lastSettleOkAt = 0;   // 最近一次【成功结算】的时刻（看门狗判"静默多久"用；Date.now() 口径）
+  let startedAt = 0;        // 本次挂机开始时刻（看门狗在没有成功结算过的起步阶段用）
 
   // 演出状态
   let showHp = 0;           // 我方演出血量（剧本插值）
@@ -195,10 +197,40 @@
   // 兜底定时：正常结算由「剧本演完」驱动（gaugeTick），这个只是保险——
   // 剧本生成一直失败、或演出卡住时，至少还能把服务器的真账要回来（窗口上限 120 秒）。
   function schedule() { clearTimeout(timer); timer = setTimeout(tick, SAFETY_SETTLE_MS); }
+  /* 🔴 2026-09-23 修「夜里静默停摆几小时」（用户报：早上看消息列表，最后一次收到经验是五六小时前）：
+   * 旧写法是 `await settleNow(); if (active) schedule();` —— **中间没有 try/catch**。
+   * 只要 settleNow 内部抛一次（演出层拿到异常数据、DOM 状态不对等），`schedule()` 就永远不执行，
+   * **兜底定时链直接断掉**；而正常结算靠 rAF（gaugeTick）驱动，夜里切后台/电脑睡眠时 rAF 是暂停的
+   * ⇒ 再没有任何东西去要账，一直静默到玩家手动点一次开始/停止。
+   * 现在的铁律：**兜底链无论如何都要重新挂上**（finally），异常只记日志。 */
   async function tick() {
     if (!active) return;
-    await settleNow();
-    if (active) schedule();
+    try {
+      await settleNow();
+    } catch (e) {
+      blog('[战斗·结算异常] ' + ((e && e.message) || e) + '（已忽略，继续重试）');
+    } finally {
+      if (active) schedule();     // ⚠️ 必须放 finally：抛异常也要把下一轮挂上
+    }
+    watchdog();                   // 长时间没成功结算 → 自愈 + 明说，不许静默
+  }
+  /* 看门狗：超过 WATCHDOG_MS 没有【成功结算】就主动自愈，并把状态写进消息列表。
+   * 为什么要它：rAF 在后台/睡眠时是暂停的，只有这条 120 秒的兜底链还活着；
+   * 一旦要账连续失败（token 过期 / 网络断 / 会话丢），玩家界面上什么都看不出来。 */
+  const WATCHDOG_MS = 5 * 60 * 1000;   // 5 分钟（> 兜底周期 120s，< 玩家能忍受的静默时长）
+  const WATCHDOG_LOG_MS = 60000;       // 告警最多每分钟一条，防后台刷屏
+  let lastWatchdogLogAt = 0;
+  function watchdog() {
+    if (!active) return;
+    const silentMs = Date.now() - (lastSettleOkAt || startedAt || Date.now());
+    if (silentMs < WATCHDOG_MS) return;
+    const now = Date.now();
+    if (now - lastWatchdogLogAt >= WATCHDOG_LOG_MS) {
+      lastWatchdogLogAt = now;
+      const mins = Math.round(silentMs / 60000);
+      warn('挂机已 ' + mins + ' 分钟没有拿到结算（网络或登录可能断了），正在自动重试…');
+    }
+    recoverSession();   // 会话丢了就重建；重建不了会在里面明确停机并说明原因
   }
 
   /* ---------- 开始 / 停止 ----------
@@ -237,6 +269,9 @@
     sessionAreaId = area.id;
     totalFights = 0;
     active = true;
+    startedAt = Date.now();
+    lastSettleOkAt = 0;          // 还没有成功结算过；看门狗从 startedAt 起算
+    lastWatchdogLogAt = 0;
     if (window.UI) window.UI.updateStatus('fighting', 0);
     startShow();
     /* 首段剧本（2026-09-15 减一趟往返）：服务器在 start 的响应里已经把「新会话的第一段录像」
@@ -274,9 +309,18 @@
     sessionAreaId = session.area_id;
     totalFights = 0;
     active = true;
+    startedAt = Date.now();
+    lastSettleOkAt = 0;
+    lastWatchdogLogAt = 0;
     if (window.UI) window.UI.updateStatus('fighting', 0);
     startShow();
-    await settleNow();
+    /* ⚠️ 2026-09-23：这里原来直接 `await settleNow()` —— 它一抛异常就会跳过下面的 schedule()，
+     * 兜底链根本没挂上（刷新后恢复挂机时最危险：看着在挂，其实没人要账）。 */
+    try {
+      await settleNow();
+    } catch (e) {
+      blog('[战斗·恢复异常] ' + ((e && e.message) || e) + '（已忽略，继续重试）');
+    }
     schedule();
     return { ok: true, resumed: true };
   }
@@ -377,8 +421,19 @@
     // 同一段录像重发（刷新/切回前台幂等返回）→ 判重：跳过经验/等级覆盖，
     // 本地显示正在按回放基线重演，先被窗后真值覆盖再逐场加 = 经验重复入账。
     const sameScript = !!(sc && sc.id && sc.id === currentScriptId);
-    applyAuthoritative(r, { skipExpLevel: sameScript });
-    presentSettle(r, sc, sameScript);
+    lastSettleOkAt = Date.now();   // 成功拿到真账（看门狗据此判断"多久没结算"）
+    /* ⚠️ 入账与演出分开保护（2026-09-23）：这两步任一抛异常，旧代码会让整条要账链断掉
+     * （见 tick 的注释）——入账是钱、演出只是画面，**画面坏了不该把要账一起带走**。 */
+    try {
+      applyAuthoritative(r, { skipExpLevel: sameScript });
+    } catch (e) {
+      blog('[战斗·入账异常] ' + ((e && e.message) || e));
+    }
+    try {
+      presentSettle(r, sc, sameScript);
+    } catch (e) {
+      blog('[战斗·演出异常] ' + ((e && e.message) || e) + '（仅影响画面，挂机继续）');
+    }
     /* 2026-09-11 甲：装备/蛋由【服务端写库】，客户端本地背包不会自动多出这两样。
      * 不刷一次就会出现「飘字说掉了一件金装，背包里没有」—— 而"掉宝"是本作第一爽点，
      * 这个落差比丢东西还伤。只在真掉到时才拉（约 1.3% + 0.6% 的场次），不是每次结算都拉。 */
