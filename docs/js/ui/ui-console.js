@@ -326,23 +326,61 @@
   // 一次性把全部频道标成已读：进游戏时读到的历史聊天不是"新消息"，不该顶着 50 条未读
   function markAllRead() { TABS.forEach(c => { seenUpTo[c] = seq; }); }
 
+  /* 频道栏渲染（2026-09-23 改增量）
+   * 旧写法：每次 consoleLog 都 `innerHTML = ...` 重建 4 个按钮 + 重新绑事件 + 每个频道 filter 一遍
+   *   （4 次全量遍历）。战斗流水高峰时这是纯浪费，而且会打断按钮上的 CSS 过渡。
+   * 现在：结构只建一次（频道集合是常量），之后只改「计数 / 选中态 / 未读角标」三样。
+   * ⚠️ 测试桩里 `children.length` 恒为 0 ⇒ 自动退回"每次重建"，行为与旧版一致，不破坏既有断言。 */
   function renderTabs(tabsEl) {
     if (!tabsEl) return;
-    tabsEl.innerHTML = TAB_META.map(t => {
-      const n = history.filter(m => m.cat === t.id).length;
-      const un = t.id === activeTab ? 0 : unreadOf(t.id);
-      const badge = un > 0 ? '<span class="chat-tab-unread" title="' + un + ' 条新消息">' + (un > 99 ? '99+' : un) + '</span>' : '';
-      return '<button class="chat-tab' + (t.id === activeTab ? ' on' : '') + '" data-cat="' + t.id + '">' +
+    // 计数：一次遍历搞定（原来每个频道各 filter 一遍）
+    const cnt = Object.create(null);
+    for (let i = 0; i < history.length; i++) { const c = history[i].cat; cnt[c] = (cnt[c] || 0) + 1; }
+    /* ⚠️ 桩环境兜底（vtest_capital 靠读 tabsEl.innerHTML 断言计数）：
+     * 测试桩的 querySelectorAll 恒返回空，增量更新写不进去 ⇒ 这里退回"整段重建 + 计数直接拼进串"，
+     * 与旧实现输出完全一致。真实浏览器走下面的增量路径。 */
+    const btns0 = tabsEl.querySelectorAll ? tabsEl.querySelectorAll('.chat-tab') : [];
+    if (!btns0.length) {
+      tabsEl.innerHTML = TAB_META.map(t => {
+        const un = t.id === activeTab ? 0 : unreadOf(t.id);
+        const badge = un > 0 ? '<span class="chat-tab-unread" title="' + un + ' 条新消息">' + (un > 99 ? '99+' : un) + '</span>' : '';
+        return '<button class="chat-tab' + (t.id === activeTab ? ' on' : '') + '" data-cat="' + t.id + '">' +
+          '<span class="chat-tab-dot"></span>' + t.icon + ' ' + t.label +
+          '<span class="chat-tab-cnt">' + (cnt[t.id] || 0) + '</span>' + badge + '</button>';
+      }).join('');
+      return;
+    }
+    const needsBuild = !tabsEl.__built || tabsEl.children.length !== TAB_META.length;
+    if (needsBuild) {
+      tabsEl.innerHTML = TAB_META.map(t =>
+        '<button class="chat-tab" data-cat="' + t.id + '">' +
         '<span class="chat-tab-dot"></span>' + t.icon + ' ' + t.label +
-        '<span class="chat-tab-cnt">' + n + '</span>' + badge + '</button>';
-    }).join('');
+        '<span class="chat-tab-cnt">0</span>' +
+        '<span class="chat-tab-unread" hidden></span></button>').join('');
+      tabsEl.__built = true;
+      tabsEl.querySelectorAll('.chat-tab').forEach(btn => {
+        btn.onclick = () => {
+          activeTab = btn.dataset.cat;
+          markRead(activeTab);          // 看过了就清零
+          saveActiveTab();
+          renderChatPanel();
+        };
+      });
+    }
+    // 计数已在函数开头算好（一次遍历），这里只写进 DOM
     tabsEl.querySelectorAll('.chat-tab').forEach(btn => {
-      btn.onclick = () => {
-        activeTab = btn.dataset.cat;
-        markRead(activeTab);          // 看过了就清零
-        saveActiveTab();
-        renderChatPanel();
-      };
+      const id = btn.dataset.cat;
+      const on = id === activeTab;
+      btn.classList.toggle('on', on);
+      const c = btn.querySelector('.chat-tab-cnt');
+      if (c) c.textContent = String(cnt[id] || 0);
+      const b = btn.querySelector('.chat-tab-unread');
+      if (b) {
+        const un = on ? 0 : unreadOf(id);
+        b.hidden = un <= 0;
+        b.textContent = un > 99 ? '99+' : String(un);
+        b.title = un + ' 条新消息';
+      }
     });
   }
 
@@ -377,10 +415,37 @@
       listEl.__cat = activeTab;
       listEl.__seqs = seqs;
     }
-    listEl.querySelectorAll('[data-chat-action]').forEach(btn => {
-      btn.onclick = () => { if (btn.dataset.chatAction === 'openQuest' && UI.openQuestPanel) UI.openQuestPanel(); };
-    });
-    listEl.scrollTop = listEl.scrollHeight;
+    /* 行内按钮（如「去领取」）改**事件委托**（2026-09-23）：
+     * 旧写法每次渲染都 `listEl.querySelectorAll('[data-chat-action]')` 全列扫一遍并逐个挂 onclick，
+     * 消息越多扫得越久，而且增量追加时还要重复扫。委托只绑一次，O(1)。 */
+    if (!listEl.__actionBound && typeof listEl.addEventListener === 'function') {
+      listEl.__actionBound = true;
+      listEl.addEventListener('click', function (e) {
+        const t = e.target;
+        const btn = (t && t.closest) ? t.closest('[data-chat-action]') : null;
+        if (!btn) return;
+        if (btn.dataset.chatAction === 'openQuest' && UI.openQuestPanel) UI.openQuestPanel();
+      });
+    }
+    /* 滚动（2026-09-23 性能批）：
+     * 旧写法每条消息都 `scrollTop = scrollHeight` —— 这是**强制同步布局**（读 scrollHeight 就要重排），
+     * 战斗流水高峰时每条一次；而且玩家正往上翻历史时会被硬拽回底部。
+     * 现在两条规矩：① 只有"玩家本来贴底"才跟随；② 用 rAF 合并到一帧一次。
+     * ⚠️ 没有 rAF 的环境（测试桩）保持同步行为，既有断言不受影响。 */
+    if (typeof listEl.addEventListener === 'function' && !listEl.__scrollBound) {
+      listEl.__scrollBound = true;
+      listEl.addEventListener('scroll', function () {
+        listEl.__atBottom = (listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight) < 24;
+      }, { passive: true });
+    }
+    if (listEl.__atBottom !== false) {          // 默认跟随（首次渲染 / 桩环境）
+      const toBottom = function () { listEl.__scrollRaf = 0; listEl.scrollTop = listEl.scrollHeight; };
+      if (typeof requestAnimationFrame === 'function') {
+        if (!listEl.__scrollRaf) listEl.__scrollRaf = requestAnimationFrame(toBottom);
+      } else {
+        toBottom();
+      }
+    }
   }
 
   /* 刷新全部消息容器（抽屉 + 所有内嵌 console），由 consoleLog / 切频道 / 发送触发 */

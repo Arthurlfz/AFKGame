@@ -2326,6 +2326,9 @@ select.sell-input option { background:var(--panel); color:var(--text); }
  * 仍然是全站最"安静"的一档（掉落是品质色 + 字号档位，系统是说明，都不会被盖过）。 */
 .chat-msg.battle .chat-ic { color:var(--danger-hi); flex:none; }
 .chat-msg.battle .chat-text { color:var(--log-kill, var(--text)); }
+/* 经验获取（2026-09-23）：暗金 + 等宽数字 —— 与掉落（品质色：蓝/紫/金）分开，
+ * 一眼能分出"这是成长"和"这是收获"。字号不动：字号档位留给稀有度（见掉落播报那套）。 */
+.chat-msg .log-exp { color: var(--log-exp); font-family: var(--font-num); font-weight: 600; }
 .chat-msg.loot .chat-text b { color:var(--text-hi); }
 /* 掉落播报的视觉语言（2026-09-13）：挂机没有"地上的东西"可以踩，掉宝只能靠消息控制台拉注意力。
  * 分工：**字号 = 稀有度**（档位表 config.js 的 drop.lootTiers），**颜色 = 用途 / 东西本身**。

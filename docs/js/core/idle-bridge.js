@@ -718,6 +718,17 @@
       pet.level = r.level;
       if (r.level < maxLevel && r.expLeft != null) pet.exp = r.expLeft;
     }
+    /* 经验汇总行（2026-09-23，UI 规范：日志要有"经验获取"这一档，暗金）。
+     * ⚠️ 刻意**不做每场一条** —— 一次结算可能含几十场，逐条写会把战斗频道淹掉。
+     * 做法：借 ui-console 已有的「同类合并」机制（mergeKey），同窗口内的经验累加到同一行。
+     * 颜色走 `--log-exp`（暗金），与掉落（品质色）分开：经验是"成长"，掉落是"收获"。 */
+    if (r.exp != null && Number(r.exp) > 0 && window.UI && window.UI.consoleLog) {
+      const expHtml = n => '<span class="log-exp">经验 +' + Math.round(Number(n) || 0).toLocaleString() + '</span>';
+      try {
+        window.UI.consoleLog('battle', expHtml(r.exp),
+          { mergeKey: 'exp', mergeQty: Number(r.exp) || 0, mergeRender: expHtml });
+      } catch (e) { /* 日志失败不影响入账 */ }
+    }
     totalFights = r.totalFights != null ? r.totalFights : (totalFights + (r.fights || 0));
     if (window.Game && window.Game.refreshStats) window.Game.refreshStats();
     // 通知上层刷新账号数据（经验/背包/统计）——与战斗页演出无关
